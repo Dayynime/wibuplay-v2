@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../app_routes.dart';
 import '../components/floating_bottom_bar.dart';
+import '../screens/explore/explore_screen.dart';
 import '../screens/home/home_screen.dart';
+import '../screens/schedule/schedule_screen.dart';
 
 /// Port AppNavigation.kt (tahap 1): 5 tab + bottom bar melayang.
-/// Detail dan Player sudah jadi; tab Jelajah, Jadwal, Cuplix, Profil menyusul
+/// Detail, Player, Jelajah, Jadwal sudah jadi; Cuplix dan Profil menyusul
 /// (sementara placeholder).
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
@@ -18,7 +20,17 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   int _index = 0;
 
-  void _goTab(int i) => setState(() => _index = i);
+  /// Tab dibuat saat pertama kali dibuka (seperti NavHost), supaya Jelajah dan
+  /// Jadwal tidak memanggil API sebelum dikunjungi.
+  final Set<int> _visited = {0};
+
+  void _goTab(int i) => setState(() {
+        _index = i;
+        _visited.add(i);
+      });
+
+  Widget _tab(int i, Widget Function() build) =>
+      _visited.contains(i) ? build() : const SizedBox.shrink();
 
   void _openDetail(String movieId) => openDetail(context, movieId);
 
@@ -40,8 +52,8 @@ class _AppShellState extends State<AppShell> {
                 onSearchClick: () => _goTab(1),
                 onSeeAllClick: (_) => _goTab(1),
               ),
-              const _PlaceholderTab(title: 'Jelajah'),
-              const _PlaceholderTab(title: 'Jadwal'),
+              _tab(1, () => ExploreScreen(onAnimeClick: _openDetail)),
+              _tab(2, () => ScheduleScreen(onAnimeClick: _openDetail)),
               const _PlaceholderTab(title: 'Cuplix'),
               const _PlaceholderTab(title: 'Profil'),
             ],

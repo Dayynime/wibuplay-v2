@@ -30,7 +30,8 @@ Settings > Secrets and variables > Actions:
 Sudah: tema, model + JsonHelper, ApiService, Dio, repository, penyimpanan lokal (favorit + riwayat tonton,
 pengganti Room), Beranda lengkap, bottom bar melayang, Detail (3 tab, favorit, tonton), Player
 (video_player, kontrol, seek, fullscreen, server/kualitas, auto-next, simpan progres, resume, bagikan).
-Belum: Jelajah, Jadwal, Cuplix, Profil, shared element transition poster, gesture kecerahan/volume
+Jelajah (cari, filter, urutan, genre, scroll tak terbatas) dan Jadwal (per hari) juga sudah.
+Belum: Cuplix, Profil, shared element transition poster, gesture kecerahan/volume
 di fullscreen (butuh plugin tambahan).
 Drift/build_runner diganti shared_preferences supaya tidak butuh codegen.
 CI menambal AndroidManifest hasil flutter create (INTERNET, cleartext, nama app) karena
