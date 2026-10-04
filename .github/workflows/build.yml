@@ -41,13 +41,36 @@ jobs:
           cache: true
 
       # Repo ini belum punya folder android/. Kalau belum ada, dibuat saat CI
-      # (applicationId jadi com.dayynime.wibuplay). Kalau nanti android/
+      # (namespace com.dayynime.wibuplay, applicationId diganti ke Zenime di langkah berikutnya). Kalau nanti android/
       # di-commit, langkah ini otomatis dilewati.
       - name: Siapkan folder android (kalau belum ada)
         run: |
           if [ ! -d android ]; then
             flutter create . --platforms=android --org com.dayynime --project-name wibuplay
           fi
+
+      # applicationId disamakan dengan Zenime (com.aistudio.zenime.app) supaya APK
+      # Wibuplay menggantikan/meng-update app Zenime di perangkat. Hanya
+      # applicationId yang diganti; namespace bawaan flutter create
+      # (com.dayynime.wibuplay) dibiarkan karena keduanya independen dan
+      # MainActivity tetap cocok. Aman dijalankan ulang kalau android/ di-commit.
+      - name: Atur applicationId (ikut Zenime)
+        run: |
+          python3 - <<'PY'
+          import glob, re, sys
+          files = glob.glob('android/app/build.gradle*')
+          if not files:
+              print('::error::android/app/build.gradle(.kts) tidak ditemukan')
+              sys.exit(1)
+          p = files[0]
+          s = open(p, encoding='utf-8').read()
+          s, n = re.subn(r'applicationId\s*=?\s*["\'][^"\']*["\']', 'applicationId = "com.aistudio.zenime.app"', s, count=1)
+          if n != 1:
+              print('::error::applicationId tidak ditemukan di ' + p)
+              sys.exit(1)
+          open(p, 'w', encoding='utf-8').write(s)
+          PY
+          grep -n "applicationId\|namespace" android/app/build.gradle*
 
       # flutter create tidak menaruh INTERNET di manifest utama (hanya debug/profile),
       # dan Android 9+ memblokir HTTP polos. Samakan dengan manifest Kotlin:

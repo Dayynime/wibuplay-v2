@@ -8,6 +8,14 @@ Workflow diadaptasi dari `android-workflow-template`. Kode di `lib/` dan `test/`
 - Rilis: `git tag v1.0.1 && git push origin v1.0.1`: `release.yml` build, tanda tangan, verifikasi, publish ke GitHub Release.
 - `versionCode` rilis dari versi: `1.2.3` menjadi `10203`.
 
+## Package name (applicationId)
+
+- applicationId Wibuplay = `com.aistudio.zenime.app` (sama dengan Zenime), diatur otomatis oleh langkah "Atur applicationId" di `build.yml` dan `release.yml`. `namespace` tetap `com.dayynime.wibuplay` (independen, tidak mempengaruhi ID app).
+- Supaya bisa meng-update Zenime yang sudah terpasang: tanda tangan rilis HARUS sama dengan Zenime dan versionCode harus lebih besar dari versi Zenime terakhir (13 saat ini; `1.0.0` -> `10000` sudah lebih besar).
+- APK Zenime yang beredar ditandatangani `debug.keystore` (CN=Android Debug, SHA-1 `0A:D0:D7:7C:1F:9E:63:45:28:F3:6D:E9:A7:08:B7:3F:D1:6F:EA:D3`, sudah terdaftar di Firebase). Jadi secret rilis diisi dengan debug.keystore itu: `KEYSTORE_BASE64` = `base64 -w0 debug.keystore`, `KEY_ALIAS` = `androiddebugkey`, `STORE_PASSWORD` = `android`, `KEY_PASSWORD` = `android`. `KEY_ALIAS` WAJIB diisi (default `upload` tidak cocok).
+- Hanya APK dari `release.yml` yang bisa meng-update Zenime: build `build.yml` memakai versionCode = nomor run (kecil, lebih rendah dari 13) sehingga ditolak Android sebagai downgrade.
+- Secret `FIREBASE_API_KEY` dan `FIREBASE_APP_ID` diambil dari google-services.json Zenime (client `com.aistudio.zenime.app`), bukan app com.dayynime.wibuplay.
+
 ## Beda dengan template Gradle
 
 - Build type `perf` diganti `flutter build apk --profile` (AOT, ditandatangani debug key).

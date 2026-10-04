@@ -4,8 +4,8 @@ import 'package:firebase_core/firebase_core.dart';
 /// akun, XP, dan chat nyambung).
 ///
 /// Dua nilai di bawah (apiKey dan appId) harus diisi dari
-/// google-services.json milik app Android Wibuplay (com.dayynime.wibuplay)
-/// yang didaftarkan di Firebase project yang sama:
+/// google-services.json milik app Android Zenime (com.aistudio.zenime.app,
+/// applicationId yang sekarang juga dipakai Wibuplay) di Firebase project yang sama:
 ///   - apiKey -> client[0].api_key[0].current_key
 ///   - appId  -> client[0].client_info.mobilesdk_app_id  (format 1:xxx:android:yyy)
 ///
