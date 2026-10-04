@@ -61,7 +61,8 @@ manifest rilis bawaan Flutter tidak punya izin internet.
 
 - Slide Top Leaderboard sekarang dua kolom ala Zenime: TOP XP (XP nonton bulan ini) dan TOP CLAN (urut level lalu total XP), dipisah garis vertikal, tema navy.
 - Data clan: `ChatRepository.getTopClans` (`rest/v1/clans`), provider `heroTopClansProvider`. Slide tampil kalau salah satu kolom ada isinya.
-- Beda dari Zenime: tap hanya di header TOP XP (ke leaderboard XP). Kolom clan belum punya halaman tujuan di Wibuplay, jadi tanpa chevron/tap. Subtitle "XP nonton bulan ini" dihapus, dan angka XP tanpa tulisan "XP".
+- Tampilan (redesain): dua panel kaca di atas kartu navy dengan glow lembut emas/ungu; tiap baris = avatar dengan ring (emas/perak/perunggu untuk top 3) + badge rank di pojok, nama di atas, nilai emas (XP / Lv) di bawah nama. Baris disebar rata, tinggi tetap 28.
+- Beda dari Zenime: tap di panel TOP XP (bukan cuma header) (ke leaderboard XP). Kolom clan belum punya halaman tujuan di Wibuplay, jadi tanpa chevron/tap. Subtitle "XP nonton bulan ini" dihapus, dan angka XP tanpa tulisan "XP".
 
 ### Catatan Hero Carousel (Beranda)
 
