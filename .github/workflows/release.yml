@@ -107,8 +107,13 @@ jobs:
       - name: Ambil dependency
         run: flutter pub get
 
+      # Firebase Wibuplay (project yang sama dengan Zenime), dari google-services.json.
       - name: Build Release APK
-        run: flutter build apk --release --build-name=$APP_VERSION_NAME --build-number=$APP_VERSION_CODE
+        run: >
+          flutter build apk --release
+          --build-name=$APP_VERSION_NAME --build-number=$APP_VERSION_CODE
+          --dart-define=FIREBASE_API_KEY=${{ secrets.FIREBASE_API_KEY }}
+          --dart-define=FIREBASE_APP_ID=${{ secrets.FIREBASE_APP_ID }}
 
       # Flutter menandatangani APK rilis dengan debug key kalau gradle belum diatur.
       # Daripada menambal build.gradle.kts, APK ditandatangani ulang di sini pakai
@@ -142,6 +147,24 @@ jobs:
             echo "::error::APK rilis ditandatangani debug key. Dibatalkan."
             exit 1
           fi
+
+          # Sidik jari sertifikat (SHA-1/SHA-256) untuk didaftarkan di Firebase
+          # (Project settings > app Wibuplay > Add fingerprint), supaya Login
+          # Google jalan. Tetap sama selama keystore-nya sama.
+          fmt() { sed 's/../&:/g; s/:$//' | tr 'a-f' 'A-F'; }
+          SHA1=$(grep -m1 "SHA-1 digest" "$RUNNER_TEMP/certs.txt" | awk '{print $NF}' | fmt)
+          SHA256=$(grep -m1 "SHA-256 digest" "$RUNNER_TEMP/certs.txt" | awk '{print $NF}' | fmt)
+          {
+            echo "### Sidik jari untuk Firebase"
+            echo "SHA-1:"
+            echo '```'
+            echo "$SHA1"
+            echo '```'
+            echo "SHA-256:"
+            echo '```'
+            echo "$SHA256"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Siapkan file rilis
         run: |
