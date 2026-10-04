@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../app_routes.dart';
 import '../components/floating_bottom_bar.dart';
 import '../screens/home/home_screen.dart';
 
 /// Port AppNavigation.kt (tahap 1): 5 tab + bottom bar melayang.
-/// Layar lain (Jelajah, Jadwal, Cuplix, Profil, Detail, Player) menyusul;
-/// sementara memakai placeholder supaya navigasinya sudah bisa dicoba.
+/// Detail dan Player sudah jadi; tab Jelajah, Jadwal, Cuplix, Profil menyusul
+/// (sementara placeholder).
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
 
@@ -19,15 +20,10 @@ class _AppShellState extends State<AppShell> {
 
   void _goTab(int i) => setState(() => _index = i);
 
-  void _openDetail(String movieId) {
-    Navigator.of(context).push(_fadeRoute(_PlaceholderPage(title: 'Detail #$movieId')));
-  }
+  void _openDetail(String movieId) => openDetail(context, movieId);
 
-  void _openPlayer(String movieId, String episodeId) {
-    Navigator.of(context).push(
-      _fadeRoute(_PlaceholderPage(title: 'Player #$movieId / $episodeId')),
-    );
-  }
+  void _openPlayer(String movieId, String episodeId) =>
+      openPlayer(context, movieId, episodeId);
 
   @override
   Widget build(BuildContext context) {
@@ -60,16 +56,6 @@ class _AppShellState extends State<AppShell> {
   }
 }
 
-Route<T> _fadeRoute<T>(Widget page) {
-  return PageRouteBuilder<T>(
-    transitionDuration: const Duration(milliseconds: 300),
-    reverseTransitionDuration: const Duration(milliseconds: 300),
-    pageBuilder: (context, animation, secondary) => page,
-    transitionsBuilder: (context, animation, secondary, child) =>
-        FadeTransition(opacity: animation, child: child),
-  );
-}
-
 class _PlaceholderTab extends StatelessWidget {
   const _PlaceholderTab({required this.title});
 
@@ -82,29 +68,6 @@ class _PlaceholderTab extends StatelessWidget {
         '$title\n(segera hadir)',
         textAlign: TextAlign.center,
         style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
-      ),
-    );
-  }
-}
-
-class _PlaceholderPage extends StatelessWidget {
-  const _PlaceholderPage({required this.title});
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.backgroundDark,
-      appBar: AppBar(
-        backgroundColor: AppColors.backgroundDark,
-        title: Text(title, style: const TextStyle(fontSize: 14)),
-      ),
-      body: const Center(
-        child: Text(
-          'Segera hadir',
-          style: TextStyle(color: AppColors.textSecondary, fontSize: 14),
-        ),
       ),
     );
   }

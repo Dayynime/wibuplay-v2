@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/models/anime_item.dart';
+import '../../data/models/episode_item.dart';
 import 'net_image.dart';
+import 'poster_holder.dart';
 
 bool _blank(String? s) => s == null || s.trim().isEmpty;
 
@@ -40,7 +42,10 @@ class _AnimePosterCardState extends State<AnimePosterCard> {
       onTapDown: (_) => setState(() => _pressed = true),
       onTapUp: (_) => setState(() => _pressed = false),
       onTapCancel: () => setState(() => _pressed = false),
-      onTap: widget.onTap,
+      onTap: () {
+        PosterTransitionHolder.url = widget.anime.posterUrl;
+        widget.onTap();
+      },
       child: AnimatedScale(
         scale: _pressed ? 0.96 : 1.0,
         duration: const Duration(milliseconds: 150),
@@ -288,6 +293,90 @@ class _ContinueWatchingCardState extends State<ContinueWatchingCard> {
                 ),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Port EpisodeListItem (Cards.kt).
+class EpisodeListItem extends StatelessWidget {
+  const EpisodeListItem({super.key, required this.episode, required this.onTap});
+
+  final EpisodeItem episode;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final index = episode.index ?? '';
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
+      child: Material(
+        color: AppColors.surfaceCard,
+        borderRadius: AppShapes.card,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 88,
+                  height: 56,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: ColoredBox(
+                      color: AppColors.surfaceCard,
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          NetImage(episode.imageUrl),
+                          const ColoredBox(
+                            color: Color(0x44000000),
+                            child: Center(
+                              child: Icon(Icons.play_arrow, color: AppColors.textWhite, size: 20),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Episode $index',
+                        style: const TextStyle(
+                          color: AppColors.accentViolet,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        episode.title ?? 'Episode $index',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.textWhite,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      if (!_blank(episode.views))
+                        Text(
+                          '${episode.views} tayangan',
+                          style: const TextStyle(color: AppColors.textMuted, fontSize: 10),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

@@ -28,7 +28,10 @@ Settings > Secrets and variables > Actions:
 ## Status port Flutter (dari Kotlin wibuplay-main)
 
 Sudah: tema, model + JsonHelper, ApiService, Dio, repository, penyimpanan lokal (favorit + riwayat tonton,
-pengganti Room), Beranda lengkap (hero banner, Lanjutkan Menonton, Top Hits, Favorit, Episode Baru,
-Jadwal Hari Ini, Populer, Mungkin Kamu Suka), bottom bar melayang.
-Belum: Jelajah, Jadwal, Cuplix, Profil, Detail, Player, shared element transition poster.
+pengganti Room), Beranda lengkap, bottom bar melayang, Detail (3 tab, favorit, tonton), Player
+(video_player, kontrol, seek, fullscreen, server/kualitas, auto-next, simpan progres, resume, bagikan).
+Belum: Jelajah, Jadwal, Cuplix, Profil, shared element transition poster, gesture kecerahan/volume
+di fullscreen (butuh plugin tambahan).
 Drift/build_runner diganti shared_preferences supaya tidak butuh codegen.
+CI menambal AndroidManifest hasil flutter create (INTERNET, cleartext, nama app) karena
+manifest rilis bawaan Flutter tidak punya izin internet.

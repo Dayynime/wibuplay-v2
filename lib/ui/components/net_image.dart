@@ -4,10 +4,16 @@ import 'package:flutter/material.dart';
 /// Gambar jaringan dengan cache. Pakai di tempat yang ukurannya sudah pasti
 /// (Positioned.fill / SizedBox / AspectRatio). URL kosong -> area kosong.
 class NetImage extends StatelessWidget {
-  const NetImage(this.url, {super.key, this.fit = BoxFit.cover});
+  const NetImage(
+    this.url, {
+    super.key,
+    this.fit = BoxFit.cover,
+    this.alignment = Alignment.center,
+  });
 
   final String url;
   final BoxFit fit;
+  final Alignment alignment;
 
   @override
   Widget build(BuildContext context) {
@@ -15,6 +21,7 @@ class NetImage extends StatelessWidget {
     return CachedNetworkImage(
       imageUrl: url,
       fit: fit,
+      alignment: alignment,
       fadeInDuration: const Duration(milliseconds: 200),
       fadeOutDuration: Duration.zero,
       errorWidget: (context, url, error) => const SizedBox.expand(),

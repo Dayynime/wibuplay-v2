@@ -86,6 +86,24 @@ jobs:
             flutter create . --platforms=android --org com.dayynime --project-name wibuplay
           fi
 
+      # flutter create tidak menaruh INTERNET di manifest utama (hanya debug/profile),
+      # dan Android 9+ memblokir HTTP polos. Samakan dengan manifest Kotlin:
+      # INTERNET, ACCESS_NETWORK_STATE, usesCleartextTraffic, label "Wibuplay".
+      - name: Atur AndroidManifest (internet + cleartext + nama)
+        run: |
+          python3 - <<'PY'
+          import re
+          p = 'android/app/src/main/AndroidManifest.xml'
+          s = open(p, encoding='utf-8').read()
+          if 'android.permission.INTERNET' not in s:
+              s = s.replace('<application', '<uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>\n    <application', 1)
+          if 'usesCleartextTraffic' not in s:
+              s = s.replace('<application', '<application android:usesCleartextTraffic="true"', 1)
+          s = re.sub(r'android:label="[^"]*"', 'android:label="Wibuplay"', s, count=1)
+          open(p, 'w', encoding='utf-8').write(s)
+          PY
+          grep -n "INTERNET\|usesCleartextTraffic\|android:label" android/app/src/main/AndroidManifest.xml
+
       - name: Ambil dependency
         run: flutter pub get
 
