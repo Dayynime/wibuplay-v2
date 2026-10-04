@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/error_message.dart';
+import '../../../core/premium_access.dart';
 import '../../../data/models/anime_item.dart';
 import '../../../data/models/cuplix_item.dart';
 import '../../../data/models/episode_item.dart';
@@ -13,6 +14,7 @@ class DetailUiState {
   const DetailUiState({
     this.anime,
     this.episodes = const [],
+    this.totalEpisodes = 0,
     this.covers = const [],
     this.posters = const [],
     this.cuplix = const [],
@@ -27,6 +29,10 @@ class DetailUiState {
 
   final AnimeItem? anime;
   final List<EpisodeItem> episodes;
+
+  /// Index episode tertinggi (dari daftar tanpa pencarian). Dipakai buat
+  /// nentuin episode terbaru yang dikunci; tidak ikut berubah saat mencari.
+  final int totalEpisodes;
   final List<MediaGalleryItem> covers;
   final List<MediaGalleryItem> posters;
   final List<CuplixItem> cuplix;
@@ -46,6 +52,7 @@ class DetailUiState {
   DetailUiState copyWith({
     AnimeItem? anime,
     List<EpisodeItem>? episodes,
+    int? totalEpisodes,
     List<MediaGalleryItem>? covers,
     List<MediaGalleryItem>? posters,
     List<CuplixItem>? cuplix,
@@ -60,6 +67,7 @@ class DetailUiState {
     return DetailUiState(
       anime: anime ?? this.anime,
       episodes: episodes ?? this.episodes,
+      totalEpisodes: totalEpisodes ?? this.totalEpisodes,
       covers: covers ?? this.covers,
       posters: posters ?? this.posters,
       cuplix: cuplix ?? this.cuplix,
@@ -134,8 +142,12 @@ class DetailController extends AutoDisposeFamilyNotifier<DetailUiState, String> 
       // Abaikan hasil lama kalau ada pencarian yang lebih baru
       if (request != _episodeRequest) return;
       _episodeNextPage = 1;
+      final total = latestEpisodeIndex(list.map((e) => e.index));
       _update((s) => s.copyWith(
             episodes: list,
+            // Pencarian bisa menyaring episode terbaru keluar dari hasil,
+            // jadi total cuma diperbarui dari daftar tanpa pencarian.
+            totalEpisodes: search.trim().isEmpty && total > 0 ? total : null,
             isLoadingEpisodes: false,
             hasMoreEpisodes: list.isNotEmpty,
           ));

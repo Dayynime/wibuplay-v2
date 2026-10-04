@@ -9,6 +9,7 @@ import 'package:video_player/video_player.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/premium_access.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/watch_xp_gate.dart';
 import '../../../data/models/episode_item.dart';
@@ -117,7 +118,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     _tick = Timer.periodic(const Duration(seconds: 1), _onTick);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _loadLink(ref.read(playerControllerProvider(_args)).selectedServer?.link);
+      _applyPlayback();
     });
   }
 
@@ -145,6 +146,56 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
   }
 
   // ---------------------------------------------------------------- pemutar
+
+  /// Index episode yang sedang dibuka. Diambil dari daftar episode (cocok id),
+  /// fallback ke data stream cuma kalau id-nya sama. Null = belum diketahui.
+  String? _currentIndex(PlayerUiState ui) {
+    for (final e in ui.episodes) {
+      if (e.id == ui.currentEpisodeId) return e.index;
+    }
+    final se = ui.streamData?.episode;
+    if (se != null && se.id == ui.currentEpisodeId) return se.index;
+    return null;
+  }
+
+  /// ready = sudah cukup data buat memutuskan (status premium + daftar episode).
+  /// Sebelum itu video tidak diputar, supaya suara episode terkunci tidak bocor.
+  ({bool ready, bool locked}) _gate(PlayerUiState ui, AsyncValue<bool> premium) {
+    final isPremium = premium.valueOrNull ?? false;
+    final decided = premium.hasValue || premium.hasError;
+    if (isPremium) return (ready: true, locked: false);
+    if (!decided || !ui.episodesLoaded) return (ready: false, locked: false);
+    final total = latestEpisodeIndex(ui.episodes.map((e) => e.index));
+    return (ready: true, locked: isEpisodeLocked(_currentIndex(ui), total, false));
+  }
+
+  /// Satu pintu buat nyalain/matiin pemutar sesuai status kunci.
+  void _applyPlayback() {
+    if (!mounted) return;
+    final ui = ref.read(playerControllerProvider(_args));
+    final gate = _gate(ui, ref.read(myPremiumProvider));
+    if (gate.locked) {
+      _stopPlayer();
+      return;
+    }
+    if (!gate.ready) return;
+    _loadLink(ui.selectedServer?.link);
+  }
+
+  void _stopPlayer() {
+    final vc = _vc;
+    _loadedLink = null;
+    if (vc == null) return;
+    _vc = null;
+    vc.removeListener(_onVideo);
+    vc.pause();
+    vc.dispose();
+    _pb.value = const _Playback(isBuffering: false);
+    _wasPlaying = false;
+    _playerError = false;
+    WakelockPlus.disable();
+    if (mounted) setState(() {});
+  }
 
   Future<void> _loadLink(String? link) async {
     if (link == null || link.trim().isEmpty) return;
@@ -362,10 +413,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     final ui = ref.watch(playerControllerProvider(_args));
     final isFavorite = ref.watch(localStoreProvider.select((s) => s.isFavorite(ui.movieId)));
 
-    ref.listen<String?>(
-      playerControllerProvider(_args).select((s) => s.selectedServer?.link),
-      (prev, next) => _loadLink(next),
+    final premium = ref.watch(myPremiumProvider);
+    final gate = _gate(ui, premium);
+    ref.listen<(String?, String, bool, int)>(
+      playerControllerProvider(_args).select(
+        (s) => (s.selectedServer?.link, s.currentEpisodeId, s.episodesLoaded, s.episodes.length),
+      ),
+      (prev, next) => _applyPlayback(),
     );
+    ref.listen<AsyncValue<bool>>(myPremiumProvider, (prev, next) => _applyPlayback());
     ref.listen<bool>(
       playerControllerProvider(_args).select((s) => s.isFullscreen),
       (prev, next) => _applyFullscreen(next),
@@ -386,7 +442,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
       },
       child: Scaffold(
         backgroundColor: AppColors.backgroundDark,
-        body: ui.isFullscreen ? _fullscreenLayout(ui) : _portraitLayout(ui, isFavorite),
+        body: ui.isFullscreen
+            ? _fullscreenLayout(ui, gate)
+            : _portraitLayout(ui, isFavorite, gate),
       ),
     );
   }
@@ -440,7 +498,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
 
   // ------------------------------------------------------------- fullscreen
 
-  Widget _fullscreenLayout(PlayerUiState ui) {
+  Widget _fullscreenLayout(PlayerUiState ui, ({bool ready, bool locked}) gate) {
     return ColoredBox(
       color: Colors.black,
       child: GestureDetector(
@@ -478,6 +536,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                 ),
               ),
             _controls(ui, fullscreen: true),
+            if (gate.locked) _lockedOverlay(fullscreen: true),
           ],
         ),
       ),
@@ -486,12 +545,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
 
   // --------------------------------------------------------------- portrait
 
-  Widget _portraitLayout(PlayerUiState ui, bool isFavorite) {
+  Widget _portraitLayout(PlayerUiState ui, bool isFavorite, ({bool ready, bool locked}) gate) {
     final currentEp = ui.streamData?.episode ?? _findEpisode(ui);
     final anime = ui.anime;
     final nextEp = ui.streamData?.episodeNext;
     final hasNext = nextEp != null || ui.streamData?.hasNextEpisode == true;
     final syn = anime?.synopsis;
+    // Loading dianggap premium biar ikon gembok tidak berkedip.
+    final chipPremium = ref.watch(myPremiumProvider).valueOrNull ?? true;
+    final totalEps = latestEpisodeIndex(ui.episodes.map((e) => e.index));
 
     return SafeArea(
       bottom: false,
@@ -506,8 +568,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                 children: [
                   _videoSurface(),
                   _controls(ui, fullscreen: false),
-                  if (ui.streamError != null || _playerError) _errorOverlay(),
-                  if (ui.autoNextCountdown != null) _countdownOverlay(ui.autoNextCountdown!),
+                  if (!gate.locked && (ui.streamError != null || _playerError)) _errorOverlay(),
+                  if (!gate.locked && ui.autoNextCountdown != null)
+                    _countdownOverlay(ui.autoNextCountdown!),
+                  if (gate.locked) _lockedOverlay(fullscreen: false),
                 ],
               ),
             ),
@@ -726,7 +790,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                     children: [
                       for (var i = 0; i < ui.episodes.length; i++) ...[
                         if (i > 0) const SizedBox(width: 10),
-                        _episodeChip(ui, ui.episodes[i]),
+                        _episodeChip(ui, ui.episodes[i], isEpisodeLocked(ui.episodes[i].index, totalEps, chipPremium)),
                       ],
                     ],
                   ),
@@ -775,7 +839,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     return null;
   }
 
-  Widget _episodeChip(PlayerUiState ui, EpisodeItem ep) {
+  Widget _episodeChip(PlayerUiState ui, EpisodeItem ep, bool locked) {
     final isCurrent = ep.id == ui.currentEpisodeId;
     final key = ep.id == null ? null : _epKeys.putIfAbsent(ep.id!, () => GlobalKey());
     return GestureDetector(
@@ -790,12 +854,76 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
           color: isCurrent ? AppColors.accentViolet : AppColors.surfaceCard,
           borderRadius: AppShapes.card,
         ),
-        child: Text(
-          'Ep ${ep.index ?? ''}',
-          style: TextStyle(
-            color: AppColors.textWhite,
-            fontSize: 13,
-            fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (locked) ...[
+              const Icon(Icons.lock, size: 12, color: AppColors.textWhite),
+              const SizedBox(width: 4),
+            ],
+            Text(
+              'Ep ${ep.index ?? ''}',
+              style: TextStyle(
+                color: AppColors.textWhite,
+                fontSize: 13,
+                fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Menutup area video (termasuk kontrol) kalau episode ini khusus Premium.
+  Widget _lockedOverlay({required bool fullscreen}) {
+    return Positioned.fill(
+      child: ColoredBox(
+        color: AppColors.backgroundDark,
+        child: SafeArea(
+          child: Stack(
+            children: [
+              Align(
+                alignment: Alignment.topLeft,
+                child: IconButton(
+                  onPressed: fullscreen
+                      ? () => _notifier.setFullscreen(false)
+                      : widget.onBackClick,
+                  icon: const Icon(Icons.arrow_back, color: AppColors.textWhite),
+                ),
+              ),
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.lock, size: 30, color: AppColors.accentViolet),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Episode terbaru khusus Premium',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: AppColors.textWhite,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '$kLockedLatestEpisodesCount episode terbaru bisa ditonton dengan Premium. '
+                        'Episode sebelumnya tetap gratis.',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/premium_access.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/anime_item.dart';
@@ -482,6 +483,9 @@ class _DetailScreenState extends ConsumerState<DetailScreen> {
   }
 
   List<Widget> _episodesTab(DetailUiState ui) {
+    // Loading dianggap premium biar gembok tidak berkedip; player tetap
+    // menegakkan kunci dengan status yang sudah pasti.
+    final premium = ref.watch(myPremiumProvider).valueOrNull ?? true;
     return [
       SliverToBoxAdapter(
         child: Padding(
@@ -549,6 +553,7 @@ class _DetailScreenState extends ConsumerState<DetailScreen> {
             final ep = ui.episodes[i];
             return EpisodeListItem(
               episode: ep,
+              isLocked: isEpisodeLocked(ep.index, ui.totalEpisodes, premium),
               onTap: () {
                 final id = ep.id;
                 if (id != null) widget.onWatchEpisode(widget.movieId, id);

@@ -13,6 +13,7 @@ class PlayerUiState {
     this.currentEpisodeId = '',
     this.anime,
     this.episodes = const [],
+    this.episodesLoaded = false,
     this.streamData,
     this.selectedServer,
     this.recommended = const [],
@@ -27,6 +28,9 @@ class PlayerUiState {
   final String currentEpisodeId;
   final AnimeItem? anime;
   final List<EpisodeItem> episodes;
+
+  /// True setelah daftar episode selesai dimuat (sukses ATAU gagal).
+  final bool episodesLoaded;
   final StreamData? streamData;
   final StreamServer? selectedServer;
   final List<AnimeItem> recommended;
@@ -43,6 +47,7 @@ class PlayerUiState {
     String? currentEpisodeId,
     AnimeItem? anime,
     List<EpisodeItem>? episodes,
+    bool? episodesLoaded,
     StreamData? streamData,
     StreamServer? Function()? selectedServer,
     List<AnimeItem>? recommended,
@@ -57,6 +62,7 @@ class PlayerUiState {
       currentEpisodeId: currentEpisodeId ?? this.currentEpisodeId,
       anime: anime ?? this.anime,
       episodes: episodes ?? this.episodes,
+      episodesLoaded: episodesLoaded ?? this.episodesLoaded,
       streamData: streamData ?? this.streamData,
       selectedServer: selectedServer != null ? selectedServer() : this.selectedServer,
       recommended: recommended ?? this.recommended,
@@ -108,13 +114,15 @@ class PlayerController
   Future<void> _loadEpisodes() async {
     try {
       final eps = await ref.read(repositoryProvider).getMovieEpisodes(state.movieId, page: 0);
-      _update((s) => s.copyWith(episodes: eps));
+      _update((s) => s.copyWith(episodes: eps, episodesLoaded: true));
       // Kalau episode awal kosong, putar episode pertama
       if (_alive && state.currentEpisodeId.trim().isEmpty && eps.isNotEmpty) {
         final id = eps.first.id;
         if (id != null) loadEpisodeStream(id);
       }
-    } catch (_) {}
+    } catch (_) {
+      _update((s) => s.copyWith(episodesLoaded: true));
+    }
   }
 
   Future<void> _loadRecommendations() async {
@@ -129,6 +137,9 @@ class PlayerController
     _update((s) => s.copyWith(
           currentEpisodeId: episodeId,
           isLoadingStream: true,
+          // Buang link episode sebelumnya supaya tidak ikut diputar kalau
+          // episode baru ini ternyata terkunci / gagal dimuat.
+          selectedServer: () => null,
           streamError: () => null,
         ));
 

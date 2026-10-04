@@ -9,6 +9,7 @@ import '../../../data/models/anime_item.dart';
 import '../../../data/models/home_sections.dart';
 import '../../../providers.dart';
 import '../../components/cards.dart';
+import '../../components/chat_ticker.dart';
 import '../../components/common_components.dart';
 import '../../components/hero_banner.dart';
 import '../../components/shimmer.dart';
@@ -294,6 +295,16 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
               ),
             ),
           ),
+
+        // Chat global terbaru (bergeser otomatis), di atas Top Hits
+        StaggeredSection(
+          visible: _animateSections,
+          delayMs: 150,
+          child: const Padding(
+            padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: ChatTicker(),
+          ),
+        ),
 
         // 3. Top Hits
         if (topHits.isNotEmpty)

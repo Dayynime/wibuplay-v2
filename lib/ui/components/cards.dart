@@ -302,10 +302,18 @@ class _ContinueWatchingCardState extends State<ContinueWatchingCard> {
 
 /// Port EpisodeListItem (Cards.kt).
 class EpisodeListItem extends StatelessWidget {
-  const EpisodeListItem({super.key, required this.episode, required this.onTap});
+  const EpisodeListItem({
+    super.key,
+    required this.episode,
+    required this.onTap,
+    this.isLocked = false,
+  });
 
   final EpisodeItem episode;
   final VoidCallback onTap;
+
+  /// Episode terbaru khusus Premium (ikon gembok menggantikan ikon play).
+  final bool isLocked;
 
   @override
   Widget build(BuildContext context) {
@@ -333,10 +341,14 @@ class EpisodeListItem extends StatelessWidget {
                         fit: StackFit.expand,
                         children: [
                           NetImage(episode.imageUrl),
-                          const ColoredBox(
-                            color: Color(0x44000000),
+                          ColoredBox(
+                            color: isLocked ? const Color(0x99000000) : const Color(0x44000000),
                             child: Center(
-                              child: Icon(Icons.play_arrow, color: AppColors.textWhite, size: 20),
+                              child: Icon(
+                                isLocked ? Icons.lock : Icons.play_arrow,
+                                color: AppColors.textWhite,
+                                size: 20,
+                              ),
                             ),
                           ),
                         ],

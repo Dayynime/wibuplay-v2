@@ -57,6 +57,16 @@ final premiumProvider = FutureProvider.family<bool, String>(
   (ref, uid) => ref.watch(xpRepositoryProvider).isPremium(uid),
 );
 
+/// Status Premium user yang sedang login.
+/// loading = belum tahu (auth / cek server belum selesai); belum login = false.
+final myPremiumProvider = Provider<AsyncValue<bool>>((ref) {
+  final auth = ref.watch(authUserProvider);
+  if (auth.isLoading) return const AsyncLoading();
+  final uid = auth.valueOrNull?.uid;
+  if (uid == null || uid.isEmpty) return const AsyncData(false);
+  return ref.watch(premiumProvider(uid));
+});
+
 final xpLeaderboardProvider = FutureProvider.autoDispose<List<UserXpDisplay>>(
   (ref) => ref.watch(xpRepositoryProvider).getLeaderboardDisplay(),
 );
