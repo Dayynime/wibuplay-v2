@@ -1,7 +1,9 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'core/firebase_config.dart';
 import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
 import 'data/local/local_store.dart';
@@ -24,6 +26,17 @@ Future<void> main() async {
   );
 
   final store = await LocalStore.open();
+
+  // Firebase (login Zenime). Kalau belum dikonfigurasi atau gagal init, app
+  // tetap jalan normal; hanya login dan chat yang nonaktif.
+  if (FirebaseConfig.isConfigured) {
+    try {
+      await Firebase.initializeApp(options: FirebaseConfig.options);
+      FirebaseConfig.ready = true;
+    } catch (_) {
+      FirebaseConfig.ready = false;
+    }
+  }
 
   runApp(
     ProviderScope(

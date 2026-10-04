@@ -1,14 +1,20 @@
 import 'dart:math' as math;
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/local/entities.dart';
+import '../../../core/firebase_config.dart';
+import '../../../providers.dart';
+import '../../app_routes.dart';
 import '../../components/cards.dart';
 import '../../components/common_components.dart';
 import '../../components/net_image.dart';
+import '../auth/login_screen.dart';
+import '../chat/chat_screen.dart';
 import 'profile_controller.dart';
 
 /// Port ProfileScreen.kt: header pengguna + tab Favorit / Riwayat / Pengaturan.
@@ -40,6 +46,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Widget build(BuildContext context) {
     final favorites = ref.watch(profileFavoritesProvider);
     final history = ref.watch(profileHistoryProvider);
+    final user = ref.watch(authUserProvider).valueOrNull;
 
     // Material (bukan ColoredBox) supaya efek ripple InkWell tab terlihat.
     return Material(
@@ -48,7 +55,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         bottom: false,
         child: Column(
           children: [
-            _buildHeader(favorites.length, history.length),
+            _buildHeader(favorites.length, history.length, user),
             _buildTabs(),
             const SizedBox(height: 12),
             Expanded(child: _buildTabContent(favorites, history)),
@@ -60,7 +67,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   // ----------------------------------------------------------------- header
 
-  Widget _buildHeader(int favoriteCount, int historyCount) {
+  Widget _buildHeader(int favoriteCount, int historyCount, User? user) {
     return Padding(
       padding: const EdgeInsets.all(20),
       child: Row(
@@ -72,16 +79,21 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               color: AppColors.accentViolet,
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.person_outline, color: AppColors.textWhite, size: 34),
+            clipBehavior: Clip.antiAlias,
+            child: (user?.photoURL != null && user!.photoURL!.isNotEmpty)
+                ? NetImage(user.photoURL!)
+                : const Icon(Icons.person_outline, color: AppColors.textWhite, size: 34),
           ),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Wibu Sejati',
-                  style: TextStyle(
+                Text(
+                  _displayName(user),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
                     color: AppColors.textWhite,
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
@@ -331,9 +343,35 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       fontSize: 12,
       fontWeight: FontWeight.w700,
     );
+    final user = ref.watch(authUserProvider).valueOrNull;
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       children: [
+        const Text('Akun Zenime', style: sectionStyle),
+        const SizedBox(height: 10),
+        if (user == null)
+          _SettingsItem(
+            icon: Icons.login,
+            title: 'Masuk',
+            subtitle: 'Pakai akun Zenime yang sama untuk chat dan data lain',
+            onTap: _openLogin,
+          )
+        else ...[
+          _SettingsItem(
+            icon: Icons.forum_outlined,
+            title: 'Chat Global',
+            subtitle: 'Ngobrol bareng pengguna Wibuplay dan Zenime',
+            onTap: _openChat,
+          ),
+          const SizedBox(height: 10),
+          _SettingsItem(
+            icon: Icons.logout,
+            title: 'Keluar',
+            subtitle: _displayName(user),
+            onTap: _confirmSignOut,
+          ),
+        ],
+        const SizedBox(height: 20),
         const Text('Penyimpanan & Cache', style: sectionStyle),
         const SizedBox(height: 10),
         _SettingsItem(
@@ -352,6 +390,51 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         ),
       ],
     );
+  }
+
+  String _displayName(User? user) {
+    final name = user?.displayName;
+    if (name != null && name.trim().isNotEmpty) return name.trim();
+    final email = user?.email;
+    if (email != null && email.contains('@')) return email.substring(0, email.indexOf('@'));
+    return user == null ? 'Wibu Sejati' : 'Pengguna';
+  }
+
+  Future<bool> _openLogin() async {
+    final ok = await Navigator.of(context).push<bool>(fadeRoute(const LoginScreen()));
+    return ok == true;
+  }
+
+  Future<void> _openChat() async {
+    if (!FirebaseConfig.ready) {
+      await _openLogin();
+      return;
+    }
+    if (ref.read(authRepositoryProvider).currentUser == null) {
+      final ok = await _openLogin();
+      if (!ok || !mounted) return;
+    }
+    if (!mounted) return;
+    await Navigator.of(context).push<void>(fadeRoute(const ChatScreen()));
+  }
+
+  Future<void> _confirmSignOut() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surfaceDark,
+        title: const Text('Keluar?', style: TextStyle(color: AppColors.textWhite)),
+        content: const Text(
+          'Kamu perlu masuk lagi untuk memakai Chat.',
+          style: TextStyle(color: AppColors.textSecondary),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Batal')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Keluar')),
+        ],
+      ),
+    );
+    if (confirmed == true) await ref.read(authRepositoryProvider).signOut();
   }
 
   /// Di Kotlin tombol ini hanya menampilkan Toast. Di sini cache gambar di

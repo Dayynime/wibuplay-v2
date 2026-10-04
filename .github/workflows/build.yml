@@ -72,11 +72,32 @@ jobs:
 
       # Profile = padanan build "perf": AOT seperti release tapi ditandatangani debug key,
       # jadi performa asli bisa dites tanpa keystore produksi.
+      # Opsional: debug keystore yang STABIL (base64 di secret DEBUG_KEYSTORE_BASE64)
+      # supaya SHA-1 tidak berubah tiap build. Wajib kalau mau Login Google,
+      # karena SHA-1 harus didaftarkan di Firebase. Login email tidak butuh ini.
+      - name: Pakai debug keystore tetap (kalau secret ada)
+        env:
+          DEBUG_KEYSTORE_BASE64: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$DEBUG_KEYSTORE_BASE64" ]; then
+            mkdir -p ~/.android
+            echo "$DEBUG_KEYSTORE_BASE64" | base64 -d > ~/.android/debug.keystore
+            echo "debug keystore tetap dipasang"
+          fi
+
+      # Firebase Wibuplay (project yang sama dengan Zenime) dikirim lewat
+      # secret FIREBASE_API_KEY dan FIREBASE_APP_ID (dari google-services.json).
       - name: Build Debug APK
-        run: flutter build apk --debug --build-number=$APP_VERSION_CODE
+        run: >
+          flutter build apk --debug --build-number=$APP_VERSION_CODE
+          --dart-define=FIREBASE_API_KEY=${{ secrets.FIREBASE_API_KEY }}
+          --dart-define=FIREBASE_APP_ID=${{ secrets.FIREBASE_APP_ID }}
 
       - name: Build Profile APK
-        run: flutter build apk --profile --build-number=$APP_VERSION_CODE
+        run: >
+          flutter build apk --profile --build-number=$APP_VERSION_CODE
+          --dart-define=FIREBASE_API_KEY=${{ secrets.FIREBASE_API_KEY }}
+          --dart-define=FIREBASE_APP_ID=${{ secrets.FIREBASE_APP_ID }}
 
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
