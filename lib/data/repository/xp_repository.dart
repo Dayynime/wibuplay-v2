@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../core/firebase_config.dart';
+import '../models/chat_models.dart';
 import '../models/xp_models.dart';
 import 'chat_repository.dart';
 
