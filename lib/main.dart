@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/firebase_config.dart';
+import 'core/remote_config_manager.dart';
 import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
 import 'data/local/local_store.dart';
@@ -33,6 +34,8 @@ Future<void> main() async {
     try {
       await Firebase.initializeApp(options: FirebaseConfig.options);
       FirebaseConfig.ready = true;
+      // Base URL API dari Remote Config harus siap sebelum request pertama.
+      await RemoteConfigManager.refresh();
     } catch (_) {
       FirebaseConfig.ready = false;
     }

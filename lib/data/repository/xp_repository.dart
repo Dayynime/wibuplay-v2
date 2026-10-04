@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../core/firebase_config.dart';
 import '../models/chat_models.dart';
+import '../models/support_models.dart';
 import '../models/xp_models.dart';
 import 'chat_repository.dart';
 
@@ -97,6 +98,58 @@ class XpRepository {
   static String currentPeriod() {
     final wib = DateTime.now().toUtc().add(const Duration(hours: 7));
     return '${wib.year}-${wib.month.toString().padLeft(2, '0')}';
+  }
+
+  /// Top [limit] XP bulan ini versi ringan buat carousel Beranda: cuma
+  /// profil (username/avatar), TANPA cek Premium/level per user. Melempar
+  /// kalau gagal.
+  Future<List<UserXpDisplay>> getTopXpDisplay({int limit = 4}) async {
+    final res = await _dio.get<dynamic>(
+      'rest/v1/user_xp_monthly',
+      queryParameters: {
+        'period': 'eq.${currentPeriod()}',
+        'select': 'firebase_uid,xp',
+        'order': 'xp.desc',
+        'limit': limit,
+      },
+    );
+    final top = _rows(res.data);
+    if (top.isEmpty) return const [];
+    final uids = top
+        .map((r) => (r['firebase_uid'] as String?) ?? '')
+        .where((u) => u.isNotEmpty)
+        .toList();
+    Map<String, ChatProfile> profiles = const {};
+    try {
+      profiles = await _chat.getProfilesForUids(uids);
+    } catch (_) {}
+    final list = top.map((row) {
+      final uid = (row['firebase_uid'] as String?) ?? '';
+      final name = profiles[uid]?.username ?? '';
+      return UserXpDisplay(
+        firebaseUid: uid,
+        xp: (row['xp'] as num?)?.toInt() ?? 0,
+        level: 1,
+        username: name.isEmpty ? 'Pengguna' : name,
+        avatarUrl: profiles[uid]?.avatarUrl,
+      );
+    }).toList()
+      ..sort((a, b) => b.xp.compareTo(a.xp));
+    return list;
+  }
+
+  /// Top Support (donatur SociaBuzz) lewat Edge Function
+  /// `zenime-top-supporters`, urut nominal terbesar. Melempar kalau gagal.
+  Future<List<TopSupporter>> getTopSupporters() async {
+    final res = await _dio.get<dynamic>('functions/v1/zenime-top-supporters');
+    final data = res.data;
+    final raw = data is Map ? data['supporters'] : null;
+    if (raw is! List) return const [];
+    return raw
+        .whereType<Map>()
+        .map((e) => TopSupporter.fromJson(Map<String, dynamic>.from(e)))
+        .toList()
+      ..sort((a, b) => b.totalAmount.compareTo(a.totalAmount));
   }
 
   /// Top 100 leaderboard BULANAN (reset otomatis tiap tanggal 1 WIB karena

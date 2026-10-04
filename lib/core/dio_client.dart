@@ -1,6 +1,33 @@
 import 'package:dio/dio.dart';
 
 import 'constants.dart';
+import 'remote_config_manager.dart';
+
+/// Port dynamicBaseUrlInterceptor (NetworkModule.kt): host API diganti di TIAP
+/// request dengan nilai terbaru dari Remote Config. Kalau belum ada base URL
+/// (parameter kosong / belum pernah fetch sukses), request digagalkan dengan
+/// pesan jelas, TIDAK jatuh ke URL manapun.
+class DynamicBaseUrlInterceptor extends Interceptor {
+  static const String unavailableMessage = 'Server sedang tidak tersedia. Coba lagi nanti.';
+
+  @override
+  void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
+    final base = RemoteConfigManager.baseUrl;
+    if (base == null) {
+      handler.reject(
+        DioException(
+          requestOptions: options,
+          type: DioExceptionType.unknown,
+          message: unavailableMessage,
+        ),
+        true,
+      );
+      return;
+    }
+    options.baseUrl = base;
+    handler.next(options);
+  }
+}
 
 /// Port HeaderInterceptor: Referer + User-Agent di setiap request.
 class HeaderInterceptor extends Interceptor {
@@ -50,13 +77,15 @@ class RetryInterceptor extends Interceptor {
 Dio createDio() {
   final dio = Dio(
     BaseOptions(
-      baseUrl: Constants.baseUrl,
+      // Placeholder; host sebenarnya diisi DynamicBaseUrlInterceptor tiap request.
+      baseUrl: 'https://placeholder.invalid/',
       connectTimeout: const Duration(seconds: 20),
       receiveTimeout: const Duration(seconds: 60),
       responseType: ResponseType.plain,
     ),
   );
   dio.interceptors.addAll([
+    DynamicBaseUrlInterceptor(),
     HeaderInterceptor(),
     RetryInterceptor(dio),
   ]);

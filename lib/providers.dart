@@ -8,6 +8,7 @@ import 'data/local/local_store.dart';
 import 'data/repository/anime_repository.dart';
 import 'data/repository/auth_repository.dart';
 import 'data/repository/chat_repository.dart';
+import 'data/models/support_models.dart';
 import 'data/models/xp_models.dart';
 import 'data/repository/xp_repository.dart';
 import 'data/supabase/supabase_client.dart';
@@ -65,6 +66,25 @@ final myPremiumProvider = Provider<AsyncValue<bool>>((ref) {
   final uid = auth.valueOrNull?.uid;
   if (uid == null || uid.isEmpty) return const AsyncData(false);
   return ref.watch(premiumProvider(uid));
+});
+
+/// Top 4 XP bulan ini buat slide carousel Beranda. Gagal = slide disembunyikan.
+final heroTopXpProvider = FutureProvider.autoDispose<List<UserXpDisplay>>((ref) async {
+  try {
+    return await ref.watch(xpRepositoryProvider).getTopXpDisplay(limit: 4);
+  } catch (_) {
+    return const [];
+  }
+});
+
+/// Top 3 donatur buat slide carousel Beranda. Gagal = slide disembunyikan.
+final topSupportersProvider = FutureProvider.autoDispose<List<TopSupporter>>((ref) async {
+  try {
+    final all = await ref.watch(xpRepositoryProvider).getTopSupporters();
+    return all.take(3).toList();
+  } catch (_) {
+    return const [];
+  }
 });
 
 final xpLeaderboardProvider = FutureProvider.autoDispose<List<UserXpDisplay>>(

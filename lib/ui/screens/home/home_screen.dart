@@ -3,11 +3,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/remote_config_manager.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/anime_item.dart';
 import '../../../data/models/home_sections.dart';
 import '../../../providers.dart';
+import '../../app_routes.dart';
+import '../xp/xp_leaderboard_screen.dart';
 import '../../components/cards.dart';
 import '../../components/chat_ticker.dart';
 import '../../components/common_components.dart';
@@ -44,8 +47,11 @@ class HomeScreen extends ConsumerWidget {
         key: const ValueKey('error'),
         child: ErrorState(
           message: _cleanError(state.error),
-          onRetry: () =>
-              ref.read(homeControllerProvider.notifier).loadHomeData(forceRefresh: true),
+          onRetry: () async {
+            // Paksa ambil api_base_url terbaru dulu (kalau baru di-Publish).
+            await RemoteConfigManager.forceRefresh();
+            ref.read(homeControllerProvider.notifier).loadHomeData(forceRefresh: true);
+          },
         ),
       );
     } else if (state.isLoading) {
@@ -256,6 +262,10 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               child: HeroBanner(
                 sliderItems: sections.slider,
+                topXp: ref.watch(heroTopXpProvider).valueOrNull ?? const [],
+                topSupport: ref.watch(topSupportersProvider).valueOrNull ?? const [],
+                onLeaderboardClick: () => Navigator.of(context)
+                    .push<void>(fadeRoute(const XpLeaderboardScreen())),
                 onItemClick: (item) {
                   final id = item.id;
                   if (id != null) widget.onAnimeClick(id);

@@ -5,6 +5,9 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/models/anime_item.dart';
+import '../../data/models/support_models.dart';
+import '../../data/models/xp_models.dart';
+import 'hero_slides.dart';
 import 'net_image.dart';
 
 bool _blank(String? s) => s == null || s.trim().isEmpty;
@@ -14,10 +17,22 @@ bool _isNone(String? s) => s != null && s.toLowerCase() == 'none';
 /// parallax + Ken Burns, chip tipe/tahun/genre, tombol play berdenyut,
 /// indikator pill yang melebar.
 class HeroBanner extends StatefulWidget {
-  const HeroBanner({super.key, required this.sliderItems, required this.onItemClick});
+  const HeroBanner({
+    super.key,
+    required this.sliderItems,
+    required this.onItemClick,
+    this.topXp = const [],
+    this.topSupport = const [],
+    this.onLeaderboardClick,
+  });
 
   final List<AnimeItem> sliderItems;
   final ValueChanged<AnimeItem> onItemClick;
+
+  /// Slide tambahan setelah semua slide anime (kosong = slide tidak ada).
+  final List<UserXpDisplay> topXp;
+  final List<TopSupporter> topSupport;
+  final VoidCallback? onLeaderboardClick;
 
   @override
   State<HeroBanner> createState() => _HeroBannerState();
@@ -46,6 +61,8 @@ class _HeroBannerState extends State<HeroBanner> with SingleTickerProviderStateM
     if (widget.sliderItems.length <= 1) return;
     _autoTimer = Timer.periodic(const Duration(seconds: 5), (_) {
       if (!mounted || _interacting || !_pager.hasClients) return;
+      // Rotasi otomatis berhenti selama user ada di slide leaderboard/support.
+      if (_current >= widget.sliderItems.length) return;
       final next = (_current + 1) % widget.sliderItems.length;
       _pager.animateToPage(
         next,
@@ -90,6 +107,11 @@ class _HeroBannerState extends State<HeroBanner> with SingleTickerProviderStateM
     final items = widget.sliderItems;
     if (items.isEmpty) return const SizedBox.shrink();
 
+    final lbPage = widget.topXp.isNotEmpty ? items.length : -1;
+    final supportPage =
+        widget.topSupport.isNotEmpty ? items.length + (lbPage >= 0 ? 1 : 0) : -1;
+    final pageCount = items.length + (lbPage >= 0 ? 1 : 0) + (supportPage >= 0 ? 1 : 0);
+
     return Column(
       children: [
         SizedBox(
@@ -102,9 +124,18 @@ class _HeroBannerState extends State<HeroBanner> with SingleTickerProviderStateM
                 onNotification: _onScroll,
                 child: PageView.builder(
                   controller: _pager,
-                  itemCount: items.length,
+                  itemCount: pageCount,
                   onPageChanged: (i) => setState(() => _current = i),
                   itemBuilder: (context, page) {
+                    if (page == lbPage) {
+                      return HeroLeaderboardSlide(
+                        entries: widget.topXp,
+                        onTap: widget.onLeaderboardClick ?? () {},
+                      );
+                    }
+                    if (page == supportPage) {
+                      return HeroSupportSlide(supporters: widget.topSupport);
+                    }
                     return AnimatedBuilder(
                       animation: _pager,
                       builder: (context, _) {
@@ -127,12 +158,12 @@ class _HeroBannerState extends State<HeroBanner> with SingleTickerProviderStateM
             ),
           ),
         ),
-        if (items.length > 1) ...[
+        if (pageCount > 1) ...[
           const SizedBox(height: 10),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              for (var i = 0; i < items.length; i++)
+              for (var i = 0; i < pageCount; i++)
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 3),
                   child: AnimatedContainer(
@@ -141,7 +172,15 @@ class _HeroBannerState extends State<HeroBanner> with SingleTickerProviderStateM
                     width: i == _current ? 22 : 6,
                     height: 5,
                     decoration: BoxDecoration(
-                      color: i == _current ? AppColors.accentViolet : AppColors.surfaceDark,
+                      color: i == _current
+                          ? (i == lbPage
+                              ? heroGold
+                              : i == supportPage
+                                  ? heroPink
+                                  : AppColors.accentViolet)
+                          : (i == supportPage
+                              ? heroPink.withValues(alpha: 0.4)
+                              : AppColors.surfaceDark),
                       borderRadius: AppShapes.pill,
                     ),
                   ),
