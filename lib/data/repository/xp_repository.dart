@@ -94,6 +94,18 @@ class XpRepository {
     }
   }
 
+  /// Uid yang premium dari sekumpulan uid (dicek paralel per uid, karena
+  /// `zenime-check-premium` cuma menerima satu uid per request). Gagal cek =
+  /// dianggap tidak premium.
+  Future<Set<String>> getPremiumUids(List<String> uids) async {
+    final distinct = uids.where((u) => u.isNotEmpty).toSet().toList();
+    if (distinct.isEmpty) return const {};
+    final results = await Future.wait(
+      distinct.map((u) async => MapEntry(u, await isPremium(u))),
+    );
+    return {for (final e in results) if (e.value) e.key};
+  }
+
   /// Bulan berjalan zona WIB (UTC+7), format "yyyy-MM".
   static String currentPeriod() {
     final wib = DateTime.now().toUtc().add(const Duration(hours: 7));

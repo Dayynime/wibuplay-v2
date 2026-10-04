@@ -162,6 +162,29 @@ class ChatRepository {
     return ChatBadgeData(usernameColors: colors, userNumbers: numbers, avatarUrls: avatars);
   }
 
+  /// Tag clan banyak uid dalam 1 request (embedding PostgREST
+  /// clan_members.clan_id -> clans.id, sama seperti Zenime). Uid yang tidak
+  /// gabung clan tidak masuk map.
+  Future<Map<String, String>> getClanTagsForUids(List<String> uids) async {
+    final distinct = uids.where((u) => u.isNotEmpty).toSet().toList();
+    if (distinct.isEmpty) return const {};
+    final res = await _dio.get<dynamic>(
+      'rest/v1/clan_members',
+      queryParameters: {
+        'firebase_uid': 'in.(${distinct.join(',')})',
+        'select': 'firebase_uid,clans(tag)',
+      },
+    );
+    final out = <String, String>{};
+    for (final row in _rows(res.data)) {
+      final uid = (row['firebase_uid'] as String?) ?? '';
+      final clan = row['clans'];
+      final tag = clan is Map ? clan['tag'] as String? : null;
+      if (uid.isNotEmpty && tag != null && tag.isNotEmpty) out[uid] = tag;
+    }
+    return out;
+  }
+
   /// Profil (username/avatar) banyak uid dalam 1 request, buat leaderboard.
   Future<Map<String, ChatProfile>> getProfilesForUids(List<String> uids) async {
     final distinct = uids.where((u) => u.isNotEmpty).toSet().toList();

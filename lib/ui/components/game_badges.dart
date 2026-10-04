@@ -64,6 +64,159 @@ class LevelBadge extends StatelessWidget {
   }
 }
 
+/// Bentuk heksagon pita runcing di dua sisi (port BadgeHexShape di GameBadges.kt).
+Path _clanHexPath(Size size) {
+  final tip = size.height * 0.5;
+  return Path()
+    ..moveTo(tip, 0)
+    ..lineTo(size.width - tip, 0)
+    ..lineTo(size.width, size.height / 2)
+    ..lineTo(size.width - tip, size.height)
+    ..lineTo(tip, size.height)
+    ..lineTo(0, size.height / 2)
+    ..close();
+}
+
+class _ClanHexClipper extends CustomClipper<Path> {
+  const _ClanHexClipper();
+
+  @override
+  Path getClip(Size size) => _clanHexPath(size);
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
+}
+
+class _ClanHexBorderPainter extends CustomPainter {
+  const _ClanHexBorderPainter(this.alpha);
+
+  final double alpha;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawPath(
+      _clanHexPath(size),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1
+        ..color = Colors.white.withValues(alpha: alpha),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _ClanHexBorderPainter old) => old.alpha != alpha;
+}
+
+/// Badge tag clan rainbow animasi (fill geser + kilau + border berdenyut),
+/// port ClanRainbowBadge di GameBadges.kt.
+class ClanRainbowBadge extends StatefulWidget {
+  const ClanRainbowBadge({super.key, required this.text});
+
+  final String text;
+
+  @override
+  State<ClanRainbowBadge> createState() => _ClanRainbowBadgeState();
+}
+
+class _ClanRainbowBadgeState extends State<ClanRainbowBadge>
+    with SingleTickerProviderStateMixin {
+  // Satu controller buat tiga animasi (pelangi 2600ms, kilau 1800ms, denyut
+  // border 900ms). 23400ms = kelipatan persekutuan ketiganya, jadi semua
+  // loop mulus tanpa loncat.
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 23400),
+  )..repeat();
+
+  static const _rainbow = [
+    Color(0xFFFF3B30),
+    Color(0xFFFF9500),
+    Color(0xFFFFCC00),
+    Color(0xFF34C759),
+    Color(0xFF00C7BE),
+    Color(0xFF30ADE6),
+    Color(0xFF5856D6),
+    Color(0xFFAF52DE),
+    Color(0xFFFF3B30),
+  ];
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const star = TextStyle(color: Color(0xD9FFFFFF), fontSize: 7, height: 1.2);
+    return RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: _c,
+        builder: (context, child) {
+          final v = _c.value;
+          final rainbow = (v * 9) % 1.0; // 23400 / 2600
+          final shine = (v * 13) % 1.0; // 23400 / 1800
+          final pulse = (v * 26) % 1.0; // 23400 / 900
+          // Denyut bolak-balik 0.35 <-> 0.95.
+          final glow = 0.35 + 0.6 * (pulse < 0.5 ? pulse * 2 : (1 - pulse) * 2);
+          return CustomPaint(
+            foregroundPainter: _ClanHexBorderPainter(glow),
+            child: ClipPath(
+              clipper: const _ClanHexClipper(),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment(-1 + 2 * rainbow, 0),
+                    end: Alignment(1 + 2 * rainbow, 0),
+                    colors: _rainbow,
+                    tileMode: TileMode.repeated,
+                  ),
+                ),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment(-2 + 4 * shine, -0.3),
+                      end: Alignment(-1 + 4 * shine, 0.3),
+                      colors: [
+                        Colors.white.withValues(alpha: 0),
+                        Colors.white.withValues(alpha: 0.55),
+                        Colors.white.withValues(alpha: 0),
+                      ],
+                    ),
+                  ),
+                  child: child,
+                ),
+              ),
+            ),
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2.5),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('✦', style: star),
+              const SizedBox(width: 3),
+              Text(
+                widget.text.toUpperCase(),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.6,
+                  height: 1.2,
+                ),
+              ),
+              const SizedBox(width: 3),
+              const Text('✦', style: star),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Centang biru untuk akun Premium.
 class PremiumCheckBadge extends StatelessWidget {
   const PremiumCheckBadge({super.key, this.size = 14});

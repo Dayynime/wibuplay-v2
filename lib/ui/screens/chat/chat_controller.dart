@@ -26,6 +26,8 @@ class ChatUiState {
     this.userNumbers = const {},
     this.avatarUrls = const {},
     this.levels = const {},
+    this.clanTags = const {},
+    this.premiumUids = const {},
     this.myUid = '',
     this.myUsername = '',
     this.myAvatarUrl,
@@ -41,6 +43,12 @@ class ChatUiState {
   final Map<String, int> userNumbers;
   final Map<String, String> avatarUrls;
   final Map<String, int> levels;
+
+  /// uid -> tag clan (cuma yang sedang gabung clan).
+  final Map<String, String> clanTags;
+
+  /// uid pengirim yang Premium (badge centang biru).
+  final Set<String> premiumUids;
   final String myUid;
   final String myUsername;
   final String? myAvatarUrl;
@@ -57,6 +65,8 @@ class ChatUiState {
     Map<String, int>? userNumbers,
     Map<String, String>? avatarUrls,
     Map<String, int>? levels,
+    Map<String, String>? clanTags,
+    Set<String>? premiumUids,
     String? myUsername,
     String? myAvatarUrl,
   }) {
@@ -71,6 +81,8 @@ class ChatUiState {
       userNumbers: userNumbers ?? this.userNumbers,
       avatarUrls: avatarUrls ?? this.avatarUrls,
       levels: levels ?? this.levels,
+      clanTags: clanTags ?? this.clanTags,
+      premiumUids: premiumUids ?? this.premiumUids,
       myUid: myUid,
       myUsername: myUsername ?? this.myUsername,
       myAvatarUrl: myAvatarUrl ?? this.myAvatarUrl,
@@ -227,6 +239,16 @@ class ChatController extends AutoDisposeNotifier<ChatUiState> {
       try {
         final levels = await ref.read(xpRepositoryProvider).getLevelsForUids(fresh);
         _update((s) => s.copyWith(levels: {...s.levels, ...levels}));
+      } catch (_) {}
+      // Tag clan (badge di bawah username). Gagal = tidak tampil.
+      try {
+        final tags = await _repo.getClanTagsForUids(fresh);
+        _update((s) => s.copyWith(clanTags: {...s.clanTags, ...tags}));
+      } catch (_) {}
+      // Status Premium (centang biru di samping username). Gagal = tidak tampil.
+      try {
+        final premium = await ref.read(xpRepositoryProvider).getPremiumUids(fresh);
+        _update((s) => s.copyWith(premiumUids: {...s.premiumUids, ...premium}));
       } catch (_) {}
     }();
   }

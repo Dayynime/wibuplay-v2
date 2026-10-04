@@ -187,6 +187,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           nameColor: _parseHex(s.usernameColors[m.firebaseUid]),
           userNumber: s.userNumbers[m.firebaseUid],
           level: s.levels[m.firebaseUid],
+          clanTag: s.clanTags[m.firebaseUid],
+          isPremium: s.premiumUids.contains(m.firebaseUid),
           avatarUrl: s.avatarUrls[m.firebaseUid] ?? m.avatarUrl,
           onLongPress: () => _showActions(m, s),
           onReply: () => _controller.setReplyTarget(m),
@@ -322,6 +324,8 @@ class _MessageBubble extends StatelessWidget {
     this.nameColor,
     this.userNumber,
     this.level,
+    this.clanTag,
+    this.isPremium = false,
     this.avatarUrl,
   });
 
@@ -335,6 +339,8 @@ class _MessageBubble extends StatelessWidget {
   final Color? nameColor;
   final int? userNumber;
   final int? level;
+  final String? clanTag;
+  final bool isPremium;
   final String? avatarUrl;
 
   @override
@@ -352,6 +358,7 @@ class _MessageBubble extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Baris 1: username > centang Premium > #ID (urutan sama dengan Zenime).
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -367,19 +374,31 @@ class _MessageBubble extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (isPremium) ...[
+                  const SizedBox(width: 3),
+                  const PremiumCheckBadge(size: 15),
+                ],
                 if (userNumber != null) ...[
-                  const SizedBox(width: 6),
+                  const SizedBox(width: 4),
                   Text(
                     '#$userNumber',
                     style: const TextStyle(color: AppColors.textMuted, fontSize: 10),
                   ),
                 ],
-                if (level != null) ...[
-                  const SizedBox(width: 6),
-                  LevelBadge(level: level!),
-                ],
               ],
             ),
+            // Baris 2: badge clan + level, di bawah username.
+            if (clanTag != null || level != null) ...[
+              const SizedBox(height: 3),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (clanTag != null) ClanRainbowBadge(text: clanTag!),
+                  if (clanTag != null && level != null) const SizedBox(width: 4),
+                  if (level != null) LevelBadge(level: level!),
+                ],
+              ),
+            ],
             if (hasReply) ...[
               const SizedBox(height: 4),
               Container(

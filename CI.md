@@ -49,3 +49,10 @@ manifest rilis bawaan Flutter tidak punya izin internet.
 - Cuplix: suka hanya di memori (hilang saat app ditutup) dan tombol komentar belum ada aksi, sama seperti Kotlin.
 - Profil: "Bersihkan Cache Memori" di Kotlin hanya Toast; di Flutter mengosongkan cache gambar di memori (cache disk tidak disentuh).
 - Profil: nama "Wibu Sejati" dan badge "VIP Member" masih tetap (hardcode), sama seperti Kotlin.
+
+### Catatan Chat Global (badge ala Zenime)
+
+- Bubble chat: baris 1 = username > centang biru Premium > #ID; baris 2 = badge clan (rainbow animasi, `ClanRainbowBadge`) + badge level.
+- Tag clan diambil batch lewat `clan_members?select=firebase_uid,clans(tag)`; Premium dicek paralel per uid lewat `zenime-check-premium` (Edge Function cuma terima satu uid per request).
+- Belum: centang berwarna per role (developer/admin/moderator) dan badge role teks seperti di Zenime. Hanya centang Premium biru.
+
