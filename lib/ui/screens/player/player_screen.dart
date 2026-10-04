@@ -10,6 +10,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/watch_xp_gate.dart';
 import '../../../data/models/episode_item.dart';
 import '../../../data/models/stream_data.dart';
 import '../../../providers.dart';
@@ -82,7 +83,11 @@ class PlayerScreen extends ConsumerStatefulWidget {
   ConsumerState<PlayerScreen> createState() => _PlayerScreenState();
 }
 
-class _PlayerScreenState extends ConsumerState<PlayerScreen> {
+class _PlayerScreenState extends ConsumerState<PlayerScreen>
+    with WidgetsBindingObserver {
+  /// false saat app di background: detik itu tidak dihitung untuk XP.
+  bool _inForeground = true;
+
   VideoPlayerController? _vc;
   String? _loadedLink;
   final ValueNotifier<_Playback> _pb = ValueNotifier<_Playback>(const _Playback());
@@ -107,6 +112,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     _tick = Timer.periodic(const Duration(seconds: 1), _onTick);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -116,7 +122,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _inForeground = state == AppLifecycleState.resumed;
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    WatchXpGate.release(this);
     _hideTimer?.cancel();
     _tick?.cancel();
     final vc = _vc;
@@ -212,6 +225,16 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     final dur = vc.value.duration.inMilliseconds;
     if (_tickCount % 5 == 0 && dur > 0) {
       _notifier.saveProgress(vc.value.position.inMilliseconds, dur);
+    }
+
+    // XP nonton: hanya detik aktif (playing, tidak buffering, app di depan).
+    if (_inForeground && !vc.value.isBuffering && WatchXpGate.onActiveSecond(this)) {
+      unawaited(
+        ref.read(xpRepositoryProvider).sendHeartbeat(minutes: 1).then((ok) {
+          // Segarkan kartu XP di Profil begitu server menerima heartbeat.
+          if (ok && mounted) ref.invalidate(myXpProvider);
+        }),
+      );
     }
   }
 

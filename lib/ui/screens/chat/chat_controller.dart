@@ -25,6 +25,7 @@ class ChatUiState {
     this.usernameColors = const {},
     this.userNumbers = const {},
     this.avatarUrls = const {},
+    this.levels = const {},
     this.myUid = '',
     this.myUsername = '',
     this.myAvatarUrl,
@@ -39,6 +40,7 @@ class ChatUiState {
   final Map<String, String> usernameColors;
   final Map<String, int> userNumbers;
   final Map<String, String> avatarUrls;
+  final Map<String, int> levels;
   final String myUid;
   final String myUsername;
   final String? myAvatarUrl;
@@ -54,6 +56,7 @@ class ChatUiState {
     Map<String, String>? usernameColors,
     Map<String, int>? userNumbers,
     Map<String, String>? avatarUrls,
+    Map<String, int>? levels,
     String? myUsername,
     String? myAvatarUrl,
   }) {
@@ -67,6 +70,7 @@ class ChatUiState {
       usernameColors: usernameColors ?? this.usernameColors,
       userNumbers: userNumbers ?? this.userNumbers,
       avatarUrls: avatarUrls ?? this.avatarUrls,
+      levels: levels ?? this.levels,
       myUid: myUid,
       myUsername: myUsername ?? this.myUsername,
       myAvatarUrl: myAvatarUrl ?? this.myAvatarUrl,
@@ -218,6 +222,12 @@ class ChatController extends AutoDisposeNotifier<ChatUiState> {
       } catch (_) {
         _badgeChecked.removeAll(fresh);
       }
+      // Level XP (badge "Lv.N"). Gagal = badge level tidak tampil, tidak
+      // menggagalkan badge warna/ID di atas.
+      try {
+        final levels = await ref.read(xpRepositoryProvider).getLevelsForUids(fresh);
+        _update((s) => s.copyWith(levels: {...s.levels, ...levels}));
+      } catch (_) {}
     }();
   }
 

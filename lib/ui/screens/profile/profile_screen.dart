@@ -12,9 +12,11 @@ import '../../../providers.dart';
 import '../../app_routes.dart';
 import '../../components/cards.dart';
 import '../../components/common_components.dart';
+import '../../components/game_badges.dart';
 import '../../components/net_image.dart';
 import '../auth/login_screen.dart';
 import '../chat/chat_screen.dart';
+import 'my_xp_card.dart';
 import 'profile_controller.dart';
 
 /// Port ProfileScreen.kt: header pengguna + tab Favorit / Riwayat / Pengaturan.
@@ -56,6 +58,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         child: Column(
           children: [
             _buildHeader(favorites.length, history.length, user),
+            if (user != null && FirebaseConfig.ready) ...[
+              MyXpCard(firebaseUid: user.uid),
+              const SizedBox(height: 14),
+            ],
             _buildTabs(),
             const SizedBox(height: 12),
             Expanded(child: _buildTabContent(favorites, history)),
@@ -68,6 +74,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   // ----------------------------------------------------------------- header
 
   Widget _buildHeader(int favoriteCount, int historyCount, User? user) {
+    // Badge Premium asli dari server (bukan teks tetap seperti sebelumnya).
+    final premium = user != null &&
+        FirebaseConfig.ready &&
+        (ref.watch(premiumProvider(user.uid)).valueOrNull ?? false);
     return Padding(
       padding: const EdgeInsets.all(20),
       child: Row(
@@ -102,22 +112,31 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 const SizedBox(height: 3),
                 Row(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceDark,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: const Text(
-                        'VIP Member',
-                        style: TextStyle(
-                          color: AppColors.accentViolet,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
+                    if (premium) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceDark,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            PremiumCheckBadge(size: 11),
+                            SizedBox(width: 3),
+                            Text(
+                              'Premium',
+                              style: TextStyle(
+                                color: Color(0xFF3897F0),
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
+                      const SizedBox(width: 8),
+                    ],
                     Flexible(
                       child: Text(
                         '$favoriteCount Favorit • $historyCount Ditonton',

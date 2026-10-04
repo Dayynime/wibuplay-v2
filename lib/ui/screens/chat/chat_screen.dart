@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/chat_models.dart';
+import '../../components/game_badges.dart';
 import 'chat_controller.dart';
 
 Color? _parseHex(String? hex) {
@@ -185,6 +186,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           mine: m.firebaseUid == s.myUid,
           nameColor: _parseHex(s.usernameColors[m.firebaseUid]),
           userNumber: s.userNumbers[m.firebaseUid],
+          level: s.levels[m.firebaseUid],
           avatarUrl: s.avatarUrls[m.firebaseUid] ?? m.avatarUrl,
           onLongPress: () => _showActions(m, s),
           onReply: () => _controller.setReplyTarget(m),
@@ -319,6 +321,7 @@ class _MessageBubble extends StatelessWidget {
     this.onDelete,
     this.nameColor,
     this.userNumber,
+    this.level,
     this.avatarUrl,
   });
 
@@ -331,6 +334,7 @@ class _MessageBubble extends StatelessWidget {
   final VoidCallback? onDelete;
   final Color? nameColor;
   final int? userNumber;
+  final int? level;
   final String? avatarUrl;
 
   @override
@@ -369,6 +373,10 @@ class _MessageBubble extends StatelessWidget {
                     '#$userNumber',
                     style: const TextStyle(color: AppColors.textMuted, fontSize: 10),
                   ),
+                ],
+                if (level != null) ...[
+                  const SizedBox(width: 6),
+                  LevelBadge(level: level!),
                 ],
               ],
             ),

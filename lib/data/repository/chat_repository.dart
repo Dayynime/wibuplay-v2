@@ -161,4 +161,23 @@ class ChatRepository {
     }
     return ChatBadgeData(usernameColors: colors, userNumbers: numbers, avatarUrls: avatars);
   }
+
+  /// Profil (username/avatar) banyak uid dalam 1 request, buat leaderboard.
+  Future<Map<String, ChatProfile>> getProfilesForUids(List<String> uids) async {
+    final distinct = uids.where((u) => u.isNotEmpty).toSet().toList();
+    if (distinct.isEmpty) return const {};
+    final res = await _dio.get<dynamic>(
+      'rest/v1/chat_profiles',
+      queryParameters: {
+        'firebase_uid': 'in.(${distinct.join(',')})',
+        'select': 'firebase_uid,username,avatar_url,username_color,user_number',
+      },
+    );
+    final out = <String, ChatProfile>{};
+    for (final row in _rows(res.data)) {
+      final p = ChatProfile.fromJson(row);
+      if (p.firebaseUid.isNotEmpty) out[p.firebaseUid] = p;
+    }
+    return out;
+  }
 }
