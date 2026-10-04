@@ -53,6 +53,7 @@ class _AppShellState extends State<AppShell> {
                 onWatchEpisode: _openPlayer,
                 onSearchClick: () => _goTab(1),
                 onSeeAllClick: (_) => _goTab(1),
+                onProfileClick: () => _goTab(4),
               ),
               _tab(1, () => ExploreScreen(onAnimeClick: _openDetail)),
               _tab(2, () => ScheduleScreen(onAnimeClick: _openDetail)),

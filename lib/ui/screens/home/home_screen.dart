@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/firebase_config.dart';
 import '../../../core/remote_config_manager.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
@@ -15,6 +16,7 @@ import '../../components/cards.dart';
 import '../../components/chat_ticker.dart';
 import '../../components/common_components.dart';
 import '../../components/hero_banner.dart';
+import '../../components/home_profile_header.dart';
 import '../../components/shimmer.dart';
 import '../../components/staggered_section.dart';
 import '../../components/top_hits_row.dart';
@@ -28,12 +30,16 @@ class HomeScreen extends ConsumerWidget {
     required this.onWatchEpisode,
     required this.onSearchClick,
     required this.onSeeAllClick,
+    required this.onProfileClick,
   });
 
   final ValueChanged<String> onAnimeClick;
   final void Function(String movieId, String episodeId) onWatchEpisode;
   final VoidCallback onSearchClick;
   final ValueChanged<String> onSeeAllClick;
+
+  /// Ketuk kartu profil / chip Premium / chip ZCoin / tombol Premium: buka tab Profil.
+  final VoidCallback onProfileClick;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -65,6 +71,7 @@ class HomeScreen extends ConsumerWidget {
         onWatchEpisode: onWatchEpisode,
         onSearchClick: onSearchClick,
         onSeeAllClick: onSeeAllClick,
+        onProfileClick: onProfileClick,
       );
     }
 
@@ -91,6 +98,7 @@ class _HomeContent extends ConsumerStatefulWidget {
     required this.onWatchEpisode,
     required this.onSearchClick,
     required this.onSeeAllClick,
+    required this.onProfileClick,
   });
 
   final HomeSectionData sections;
@@ -98,6 +106,7 @@ class _HomeContent extends ConsumerStatefulWidget {
   final void Function(String movieId, String episodeId) onWatchEpisode;
   final VoidCallback onSearchClick;
   final ValueChanged<String> onSeeAllClick;
+  final VoidCallback onProfileClick;
 
   @override
   ConsumerState<_HomeContent> createState() => _HomeContentState();
@@ -163,6 +172,8 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
     final sections = widget.sections;
     final history = ref.watch(localStoreProvider.select((s) => s.history));
     final favorites = ref.watch(localStoreProvider.select((s) => s.favorites));
+    final user = ref.watch(authUserProvider).valueOrNull;
+    final showProfileHeader = user != null && FirebaseConfig.ready;
 
     final topHits = sections.hot.isNotEmpty ? sections.hot : sections.popular;
     final newEpisodes = sections.update.isNotEmpty ? sections.update : sections.newRelease;
@@ -199,7 +210,19 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
           bottom: false,
           child: Opacity(
             opacity: _isScrolled ? 0.94 : 1.0,
-            child: Padding(
+            // Sudah login: kartu profil ala Zenime. Belum login: header lama
+            // (logo + tombol cari).
+            child: showProfileHeader
+                ? HomeProfileHeader(
+                    user: user!,
+                    onSearchClick: widget.onSearchClick,
+                    onProfileClick: widget.onProfileClick,
+                    onPremiumClick: widget.onProfileClick,
+                    onCoinClick: widget.onProfileClick,
+                    onShieldClick: () => Navigator.of(context)
+                        .push<void>(fadeRoute(const XpLeaderboardScreen())),
+                  )
+                : Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,

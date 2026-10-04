@@ -5,9 +5,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/dio_client.dart';
 import 'data/api/api_service.dart';
 import 'data/local/local_store.dart';
+import 'data/repository/account_repository.dart';
 import 'data/repository/anime_repository.dart';
 import 'data/repository/auth_repository.dart';
 import 'data/repository/chat_repository.dart';
+import 'data/models/account_models.dart';
+import 'data/models/chat_models.dart';
 import 'data/models/clan_models.dart';
 import 'data/models/support_models.dart';
 import 'data/models/xp_models.dart';
@@ -54,10 +57,39 @@ final myXpProvider = FutureProvider.family<UserXp?, String>((ref, uid) async {
   }
 });
 
-/// Status Premium per uid (gagal cek = tidak premium).
-final premiumProvider = FutureProvider.family<bool, String>(
-  (ref, uid) => ref.watch(xpRepositoryProvider).isPremium(uid),
+final accountRepositoryProvider = Provider<AccountRepository>(
+  (ref) => AccountRepository(ref.watch(supabaseDioProvider)),
 );
+
+/// Status Premium lengkap (is_premium + expires_at) per uid. Gagal cek = tidak premium.
+final premiumStatusProvider = FutureProvider.family<PremiumStatus, String>(
+  (ref, uid) => ref.watch(accountRepositoryProvider).getPremiumStatus(uid),
+);
+
+/// Status Premium per uid (gagal cek = tidak premium). Berbagi satu request
+/// dengan [premiumStatusProvider] supaya Beranda tidak mengecek dua kali.
+final premiumProvider = FutureProvider.family<bool, String>(
+  (ref, uid) async => (await ref.watch(premiumStatusProvider(uid).future)).isPremium,
+);
+
+/// Kode akun + ID urut (kartu profil Beranda).
+final profileIdentityProvider = FutureProvider.family<ProfileIdentity, String>(
+  (ref, uid) => ref.watch(accountRepositoryProvider).getProfileIdentity(uid),
+);
+
+/// Saldo ZCoin per uid. Gagal = 0.
+final coinBalanceProvider = FutureProvider.family<int, String>(
+  (ref, uid) => ref.watch(accountRepositoryProvider).getCoinBalance(uid),
+);
+
+/// Profil chat (username/avatar) per uid. Gagal = null.
+final chatProfileProvider = FutureProvider.family<ChatProfile?, String>((ref, uid) async {
+  try {
+    return await ref.watch(chatRepositoryProvider).getProfile(uid);
+  } catch (_) {
+    return null;
+  }
+});
 
 /// Status Premium user yang sedang login.
 /// loading = belum tahu (auth / cek server belum selesai); belum login = false.
