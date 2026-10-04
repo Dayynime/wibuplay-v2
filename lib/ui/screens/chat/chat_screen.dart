@@ -35,6 +35,13 @@ class ChatScreen extends ConsumerStatefulWidget {
 class _ChatScreenState extends ConsumerState<ChatScreen> {
   final TextEditingController _input = TextEditingController();
 
+  /// Id pesan yang masuk SETELAH layar selesai memuat (kena animasi masuk).
+  final Set<int> _live = {};
+
+  /// Id yang animasinya sudah diputar, supaya tidak mengulang saat item
+  /// di-scroll keluar lalu masuk lagi.
+  final Set<int> _played = {};
+
   @override
   void dispose() {
     _input.dispose();
@@ -46,6 +53,31 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   Future<void> _send() async {
     final ok = await _controller.send(_input.text);
     if (ok) _input.clear();
+  }
+
+  Future<void> _confirmDelete(ChatMessage m) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surfaceDark,
+        title: const Text('Hapus pesan?', style: TextStyle(color: AppColors.textWhite)),
+        content: const Text(
+          'Pesan ini akan dihapus untuk semua orang di Chat Global.',
+          style: TextStyle(color: AppColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Batal', style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Hapus', style: TextStyle(color: AppColors.errorRed)),
+          ),
+        ],
+      ),
+    );
+    if (ok == true) await _controller.deleteMessage(m);
   }
 
   void _showActions(ChatMessage m, ChatUiState s) {
@@ -90,6 +122,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     final s = ref.watch(chatControllerProvider);
+
+    ref.listen<ChatUiState>(chatControllerProvider, (prev, next) {
+      // Muatan awal (isLoading true -> false) tidak dianimasikan.
+      if (prev == null || prev.isLoading) return;
+      final maxPrev = prev.messages.fold<int>(0, (a, m) => m.id > a ? m.id : a);
+      for (final m in next.messages) {
+        if (m.id > maxPrev) _live.add(m.id);
+      }
+    });
 
     ref.listen<String?>(chatControllerProvider.select((x) => x.errorMessage), (prev, next) {
       if (next == null) return;
@@ -138,7 +179,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       itemCount: msgs.length,
       itemBuilder: (context, i) {
         final m = msgs[msgs.length - 1 - i];
-        return _MessageBubble(
+        final bubble = _MessageBubble(
           key: ValueKey(m.id),
           message: m,
           mine: m.firebaseUid == s.myUid,
@@ -146,6 +187,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           userNumber: s.userNumbers[m.firebaseUid],
           avatarUrl: s.avatarUrls[m.firebaseUid] ?? m.avatarUrl,
           onLongPress: () => _showActions(m, s),
+          onReply: () => _controller.setReplyTarget(m),
+          onDelete: m.firebaseUid == s.myUid ? () => _confirmDelete(m) : null,
+        );
+        if (!_live.contains(m.id)) return bubble;
+        return _EntryAnimation(
+          key: ValueKey('entry_${m.id}'),
+          animate: !_played.contains(m.id),
+          fromRight: m.firebaseUid == s.myUid,
+          onPlayed: () => _played.add(m.id),
+          child: bubble,
         );
       },
     );
@@ -264,6 +315,8 @@ class _MessageBubble extends StatelessWidget {
     required this.message,
     required this.mine,
     required this.onLongPress,
+    required this.onReply,
+    this.onDelete,
     this.nameColor,
     this.userNumber,
     this.avatarUrl,
@@ -272,6 +325,10 @@ class _MessageBubble extends StatelessWidget {
   final ChatMessage message;
   final bool mine;
   final VoidCallback onLongPress;
+  final VoidCallback onReply;
+
+  /// null = pesan orang lain (tombol Hapus tidak ditampilkan).
+  final VoidCallback? onDelete;
   final Color? nameColor;
   final int? userNumber;
   final String? avatarUrl;
@@ -360,13 +417,21 @@ class _MessageBubble extends StatelessWidget {
                   style: TextStyle(color: AppColors.textMuted, fontSize: 10),
                 ),
               ),
-            const SizedBox(height: 2),
-            Align(
-              alignment: Alignment.centerRight,
-              child: Text(
-                _timeLabel(m),
-                style: const TextStyle(color: AppColors.textMuted, fontSize: 10),
-              ),
+            const SizedBox(height: 4),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _timeLabel(m),
+                  style: const TextStyle(color: AppColors.textMuted, fontSize: 10),
+                ),
+                const SizedBox(width: 10),
+                _FooterAction(label: 'Balas', onTap: onReply),
+                if (onDelete != null) ...[
+                  const SizedBox(width: 10),
+                  _FooterAction(label: 'Hapus', onTap: onDelete!),
+                ],
+              ],
             ),
           ],
         ),
@@ -389,12 +454,183 @@ class _MessageBubble extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: mine ? MainAxisAlignment.end : MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: mine
-            ? [bubble]
-            : [avatar, const SizedBox(width: 8), Flexible(child: bubble)],
+      child: _SwipeToReply(
+        onReply: onReply,
+        child: Row(
+          mainAxisAlignment: mine ? MainAxisAlignment.end : MainAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: mine
+              ? [bubble]
+              : [avatar, const SizedBox(width: 8), Flexible(child: bubble)],
+        ),
+      ),
+    );
+  }
+}
+
+/// Teks aksi kecil di footer bubble ("Balas" / "Hapus"), sama seperti Zenime.
+class _FooterAction extends StatelessWidget {
+  const _FooterAction({required this.label, required this.onTap});
+
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(4),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+        child: Text(
+          label,
+          style: const TextStyle(color: AppColors.textSecondary, fontSize: 10),
+        ),
+      ),
+    );
+  }
+}
+
+/// Geser ke kanan untuk membalas: bubble ikut bergeser, ikon + tulisan
+/// "Reply" muncul di kiri, lepas jari setelah melewati batas = reply terpicu.
+class _SwipeToReply extends StatefulWidget {
+  const _SwipeToReply({required this.child, required this.onReply});
+
+  final Widget child;
+  final VoidCallback onReply;
+
+  @override
+  State<_SwipeToReply> createState() => _SwipeToReplyState();
+}
+
+class _SwipeToReplyState extends State<_SwipeToReply> {
+  static const double _trigger = 64;
+  static const double _max = 96;
+
+  double _dx = 0;
+  bool _dragging = false;
+  bool _buzzed = false;
+
+  void _onUpdate(DragUpdateDetails d) {
+    final next = (_dx + d.delta.dx).clamp(0.0, _max);
+    if (!_buzzed && next >= _trigger) {
+      _buzzed = true;
+      HapticFeedback.selectionClick();
+    }
+    if (next < _trigger) _buzzed = false;
+    setState(() => _dx = next);
+  }
+
+  void _onEnd([DragEndDetails? _]) {
+    final fire = _dx >= _trigger;
+    setState(() {
+      _dragging = false;
+      _dx = 0;
+      _buzzed = false;
+    });
+    if (fire) widget.onReply();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = (_dx / _trigger).clamp(0.0, 1.0);
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onHorizontalDragStart: (_) => setState(() => _dragging = true),
+      onHorizontalDragUpdate: _onUpdate,
+      onHorizontalDragEnd: _onEnd,
+      onHorizontalDragCancel: _onEnd,
+      child: Stack(
+        alignment: Alignment.centerLeft,
+        children: [
+          Opacity(
+            opacity: progress,
+            child: const Padding(
+              padding: EdgeInsets.only(left: 6),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.reply, size: 18, color: AppColors.accentVioletLight),
+                  SizedBox(width: 4),
+                  Text(
+                    'Reply',
+                    style: TextStyle(color: AppColors.accentVioletLight, fontSize: 11),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          AnimatedContainer(
+            duration: _dragging ? Duration.zero : const Duration(milliseconds: 180),
+            transform: Matrix4.translationValues(_dx, 0, 0),
+            child: widget.child,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Animasi pesan baru masuk: geser dari samping (kanan untuk pesan sendiri,
+/// kiri untuk pesan orang lain) + muncul perlahan + tinggi membuka dari
+/// bawah, jadi pesan lama naik dengan halus, tidak melompat.
+class _EntryAnimation extends StatefulWidget {
+  const _EntryAnimation({
+    super.key,
+    required this.child,
+    required this.animate,
+    required this.fromRight,
+    required this.onPlayed,
+  });
+
+  final Widget child;
+  final bool animate;
+  final bool fromRight;
+  final VoidCallback onPlayed;
+
+  @override
+  State<_EntryAnimation> createState() => _EntryAnimationState();
+}
+
+class _EntryAnimationState extends State<_EntryAnimation>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final CurvedAnimation _curve;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 380),
+      value: widget.animate ? 0 : 1,
+    );
+    _curve = CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic);
+    if (widget.animate) {
+      widget.onPlayed();
+      _controller.forward();
+    }
+  }
+
+  @override
+  void dispose() {
+    _curve.dispose();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final slide = Tween<Offset>(
+      begin: Offset(widget.fromRight ? 0.22 : -0.22, 0.0),
+      end: Offset.zero,
+    ).animate(_curve);
+    return SizeTransition(
+      sizeFactor: _curve,
+      axisAlignment: 1.0,
+      child: FadeTransition(
+        opacity: _curve,
+        child: SlideTransition(position: slide, child: widget.child),
       ),
     );
   }
