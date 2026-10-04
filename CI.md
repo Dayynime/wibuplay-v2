@@ -24,3 +24,11 @@ Settings > Secrets and variables > Actions:
 | `STORE_PASSWORD` | password keystore |
 | `KEY_PASSWORD` | password key |
 | `KEY_ALIAS` | opsional, default `upload` |
+
+## Status port Flutter (dari Kotlin wibuplay-main)
+
+Sudah: tema, model + JsonHelper, ApiService, Dio, repository, penyimpanan lokal (favorit + riwayat tonton,
+pengganti Room), Beranda lengkap (hero banner, Lanjutkan Menonton, Top Hits, Favorit, Episode Baru,
+Jadwal Hari Ini, Populer, Mungkin Kamu Suka), bottom bar melayang.
+Belum: Jelajah, Jadwal, Cuplix, Profil, Detail, Player, shared element transition poster.
+Drift/build_runner diganti shared_preferences supaya tidak butuh codegen.
