@@ -8,6 +8,7 @@ import 'data/local/local_store.dart';
 import 'data/repository/anime_repository.dart';
 import 'data/repository/auth_repository.dart';
 import 'data/repository/chat_repository.dart';
+import 'data/models/clan_models.dart';
 import 'data/models/support_models.dart';
 import 'data/models/xp_models.dart';
 import 'data/repository/xp_repository.dart';
@@ -72,6 +73,15 @@ final myPremiumProvider = Provider<AsyncValue<bool>>((ref) {
 final heroTopXpProvider = FutureProvider.autoDispose<List<UserXpDisplay>>((ref) async {
   try {
     return await ref.watch(xpRepositoryProvider).getTopXpDisplay(limit: 4);
+  } catch (_) {
+    return const [];
+  }
+});
+
+/// Top 4 clan buat slide carousel Beranda. Gagal = kolom clan kosong.
+final heroTopClansProvider = FutureProvider.autoDispose<List<ClanSummary>>((ref) async {
+  try {
+    return await ref.watch(chatRepositoryProvider).getTopClans(limit: 4);
   } catch (_) {
     return const [];
   }

@@ -13,6 +13,9 @@ const Map<String, String> _imageHeaders = {
   'Accept': 'image/webp,image/png,image/jpeg,image/*;q=0.8,*/*;q=0.5',
 };
 
+/// Dipakai juga buat preload gambar (mis. hero banner).
+const Map<String, String> netImageHeaders = _imageHeaders;
+
 /// Gambar jaringan dengan cache. Pakai di tempat yang ukurannya sudah pasti
 /// (Positioned.fill / SizedBox / AspectRatio). URL kosong -> area kosong.
 /// Saat memuat tampil shimmer; kalau gagal tampil ikon + sisa pesan error

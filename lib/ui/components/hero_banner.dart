@@ -1,10 +1,12 @@
 import 'dart:async';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/models/anime_item.dart';
+import '../../data/models/clan_models.dart';
 import '../../data/models/support_models.dart';
 import '../../data/models/xp_models.dart';
 import 'hero_slides.dart';
@@ -13,15 +15,23 @@ import 'net_image.dart';
 bool _blank(String? s) => s == null || s.trim().isEmpty;
 bool _isNone(String? s) => s != null && s.toLowerCase() == 'none';
 
-/// Port HeroBanner.kt: carousel 220dp, auto-slide 5 dtk (jeda saat disentuh),
-/// parallax + Ken Burns, chip tipe/tahun/genre, tombol play berdenyut,
-/// indikator pill yang melebar.
+const Color _heroInk = Color(0xFF0B0E14);
+const Duration _rotateEvery = Duration(milliseconds: 4500);
+
+/// Hero carousel gaya "Poster Otomatis" (port FullBleedHeroBannerCarousel di
+/// HomeScreen.kt, Zenime).
+///
+/// Pager luar cuma punya slide: (1) SATU kartu anime yang gambarnya ganti
+/// sendiri (crossfade + zoom pelan, peringkat & judul ikut beranimasi),
+/// (2) Top Leaderboard, (3) Top Support. Rotasi anime berhenti selama user
+/// lagi geser atau sedang di slide leaderboard/support.
 class HeroBanner extends StatefulWidget {
   const HeroBanner({
     super.key,
     required this.sliderItems,
     required this.onItemClick,
     this.topXp = const [],
+    this.topClans = const [],
     this.topSupport = const [],
     this.onLeaderboardClick,
   });
@@ -29,8 +39,9 @@ class HeroBanner extends StatefulWidget {
   final List<AnimeItem> sliderItems;
   final ValueChanged<AnimeItem> onItemClick;
 
-  /// Slide tambahan setelah semua slide anime (kosong = slide tidak ada).
+  /// Slide tambahan setelah slide anime (kosong = slide tidak ada).
   final List<UserXpDisplay> topXp;
+  final List<ClanSummary> topClans;
   final List<TopSupporter> topSupport;
   final VoidCallback? onLeaderboardClick;
 
@@ -38,66 +49,59 @@ class HeroBanner extends StatefulWidget {
   State<HeroBanner> createState() => _HeroBannerState();
 }
 
-class _HeroBannerState extends State<HeroBanner> with SingleTickerProviderStateMixin {
+class _HeroBannerState extends State<HeroBanner> {
   final PageController _pager = PageController();
-  late final AnimationController _pulse = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 1200),
-  )..repeat(reverse: true);
-
-  Timer? _autoTimer;
-  Timer? _resumeTimer;
-  bool _interacting = false;
-  int _current = 0;
+  Timer? _timer;
+  int _page = 0;
+  int _animeIndex = 0;
+  bool _scrolling = false;
 
   @override
   void initState() {
     super.initState();
-    _startAuto();
+    _timer = Timer.periodic(_rotateEvery, (_) => _tick());
   }
 
-  void _startAuto() {
-    _autoTimer?.cancel();
-    if (widget.sliderItems.length <= 1) return;
-    _autoTimer = Timer.periodic(const Duration(seconds: 5), (_) {
-      if (!mounted || _interacting || !_pager.hasClients) return;
-      // Rotasi otomatis berhenti selama user ada di slide leaderboard/support.
-      if (_current >= widget.sliderItems.length) return;
-      final next = (_current + 1) % widget.sliderItems.length;
-      _pager.animateToPage(
-        next,
-        duration: const Duration(milliseconds: 650),
-        curve: Curves.fastOutSlowIn,
-      );
-    });
+  void _tick() {
+    final n = widget.sliderItems.length;
+    if (!mounted || n <= 1 || _page != 0 || _scrolling) return;
+    setState(() => _animeIndex = (_animeIndex + 1) % n);
+    _preloadNext();
+  }
+
+  /// Preload gambar berikutnya supaya crossfade-nya tidak muncul kosong dulu.
+  void _preloadNext() {
+    final items = widget.sliderItems;
+    if (items.length <= 1) return;
+    final next = items[(_animeIndex + 1) % items.length];
+    final url = next.coverUrl;
+    if (url.isEmpty) return;
+    precacheImage(
+      CachedNetworkImageProvider(url, headers: netImageHeaders),
+      context,
+      onError: (_, __) {},
+    );
   }
 
   @override
   void didUpdateWidget(HeroBanner old) {
     super.didUpdateWidget(old);
-    if (old.sliderItems.length != widget.sliderItems.length) {
-      _startAuto();
-    }
+    // Jaga-jaga kalau jumlah item berkurang (mis. ganti sumber banner).
+    if (_animeIndex >= widget.sliderItems.length) _animeIndex = 0;
   }
 
   @override
   void dispose() {
-    _autoTimer?.cancel();
-    _resumeTimer?.cancel();
-    _pulse.dispose();
+    _timer?.cancel();
     _pager.dispose();
     super.dispose();
   }
 
   bool _onScroll(ScrollNotification n) {
     if (n is ScrollStartNotification && n.dragDetails != null) {
-      _resumeTimer?.cancel();
-      _interacting = true;
-    } else if (n is ScrollEndNotification && _interacting) {
-      _resumeTimer?.cancel();
-      _resumeTimer = Timer(const Duration(seconds: 4), () {
-        _interacting = false;
-      });
+      _scrolling = true;
+    } else if (n is ScrollEndNotification) {
+      _scrolling = false;
     }
     return false;
   }
@@ -106,11 +110,12 @@ class _HeroBannerState extends State<HeroBanner> with SingleTickerProviderStateM
   Widget build(BuildContext context) {
     final items = widget.sliderItems;
     if (items.isEmpty) return const SizedBox.shrink();
+    final index = _animeIndex < items.length ? _animeIndex : 0;
 
-    final lbPage = widget.topXp.isNotEmpty ? items.length : -1;
-    final supportPage =
-        widget.topSupport.isNotEmpty ? items.length + (lbPage >= 0 ? 1 : 0) : -1;
-    final pageCount = items.length + (lbPage >= 0 ? 1 : 0) + (supportPage >= 0 ? 1 : 0);
+    final hasLeaderboard = widget.topXp.isNotEmpty || widget.topClans.isNotEmpty;
+    final lbPage = hasLeaderboard ? 1 : -1;
+    final supportPage = widget.topSupport.isNotEmpty ? 1 + (hasLeaderboard ? 1 : 0) : -1;
+    final pageCount = 1 + (hasLeaderboard ? 1 : 0) + (widget.topSupport.isNotEmpty ? 1 : 0);
 
     return Column(
       children: [
@@ -124,33 +129,26 @@ class _HeroBannerState extends State<HeroBanner> with SingleTickerProviderStateM
                 onNotification: _onScroll,
                 child: PageView.builder(
                   controller: _pager,
+                  physics: pageCount > 1
+                      ? const PageScrollPhysics()
+                      : const NeverScrollableScrollPhysics(),
                   itemCount: pageCount,
-                  onPageChanged: (i) => setState(() => _current = i),
+                  onPageChanged: (i) => setState(() => _page = i),
                   itemBuilder: (context, page) {
                     if (page == lbPage) {
                       return HeroLeaderboardSlide(
                         entries: widget.topXp,
+                        clans: widget.topClans,
                         onTap: widget.onLeaderboardClick ?? () {},
                       );
                     }
                     if (page == supportPage) {
                       return HeroSupportSlide(supporters: widget.topSupport);
                     }
-                    return AnimatedBuilder(
-                      animation: _pager,
-                      builder: (context, _) {
-                        double pageValue = _current.toDouble();
-                        if (_pager.hasClients && _pager.position.haveDimensions) {
-                          pageValue = _pager.page ?? pageValue;
-                        }
-                        return _HeroPage(
-                          anime: items[page],
-                          isCurrent: _current == page,
-                          pageOffset: (pageValue - page).abs(),
-                          pulse: _pulse,
-                          onClick: () => widget.onItemClick(items[page]),
-                        );
-                      },
+                    return _AutoPosterSlide(
+                      items: items,
+                      index: index,
+                      onTap: () => widget.onItemClick(items[index]),
                     );
                   },
                 ),
@@ -164,24 +162,32 @@ class _HeroBannerState extends State<HeroBanner> with SingleTickerProviderStateM
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               for (var i = 0; i < pageCount; i++)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 3),
-                  child: AnimatedContainer(
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => _pager.animateToPage(
+                    i,
                     duration: const Duration(milliseconds: 350),
-                    curve: Curves.easeOutBack,
-                    width: i == _current ? 22 : 6,
-                    height: 5,
-                    decoration: BoxDecoration(
-                      color: i == _current
-                          ? (i == lbPage
-                              ? heroGold
-                              : i == supportPage
-                                  ? heroPink
-                                  : AppColors.accentViolet)
-                          : (i == supportPage
-                              ? heroPink.withValues(alpha: 0.4)
-                              : AppColors.surfaceDark),
-                      borderRadius: AppShapes.pill,
+                    curve: Curves.easeOut,
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 3),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 350),
+                      curve: Curves.easeOutBack,
+                      width: i == _page ? 22 : 6,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: i == _page
+                            ? (i == lbPage
+                                ? heroGold
+                                : i == supportPage
+                                    ? heroPink
+                                    : AppColors.accentViolet)
+                            : (i == supportPage
+                                ? heroPink.withValues(alpha: 0.4)
+                                : AppColors.surfaceDark),
+                        borderRadius: AppShapes.pill,
+                      ),
                     ),
                   ),
                 ),
@@ -193,232 +199,257 @@ class _HeroBannerState extends State<HeroBanner> with SingleTickerProviderStateM
   }
 }
 
-class _HeroPage extends StatefulWidget {
-  const _HeroPage({
-    required this.anime,
-    required this.isCurrent,
-    required this.pageOffset,
-    required this.pulse,
-    required this.onClick,
+/// Slide anime: satu kartu, gambar ganti sendiri mengikuti [index]. Chip
+/// views di kiri atas, indikator rotasi di kanan atas, peringkat + judul rata
+/// tengah di bawah. Seluruh kartu bisa di-tap buat buka anime.
+class _AutoPosterSlide extends StatelessWidget {
+  const _AutoPosterSlide({
+    required this.items,
+    required this.index,
+    required this.onTap,
   });
 
-  final AnimeItem anime;
-  final bool isCurrent;
-  final double pageOffset;
-  final Animation<double> pulse;
-  final VoidCallback onClick;
-
-  @override
-  State<_HeroPage> createState() => _HeroPageState();
-}
-
-class _HeroPageState extends State<_HeroPage> {
-  bool _showMeta = false;
-  bool _playPressed = false;
-  Timer? _metaTimer;
-
-  @override
-  void initState() {
-    super.initState();
-    _syncMeta();
-  }
-
-  @override
-  void didUpdateWidget(_HeroPage old) {
-    super.didUpdateWidget(old);
-    if (old.isCurrent != widget.isCurrent) _syncMeta();
-  }
-
-  void _syncMeta() {
-    _metaTimer?.cancel();
-    if (widget.isCurrent) {
-      _metaTimer = Timer(const Duration(milliseconds: 80), () {
-        if (mounted) setState(() => _showMeta = true);
-      });
-    } else {
-      _showMeta = false;
-    }
-  }
-
-  @override
-  void dispose() {
-    _metaTimer?.cancel();
-    super.dispose();
-  }
-
-  Widget _chip(String text, Color bg, Color fg, FontWeight w) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(4)),
-      child: Text(text, style: TextStyle(color: fg, fontSize: 10, fontWeight: w)),
-    );
-  }
+  final List<AnimeItem> items;
+  final int index;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final anime = widget.anime;
-    final dpr = MediaQuery.devicePixelRatioOf(context);
-
-    // Cover dulu, fallback ke poster
-    final imageUrl = !_blank(anime.imageCover) ? anime.coverUrl : anime.posterUrl;
-
-    final genres = (anime.genre ?? '')
-        .split(',')
-        .map((e) => e.trim())
-        .where((e) => e.isNotEmpty && !_isNone(e))
-        .take(3)
-        .toList();
-
-    final title = anime.title;
-    final displayTitle =
-        (!_blank(title) && !_isNone(title) && title!.toLowerCase() != 'anime') ? title : '';
+    final anime = items[index];
 
     return GestureDetector(
-      onTap: widget.onClick,
+      onTap: onTap,
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // Gambar dengan parallax + Ken Burns
-          TweenAnimationBuilder<double>(
-            tween: Tween<double>(end: widget.isCurrent ? 1.06 : 1.0),
-            duration: const Duration(milliseconds: 4500),
-            curve: Curves.linear,
-            builder: (context, scale, child) {
-              return Transform.translate(
-                offset: Offset(widget.pageOffset * 40 / dpr, 0),
-                child: Transform.scale(scale: scale, child: child),
-              );
-            },
-            child: NetImage(imageUrl),
+          const ColoredBox(color: _heroInk),
+          // 1. Gambar: crossfade antar anime + zoom pelan (Ken Burns).
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 700),
+            child: _KenBurnsImage(
+              key: ValueKey('hero_img_$index'),
+              url: anime.coverUrl,
+            ),
           ),
-          // Gradien sinematik atas -> bawah
-          const DecoratedBox(
+          // 2. Scrim: atas tipis (chip kebaca), bawah tebal (judul kebaca).
+          DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
+                stops: const [0, 0.28, 0.5, 1],
                 colors: [
-                  Color(0x111E1B2E),
-                  Color(0x551E1B2E),
-                  Color(0xDD1E1B2E),
-                  Color(0xFF1E1B2E),
+                  Colors.black.withValues(alpha: 0.35),
+                  Colors.transparent,
+                  _heroInk.withValues(alpha: 0.35),
+                  _heroInk.withValues(alpha: 0.96),
                 ],
               ),
             ),
           ),
-          // Vinyet kiri
-          Align(
-            alignment: Alignment.centerLeft,
-            child: SizedBox(
-              width: 400 / dpr,
-              child: const DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                    colors: [Color(0xAA1E1B2E), Colors.transparent],
-                  ),
-                ),
-                child: SizedBox.expand(),
-              ),
+          // 3. Chip views (kiri atas).
+          Positioned(
+            left: 12,
+            top: 12,
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 400),
+              reverseDuration: const Duration(milliseconds: 250),
+              child: _blank(anime.views)
+                  ? SizedBox.shrink(key: ValueKey('views_none_$index'))
+                  : _ViewsChip(key: ValueKey('views_$index'), views: anime.views!),
             ),
           ),
-          // Teks: chip + judul
-          Align(
-            alignment: Alignment.bottomLeft,
-            child: FractionallySizedBox(
-              widthFactor: 0.72,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                child: Column(
+          // 4. Indikator rotasi (kanan atas): ini poster ke berapa.
+          if (items.length > 1)
+            Positioned(
+              right: 12,
+              top: 12,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    AnimatedOpacity(
-                      opacity: _showMeta ? 1 : 0,
-                      duration: const Duration(milliseconds: 250),
-                      child: AnimatedSlide(
-                        offset: _showMeta ? Offset.zero : const Offset(0, 0.5),
-                        duration: const Duration(milliseconds: 250),
-                        curve: Curves.easeOut,
-                        child: Wrap(
-                          spacing: 6,
-                          runSpacing: 4,
-                          children: [
-                            if (!_blank(anime.type) && !_isNone(anime.type))
-                              _chip(
-                                anime.type!,
-                                AppColors.accentViolet.withValues(alpha: 0.25),
-                                AppColors.accentViolet,
-                                FontWeight.w700,
-                              ),
-                            if (!_blank(anime.year) && !_isNone(anime.year))
-                              _chip(
-                                anime.year!,
-                                AppColors.surfaceDark.withValues(alpha: 0.6),
-                                AppColors.textSecondary,
-                                FontWeight.w500,
-                              ),
-                            for (final g in genres)
-                              _chip(
-                                g,
-                                AppColors.surfaceDark.withValues(alpha: 0.7),
-                                AppColors.textWhite,
-                                FontWeight.w500,
-                              ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    if (displayTitle.isNotEmpty)
-                      Text(
-                        displayTitle,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppColors.textWhite,
-                          fontSize: 17,
-                          fontWeight: FontWeight.w700,
-                          height: 22 / 17,
+                    for (var i = 0; i < items.length; i++)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 2),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          width: i == index ? 16 : 5,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: i == index ? 0.95 : 0.35),
+                            borderRadius: AppShapes.pill,
+                          ),
                         ),
                       ),
                   ],
                 ),
               ),
             ),
-          ),
-          // Tombol play berdenyut
+          // 5. Peringkat + judul (tengah bawah), naik pelan tiap ganti anime.
           Positioned(
-            right: 16,
-            bottom: 16,
-            child: GestureDetector(
-              onTapDown: (_) => setState(() => _playPressed = true),
-              onTapUp: (_) => setState(() => _playPressed = false),
-              onTapCancel: () => setState(() => _playPressed = false),
-              onTap: widget.onClick,
-              child: AnimatedBuilder(
-                animation: widget.pulse,
-                builder: (context, child) {
-                  final pulseScale =
-                      1.0 + 0.06 * Curves.fastOutSlowIn.transform(widget.pulse.value);
-                  return Transform.scale(
-                    scale: _playPressed ? 0.94 : pulseScale,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: 124,
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 500),
+              reverseDuration: const Duration(milliseconds: 250),
+              layoutBuilder: (current, previous) => Stack(
+                alignment: Alignment.bottomCenter,
+                children: [...previous, if (current != null) current],
+              ),
+              transitionBuilder: (child, anim) {
+                // Yang masuk menunggu 200ms (0.4 dari 500ms) biar tidak
+                // numpuk sama caption lama yang sedang memudar.
+                final incoming = child.key == ValueKey('hero_caption_$index');
+                final a = incoming
+                    ? anim.drive(CurveTween(curve: const Interval(0.4, 1.0)))
+                    : anim;
+                return FadeTransition(
+                  opacity: a,
+                  child: SlideTransition(
+                    position: a.drive(
+                      Tween<Offset>(begin: const Offset(0, 0.25), end: Offset.zero),
+                    ),
                     child: child,
-                  );
-                },
-                child: Container(
-                  width: 46,
-                  height: 46,
-                  decoration: const BoxDecoration(
-                    color: AppColors.accentViolet,
-                    shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.play_arrow, color: AppColors.textWhite, size: 28),
-                ),
+                );
+              },
+              child: _Caption(
+                key: ValueKey('hero_caption_$index'),
+                anime: anime,
+                rank: index + 1,
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Gambar hero dengan zoom pelan 1.0 -> 1.08 selama poster ini tampil.
+class _KenBurnsImage extends StatelessWidget {
+  const _KenBurnsImage({super.key, required this.url});
+
+  final String url;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 1.0, end: 1.08),
+      duration: _rotateEvery + const Duration(milliseconds: 700),
+      curve: Curves.linear,
+      builder: (context, scale, child) => Transform.scale(scale: scale, child: child),
+      child: SizedBox.expand(child: NetImage(url)),
+    );
+  }
+}
+
+class _ViewsChip extends StatelessWidget {
+  const _ViewsChip({super.key, required this.views});
+
+  final String views;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.visibility, size: 14, color: Colors.white),
+          const SizedBox(width: 5),
+          Text(
+            '$views views',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Caption extends StatelessWidget {
+  const _Caption({super.key, required this.anime, required this.rank});
+
+  final AnimeItem anime;
+  final int rank;
+
+  @override
+  Widget build(BuildContext context) {
+    final title = anime.title;
+    final displayTitle =
+        (!_blank(title) && !_isNone(title) && title!.toLowerCase() != 'anime')
+            ? title!
+            : 'Tanpa Judul';
+    final meta = [anime.type, anime.status]
+        .where((e) => !_blank(e) && !_isNone(e))
+        .join(' \u2022 ');
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 18),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.55),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: heroGold.withValues(alpha: 0.35)),
+            ),
+            child: Text(
+              '#$rank',
+              style: const TextStyle(
+                color: heroGold,
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            displayTitle,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: AppColors.textWhite,
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              height: 26 / 20,
+            ),
+          ),
+          if (meta.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              meta.toUpperCase(),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Color(0xB3FFFFFF),
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                letterSpacing: 0.8,
+              ),
+            ),
+          ],
         ],
       ),
     );

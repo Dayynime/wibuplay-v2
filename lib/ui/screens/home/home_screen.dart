@@ -263,6 +263,7 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
               child: HeroBanner(
                 sliderItems: sections.slider,
                 topXp: ref.watch(heroTopXpProvider).valueOrNull ?? const [],
+                topClans: ref.watch(heroTopClansProvider).valueOrNull ?? const [],
                 topSupport: ref.watch(topSupportersProvider).valueOrNull ?? const [],
                 onLeaderboardClick: () => Navigator.of(context)
                     .push<void>(fadeRoute(const XpLeaderboardScreen())),

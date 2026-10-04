@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../models/chat_models.dart';
+import '../models/clan_models.dart';
 
 /// Chat Global lewat PostgREST Supabase Zenime (tabel `global_chat_messages`
 /// dan `chat_profiles`). Port ChatRepository.kt.
@@ -183,6 +184,22 @@ class ChatRepository {
       if (uid.isNotEmpty && tag != null && tag.isNotEmpty) out[uid] = tag;
     }
     return out;
+  }
+
+  /// Top clan (level tertinggi, lalu total XP) buat slide Top Leaderboard.
+  Future<List<ClanSummary>> getTopClans({int limit = 4}) async {
+    final res = await _dio.get<dynamic>(
+      'rest/v1/clans',
+      queryParameters: {
+        'select': 'id,tag,photo_url,level,total_xp',
+        'order': 'level.desc,total_xp.desc',
+        'limit': limit,
+      },
+    );
+    return _rows(res.data)
+        .map(ClanSummary.fromJson)
+        .where((c) => c.tag.isNotEmpty)
+        .toList();
   }
 
   /// Profil (username/avatar) banyak uid dalam 1 request, buat leaderboard.

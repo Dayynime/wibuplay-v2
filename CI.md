@@ -56,3 +56,15 @@ manifest rilis bawaan Flutter tidak punya izin internet.
 - Tag clan diambil batch lewat `clan_members?select=firebase_uid,clans(tag)`; Premium dicek paralel per uid lewat `zenime-check-premium` (Edge Function cuma terima satu uid per request).
 - Belum: centang berwarna per role (developer/admin/moderator) dan badge role teks seperti di Zenime. Hanya centang Premium biru.
 
+
+### Catatan Top Leaderboard (Beranda)
+
+- Slide Top Leaderboard sekarang dua kolom ala Zenime: TOP XP (XP nonton bulan ini) dan TOP CLAN (urut level lalu total XP), dipisah garis vertikal, tema navy.
+- Data clan: `ChatRepository.getTopClans` (`rest/v1/clans`), provider `heroTopClansProvider`. Slide tampil kalau salah satu kolom ada isinya.
+- Beda dari Zenime: tap hanya di header TOP XP (ke leaderboard XP). Kolom clan belum punya halaman tujuan di Wibuplay, jadi tanpa chevron/tap. Subtitle "XP nonton bulan ini" dihapus, dan angka XP tanpa tulisan "XP".
+
+### Catatan Hero Carousel (Beranda)
+
+- Gaya "Poster Otomatis" ala Zenime: slide anime sekarang SATU kartu yang gambarnya ganti sendiri tiap 4,5 detik (crossfade 700ms + zoom pelan 1.0 -> 1.08), bukan satu halaman per anime. Chip views kiri atas, indikator rotasi kanan atas, peringkat `#N` + judul + `TIPE • STATUS` di tengah bawah, ikut beranimasi.
+- Pager luar cuma: kartu anime, Top Leaderboard, Top Support. Rotasi berhenti saat user sedang geser atau ada di slide leaderboard/support. Gambar berikutnya di-preload (`netImageHeaders` di `net_image.dart`).
+- Beda dari versi sebelumnya: tombol play berdenyut, chip genre/tahun, dan parallax dihapus (Zenime tidak punya). Dot indikator bawah sekarang bisa di-tap.
