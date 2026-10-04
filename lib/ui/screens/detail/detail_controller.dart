@@ -20,6 +20,8 @@ class DetailUiState {
     this.selectedTab = 0,
     this.isLoading = false,
     this.isLoadingEpisodes = false,
+    this.isLoadingMoreEpisodes = false,
+    this.hasMoreEpisodes = true,
     this.error,
   });
 
@@ -32,6 +34,12 @@ class DetailUiState {
   final int selectedTab;
   final bool isLoading;
   final bool isLoadingEpisodes;
+
+  /// True saat halaman episode berikutnya sedang diambil (load more otomatis).
+  final bool isLoadingMoreEpisodes;
+
+  /// False kalau API sudah tidak punya halaman episode lagi.
+  final bool hasMoreEpisodes;
   final String? error;
 
   /// [error] berupa fungsi supaya bisa mengisi null secara eksplisit.
@@ -45,6 +53,8 @@ class DetailUiState {
     int? selectedTab,
     bool? isLoading,
     bool? isLoadingEpisodes,
+    bool? isLoadingMoreEpisodes,
+    bool? hasMoreEpisodes,
     String? Function()? error,
   }) {
     return DetailUiState(
@@ -57,6 +67,8 @@ class DetailUiState {
       selectedTab: selectedTab ?? this.selectedTab,
       isLoading: isLoading ?? this.isLoading,
       isLoadingEpisodes: isLoadingEpisodes ?? this.isLoadingEpisodes,
+      isLoadingMoreEpisodes: isLoadingMoreEpisodes ?? this.isLoadingMoreEpisodes,
+      hasMoreEpisodes: hasMoreEpisodes ?? this.hasMoreEpisodes,
       error: error != null ? error() : this.error,
     );
   }
@@ -66,6 +78,8 @@ class DetailUiState {
 class DetailController extends AutoDisposeFamilyNotifier<DetailUiState, String> {
   bool _alive = true;
   int _episodeRequest = 0;
+  int _episodeNextPage = 0;
+  bool _fetchingMore = false;
 
   String get movieId => arg;
 
@@ -103,19 +117,67 @@ class DetailController extends AutoDisposeFamilyNotifier<DetailUiState, String> 
     }
   }
 
+  /// Reset & ambil halaman pertama (dipanggil pas layar dibuka / ganti pencarian).
   Future<void> loadEpisodes([String search = '']) async {
     final request = ++_episodeRequest;
-    _update((s) => s.copyWith(isLoadingEpisodes: true));
+    _episodeNextPage = 0;
+    _fetchingMore = false;
+    _update((s) => s.copyWith(
+          isLoadingEpisodes: true,
+          isLoadingMoreEpisodes: false,
+          hasMoreEpisodes: true,
+        ));
     try {
       final list = await ref
           .read(repositoryProvider)
           .getMovieEpisodes(movieId, page: 0, search: search);
       // Abaikan hasil lama kalau ada pencarian yang lebih baru
       if (request != _episodeRequest) return;
-      _update((s) => s.copyWith(episodes: list, isLoadingEpisodes: false));
+      _episodeNextPage = 1;
+      _update((s) => s.copyWith(
+            episodes: list,
+            isLoadingEpisodes: false,
+            hasMoreEpisodes: list.isNotEmpty,
+          ));
     } catch (_) {
       if (request != _episodeRequest) return;
-      _update((s) => s.copyWith(isLoadingEpisodes: false));
+      _update((s) => s.copyWith(isLoadingEpisodes: false, hasMoreEpisodes: false));
+    }
+  }
+
+  /// Dipanggil dari scroll listener di DetailScreen tiap kali user sudah
+  /// dekat ujung bawah daftar episode. Otomatis ambil halaman berikutnya
+  /// kalau masih ada & tidak sedang fetch lain (port loadMoreEpisodesIfNeeded).
+  Future<void> loadMoreEpisodesIfNeeded() async {
+    if (_fetchingMore || !state.hasMoreEpisodes || state.isLoadingEpisodes) return;
+    if (state.episodes.isEmpty) return;
+    final request = _episodeRequest;
+    final page = _episodeNextPage;
+    final search = state.episodeSearch;
+    _fetchingMore = true;
+    _update((s) => s.copyWith(isLoadingMoreEpisodes: true));
+    try {
+      final list = await ref
+          .read(repositoryProvider)
+          .getMovieEpisodes(movieId, page: page, search: search);
+      // Pencarian/reset baru sudah jalan, buang hasil halaman lama
+      if (request != _episodeRequest) return;
+      final existing = state.episodes.map((e) => e.id).toSet();
+      final fresh = list.where((e) => e.id == null || !existing.contains(e.id)).toList();
+      _episodeNextPage = page + 1;
+      _update((s) => s.copyWith(
+            episodes: [...s.episodes, ...fresh],
+            // Halaman kosong / isinya duplikat semua = sudah habis
+            hasMoreEpisodes: fresh.isNotEmpty,
+          ));
+    } catch (_) {
+      if (request != _episodeRequest) return;
+      // Gagal jaringan: jangan matikan hasMore, biar scroll berikutnya coba lagi
+    } finally {
+      if (request == _episodeRequest) {
+        _fetchingMore = false;
+        _update((s) => s.copyWith(isLoadingMoreEpisodes: false));
+      }
     }
   }
 

@@ -38,7 +38,39 @@ class _DetailScreenState extends ConsumerState<DetailScreen> {
   bool _synopsisExpanded = false;
 
   @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(_onScroll);
+  }
+
+  /// Load more otomatis: begitu mendekati ujung bawah di tab Daftar Episode,
+  /// minta halaman berikutnya (sama seperti Zenime, tanpa tombol).
+  void _onScroll() {
+    if (!_scroll.hasClients) return;
+    final ui = ref.read(detailControllerProvider(widget.movieId));
+    if (ui.selectedTab != 1) return;
+    final pos = _scroll.position;
+    if (pos.pixels >= pos.maxScrollExtent - 600) {
+      _notifier.loadMoreEpisodesIfNeeded();
+    }
+  }
+
+  /// Kalau halaman yang sudah dimuat belum cukup panjang untuk di-scroll,
+  /// listener tidak akan pernah terpicu, jadi cek lagi setelah frame selesai.
+  void _checkFillViewport(DetailUiState ui) {
+    if (ui.selectedTab != 1 || ui.isLoadingEpisodes || ui.isLoadingMoreEpisodes) return;
+    if (!ui.hasMoreEpisodes || ui.episodes.isEmpty) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scroll.hasClients) return;
+      if (_scroll.position.maxScrollExtent - _scroll.position.pixels <= 600) {
+        _notifier.loadMoreEpisodesIfNeeded();
+      }
+    });
+  }
+
+  @override
   void dispose() {
+    _scroll.removeListener(_onScroll);
     _scroll.dispose();
     _search.dispose();
     super.dispose();
@@ -50,6 +82,7 @@ class _DetailScreenState extends ConsumerState<DetailScreen> {
   @override
   Widget build(BuildContext context) {
     final ui = ref.watch(detailControllerProvider(widget.movieId));
+    _checkFillViewport(ui);
     final isFavorite =
         ref.watch(localStoreProvider.select((s) => s.isFavorite(widget.movieId)));
 
@@ -522,6 +555,19 @@ class _DetailScreenState extends ConsumerState<DetailScreen> {
               },
             );
           },
+        ),
+      if (ui.isLoadingMoreEpisodes)
+        const SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.symmetric(vertical: 16),
+            child: Center(
+              child: SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(color: AppColors.accentViolet, strokeWidth: 2),
+              ),
+            ),
+          ),
         ),
     ];
   }
