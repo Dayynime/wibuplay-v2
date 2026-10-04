@@ -6,6 +6,7 @@ import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
 import 'data/local/local_store.dart';
 import 'providers.dart';
+import 'ui/route_observer.dart';
 import 'ui/shell/app_shell.dart';
 
 Future<void> main() async {
@@ -41,6 +42,7 @@ class WibuplayApp extends StatelessWidget {
       title: 'Wibuplay',
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(),
+      navigatorObservers: [routeObserver],
       home: const AppShell(),
     );
   }
