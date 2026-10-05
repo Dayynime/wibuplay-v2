@@ -172,6 +172,38 @@ class ChatController extends AutoDisposeNotifier<ChatUiState> {
     );
   }
 
+  /// Dipanggil dialog Edit Profil Chat setelah tersimpan di server: langsung
+  /// perbarui username/avatar/warna sendiri di layar (dan untuk pesan yang
+  /// dikirim berikutnya) tanpa menunggu refresh.
+  void applyMyProfile({
+    required String username,
+    String? avatarUrl,
+    String? usernameColor,
+  }) {
+    final uid = state.myUid;
+    if (uid.isEmpty) return;
+    _update((s) {
+      final colors = Map<String, String>.from(s.usernameColors);
+      if (usernameColor != null && usernameColor.isNotEmpty) {
+        colors[uid] = usernameColor;
+      } else {
+        colors.remove(uid);
+      }
+      final avatars = Map<String, String>.from(s.avatarUrls);
+      if (avatarUrl != null && avatarUrl.isNotEmpty) {
+        avatars[uid] = avatarUrl;
+      } else {
+        avatars.remove(uid);
+      }
+      return s.copyWith(
+        myUsername: username,
+        myAvatarUrl: avatarUrl,
+        usernameColors: colors,
+        avatarUrls: avatars,
+      );
+    });
+  }
+
   /// Profil bersama Zenime: pakai username/avatar yang sudah ada kalau ada.
   Future<void> _loadProfile() async {
     try {

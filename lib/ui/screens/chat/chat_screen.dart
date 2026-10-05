@@ -2,10 +2,14 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 
+import '../../../core/error_message.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/chat_models.dart';
+import '../../../data/repository/profile_image_uploader.dart';
+import '../../../providers.dart';
 import '../../components/game_badges.dart';
 import '../../components/role_badges.dart';
 import 'chat_controller.dart';
@@ -51,6 +55,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   ChatController get _controller => ref.read(chatControllerProvider.notifier);
+
+  void _openProfileDialog() {
+    final s = ref.read(chatControllerProvider);
+    if (s.myUid.isEmpty) return;
+    showDialog<void>(
+      context: context,
+      builder: (_) => _ChatProfileDialog(
+        uid: s.myUid,
+        username: s.myUsername,
+        avatarUrl: s.avatarUrls[s.myUid] ?? s.myAvatarUrl,
+        usernameColor: s.usernameColors[s.myUid],
+      ),
+    );
+  }
 
   Future<void> _send() async {
     final ok = await _controller.send(_input.text);
@@ -148,6 +166,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         backgroundColor: AppColors.backgroundDark,
         elevation: 0,
         title: const Text('Chat Global'),
+        actions: [
+          // Pengaturan di pojok kanan atas -> Edit Profil Chat (sama dengan
+          // ikon Settings di Chat Global Zenime).
+          IconButton(
+            tooltip: 'Edit Profil',
+            onPressed: _openProfileDialog,
+            icon: const Icon(Icons.settings, color: Colors.white),
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -680,6 +707,371 @@ class _EntryAnimationState extends State<_EntryAnimation>
       child: FadeTransition(
         opacity: _curve,
         child: SlideTransition(position: slide, child: widget.child),
+      ),
+    );
+  }
+}
+
+/// Palet warna preset buat warna username sendiri (sama dengan Zenime).
+const List<String> _usernameColorPresets = [
+  '#E4344A', // merah default Zenime
+  '#3897F0', // biru
+  '#22C55E', // hijau
+  '#F59E0B', // oranye
+  '#A855F7', // ungu
+  '#EC4899', // pink
+  '#14B8A6', // teal
+  '#EAB308', // kuning
+  '#6366F1', // indigo
+  '#FFFFFF', // putih
+  '#FCA5A5', // merah muda
+  '#93C5FD', // biru muda
+  '#86EFAC', // hijau muda
+  '#FCD34D', // kuning muda
+  '#D8B4FE', // ungu muda
+  '#F9A8D4', // pink muda
+  '#5EEAD4', // teal muda
+  '#FDBA74', // oranye muda
+];
+
+/// Dialog Edit Profil Chat (port EditProfileDialog di ChatScreen.kt): foto
+/// profil, username, dan warna username. Semua user boleh, tidak perlu
+/// Premium. Menyimpan ke `chat_profiles`, yang sama dengan Zenime. Banner dan
+/// toggle privasi dibawa apa adanya karena upsert menimpa semua kolom.
+class _ChatProfileDialog extends ConsumerStatefulWidget {
+  const _ChatProfileDialog({
+    required this.uid,
+    required this.username,
+    required this.avatarUrl,
+    required this.usernameColor,
+  });
+
+  final String uid;
+  final String username;
+  final String? avatarUrl;
+  final String? usernameColor;
+
+  @override
+  ConsumerState<_ChatProfileDialog> createState() => _ChatProfileDialogState();
+}
+
+class _ChatProfileDialogState extends ConsumerState<_ChatProfileDialog> {
+  static const int _maxUsername = 24;
+
+  final _picker = ImagePicker();
+  late final TextEditingController _nameCtrl;
+
+  // Nilai yang SUDAH tersimpan di server (dipakai saat upload foto, supaya
+  // ketikan username yang belum disimpan tidak ikut tersimpan).
+  late String _savedName;
+  late String? _savedColor;
+  String? _avatarUrl;
+
+  // Pilihan warna di dialog (belum tentu tersimpan).
+  String? _color;
+
+  ChatProfile? _profile;
+  bool _loaded = false;
+  bool _saving = false;
+  bool _uploading = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _savedName = widget.username;
+    _savedColor = widget.usernameColor;
+    _color = widget.usernameColor;
+    _avatarUrl = widget.avatarUrl;
+    _nameCtrl = TextEditingController(text: widget.username);
+    _loadProfile();
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    super.dispose();
+  }
+
+  /// Ambil profil lengkap dulu (banner + toggle privasi) supaya upsert tidak
+  /// menimpanya dengan nilai default.
+  Future<void> _loadProfile() async {
+    try {
+      final p = await ref.read(chatRepositoryProvider).getProfile(widget.uid);
+      if (!mounted) return;
+      setState(() {
+        _profile = p;
+        _loaded = true;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = errorMessage(e, 'Gagal memuat profil. Tutup lalu buka lagi.'));
+    }
+  }
+
+  Future<void> _persist({required String username, String? avatar, String? color}) async {
+    await ref.read(chatRepositoryProvider).saveProfile(
+          firebaseUid: widget.uid,
+          username: username,
+          avatarUrl: avatar,
+          bannerUrl: _profile?.bannerUrl,
+          usernameColor: color,
+          favoritesPublic: _profile?.favoritesPublic ?? false,
+          historyPublic: _profile?.historyPublic ?? false,
+        );
+    ref.read(chatControllerProvider.notifier).applyMyProfile(
+          username: username,
+          avatarUrl: avatar,
+          usernameColor: color,
+        );
+    ref.invalidate(chatProfileProvider(widget.uid));
+  }
+
+  Future<void> _pickAvatar() async {
+    if (!_loaded || _uploading || _saving) return;
+    final x = await _picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 512,
+      maxHeight: 512,
+      imageQuality: 82,
+    );
+    if (x == null || !mounted) return;
+    setState(() {
+      _uploading = true;
+      _error = null;
+    });
+    try {
+      final url = await ProfileImageUploader.uploadAvatar(x.path, widget.uid);
+      await _persist(username: _savedName, avatar: url, color: _savedColor);
+      if (!mounted) return;
+      setState(() {
+        _avatarUrl = url;
+        _uploading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _uploading = false;
+        _error = errorMessage(e, 'Gagal upload foto profil');
+      });
+    }
+  }
+
+  Future<void> _save() async {
+    final trimmed = _nameCtrl.text.trim();
+    final name = trimmed.length > _maxUsername ? trimmed.substring(0, _maxUsername) : trimmed;
+    if (name.isEmpty) {
+      setState(() => _error = 'Username gak boleh kosong');
+      return;
+    }
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      await _persist(username: name, avatar: _avatarUrl, color: _color);
+      if (!mounted) return;
+      Navigator.of(context).pop();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _error = errorMessage(e, 'Gagal menyimpan username');
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasAvatar = _avatarUrl != null && _avatarUrl!.isNotEmpty;
+    return Dialog(
+      backgroundColor: AppColors.surfaceDark,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: const BorderSide(color: Color(0x14FFFFFF)),
+      ),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'Edit Profil Chat',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppColors.textWhite,
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 14),
+            Center(
+              child: GestureDetector(
+                onTap: _pickAvatar,
+                child: SizedBox(
+                  width: 84,
+                  height: 84,
+                  child: Stack(
+                    children: [
+                      Positioned.fill(
+                        child: ClipOval(
+                          child: ColoredBox(
+                            color: AppColors.backgroundDark,
+                            child: hasAvatar
+                                ? CachedNetworkImage(
+                                    imageUrl: _avatarUrl!,
+                                    fit: BoxFit.cover,
+                                    errorWidget: (_, __, ___) => GeneratedAvatar(
+                                      seed: widget.uid,
+                                      label: _savedName,
+                                      size: 84,
+                                    ),
+                                  )
+                                : GeneratedAvatar(
+                                    seed: widget.uid,
+                                    label: _savedName,
+                                    size: 84,
+                                  ),
+                          ),
+                        ),
+                      ),
+                      if (_uploading)
+                        Positioned.fill(
+                          child: Container(
+                            decoration: const BoxDecoration(
+                              color: Color(0x8C000000),
+                              shape: BoxShape.circle,
+                            ),
+                            alignment: Alignment.center,
+                            child: const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        )
+                      else
+                        Positioned(
+                          right: 0,
+                          bottom: 0,
+                          child: Container(
+                            width: 26,
+                            height: 26,
+                            decoration: const BoxDecoration(
+                              color: AppColors.accentViolet,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.photo_camera, color: Colors.white, size: 14),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: _nameCtrl,
+              maxLength: _maxUsername,
+              maxLines: 1,
+              style: const TextStyle(color: AppColors.textWhite),
+              cursorColor: AppColors.accentViolet,
+              decoration: InputDecoration(
+                labelText: 'Username',
+                labelStyle: const TextStyle(color: AppColors.textSecondary),
+                counterStyle: const TextStyle(color: AppColors.textMuted),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0x33FFFFFF)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppColors.accentViolet),
+                ),
+              ),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Warna Username',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
+            ),
+            const SizedBox(height: 8),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  for (final hex in _usernameColorPresets) ...[
+                    GestureDetector(
+                      onTap: () => setState(() => _color = hex),
+                      child: Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: _parseHex(hex),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: _color == hex ? Colors.white : const Color(0x33FFFFFF),
+                            width: _color == hex ? 2 : 1,
+                          ),
+                        ),
+                        child: _color == hex
+                            ? Icon(
+                                Icons.check,
+                                size: 16,
+                                color: hex == '#FFFFFF' ? Colors.black : Colors.white,
+                              )
+                            : null,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                  ],
+                ],
+              ),
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                _error!,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: AppColors.errorRed, fontSize: 12),
+              ),
+            ],
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _saving ? null : () => Navigator.of(context).pop(),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      side: const BorderSide(color: Color(0x33FFFFFF)),
+                    ),
+                    child: const Text('Batal'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: (_saving || _uploading || !_loaded) ? null : _save,
+                    style: FilledButton.styleFrom(backgroundColor: AppColors.accentViolet),
+                    child: _saving
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Text('Simpan'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
