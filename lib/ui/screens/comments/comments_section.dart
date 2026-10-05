@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../data/models/comment_models.dart';
 import '../../../providers.dart';
 import '../../components/game_badges.dart';
+import '../../components/role_badges.dart';
 import 'comments_controller.dart';
 
 const Color _kPinnedGold = Color(0xFFE8A317);
@@ -534,10 +535,14 @@ class CommentItem extends StatelessWidget {
                         ),
                       ),
                     ),
-                    if (isPremiumSender) ...[
-                      const SizedBox(width: 3),
-                      const PremiumCheckBadge(size: 15),
-                    ],
+                    Padding(
+                      padding: const EdgeInsets.only(left: 3),
+                      child: UserCheckBadge(
+                        firebaseUid: comment.firebaseUid,
+                        isPremium: isPremiumSender,
+                        size: 15,
+                      ),
+                    ),
                     if (comment.isPinned) ...[
                       const SizedBox(width: 3),
                       const Icon(Icons.workspace_premium, size: 14, color: _kPinnedGold),

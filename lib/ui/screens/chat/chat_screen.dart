@@ -7,6 +7,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/chat_models.dart';
 import '../../components/game_badges.dart';
+import '../../components/role_badges.dart';
 import 'chat_controller.dart';
 
 Color? _parseHex(String? hex) {
@@ -388,10 +389,16 @@ class _MessageBubble extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (isPremium) ...[
-                  const SizedBox(width: 3),
-                  const PremiumCheckBadge(size: 15),
-                ],
+                // Centang: warna role (developer merah, admin hijau, moderator
+                // ungu) menang atas Premium biru; hilang kalau bukan keduanya.
+                Padding(
+                  padding: const EdgeInsets.only(left: 3),
+                  child: UserCheckBadge(
+                    firebaseUid: m.firebaseUid,
+                    isPremium: isPremium,
+                    size: 15,
+                  ),
+                ),
                 if (userNumber != null) ...[
                   const SizedBox(width: 4),
                   Text(

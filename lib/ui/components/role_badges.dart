@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -99,26 +102,77 @@ RoleInfo? roleInfoFrom(String? roleValue, String? badgeColorHex) {
   }
 }
 
-/// Role satu user dari `user_roles` (SELECT publik). null = bukan staff atau
-/// gagal dimuat (badge cukup tidak tampil).
-final roleInfoProvider = FutureProvider.family<RoleInfo?, String>((ref, uid) async {
-  if (uid.isEmpty) return null;
-  try {
-    final res = await ref.watch(supabaseDioProvider).get<dynamic>(
-      'rest/v1/user_roles',
-      queryParameters: {
-        'firebase_uid': 'eq.$uid',
-        'select': 'firebase_uid,role,badge_color',
-        'limit': 1,
-      },
-    );
-    final data = res.data;
-    if (data is! List || data.isEmpty || data.first is! Map) return null;
-    final row = Map<String, dynamic>.from(data.first as Map);
-    return roleInfoFrom(row['role'] as String?, row['badge_color'] as String?);
-  } catch (_) {
-    return null;
+/// Mengumpulkan permintaan role dari banyak badge (mis. satu layar chat) jadi
+/// satu request `firebase_uid=in.(...)` per ~40ms, seperti getRolesForUids di
+/// Zenime, supaya chat dengan banyak pengirim tidak menembak server satu-satu.
+class _RoleBatcher {
+  _RoleBatcher(this._dio);
+
+  final Dio _dio;
+  final Map<String, Completer<RoleInfo?>> _pending = {};
+  Timer? _timer;
+
+  static final RegExp _safeUid = RegExp(r'^[A-Za-z0-9_-]+$');
+  static const int _chunk = 50;
+
+  Future<RoleInfo?> load(String uid) {
+    if (!_safeUid.hasMatch(uid)) return Future.value(null);
+    final c = _pending.putIfAbsent(uid, () => Completer<RoleInfo?>());
+    _timer ??= Timer(const Duration(milliseconds: 40), _flush);
+    return c.future;
   }
+
+  Future<void> _flush() async {
+    final batch = Map<String, Completer<RoleInfo?>>.from(_pending);
+    _pending.clear();
+    _timer = null;
+    final uids = batch.keys.toList();
+    for (var i = 0; i < uids.length; i += _chunk) {
+      final part = uids.sublist(i, i + _chunk > uids.length ? uids.length : i + _chunk);
+      try {
+        final res = await _dio.get<dynamic>(
+          'rest/v1/user_roles',
+          queryParameters: {
+            'firebase_uid': 'in.(${part.join(',')})',
+            'select': 'firebase_uid,role,badge_color',
+          },
+        );
+        final found = <String, RoleInfo>{};
+        final data = res.data;
+        if (data is List) {
+          for (final row in data) {
+            if (row is! Map) continue;
+            final uid = row['firebase_uid'] as String?;
+            final info = roleInfoFrom(row['role'] as String?, row['badge_color'] as String?);
+            if (uid != null && info != null) found[uid] = info;
+          }
+        }
+        for (final uid in part) {
+          batch[uid]!.complete(found[uid]);
+        }
+      } catch (e) {
+        // Gagal: error (bukan null) supaya tidak di-cache selamanya (lihat
+        // roleInfoProvider); badge cukup tidak tampil dulu.
+        for (final uid in part) {
+          batch[uid]!.completeError(e);
+        }
+      }
+    }
+  }
+}
+
+final _roleBatcherProvider =
+    Provider<_RoleBatcher>((ref) => _RoleBatcher(ref.watch(supabaseDioProvider)));
+
+/// Role satu user dari `user_roles` (SELECT publik). null = bukan staff atau
+/// gagal dimuat (badge cukup tidak tampil). Hasil sukses di-cache selama app
+/// jalan; yang gagal dicoba lagi saat widget dibangun ulang.
+final roleInfoProvider =
+    FutureProvider.autoDispose.family<RoleInfo?, String>((ref, uid) async {
+  if (uid.isEmpty) return null;
+  final info = await ref.watch(_roleBatcherProvider).load(uid);
+  ref.keepAlive();
+  return info;
 });
 
 ShapeBorder _roleShape(ZenimeRole role, Color outline) {

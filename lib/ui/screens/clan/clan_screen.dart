@@ -7,6 +7,7 @@ import '../../../data/models/clan_models.dart';
 import '../../../data/repository/clan_repository.dart';
 import '../../../providers.dart';
 import '../../components/game_badges.dart';
+import '../../components/role_badges.dart';
 import '../../app_routes.dart';
 import '../../components/hero_slides.dart' show heroGold;
 import 'clan_manage_screen.dart';
@@ -913,10 +914,14 @@ class _MemberRow extends StatelessWidget {
                         ),
                       ),
                     ),
-                    if (isPremium) ...[
-                      const SizedBox(width: 4),
-                      const PremiumCheckBadge(size: 15),
-                    ],
+                    Padding(
+                      padding: const EdgeInsets.only(left: 4),
+                      child: UserCheckBadge(
+                        firebaseUid: member.firebaseUid,
+                        isPremium: isPremium,
+                        size: 15,
+                      ),
+                    ),
                     if (member.userNumber != null) ...[
                       const SizedBox(width: 5),
                       Text(

@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../data/models/xp_models.dart';
 import '../../../providers.dart';
 import '../../components/game_badges.dart';
+import '../../components/role_badges.dart';
 
 /// Leaderboard XP: podium top-3 + daftar (port XpLeaderboardScreen.kt).
 /// XP yang tampil adalah XP nonton BULAN BERJALAN (reset tiap tanggal 1 WIB);
@@ -184,10 +185,14 @@ class XpLeaderboardScreen extends ConsumerWidget {
                 ),
               ),
             ),
-            if (e.isPremium) ...[
-              const SizedBox(width: 3),
-              const PremiumCheckBadge(size: 14),
-            ],
+            Padding(
+              padding: const EdgeInsets.only(left: 3),
+              child: UserCheckBadge(
+                firebaseUid: e.firebaseUid,
+                isPremium: e.isPremium,
+                size: 14,
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 4),
@@ -241,10 +246,14 @@ class XpLeaderboardScreen extends ConsumerWidget {
                         ),
                       ),
                     ),
-                    if (e.isPremium) ...[
-                      const SizedBox(width: 4),
-                      const PremiumCheckBadge(size: 16),
-                    ],
+                    Padding(
+                      padding: const EdgeInsets.only(left: 4),
+                      child: UserCheckBadge(
+                        firebaseUid: e.firebaseUid,
+                        isPremium: e.isPremium,
+                        size: 16,
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 4),
