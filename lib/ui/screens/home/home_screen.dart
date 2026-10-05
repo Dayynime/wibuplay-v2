@@ -230,8 +230,9 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
                     onProfileClick: widget.onProfileClick,
                     onPremiumClick: () => openPremium(context),
                     onCoinClick: () => openCoin(context),
-                    onShieldClick: () => Navigator.of(context)
-                        .push<void>(fadeRoute(const XpLeaderboardScreen())),
+                    onShieldClick: () => Navigator.of(context).push<void>(fadeRoute(
+                        const ClanBrowseScreen(
+                            initialMode: ClanBrowseMode.leaderboard))),
                   )
                 : Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),

@@ -10,6 +10,7 @@ import 'data/repository/anime_repository.dart';
 import 'data/repository/auth_repository.dart';
 import 'data/repository/chat_repository.dart';
 import 'data/repository/clan_repository.dart';
+import 'data/repository/public_profile_repository.dart';
 import 'data/repository/comment_repository.dart';
 import 'data/models/account_models.dart';
 import 'data/models/chat_models.dart';
@@ -35,11 +36,20 @@ final apiServiceProvider = Provider<ApiService>(
 
 /// Pakai `read` untuk store supaya repository tidak dibuat ulang tiap data lokal berubah.
 final repositoryProvider = Provider<AnimeRepository>(
-  (ref) => AnimeRepository(ref.watch(apiServiceProvider), ref.read(localStoreProvider)),
+  (ref) => AnimeRepository(
+    ref.watch(apiServiceProvider),
+    ref.read(localStoreProvider),
+    ref.watch(publicProfileRepositoryProvider),
+  ),
 );
 
 /// Dio khusus Supabase Zenime (login + chat).
 final supabaseDioProvider = Provider<Dio>((ref) => createSupabaseDio());
+
+/// Sync favorit + riwayat tonton ke Supabase (port PublicProfileRepository.kt).
+final publicProfileRepositoryProvider = Provider<PublicProfileRepository>(
+  (ref) => PublicProfileRepository(ref.watch(supabaseDioProvider)),
+);
 
 final chatRepositoryProvider = Provider<ChatRepository>(
   (ref) => ChatRepository(ref.watch(supabaseDioProvider)),

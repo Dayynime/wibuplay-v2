@@ -1,3 +1,8 @@
+import 'dart:async';
+
+import 'package:firebase_auth/firebase_auth.dart';
+
+import '../../core/firebase_config.dart';
 import '../../core/json_helper.dart';
 import '../api/api_service.dart';
 import '../local/entities.dart';
@@ -9,14 +14,35 @@ import '../models/genre_item.dart';
 import '../models/home_sections.dart';
 import '../models/media_item.dart';
 import '../models/stream_data.dart';
+import 'public_profile_repository.dart';
 
 /// Port AnimeRepository.kt. Method jaringan melempar exception kalau gagal
 /// (setara Result.failure); pemanggil yang menangkapnya.
 class AnimeRepository {
-  AnimeRepository(this._api, this._store);
+  AnimeRepository(this._api, this._store, [this._publicProfile]);
 
   final ApiService _api;
   final LocalStore _store;
+
+  /// Sinkronisasi favorit/riwayat ke Supabase (opsional, best-effort).
+  final PublicProfileRepository? _publicProfile;
+
+  /// UID user yang login (null kalau belum login / email belum verifikasi,
+  /// aturan sama dengan AuthRepository).
+  String? _currentUidOrNull() {
+    if (!FirebaseConfig.ready) return null;
+    final u = FirebaseAuth.instance.currentUser;
+    if (u == null) return null;
+    final viaGoogle = u.providerData.any((p) => p.providerId == 'google.com');
+    return (viaGoogle || u.emailVerified) ? u.uid : null;
+  }
+
+  void _sync(Future<void> Function(PublicProfileRepository repo, String uid) job) {
+    final repo = _publicProfile;
+    final uid = _currentUidOrNull();
+    if (repo == null || uid == null) return;
+    unawaited(job(repo, uid));
+  }
 
   // Cache dalam memori
   HomeSectionData? _cachedHome;
@@ -321,25 +347,29 @@ class AnimeRepository {
     if (animeId == null) return;
     if (_store.isFavorite(animeId)) {
       await _store.deleteFavorite(animeId);
+      _sync((repo, uid) => repo.syncFavoriteRemoved(uid, animeId));
     } else {
-      await _store.insertFavorite(
-        FavoriteEntity(
-          id: animeId,
-          title: anime.title ?? 'Anime',
-          posterUrl: anime.posterUrl,
-          coverUrl: anime.coverUrl,
-          synopsis: anime.synopsis,
-          genre: anime.genre,
-          status: anime.status,
-          type: anime.type,
-          views: anime.views,
-          timestamp: DateTime.now().millisecondsSinceEpoch,
-        ),
+      final entity = FavoriteEntity(
+        id: animeId,
+        title: anime.title ?? 'Anime',
+        posterUrl: anime.posterUrl,
+        coverUrl: anime.coverUrl,
+        synopsis: anime.synopsis,
+        genre: anime.genre,
+        status: anime.status,
+        type: anime.type,
+        views: anime.views,
+        timestamp: DateTime.now().millisecondsSinceEpoch,
       );
+      await _store.insertFavorite(entity);
+      _sync((repo, uid) => repo.syncFavoriteAdded(uid, entity));
     }
   }
 
-  Future<void> removeFavorite(String id) => _store.deleteFavorite(id);
+  Future<void> removeFavorite(String id) async {
+    await _store.deleteFavorite(id);
+    _sync((repo, uid) => repo.syncFavoriteRemoved(uid, id));
+  }
 
   List<WatchHistoryEntity> get watchHistory => _store.history;
 
@@ -360,23 +390,40 @@ class AnimeRepository {
     required int durationMs,
   }) async {
     if (episodeId.isEmpty || movieId.isEmpty) return;
-    await _store.insertOrUpdateHistory(
-      WatchHistoryEntity(
-        id: '${movieId}_$episodeId',
-        movieId: movieId,
-        movieTitle: movieTitle,
-        moviePoster: moviePoster,
-        episodeId: episodeId,
-        episodeIndex: episodeIndex,
-        episodeTitle: episodeTitle,
-        playbackPositionMs: playbackPositionMs,
-        durationMs: durationMs,
-        lastWatchedTime: DateTime.now().millisecondsSinceEpoch,
-      ),
+    final entity = WatchHistoryEntity(
+      id: '${movieId}_$episodeId',
+      movieId: movieId,
+      movieTitle: movieTitle,
+      moviePoster: moviePoster,
+      episodeId: episodeId,
+      episodeIndex: episodeIndex,
+      episodeTitle: episodeTitle,
+      playbackPositionMs: playbackPositionMs,
+      durationMs: durationMs,
+      lastWatchedTime: DateTime.now().millisecondsSinceEpoch,
     );
+    await _store.insertOrUpdateHistory(entity);
+    _sync((repo, uid) => repo.syncWatchProgress(uid, entity));
   }
 
-  Future<void> deleteHistory(String id) => _store.deleteHistory(id);
+  Future<void> deleteHistory(String id) async {
+    // Ambil movieId/episodeId dulu sebelum baris lokal dihapus.
+    WatchHistoryEntity? target;
+    for (final h in _store.history) {
+      if (h.id == id) {
+        target = h;
+        break;
+      }
+    }
+    await _store.deleteHistory(id);
+    if (target != null) {
+      final t = target;
+      _sync((repo, uid) => repo.syncHistoryRemoved(uid, t.movieId, t.episodeId));
+    }
+  }
 
+  // CATATAN: sama seperti Zenime, "hapus semua riwayat" hanya mereset data
+  // lokal. Salinan server baru tertimpa saat ada progress nonton baru dan
+  // tetap dijaga toggle privasi (history_public).
   Future<void> clearAllHistory() => _store.clearAllHistory();
 }

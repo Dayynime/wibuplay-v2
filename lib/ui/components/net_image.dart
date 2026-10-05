@@ -45,35 +45,15 @@ class NetImage extends StatelessWidget {
       placeholder: (context, url) => const SizedBox.expand(
         child: ShimmerBox(borderRadius: BorderRadius.zero),
       ),
-      errorWidget: (context, url, error) {
-        var msg = error.toString().replaceAll('\n', ' ');
-        if (msg.length > 70) msg = msg.substring(0, 70);
-        return ClipRect(
-          child: ColoredBox(
-            color: AppColors.surfaceCard,
-            child: Padding(
-              padding: const EdgeInsets.all(4),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.broken_image_outlined,
-                      size: 20, color: AppColors.textMuted),
-                  const SizedBox(height: 2),
-                  Flexible(
-                    child: Text(
-                      msg,
-                      maxLines: 4,
-                      overflow: TextOverflow.clip,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: AppColors.textMuted, fontSize: 7),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+      errorWidget: (context, url, error) => const ClipRect(
+        child: ColoredBox(
+          color: AppColors.surfaceCard,
+          child: Center(
+            child: Icon(Icons.broken_image_outlined,
+                size: 20, color: AppColors.textMuted),
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }
