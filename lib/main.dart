@@ -12,6 +12,7 @@ import 'providers.dart';
 import 'ui/route_observer.dart';
 import 'ui/components/announcement_popup.dart';
 import 'ui/screens/auth/auth_gate.dart';
+import 'ui/screens/update/update_gate.dart';
 import 'ui/shell/app_shell.dart';
 
 Future<void> main() async {
@@ -61,7 +62,9 @@ class ZenimeApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(),
       navigatorObservers: [routeObserver],
-      home: const AuthGate(child: AnnouncementHost(child: AppShell())),
+      home: const UpdateGate(
+        child: AuthGate(child: AnnouncementHost(child: AppShell())),
+      ),
     );
   }
 }
