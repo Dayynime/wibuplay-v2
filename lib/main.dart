@@ -44,18 +44,18 @@ Future<void> main() async {
   runApp(
     ProviderScope(
       overrides: [localStoreProvider.overrideWith((ref) => store)],
-      child: const WibuplayApp(),
+      child: const ZenimeApp(),
     ),
   );
 }
 
-class WibuplayApp extends StatelessWidget {
-  const WibuplayApp({super.key});
+class ZenimeApp extends StatelessWidget {
+  const ZenimeApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Wibuplay',
+      title: 'Zenime',
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(),
       navigatorObservers: [routeObserver],

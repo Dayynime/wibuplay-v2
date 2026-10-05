@@ -47,7 +47,7 @@ class HomeProfileHeader extends ConsumerWidget {
     final authName = user.displayName ?? '';
     final username = chatName.trim().isNotEmpty
         ? chatName
-        : (authName.trim().isNotEmpty ? authName : 'Pengguna Wibuplay');
+        : (authName.trim().isNotEmpty ? authName : 'Pengguna Zenime');
     final chatAvatar = chat?.avatarUrl ?? '';
     final avatarUrl = chatAvatar.isNotEmpty ? chatAvatar : user.photoURL;
 

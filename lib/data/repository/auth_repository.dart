@@ -73,7 +73,7 @@ class AuthRepository {
   void _requireReady() {
     if (!FirebaseConfig.ready) {
       throw const AuthFailure(
-        'Login belum dikonfigurasi. Isi FirebaseConfig.apiKey dan appId untuk Wibuplay.',
+        'Login belum dikonfigurasi. Isi FirebaseConfig.apiKey dan appId untuk Zenime.',
       );
     }
   }

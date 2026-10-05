@@ -16,7 +16,7 @@ permissions:
   contents: read
 
 env:
-  APP_NAME: Wibuplay                           # nama artifact
+  APP_NAME: Zenime                           # nama artifact
   APP_VERSION_CODE: ${{ github.run_number }}   # versionCode naik otomatis (--build-number)
 
 jobs:
@@ -50,7 +50,7 @@ jobs:
           fi
 
       # applicationId disamakan dengan Zenime (com.aistudio.zenime.app) supaya APK
-      # Wibuplay menggantikan/meng-update app Zenime di perangkat. Hanya
+      # Versi Flutter ini menggantikan/meng-update app Zenime di perangkat. Hanya
       # applicationId yang diganti; namespace bawaan flutter create
       # (com.dayynime.wibuplay) dibiarkan karena keduanya independen dan
       # MainActivity tetap cocok. Aman dijalankan ulang kalau android/ di-commit.
@@ -74,7 +74,7 @@ jobs:
 
       # flutter create tidak menaruh INTERNET di manifest utama (hanya debug/profile),
       # dan Android 9+ memblokir HTTP polos. Samakan dengan manifest Kotlin:
-      # INTERNET, ACCESS_NETWORK_STATE, usesCleartextTraffic, label "Wibuplay".
+      # INTERNET, ACCESS_NETWORK_STATE, usesCleartextTraffic, label "Zenime".
       - name: Atur AndroidManifest (internet + cleartext + nama)
         run: |
           python3 - <<'PY'
@@ -85,10 +85,20 @@ jobs:
               s = s.replace('<application', '<uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>\n    <application', 1)
           if 'usesCleartextTraffic' not in s:
               s = s.replace('<application', '<application android:usesCleartextTraffic="true"', 1)
-          s = re.sub(r'android:label="[^"]*"', 'android:label="Wibuplay"', s, count=1)
+          s = re.sub(r'android:label="[^"]*"', 'android:label="Zenime"', s, count=1)
           open(p, 'w', encoding='utf-8').write(s)
           PY
           grep -n "INTERNET\|usesCleartextTraffic\|android:label" android/app/src/main/AndroidManifest.xml
+
+      # Ikon app + splash screen Zenime. Sumbernya folder android_res/ di repo
+      # (ikon adaptive dari app Zenime). flutter create membuat ic_launcher.png
+      # bawaan; harus dihapus dulu, kalau tidak bentrok dengan ic_launcher.webp.
+      - name: Pasang ikon dan splash Zenime
+        run: |
+          RES=android/app/src/main/res
+          rm -f "$RES"/mipmap-*/ic_launcher.png "$RES"/mipmap-*/ic_launcher_round.png
+          cp -r android_res/. "$RES/"
+          ls "$RES/mipmap-xxxhdpi" "$RES/drawable"
 
       - name: Ambil dependency
         run: flutter pub get
@@ -108,7 +118,7 @@ jobs:
             echo "debug keystore tetap dipasang"
           fi
 
-      # Firebase Wibuplay (project yang sama dengan Zenime) dikirim lewat
+      # Firebase Zenime (project yang sama dengan app Kotlin) dikirim lewat
       # secret FIREBASE_API_KEY dan FIREBASE_APP_ID (dari google-services.json).
       - name: Build Debug APK
         run: >

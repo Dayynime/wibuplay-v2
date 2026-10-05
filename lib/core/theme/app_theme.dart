@@ -21,7 +21,7 @@ TextStyle _ts(FontWeight w, double size, double lineHeight, double spacing, Colo
   );
 }
 
-/// Port Theme.kt + Type.kt. Wibuplay hanya punya tema gelap.
+/// Port Theme.kt + Type.kt. Zenime (Flutter) hanya punya tema gelap.
 ThemeData buildAppTheme() {
   const scheme = ColorScheme.dark(
     primary: AppColors.accentViolet,

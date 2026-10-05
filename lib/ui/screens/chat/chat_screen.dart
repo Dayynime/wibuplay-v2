@@ -440,7 +440,7 @@ class _MessageBubble extends StatelessWidget {
               const Padding(
                 padding: EdgeInsets.only(top: 2),
                 child: Text(
-                  'Pesan suara (belum bisa diputar di Wibuplay)',
+                  'Pesan suara (belum bisa diputar di versi ini)',
                   style: TextStyle(color: AppColors.textMuted, fontSize: 10),
                 ),
               ),

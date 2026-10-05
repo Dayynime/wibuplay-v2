@@ -233,7 +233,7 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
                       Row(
                         children: [
                           Text(
-                            'Wibu',
+                            'Zen',
                             style: TextStyle(
                               color: AppColors.textWhite,
                               fontSize: 24,
@@ -242,7 +242,7 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
                             ),
                           ),
                           Text(
-                            'play',
+                            'ime',
                             style: TextStyle(
                               color: AppColors.accentViolet,
                               fontSize: 24,

@@ -5,7 +5,7 @@ import 'package:firebase_core/firebase_core.dart';
 ///
 /// Dua nilai di bawah (apiKey dan appId) harus diisi dari
 /// google-services.json milik app Android Zenime (com.aistudio.zenime.app,
-/// applicationId yang sekarang juga dipakai Wibuplay) di Firebase project yang sama:
+/// applicationId yang sekarang juga dipakai versi Flutter ini) di Firebase project yang sama:
 ///   - apiKey -> client[0].api_key[0].current_key
 ///   - appId  -> client[0].client_info.mobilesdk_app_id  (format 1:xxx:android:yyy)
 ///
@@ -22,9 +22,9 @@ class FirebaseConfig {
   static const String webClientId = '936105562787-4rrc0ju88d4t2u82u9us4r6hi7q0e70t.apps.googleusercontent.com';
 
   static const String apiKey =
-      String.fromEnvironment('FIREBASE_API_KEY', defaultValue: 'ISI_API_KEY_WIBUPLAY');
+      String.fromEnvironment('FIREBASE_API_KEY', defaultValue: 'ISI_API_KEY_ZENIME');
   static const String appId =
-      String.fromEnvironment('FIREBASE_APP_ID', defaultValue: 'ISI_APP_ID_WIBUPLAY');
+      String.fromEnvironment('FIREBASE_APP_ID', defaultValue: 'ISI_APP_ID_ZENIME');
 
   static bool get isConfigured =>
       apiKey.isNotEmpty &&

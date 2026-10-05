@@ -158,7 +158,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             ),
             const SizedBox(height: 6),
             const Text(
-              'Akun yang sama dipakai di Wibuplay dan Zenime, jadi chat dan datamu nyambung.',
+              'Akun yang sama dipakai di semua versi Zenime, jadi chat dan datamu nyambung.',
               textAlign: TextAlign.center,
               style: TextStyle(color: AppColors.textMuted, fontSize: 12),
             ),
@@ -172,7 +172,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   borderRadius: AppShapes.card,
                 ),
                 child: const Text(
-                  'Login belum dikonfigurasi. Isi apiKey dan appId Firebase untuk Wibuplay '
+                  'Login belum dikonfigurasi. Isi apiKey dan appId Firebase untuk Zenime '
                   'di lib/core/firebase_config.dart (lihat panduan setup).',
                   style: TextStyle(color: AppColors.warningAmber, fontSize: 12),
                 ),

@@ -379,7 +379,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           _SettingsItem(
             icon: Icons.forum_outlined,
             title: 'Chat Global',
-            subtitle: 'Ngobrol bareng pengguna Wibuplay dan Zenime',
+            subtitle: 'Ngobrol bareng sesama pengguna Zenime',
             onTap: _openChat,
           ),
           const SizedBox(height: 10),
@@ -404,7 +404,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         const SizedBox(height: 10),
         const _SettingsItem(
           icon: Icons.info_outline,
-          title: 'Wibuplay v1.0',
+          title: 'Zenime v1.0',
           subtitle: 'Aplikasi streaming anime modern & Cuplix',
         ),
       ],

@@ -1,4 +1,4 @@
-/// Supabase milik Zenime (self-hosted). Wibuplay memakai backend yang sama,
+/// Supabase milik Zenime (self-hosted). Versi Flutter ini memakai backend yang sama,
 /// jadi akun, chat, dan data lain nyambung dengan Zenime.
 ///
 /// Anon key memang didesain untuk tertanam di app (sama seperti di Zenime);

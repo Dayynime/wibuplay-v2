@@ -573,8 +573,8 @@ class _CuplixVideoItemState extends State<CuplixVideoItem> {
                   _ActionButton(
                     onTap: () {
                       Share.share(
-                        'Tonton klip anime ${item.anime ?? ''} di Wibuplay!',
-                        subject: item.anime ?? 'Wibuplay',
+                        'Tonton klip anime ${item.anime ?? ''} di Zenime!',
+                        subject: item.anime ?? 'Zenime',
                       );
                     },
                     label: 'Bagi',

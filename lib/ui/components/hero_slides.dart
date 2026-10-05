@@ -35,7 +35,7 @@ Color _rankColor(int rank) => switch (rank) {
 /// TOP CLAN) di atas kartu navy dengan glow lembut. Tiap baris: avatar dengan
 /// ring + badge peringkat, nama, lalu nilai di bawah nama. Panel TOP XP bisa
 /// di-tap ke leaderboard XP; panel clan belum punya halaman tujuan di
-/// Wibuplay, jadi tanpa chevron/tap.
+/// Zenime, jadi tanpa chevron/tap.
 class HeroLeaderboardSlide extends StatelessWidget {
   const HeroLeaderboardSlide({
     super.key,

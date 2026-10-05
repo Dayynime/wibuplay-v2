@@ -25,7 +25,7 @@ class ChatMessage {
   final String? replyToUsername;
   final String? replyToMessage;
 
-  /// "text" atau "voice". Pesan suara belum bisa diputar di Wibuplay,
+  /// "text" atau "voice". Pesan suara belum bisa diputar di versi ini,
   /// tampil sebagai teks placeholder dari kolom [message].
   final String messageType;
   final String? audioUrl;

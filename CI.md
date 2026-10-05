@@ -77,3 +77,11 @@ manifest rilis bawaan Flutter tidak punya izin internet.
 - Gaya "Poster Otomatis" ala Zenime: slide anime sekarang SATU kartu yang gambarnya ganti sendiri tiap 4,5 detik (crossfade 700ms + zoom pelan 1.0 -> 1.08), bukan satu halaman per anime. Chip views kiri atas, indikator rotasi kanan atas, peringkat `#N` + judul + `TIPE • STATUS` di tengah bawah, ikut beranimasi.
 - Pager luar cuma: kartu anime, Top Leaderboard, Top Support. Rotasi berhenti saat user sedang geser atau ada di slide leaderboard/support. Gambar berikutnya di-preload (`netImageHeaders` di `net_image.dart`).
 - Beda dari versi sebelumnya: tombol play berdenyut, chip genre/tahun, dan parallax dihapus (Zenime tidak punya). Dot indikator bawah sekarang bisa di-tap.
+
+## Ikon dan splash screen Zenime
+
+- Nama app (label) dan nama artifact/APK: `Zenime`.
+- Ikon launcher (adaptive, sama dengan app Zenime) dan splash screen (latar `#1E1B2E` + logo Zenime) ada di folder `android_res/`.
+- Langkah "Pasang ikon dan splash Zenime" di `build.yml` dan `release.yml` menyalin `android_res/` ke `android/app/src/main/res/` setelah `flutter create`, dan menghapus `ic_launcher.png` bawaan Flutter supaya tidak bentrok dengan `ic_launcher.webp`.
+- Logo di layar login: `assets/images/logo.jpg` (logo Zenime).
+- Nama paket Dart (`wibuplay` di `pubspec.yaml`) dan namespace Android sengaja tidak diubah, karena hanya internal dan tidak terlihat di app.

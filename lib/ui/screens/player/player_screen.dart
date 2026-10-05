@@ -677,9 +677,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                               label: 'Bagikan',
                               tint: AppColors.textWhite,
                               onTap: () {
-                                final title = anime?.title ?? 'Wibuplay';
+                                final title = anime?.title ?? 'Zenime';
                                 Share.share(
-                                  'Nonton ${anime?.title ?? 'Anime'} di Wibuplay!',
+                                  'Nonton ${anime?.title ?? 'Anime'} di Zenime!',
                                   subject: title,
                                 );
                               },
