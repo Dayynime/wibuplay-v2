@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/local/entities.dart';
+import '../../../data/models/chat_models.dart';
 import '../../../core/firebase_config.dart';
 import '../../../providers.dart';
 import '../../app_routes.dart';
@@ -78,6 +79,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final premium = user != null &&
         FirebaseConfig.ready &&
         (ref.watch(premiumProvider(user.uid)).valueOrNull ?? false);
+    // Nama + foto dari profil Zenime (chat_profiles), sama dengan Beranda dan
+    // Chat. Data Google hanya cadangan kalau profil Zenime belum ada; selama
+    // masih dimuat tidak ditampilkan supaya nama Google tidak sempat berkedip.
+    final profile = _zenimeProfile(user);
+    final name = _resolvedName(user, profile.data, profile.loading);
+    final avatarUrl = _resolvedAvatar(user, profile.data, profile.loading);
     return Padding(
       padding: const EdgeInsets.all(20),
       child: Row(
@@ -90,8 +97,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               shape: BoxShape.circle,
             ),
             clipBehavior: Clip.antiAlias,
-            child: (user?.photoURL != null && user!.photoURL!.isNotEmpty)
-                ? NetImage(user.photoURL!)
+            child: avatarUrl != null
+                ? NetImage(avatarUrl)
                 : const Icon(Icons.person_outline, color: AppColors.textWhite, size: 34),
           ),
           const SizedBox(width: 16),
@@ -100,7 +107,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _displayName(user),
+                  name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
@@ -400,7 +407,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           _SettingsItem(
             icon: Icons.logout,
             title: 'Keluar',
-            subtitle: _displayName(user),
+            subtitle: _resolvedName(
+              user,
+              _zenimeProfile(user).data,
+              _zenimeProfile(user).loading,
+            ),
             onTap: _confirmSignOut,
           ),
         ],
@@ -423,6 +434,28 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         ),
       ],
     );
+  }
+
+  /// Profil Zenime (chat_profiles) user yang login; loading = masih dimuat.
+  ({ChatProfile? data, bool loading}) _zenimeProfile(User? user) {
+    if (user == null || !FirebaseConfig.ready) return (data: null, loading: false);
+    final async = ref.watch(chatProfileProvider(user.uid));
+    return (data: async.valueOrNull, loading: async.isLoading);
+  }
+
+  String _resolvedName(User? user, ChatProfile? profile, bool loading) {
+    final zenime = profile?.username.trim() ?? '';
+    if (zenime.isNotEmpty) return zenime;
+    if (loading) return 'Pengguna Zenime';
+    return _displayName(user);
+  }
+
+  String? _resolvedAvatar(User? user, ChatProfile? profile, bool loading) {
+    final zenime = profile?.avatarUrl ?? '';
+    if (zenime.isNotEmpty) return zenime;
+    if (loading) return null;
+    final google = user?.photoURL ?? '';
+    return google.isNotEmpty ? google : null;
   }
 
   String _displayName(User? user) {
