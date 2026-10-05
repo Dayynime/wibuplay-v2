@@ -1,5 +1,3 @@
-import 'dart:ui' as ui;
-
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -173,12 +171,39 @@ class _ClanRainbowBadgeState extends State<ClanRainbowBadge>
             foregroundPainter: _ClanHexBorderPainter(glow),
             child: ClipPath(
               clipper: const _ClanHexClipper(),
-              child: CustomPaint(
-                painter: _ClanFillPainter(
-                  rainbow: rainbow,
-                  shine: -0.4 + 1.8 * shine,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                    colors: _rainbow,
+                    // Lebar gradient 260 px tetap (bukan relatif lebar badge),
+                    // geser dari -260 ke +260, sama seperti ClanRainbowBadge.kt.
+                    transform: _PixelSweep(
+                      start: -260 + rainbow * 520,
+                      width: 260,
+                    ),
+                  ),
                 ),
-                child: child,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                      colors: [
+                        Colors.white.withValues(alpha: 0),
+                        Colors.white.withValues(alpha: 0.55),
+                        Colors.white.withValues(alpha: 0),
+                      ],
+                      // Kilau selebar 120 px lewat dari kiri ke kanan.
+                      transform: _PixelSweep(
+                        start: (-0.4 + 1.8 * shine) * 200 - 60,
+                        width: 120,
+                      ),
+                    ),
+                  ),
+                  child: child,
+                ),
               ),
             ),
           );
@@ -269,61 +294,20 @@ class UserAvatar extends StatelessWidget {
       );
 }
 
-/// Fill pelangi + kilau badge clan, ukurannya PIXEL TETAP seperti
-/// ClanRainbowBadge.kt (gradient 260dp yang geser dari -260 ke +260), bukan
-/// relatif ke lebar badge. Jadi di badge sempit cuma sepotong pelangi yang
-/// kelihatan tiap saat (warnanya berganti pelan), sama persis dengan Zenime.
-class _ClanFillPainter extends CustomPainter {
-  const _ClanFillPainter({required this.rainbow, required this.shine});
+/// Memetakan gradient (yang secara default memenuhi lebar widget) menjadi
+/// selebar [width] px mulai dari x = [start] px, jadi ukurannya tidak ikut
+/// lebar badge.
+class _PixelSweep extends GradientTransform {
+  const _PixelSweep({required this.start, required this.width});
 
-  /// 0..1, fase geser pelangi.
-  final double rainbow;
-
-  /// -0.4..1.4, posisi kilau.
-  final double shine;
-
-  static const double _sweep = 260;
-  static const _colors = [
-    Color(0xFFFF3B30),
-    Color(0xFFFF9500),
-    Color(0xFFFFCC00),
-    Color(0xFF34C759),
-    Color(0xFF00C7BE),
-    Color(0xFF30ADE6),
-    Color(0xFF5856D6),
-    Color(0xFFAF52DE),
-    Color(0xFFFF3B30),
-  ];
+  final double start;
+  final double width;
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final rect = Offset.zero & size;
-    final startX = -_sweep + rainbow * (_sweep * 2);
-    canvas.drawRect(
-      rect,
-      Paint()
-        ..shader = ui.Gradient.linear(
-          Offset(startX, 0),
-          Offset(startX + _sweep, 30),
-          _colors,
-        ),
-    );
-    canvas.drawRect(
-      rect,
-      Paint()
-        ..shader = ui.Gradient.linear(
-          Offset(shine * 200 - 60, 0),
-          Offset(shine * 200 + 60, 26),
-          [
-            Colors.white.withValues(alpha: 0),
-            Colors.white.withValues(alpha: 0.55),
-            Colors.white.withValues(alpha: 0),
-          ],
-        ),
-    );
+  Matrix4? transform(Rect bounds, {TextDirection? textDirection}) {
+    final w = bounds.width <= 0 ? 1.0 : bounds.width;
+    return Matrix4.translationValues(start, 0, 0) *
+        Matrix4.diagonal3Values(width / w, 1, 1) *
+        Matrix4.translationValues(-bounds.left, 0, 0);
   }
-
-  @override
-  bool shouldRepaint(covariant _ClanFillPainter old) =>
-      old.rainbow != rainbow || old.shine != shine;
 }
