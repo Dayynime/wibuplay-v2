@@ -211,7 +211,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
       final link = s.link;
       if (link == null || link.trim().isEmpty) continue;
       if (isQualityLocked(s.quality, false)) continue;
-      final v = qualityValueP(s.quality) ?: 0;
+      final v = qualityValueP(s.quality) ?? 0;
       if (v > bestValue) {
         best = s;
         bestValue = v;
