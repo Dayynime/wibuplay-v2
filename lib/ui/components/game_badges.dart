@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -171,29 +173,12 @@ class _ClanRainbowBadgeState extends State<ClanRainbowBadge>
             foregroundPainter: _ClanHexBorderPainter(glow),
             child: ClipPath(
               clipper: const _ClanHexClipper(),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment(-1 + 2 * rainbow, 0),
-                    end: Alignment(1 + 2 * rainbow, 0),
-                    colors: _rainbow,
-                    tileMode: TileMode.repeated,
-                  ),
+              child: CustomPaint(
+                painter: _ClanFillPainter(
+                  rainbow: rainbow,
+                  shine: -0.4 + 1.8 * shine,
                 ),
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment(-2 + 4 * shine, -0.3),
-                      end: Alignment(-1 + 4 * shine, 0.3),
-                      colors: [
-                        Colors.white.withValues(alpha: 0),
-                        Colors.white.withValues(alpha: 0.55),
-                        Colors.white.withValues(alpha: 0),
-                      ],
-                    ),
-                  ),
-                  child: child,
-                ),
+                child: child,
               ),
             ),
           );
@@ -282,4 +267,63 @@ class UserAvatar extends StatelessWidget {
           fontWeight: FontWeight.w700,
         ),
       );
+}
+
+/// Fill pelangi + kilau badge clan, ukurannya PIXEL TETAP seperti
+/// ClanRainbowBadge.kt (gradient 260dp yang geser dari -260 ke +260), bukan
+/// relatif ke lebar badge. Jadi di badge sempit cuma sepotong pelangi yang
+/// kelihatan tiap saat (warnanya berganti pelan), sama persis dengan Zenime.
+class _ClanFillPainter extends CustomPainter {
+  const _ClanFillPainter({required this.rainbow, required this.shine});
+
+  /// 0..1, fase geser pelangi.
+  final double rainbow;
+
+  /// -0.4..1.4, posisi kilau.
+  final double shine;
+
+  static const double _sweep = 260;
+  static const _colors = [
+    Color(0xFFFF3B30),
+    Color(0xFFFF9500),
+    Color(0xFFFFCC00),
+    Color(0xFF34C759),
+    Color(0xFF00C7BE),
+    Color(0xFF30ADE6),
+    Color(0xFF5856D6),
+    Color(0xFFAF52DE),
+    Color(0xFFFF3B30),
+  ];
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final rect = Offset.zero & size;
+    final startX = -_sweep + rainbow * (_sweep * 2);
+    canvas.drawRect(
+      rect,
+      Paint()
+        ..shader = ui.Gradient.linear(
+          Offset(startX, 0),
+          Offset(startX + _sweep, 30),
+          _colors,
+        ),
+    );
+    canvas.drawRect(
+      rect,
+      Paint()
+        ..shader = ui.Gradient.linear(
+          Offset(shine * 200 - 60, 0),
+          Offset(shine * 200 + 60, 26),
+          [
+            Colors.white.withValues(alpha: 0),
+            Colors.white.withValues(alpha: 0.55),
+            Colors.white.withValues(alpha: 0),
+          ],
+        ),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _ClanFillPainter old) =>
+      old.rainbow != rainbow || old.shine != shine;
 }
