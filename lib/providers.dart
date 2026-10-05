@@ -9,6 +9,7 @@ import 'data/repository/account_repository.dart';
 import 'data/repository/anime_repository.dart';
 import 'data/repository/auth_repository.dart';
 import 'data/repository/chat_repository.dart';
+import 'data/repository/clan_repository.dart';
 import 'data/repository/comment_repository.dart';
 import 'data/models/account_models.dart';
 import 'data/models/chat_models.dart';
@@ -139,6 +140,107 @@ final heroTopClansProvider = FutureProvider.autoDispose<List<ClanSummary>>((ref)
   } catch (_) {
     return const [];
   }
+});
+
+final clanRepositoryProvider = Provider<ClanRepository>(
+  (ref) => ClanRepository(
+    ref.watch(supabaseDioProvider),
+    ref.watch(chatRepositoryProvider),
+  ),
+);
+
+/// Semua clan (urut level lalu XP) buat halaman Browse.
+final allClansProvider = FutureProvider.autoDispose<List<Clan>>(
+  (ref) => ref.watch(clanRepositoryProvider).browseClans(),
+);
+
+/// Clan yang diikuti user sekarang (null = belum gabung / belum login).
+final myClanMembershipProvider = FutureProvider.autoDispose<ClanMember?>((ref) async {
+  final uid = ref.watch(authUserProvider).valueOrNull?.uid;
+  if (uid == null || uid.isEmpty) return null;
+  return ref.watch(clanRepositoryProvider).getMyMembership(uid);
+});
+
+/// Relasi user dengan satu clan, menentukan tombol aksi di header.
+enum ClanCta { login, join, pending, blockedOtherClan, member }
+
+/// Semua data halaman detail clan.
+class ClanDetailData {
+  const ClanDetailData({
+    required this.clan,
+    required this.members,
+    required this.levels,
+    required this.premiumUids,
+    required this.donations,
+    required this.cta,
+    required this.myUid,
+    required this.myRole,
+  });
+
+  final Clan clan;
+  final List<ClanMemberDisplay> members;
+  final Map<String, int> levels;
+  final Set<String> premiumUids;
+  final List<ClanDonationEntry> donations;
+  final ClanCta cta;
+  final String myUid;
+
+  /// Role user di clan INI (null kalau bukan member).
+  final String? myRole;
+
+  int get totalDonatedToday => donations.fold(0, (a, d) => a + d.amountToday);
+}
+
+final clanDetailProvider =
+    FutureProvider.autoDispose.family<ClanDetailData, String>((ref, clanId) async {
+  final repo = ref.watch(clanRepositoryProvider);
+  final uid = ref.watch(authUserProvider).valueOrNull?.uid ?? '';
+
+  final clan = await repo.getClan(clanId);
+  // Daftar member wajib duluan (donasi, level, premium butuh uid-nya);
+  // cek keanggotaan sendiri tidak saling butuh, jalan bareng.
+  final membersF = repo.getMembers(clanId);
+  final myMemF = uid.isEmpty
+      ? Future<ClanMember?>.value(null)
+      : repo.getMyMembership(uid).then<ClanMember?>((m) => m).catchError((_) => null);
+  final members = await membersF;
+  final myMem = await myMemF;
+
+  ClanCta cta;
+  String? myRole;
+  if (uid.isEmpty) {
+    cta = ClanCta.login;
+  } else if (myMem == null) {
+    cta = await repo.getMyJoinRequestPending(clanId) ? ClanCta.pending : ClanCta.join;
+  } else if (myMem.clanId != clanId) {
+    cta = ClanCta.blockedOtherClan;
+  } else {
+    cta = ClanCta.member;
+    myRole = myMem.role;
+  }
+
+  final uids = members.map((m) => m.firebaseUid).toList();
+  final xpRepo = ref.watch(xpRepositoryProvider);
+  final donationsF = repo
+      .getTodayDonations(clanId, roleByUid: {for (final m in members) m.firebaseUid: m.role})
+      .catchError((_) => <ClanDonationEntry>[]);
+  final levelsF = uids.isEmpty
+      ? Future.value(<String, int>{})
+      : xpRepo.getLevelsForUids(uids).catchError((_) => <String, int>{});
+  final premiumF = uids.isEmpty
+      ? Future.value(<String>{})
+      : xpRepo.getPremiumUids(uids).catchError((_) => <String>{});
+
+  return ClanDetailData(
+    clan: clan,
+    members: members,
+    levels: await levelsF,
+    premiumUids: await premiumF,
+    donations: await donationsF,
+    cta: cta,
+    myUid: uid,
+    myRole: myRole,
+  );
 });
 
 /// Top 3 donatur buat slide carousel Beranda. Gagal = slide disembunyikan.

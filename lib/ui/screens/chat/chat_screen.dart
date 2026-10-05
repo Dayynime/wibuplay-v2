@@ -313,6 +313,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 }
 
+/// Lebar bubble chat TETAP (270dp seperti Zenime) supaya semua bubble
+/// seragam, apa pun panjang pesannya. Di layar sempit dikecilkan supaya
+/// tidak meluap (sisakan ruang avatar + margin).
+const double _kBubbleMaxWidth = 270;
+
+double _bubbleWidth(BuildContext context) {
+  final screen = MediaQuery.sizeOf(context).width;
+  // 24 padding list + 32 avatar + 8 jarak + 16 ruang kosong di sisi lain.
+  final available = screen - 24 - 32 - 8 - 16;
+  return available < _kBubbleMaxWidth ? available : _kBubbleMaxWidth;
+}
+
 class _MessageBubble extends StatelessWidget {
   const _MessageBubble({
     super.key,
@@ -347,12 +359,14 @@ class _MessageBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final m = message;
     final hasReply = (m.replyToUsername ?? '').isNotEmpty;
-    final bubbleColor = mine ? AppColors.accentVioletDark : AppColors.surfaceCard;
+    // Warna bubble sendiri sama dengan bubble orang lain (seperti Zenime);
+    // bedanya cuma posisi (kanan) dan tidak ada avatar.
+    const bubbleColor = AppColors.surfaceCard;
 
     final bubble = GestureDetector(
       onLongPress: onLongPress,
       child: Container(
-        constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.72),
+        width: _bubbleWidth(context),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(color: bubbleColor, borderRadius: AppShapes.card),
         child: Column(
@@ -402,6 +416,7 @@ class _MessageBubble extends StatelessWidget {
             if (hasReply) ...[
               const SizedBox(height: 4),
               Container(
+                width: double.infinity,
                 padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
                 decoration: BoxDecoration(
                   color: Colors.black26,

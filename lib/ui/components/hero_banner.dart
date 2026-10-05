@@ -34,6 +34,7 @@ class HeroBanner extends StatefulWidget {
     this.topClans = const [],
     this.topSupport = const [],
     this.onLeaderboardClick,
+    this.onClanLeaderboardClick,
   });
 
   final List<AnimeItem> sliderItems;
@@ -44,6 +45,7 @@ class HeroBanner extends StatefulWidget {
   final List<ClanSummary> topClans;
   final List<TopSupporter> topSupport;
   final VoidCallback? onLeaderboardClick;
+  final VoidCallback? onClanLeaderboardClick;
 
   @override
   State<HeroBanner> createState() => _HeroBannerState();
@@ -140,6 +142,7 @@ class _HeroBannerState extends State<HeroBanner> {
                         entries: widget.topXp,
                         clans: widget.topClans,
                         onTap: widget.onLeaderboardClick ?? () {},
+                        onClanTap: widget.onClanLeaderboardClick,
                       );
                     }
                     if (page == supportPage) {

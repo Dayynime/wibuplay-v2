@@ -34,19 +34,22 @@ Color _rankColor(int rank) => switch (rank) {
 /// Slide "TOP LEADERBOARD" di carousel Beranda: dua panel kaca (TOP XP dan
 /// TOP CLAN) di atas kartu navy dengan glow lembut. Tiap baris: avatar dengan
 /// ring + badge peringkat, nama, lalu nilai di bawah nama. Panel TOP XP bisa
-/// di-tap ke leaderboard XP; panel clan belum punya halaman tujuan di
-/// Zenime, jadi tanpa chevron/tap.
+/// di-tap ke leaderboard XP, panel TOP CLAN ke halaman Clan.
 class HeroLeaderboardSlide extends StatelessWidget {
   const HeroLeaderboardSlide({
     super.key,
     required this.entries,
     required this.clans,
     required this.onTap,
+    this.onClanTap,
   });
 
   final List<UserXpDisplay> entries;
   final List<ClanSummary> clans;
   final VoidCallback onTap;
+
+  /// Tap panel TOP CLAN (buka halaman Clan). Null = panel tidak bisa di-tap.
+  final VoidCallback? onClanTap;
 
   static const Color _xpBlue = Color(0xFF4FC3F7);
   static const Color _clanPurple = Color(0xFFB57BFF);
@@ -137,6 +140,7 @@ class HeroLeaderboardSlide extends StatelessWidget {
                           icon: Icons.shield_rounded,
                           label: 'TOP CLAN',
                           color: _clanPurple,
+                          onTap: onClanTap,
                           rows: [
                             for (var i = 0; i < clans.length && i < 4; i++)
                               _BoardRow(

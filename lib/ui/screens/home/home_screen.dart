@@ -12,6 +12,7 @@ import '../../../data/models/home_sections.dart';
 import '../../../providers.dart';
 import '../../app_routes.dart';
 import '../xp/xp_leaderboard_screen.dart';
+import '../clan/clan_browse_screen.dart';
 import '../../components/cards.dart';
 import '../../components/chat_ticker.dart';
 import '../../components/common_components.dart';
@@ -300,6 +301,8 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
                 topSupport: ref.watch(topSupportersProvider).valueOrNull ?? const [],
                 onLeaderboardClick: () => Navigator.of(context)
                     .push<void>(fadeRoute(const XpLeaderboardScreen())),
+                onClanLeaderboardClick: () => Navigator.of(context)
+                    .push<void>(fadeRoute(const ClanBrowseScreen())),
                 onItemClick: (item) {
                   final id = item.id;
                   if (id != null) widget.onAnimeClick(id);

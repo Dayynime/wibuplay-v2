@@ -85,3 +85,16 @@ manifest rilis bawaan Flutter tidak punya izin internet.
 - Langkah "Pasang ikon dan splash Zenime" di `build.yml` dan `release.yml` menyalin `android_res/` ke `android/app/src/main/res/` setelah `flutter create`, dan menghapus `ic_launcher.png` bawaan Flutter supaya tidak bentrok dengan `ic_launcher.webp`.
 - Logo di layar login: `assets/images/logo.jpg` (logo Zenime).
 - Nama paket Dart (`wibuplay` di `pubspec.yaml`) dan namespace Android sengaja tidak diubah, karena hanya internal dan tidak terlihat di app.
+
+### Catatan Halaman Clan
+
+- Alur: Beranda > tap panel TOP CLAN di slide leaderboard > `ClanBrowseScreen` (Semua Clan / Leaderboard / Clan Saya + cari) > tap clan > `ClanScreen` (detail).
+- Detail clan: header (avatar, nama, tag rainbow, level, progress XP ke level berikut, statistik Total XP / Member / Donasi hari ini), tombol aksi sesuai relasi user (Join Clan / Menunggu Persetujuan / Sudah Gabung Clan Lain / Donasi ZCoin + Keluar Clan), tab Members (cari, filter role, urut) dan Donasi hari ini.
+- Data: `ClanRepository` (`data/repository/clan_repository.dart`). Baca lewat PostgREST (`clans`, `clan_members`, `clan_donation_log`); aksi lewat Edge Function `zenime-clan-join-request`, `-donate`, `-leave`, `-my-request-status` dengan Firebase ID Token di header Authorization.
+- Belum dipindah dari Zenime: Buat Clan, Kelola Clan (kick, ubah role, terima/tolak request join, beli kuota member), centang role global di list member (cuma centang Premium). Rumus XP per level clan perkiraan (sama seperti Zenime).
+- Belum ada tombol ke halaman Clan selain dari panel TOP CLAN di Beranda.
+
+### Catatan Bubble Chat Global
+
+- Lebar bubble sekarang tetap (270dp seperti Zenime, `_kBubbleMaxWidth` di `chat_screen.dart`), jadi semua bubble seragam apa pun panjang pesannya. Di layar sempit otomatis dikecilkan. Kutipan balasan ikut selebar bubble.
+- Bubble sendiri memakai warna yang sama dengan bubble orang lain (`surfaceCard`); bedanya cuma posisi (kanan) dan tanpa avatar.
