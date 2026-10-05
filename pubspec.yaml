@@ -36,3 +36,4 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/logo.jpg
+    - assets/images/ic_zcoin_badge.png

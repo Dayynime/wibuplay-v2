@@ -239,7 +239,12 @@ class _ProfileCard extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.monetization_on_rounded, size: 16, color: AppColors.warningAmber),
+                    Image.asset(
+                      'assets/images/ic_zcoin_badge.png',
+                      width: 16,
+                      height: 16,
+                      filterQuality: FilterQuality.medium,
+                    ),
                     const SizedBox(width: 6),
                     Text(
                       formatZCoin(coins),

@@ -183,6 +183,7 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
   @override
   Widget build(BuildContext context) {
     final sections = widget.sections;
+    final history = ref.watch(localStoreProvider.select((s) => s.history));
     final cuplixClips = ref.watch(homeCuplixProvider).valueOrNull ?? const [];
     final user = ref.watch(authUserProvider).valueOrNull;
     final showProfileHeader = user != null && FirebaseConfig.ready;
@@ -316,6 +317,38 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
             child: ChatTicker(),
           ),
         ),
+
+        // Lanjutkan Menonton: tepat di bawah chat global
+        if (history.isNotEmpty)
+          section(
+            delayMs: 140,
+            title: 'Lanjutkan Menonton',
+            child: SizedBox(
+              height: 124 + 8 + 36,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: history.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 14),
+                itemBuilder: (context, i) {
+                  final h = history[i];
+                  final lower = h.episodeTitle.toLowerCase();
+                  final epLabel = (lower.contains('episode') || lower.contains('ep'))
+                      ? h.episodeTitle
+                      : 'Episode ${h.episodeIndex}';
+                  final percent = (h.progressFraction * 100).toInt();
+                  final progressLabel = percent > 0 ? '$epLabel • $percent%' : epLabel;
+                  return ContinueWatchingCard(
+                    title: h.movieTitle,
+                    episodeText: progressLabel,
+                    posterUrl: h.moviePoster,
+                    progress: h.progressFraction,
+                    onTap: () => widget.onWatchEpisode(h.movieId, h.episodeId),
+                  );
+                },
+              ),
+            ),
+          ),
 
         // Urutan section mengikuti Beranda Zenime.
 
