@@ -202,7 +202,7 @@ class ClanRoles {
   }
 
   static bool canActOn(String? actorRole, String? targetRole) =>
-      canKick(actorRole, targetRole) || assignableRoles(actorRole, targetRole).isNotEmpty();
+      canKick(actorRole, targetRole) || assignableRoles(actorRole, targetRole).isNotEmpty;
 }
 
 /// Request join yang menunggu persetujuan, digabung dengan profil chat.
