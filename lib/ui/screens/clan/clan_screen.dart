@@ -26,8 +26,8 @@ String _thousands(int v) {
 /// aksi (join / donasi / keluar), tab Members dan Donasi hari ini dengan
 /// pencarian, filter role, dan urutan. Port ClanScreen.kt.
 ///
-/// Belum dipindah dari Zenime: Kelola Clan (kick, ubah role, terima request
-/// join) dan Buat Clan.
+/// Kelola Clan ada di clan_manage_screen.dart, Buat Clan di
+/// create_clan_screen.dart (tombol + di halaman daftar clan).
 class ClanScreen extends ConsumerStatefulWidget {
   const ClanScreen({super.key, required this.clanId});
 

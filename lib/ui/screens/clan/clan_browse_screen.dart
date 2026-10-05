@@ -6,7 +6,9 @@ import '../../../data/models/clan_models.dart';
 import '../../../providers.dart';
 import '../../app_routes.dart';
 import '../../components/game_badges.dart';
+import '../auth/login_screen.dart';
 import 'clan_screen.dart';
+import 'create_clan_screen.dart';
 import 'clan_widgets.dart';
 
 enum ClanBrowseMode { all, leaderboard, mine }
@@ -26,6 +28,31 @@ class _ClanBrowseScreenState extends ConsumerState<ClanBrowseScreen> {
   late ClanBrowseMode _mode = widget.initialMode;
   String _query = '';
 
+  Future<void> _openCreateClan() async {
+    var user = ref.read(authUserProvider).valueOrNull;
+    if (user == null) {
+      final ok = await Navigator.of(context).push<bool>(fadeRoute(const LoginScreen()));
+      if (ok != true || !mounted) return;
+      user = ref.read(authUserProvider).valueOrNull;
+      if (user == null) return;
+    }
+    // Sudah punya clan -> tidak bisa bikin lagi (server juga menolak).
+    final myClanId = ref.read(myClanMembershipProvider).valueOrNull?.clanId;
+    if (myClanId != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Kamu sudah punya clan. Keluar dulu untuk bikin clan baru.')),
+      );
+      return;
+    }
+    final clanId = await Navigator.of(context).push<String>(
+      fadeRoute(CreateClanScreen(firebaseUid: user.uid)),
+    );
+    if (clanId == null || !mounted) return;
+    ref.invalidate(allClansProvider);
+    ref.invalidate(myClanMembershipProvider);
+    await Navigator.of(context).push<void>(fadeRoute(ClanScreen(clanId: clanId)));
+  }
+
   @override
   Widget build(BuildContext context) {
     final clans = ref.watch(allClansProvider);
@@ -38,6 +65,13 @@ class _ClanBrowseScreenState extends ConsumerState<ClanBrowseScreen> {
         foregroundColor: AppColors.textWhite,
         elevation: 0,
         title: const Text('Clan', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 20)),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _openCreateClan,
+        backgroundColor: AppColors.accentViolet,
+        foregroundColor: Colors.white,
+        tooltip: 'Buat Clan',
+        child: const Icon(Icons.add_rounded),
       ),
       body: Column(
         children: [

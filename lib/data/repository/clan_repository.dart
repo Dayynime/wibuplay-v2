@@ -228,6 +228,28 @@ class ClanRepository {
 
   // ------------------------------------------------------------------ aksi
 
+  /// Bikin clan baru (biaya ZCoin dipotong server). Mengembalikan clan yang jadi.
+  Future<Clan> createClan({
+    required String name,
+    required String tag,
+    String? photoUrl,
+  }) =>
+      _guard('Gagal bikin clan', () async {
+        final res = await _dio.post<dynamic>(
+          'functions/v1/zenime-clan-create',
+          data: {
+            'name': name,
+            'tag': tag,
+            if (photoUrl != null) 'photo_url': photoUrl,
+          },
+          options: Options(headers: {'Authorization': await _authHeader()}),
+        );
+        final data = res.data;
+        final raw = data is Map ? data['clan'] : null;
+        if (raw is! Map) throw const ClanException('Gagal bikin clan');
+        return Clan.fromJson(Map<String, dynamic>.from(raw));
+      });
+
   Future<void> submitJoinRequest(String clanId) => _guard('Gagal mengirim request join', () async {
         await _dio.post<dynamic>(
           'functions/v1/zenime-clan-join-request',
