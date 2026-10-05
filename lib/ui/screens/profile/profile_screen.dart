@@ -265,6 +265,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: SizedBox(
+                  width: double.infinity,
                   height: 52,
                   child: FilledButton.icon(
                     onPressed: user == null
@@ -335,6 +336,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }) {
     return showModalBottomSheet<void>(
       context: context,
+      // Root navigator: sheet menutupi bottom-nav floating milik shell.
+      useRootNavigator: true,
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: AppColors.surfaceDark,
@@ -1435,7 +1438,14 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
     return Padding(
       padding: EdgeInsets.only(bottom: bottomInset),
       child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+        // Bawah dikasih ruang ekstra setinggi tombol navigasi sistem supaya
+        // toggle terakhir (Riwayat publik) tidak ketutup.
+        padding: EdgeInsets.fromLTRB(
+          20,
+          12,
+          20,
+          24 + MediaQuery.viewPaddingOf(context).bottom,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
