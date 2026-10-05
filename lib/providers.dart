@@ -12,6 +12,7 @@ import 'data/repository/chat_repository.dart';
 import 'data/models/account_models.dart';
 import 'data/models/chat_models.dart';
 import 'data/models/clan_models.dart';
+import 'data/models/cuplix_item.dart';
 import 'data/models/support_models.dart';
 import 'data/models/xp_models.dart';
 import 'data/repository/xp_repository.dart';
@@ -146,3 +147,14 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
 final authUserProvider = StreamProvider<User?>(
   (ref) => ref.watch(authRepositoryProvider).userStream,
 );
+
+/// Klip Cuplix untuk section "Cuplix" di Beranda (10 klip teratas). Gagal ->
+/// list kosong, jadi section-nya saja yang hilang dan Beranda tetap jalan.
+final homeCuplixProvider = FutureProvider.autoDispose<List<CuplixItem>>((ref) async {
+  try {
+    final (list, _) = await ref.watch(repositoryProvider).getCuplixScroll();
+    return list.where((c) => c.thumbnailUrl.isNotEmpty).take(10).toList();
+  } catch (_) {
+    return const [];
+  }
+});

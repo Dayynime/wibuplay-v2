@@ -65,8 +65,17 @@ class AnimeRepository {
         final popular = JsonHelper.parseAnimeList(rawData['popular']);
         final newRelease = JsonHelper.parseAnimeList(rawData['new']);
         final random = JsonHelper.parseAnimeList(rawData['random']);
-        final today = JsonHelper.parseAnimeList(rawData['today']);
+        var today = JsonHelper.parseAnimeList(rawData['today']);
         final update = JsonHelper.parseAnimeList(rawData['update']);
+        final waiting = JsonHelper.parseAnimeList(rawData['waiting']);
+        final updateLabels = JsonHelper.parseEpisodeLabels(rawData['update']);
+
+        // Cadangan: jadwal hari ini dari endpoint jadwal kalau section kosong.
+        if (today.isEmpty) {
+          try {
+            today = await getSchedule(currentDay);
+          } catch (_) {}
+        }
 
         // Kalau hero kosong, ambil dari hot lalu popular (JANGAN rawData['slider'])
         if (heroAnimeList.isEmpty) heroAnimeList = _filterValidHeroAnime(hot);
@@ -80,6 +89,8 @@ class AnimeRepository {
           random: random,
           today: today,
           update: update,
+          waiting: waiting,
+          updateLabels: updateLabels,
         );
         _cachedHome = result;
         _cachedHomeTime = now;

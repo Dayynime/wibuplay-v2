@@ -19,7 +19,7 @@ import '../../components/hero_banner.dart';
 import '../../components/home_profile_header.dart';
 import '../../components/shimmer.dart';
 import '../../components/staggered_section.dart';
-import '../../components/top_hits_row.dart';
+import '../../components/home_section_cards.dart';
 import 'home_controller.dart';
 
 /// Port HomeScreen.kt.
@@ -31,12 +31,16 @@ class HomeScreen extends ConsumerWidget {
     required this.onSearchClick,
     required this.onSeeAllClick,
     required this.onProfileClick,
+    required this.onCuplixClick,
   });
 
   final ValueChanged<String> onAnimeClick;
   final void Function(String movieId, String episodeId) onWatchEpisode;
   final VoidCallback onSearchClick;
   final ValueChanged<String> onSeeAllClick;
+
+  /// Ketuk klip / "Lihat semua" di section Cuplix: buka tab Cuplix.
+  final VoidCallback onCuplixClick;
 
   /// Ketuk kartu profil / chip Premium / chip ZCoin / tombol Premium: buka tab Profil.
   final VoidCallback onProfileClick;
@@ -72,6 +76,7 @@ class HomeScreen extends ConsumerWidget {
         onSearchClick: onSearchClick,
         onSeeAllClick: onSeeAllClick,
         onProfileClick: onProfileClick,
+        onCuplixClick: onCuplixClick,
       );
     }
 
@@ -99,6 +104,7 @@ class _HomeContent extends ConsumerStatefulWidget {
     required this.onSearchClick,
     required this.onSeeAllClick,
     required this.onProfileClick,
+    required this.onCuplixClick,
   });
 
   final HomeSectionData sections;
@@ -107,6 +113,7 @@ class _HomeContent extends ConsumerStatefulWidget {
   final VoidCallback onSearchClick;
   final ValueChanged<String> onSeeAllClick;
   final VoidCallback onProfileClick;
+  final VoidCallback onCuplixClick;
 
   @override
   ConsumerState<_HomeContent> createState() => _HomeContentState();
@@ -139,20 +146,26 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
     super.dispose();
   }
 
-  Widget _posterRow(List<AnimeItem> list) {
+  Widget _posterRow(
+    List<AnimeItem> list, {
+    Map<String, String> episodeLabels = const {},
+    bool showNewBadge = false,
+  }) {
     return SizedBox(
       height: _rowHeight,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 20),
         itemCount: list.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 12),
+        separatorBuilder: (_, _) => const SizedBox(width: 14),
         itemBuilder: (context, i) {
           final anime = list[i];
           return Align(
             alignment: Alignment.topCenter,
             child: AnimePosterCard(
               anime: anime,
+              episodeLabel: episodeLabels[anime.id],
+              showNewBadge: showNewBadge,
               onTap: () {
                 final id = anime.id;
                 if (id != null) widget.onAnimeClick(id);
@@ -170,13 +183,9 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
   @override
   Widget build(BuildContext context) {
     final sections = widget.sections;
-    final history = ref.watch(localStoreProvider.select((s) => s.history));
-    final favorites = ref.watch(localStoreProvider.select((s) => s.favorites));
+    final cuplixClips = ref.watch(homeCuplixProvider).valueOrNull ?? const [];
     final user = ref.watch(authUserProvider).valueOrNull;
     final showProfileHeader = user != null && FirebaseConfig.ready;
-
-    final topHits = sections.hot.isNotEmpty ? sections.hot : sections.popular;
-    final newEpisodes = sections.update.isNotEmpty ? sections.update : sections.newRelease;
 
     Widget section({
       required int delayMs,
@@ -298,109 +307,93 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
             ),
           ),
 
-        // 2. Lanjutkan Menonton
-        if (history.isNotEmpty)
-          section(
-            delayMs: 120,
-            title: 'Lanjutkan Menonton',
-            child: SizedBox(
-              height: 124 + 8 + 36,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: history.length,
-                separatorBuilder: (_, _) => const SizedBox(width: 14),
-                itemBuilder: (context, i) {
-                  final h = history[i];
-                  final lower = h.episodeTitle.toLowerCase();
-                  final epLabel = (lower.contains('episode') || lower.contains('ep'))
-                      ? h.episodeTitle
-                      : 'Episode ${h.episodeIndex}';
-                  final percent = (h.progressFraction * 100).toInt();
-                  final progressLabel = percent > 0 ? '$epLabel • $percent%' : epLabel;
-                  return ContinueWatchingCard(
-                    title: h.movieTitle,
-                    episodeText: progressLabel,
-                    posterUrl: h.moviePoster,
-                    progress: h.progressFraction,
-                    onTap: () => widget.onWatchEpisode(h.movieId, h.episodeId),
-                  );
-                },
-              ),
-            ),
-          ),
-
-        // Chat global terbaru (bergeser otomatis), di atas Top Hits
+        // Chat global terbaru (bergeser otomatis), di bawah hero
         StaggeredSection(
           visible: _animateSections,
-          delayMs: 150,
+          delayMs: 120,
           child: const Padding(
             padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
             child: ChatTicker(),
           ),
         ),
 
-        // 3. Top Hits
-        if (topHits.isNotEmpty)
+        // Urutan section mengikuti Beranda Zenime.
+
+        // 2. Cuplix
+        if (cuplixClips.isNotEmpty)
+          section(
+            delayMs: 150,
+            title: 'Cuplix',
+            actionText: 'Lihat semua',
+            onAction: widget.onCuplixClick,
+            child: CuplixThumbRow(clips: cuplixClips, onClipClick: widget.onCuplixClick),
+          ),
+
+        // 3. Episode Baru (data/home/list -> update) + label nomor episode
+        if (sections.update.isNotEmpty)
           section(
             delayMs: 180,
-            title: 'Top Hits',
+            title: 'Episode Baru',
+            child: _posterRow(sections.update, episodeLabels: sections.updateLabels),
+          ),
+
+        // 4. Sedang Hangat (hot) - kartu cover 16:9
+        if (sections.hot.isNotEmpty)
+          section(
+            delayMs: 220,
+            title: 'Sedang Hangat',
             actionText: 'Lihat semua',
             onAction: () => widget.onSeeAllClick('hot'),
-            gapAfterHeader: false,
-            child: TopHitsRow(
-              items: topHits.take(10).toList(),
-              onItemClick: (anime) {
-                final id = anime.id;
-                if (id != null) widget.onAnimeClick(id);
-              },
+            child: AnimeCoverBannerRow(
+              items: sections.hot,
+              onAnimeClick: widget.onAnimeClick,
             ),
           ),
 
-        // 4. Favorit Saya
-        if (favorites.isNotEmpty)
-          section(
-            delayMs: 240,
-            title: 'Favorit Saya',
-            child: _posterRow(favorites.map((f) => f.toAnimeItem()).toList()),
-          ),
-
-        // 5. Episode Baru
-        if (newEpisodes.isNotEmpty)
-          section(
-            delayMs: 300,
-            title: 'Episode Baru',
-            actionText: 'Lihat semua',
-            onAction: () => widget.onSeeAllClick('new'),
-            child: _posterRow(newEpisodes),
-          ),
-
-        // 6. Jadwal Hari Ini
+        // 5. Jadwal Hari Ini
         if (sections.today.isNotEmpty)
           section(
-            delayMs: 340,
+            delayMs: 260,
             title: 'Jadwal Hari Ini',
             child: _posterRow(sections.today),
           ),
 
-        // 7. Anime Populer
-        if (sections.popular.isNotEmpty)
+        // 6. Judul Baru (new) + badge "New"
+        if (sections.newRelease.isNotEmpty)
           section(
-            delayMs: 380,
-            title: 'Anime Populer',
-            actionText: 'Lihat semua',
-            onAction: () => widget.onSeeAllClick('popular'),
-            child: _posterRow(sections.popular),
+            delayMs: 300,
+            title: 'Judul Baru',
+            child: _posterRow(sections.newRelease, showNewBadge: true),
           ),
 
-        // 8. Mungkin Kamu Suka
+        // 7. Terpopuler - kartu berperingkat
+        if (sections.popular.isNotEmpty)
+          section(
+            delayMs: 340,
+            title: 'Terpopuler',
+            child: AnimeRankedRow(
+              items: sections.popular,
+              onAnimeClick: widget.onAnimeClick,
+            ),
+          ),
+
+        // 8. Jas Por Yu (random) - kartu cover 16:9
         if (sections.random.isNotEmpty)
           section(
+            delayMs: 380,
+            title: 'Jas Por Yu',
+            child: AnimeCoverBannerRow(
+              items: sections.random,
+              onAnimeClick: widget.onAnimeClick,
+            ),
+          ),
+
+        // 9. Paling Dinanti (waiting)
+        if (sections.waiting.isNotEmpty)
+          section(
             delayMs: 420,
-            title: 'Mungkin Kamu Suka',
-            actionText: 'Lihat semua',
-            onAction: () => widget.onSeeAllClick('random'),
-            child: _posterRow(sections.random),
+            title: 'Paling Dinanti',
+            child: _posterRow(sections.waiting),
           ),
       ],
     );

@@ -11,6 +11,7 @@ class AnimeItem {
     this.year,
     this.day,
     this.views,
+    this.favorites,
     this.imagePoster,
     this.imageCover,
     this.studio,
@@ -27,6 +28,7 @@ class AnimeItem {
   final String? year;
   final String? day;
   final String? views;
+  final String? favorites;
   final String? imagePoster;
   final String? imageCover;
   final String? studio;

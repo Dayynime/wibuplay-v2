@@ -88,6 +88,7 @@ class JsonHelper {
         year: _str(map['year']),
         day: _str(map['day']),
         views: _first(map, ['views', 'count_views']),
+        favorites: _first(map, ['favorites', 'count_favorites']),
         imagePoster: _first(map, ['image_poster', 'poster', 'image']),
         imageCover: _first(map, ['image_cover', 'cover']),
         studio: _str(map['studio']),
@@ -97,6 +98,47 @@ class JsonHelper {
     } catch (_) {
       return null;
     }
+  }
+
+  static final RegExp _episodeText =
+      RegExp(r'^(?:episode|eps?)\.?\s*\d+(?:[.,]\d+)?$', caseSensitive: false);
+  static final RegExp _episodeKey = RegExp(
+    r'^(?:episode|eps?|episode_(?:index|number|num|no)|(?:last|latest|new)_episode)$',
+    caseSensitive: false,
+  );
+
+  /// Cari nomor episode di item mentah ("Episode 23"); null kalau tidak ada.
+  static String? _episodeLabelOf(Map raw) {
+    for (final v in raw.values) {
+      if (v is String && _episodeText.hasMatch(v.trim())) return v.trim();
+    }
+    // id_episode sengaja tidak ikut: itu ID, bukan nomor episode.
+    for (final e in raw.entries) {
+      final k = e.key.toString();
+      if (!_episodeKey.hasMatch(k)) continue;
+      final v = e.value;
+      String? number;
+      if (v is String) {
+        final t = v.trim();
+        if (t.isNotEmpty && RegExp(r'^[0-9.]+$').hasMatch(t)) number = t;
+      } else if (v is num) {
+        number = v == v.truncate() ? v.truncate().toString() : v.toString();
+      }
+      if (number != null) return 'Episode $number';
+    }
+    return null;
+  }
+
+  /// Peta idAnime -> "Episode N" dari daftar `update` (Beranda: Episode Baru).
+  static Map<String, String> parseEpisodeLabels(dynamic data) {
+    final labels = <String, String>{};
+    for (final item in _extractList(data, ['movie', 'movies', 'data'])) {
+      if (item is! Map) continue;
+      final id = _str(item['id']);
+      final label = _episodeLabelOf(item);
+      if (id != null && id.isNotEmpty && label != null) labels[id] = label;
+    }
+    return labels;
   }
 
   static List<AnimeItem> parseAnimeList(dynamic data) {

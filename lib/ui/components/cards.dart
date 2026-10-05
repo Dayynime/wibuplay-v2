@@ -18,12 +18,20 @@ class AnimePosterCard extends StatefulWidget {
     required this.onTap,
     this.width = 140,
     this.showRank,
+    this.episodeLabel,
+    this.showNewBadge = false,
   });
 
   final AnimeItem anime;
   final VoidCallback onTap;
   final double width;
   final int? showRank;
+
+  /// Dipakai "Episode Baru": label nomor episode di kiri bawah poster.
+  final String? episodeLabel;
+
+  /// Dipakai "Judul Baru": badge "New" di kiri atas poster.
+  final bool showNewBadge;
 
   @override
   State<AnimePosterCard> createState() => _AnimePosterCardState();
@@ -102,8 +110,25 @@ class _AnimePosterCardState extends State<AnimePosterCard> {
                               ),
                             ),
                           ),
+                        // Label episode (Episode Baru) menggantikan views
+                        if (!_blank(widget.episodeLabel))
+                          Positioned(
+                            left: 8,
+                            right: 8,
+                            bottom: 8,
+                            child: Text(
+                              widget.episodeLabel!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: AppColors.textWhite,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          )
                         // Views kiri bawah
-                        if (!_blank(anime.views))
+                        else if (!_blank(anime.views))
                           Positioned(
                             left: 8,
                             bottom: 8,
@@ -125,6 +150,26 @@ class _AnimePosterCardState extends State<AnimePosterCard> {
                                   ),
                                 ),
                               ],
+                            ),
+                          ),
+                        if (widget.showNewBadge)
+                          Positioned(
+                            top: 8,
+                            left: 8,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF2F8BFF),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text(
+                                'New',
+                                style: TextStyle(
+                                  color: AppColors.textWhite,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
                             ),
                           ),
                         // Rank opsional

@@ -10,6 +10,8 @@ class HomeSectionData {
     this.random = const [],
     this.today = const [],
     this.update = const [],
+    this.waiting = const [],
+    this.updateLabels = const {},
   });
 
   final List<AnimeItem> slider;
@@ -19,4 +21,10 @@ class HomeSectionData {
   final List<AnimeItem> random;
   final List<AnimeItem> today;
   final List<AnimeItem> update;
+
+  /// "Paling Dinanti" (data/home/list -> waiting).
+  final List<AnimeItem> waiting;
+
+  /// idAnime -> "Episode N" untuk section Episode Baru.
+  final Map<String, String> updateLabels;
 }
