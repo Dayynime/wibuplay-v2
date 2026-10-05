@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../../core/supabase_config.dart';
@@ -20,6 +21,13 @@ class ChatInserted extends ChatRealtimeEvent {
 class ChatDeleted extends ChatRealtimeEvent {
   const ChatDeleted(this.id);
   final int id;
+}
+
+/// Server membalas `phx_join` dengan status ok (socket sudah subscribe).
+/// Dipakai controller buat fetch ulang: nutup celah antara fetch awal dan
+/// subscribe, serta pesan yang kelewat saat socket putus-nyambung.
+class ChatConnected extends ChatRealtimeEvent {
+  const ChatConnected();
 }
 
 /// Port ChatRealtimeClient.kt: ngomong langsung protokol Phoenix Channel
@@ -41,6 +49,7 @@ class ChatRealtimeClient {
   int _retry = 0;
   int _ref = 0;
   int _generation = 0;
+  String? _joinRef;
 
   Stream<ChatRealtimeEvent> get events => _events.stream;
 
@@ -107,6 +116,7 @@ class ChatRealtimeClient {
   }
 
   void _join(WebSocketChannel channel) {
+    _joinRef = _nextRef();
     final join = {
       'topic': _topic,
       'event': 'phx_join',
@@ -118,7 +128,7 @@ class ChatRealtimeClient {
           ],
         },
       },
-      'ref': _nextRef(),
+      'ref': _joinRef,
     };
     channel.sink.add(jsonEncode(join));
   }
@@ -139,9 +149,25 @@ class ChatRealtimeClient {
   }
 
   void _handleFrame(String text) {
+    if (kDebugMode) debugPrint('RT <- $text');
     try {
       final json = jsonDecode(text);
-      if (json is! Map || json['event'] != 'postgres_changes') return;
+      if (json is! Map) return;
+      final event = json['event'];
+      if (event == 'phx_reply') {
+        _handleReply(json);
+        return;
+      }
+      if (event == 'system') {
+        // Gagal subscribe postgres_changes (mis. tabel belum masuk publication
+        // supabase_realtime) datang lewat event ini, bukan lewat phx_reply.
+        final p = json['payload'];
+        if (p is Map && p['status'] == 'error') {
+          debugPrint('RT subscribe gagal: ${jsonEncode(p)}');
+        }
+        return;
+      }
+      if (event != 'postgres_changes') return;
       final payload = json['payload'];
       if (payload is! Map) return;
       final data = payload['data'];
@@ -161,8 +187,19 @@ class ChatRealtimeClient {
           }
           break;
       }
-    } catch (_) {
-      // Frame lain (phx_reply, dll) aman diabaikan.
+    } catch (e) {
+      debugPrint('RT frame error: $e');
+    }
+  }
+
+  void _handleReply(Map json) {
+    if (json['topic'] != _topic || json['ref'] != _joinRef) return;
+    final payload = json['payload'];
+    final status = payload is Map ? payload['status'] : null;
+    if (status == 'ok') {
+      if (!_events.isClosed) _events.add(const ChatConnected());
+    } else {
+      debugPrint('RT join gagal: ${jsonEncode(payload)}');
     }
   }
 

@@ -7,10 +7,14 @@ import '../../../data/models/chat_models.dart';
 import '../../../data/realtime/chat_realtime_client.dart';
 import '../../../data/repository/chat_repository.dart';
 import '../../../providers.dart';
+import 'chat_session_cache.dart';
 
 const int _cooldownSeconds = 5;
 const int _maxMessageLength = 300;
 const int _maxMessagesInMemory = 200;
+
+/// Resync penuh cuma jaring pengaman (bukan mekanisme utama), sama seperti Zenime.
+const int _resyncSeconds = 45;
 
 /// State Chat Global. Port ChatUiState di ChatViewModel.kt (versi inti:
 /// kirim teks, balas, hapus pesan sendiri, realtime, badge warna/ID/avatar).
@@ -107,7 +111,17 @@ class ChatController extends AutoDisposeNotifier<ChatUiState> {
     final user = ref.read(authRepositoryProvider).currentUser;
     Future.microtask(_init);
     final name = user?.displayName;
+    // Kalau pernah dimuat di sesi ini, langsung tampilkan pesan + badge dari
+    // cache (tanpa spinner); fetch terbaru jalan di belakang dan menimpa.
     return ChatUiState(
+      messages: ChatSessionCache.messages,
+      isLoading: ChatSessionCache.messages.isEmpty,
+      usernameColors: ChatSessionCache.usernameColors,
+      userNumbers: ChatSessionCache.userNumbers,
+      avatarUrls: ChatSessionCache.avatarUrls,
+      levels: ChatSessionCache.levels,
+      clanTags: ChatSessionCache.clanTags,
+      premiumUids: ChatSessionCache.premiumUids,
       myUid: user?.uid ?? '',
       myUsername: (name != null && name.trim().isNotEmpty) ? name.trim() : 'Pengguna',
       myAvatarUrl: user?.photoURL,
@@ -123,7 +137,17 @@ class ChatController extends AutoDisposeNotifier<ChatUiState> {
   }
 
   void _update(ChatUiState Function(ChatUiState s) f) {
-    if (_alive) state = f(state);
+    if (!_alive) return;
+    state = f(state);
+    ChatSessionCache.save(
+      messages: state.messages,
+      premiumUids: state.premiumUids,
+      clanTags: state.clanTags,
+      levels: state.levels,
+      usernameColors: state.usernameColors,
+      userNumbers: state.userNumbers,
+      avatarUrls: state.avatarUrls,
+    );
   }
 
   Future<void> _init() async {
@@ -134,7 +158,22 @@ class ChatController extends AutoDisposeNotifier<ChatUiState> {
           ));
       return;
     }
-    // Profil bersama Zenime: pakai username/avatar yang sudah ada kalau ada.
+    if (!_alive) return;
+    // Sama seperti Zenime: profil, fetch awal, realtime, dan resync dimulai
+    // BERSAMAAN. Realtime + resync tidak boleh menunggu request profil/fetch
+    // (kalau salah satunya lambat/timeout, chat jadi tidak live sama sekali).
+    unawaited(_loadProfile());
+    unawaited(_refresh(initial: true));
+    _startRealtime();
+    // Jaring pengaman jarang-jarang (bukan polling tiap beberapa detik).
+    _resyncTimer = Timer.periodic(
+      const Duration(seconds: _resyncSeconds),
+      (_) => _refresh(),
+    );
+  }
+
+  /// Profil bersama Zenime: pakai username/avatar yang sudah ada kalau ada.
+  Future<void> _loadProfile() async {
     try {
       await _repo.ensureProfile(state.myUid, state.myUsername, state.myAvatarUrl);
       final profile = await _repo.getProfile(state.myUid);
@@ -145,25 +184,20 @@ class ChatController extends AutoDisposeNotifier<ChatUiState> {
             ));
       }
     } catch (_) {}
-
-    await _refresh(initial: true);
-    if (!_alive) return;
-    _startRealtime();
-    // Jaring pengaman jarang-jarang (bukan polling tiap beberapa detik).
-    _resyncTimer = Timer.periodic(const Duration(seconds: 60), (_) => _refresh());
   }
 
   Future<void> _refresh({bool initial = false}) async {
     try {
       final fetched = await _repo.getMessages(limit: 50);
       if (!_alive) return;
-      final merged = _merge(state.messages, fetched);
+      // Sama seperti Zenime: hasil server MENGGANTIKAN list, jadi pesan yang
+      // baru masuk muncul dan pesan yang sudah dihapus ikut hilang.
       _update((s) => s.copyWith(
-            messages: merged,
+            messages: fetched,
             isLoading: false,
             errorMessage: initial ? () => null : null,
           ));
-      _checkBadges(merged);
+      _checkBadges(fetched);
     } catch (e) {
       if (!_alive) return;
       if (initial) {
@@ -175,19 +209,6 @@ class ChatController extends AutoDisposeNotifier<ChatUiState> {
     }
   }
 
-  /// Gabungkan hasil server (50 terbaru) dengan pesan yang sudah di memori.
-  /// Pesan lama (id di bawah jendela server) dipertahankan; pesan di dalam
-  /// jendela diambil dari server, jadi pesan yang sudah dihapus ikut hilang.
-  List<ChatMessage> _merge(List<ChatMessage> current, List<ChatMessage> fetched) {
-    if (fetched.isEmpty) return current;
-    final minId = fetched.map((m) => m.id).reduce((a, b) => a < b ? a : b);
-    final older = current.where((m) => m.id < minId);
-    final all = <ChatMessage>[...older, ...fetched]..sort((a, b) => a.id.compareTo(b.id));
-    return all.length > _maxMessagesInMemory
-        ? all.sublist(all.length - _maxMessagesInMemory)
-        : all;
-  }
-
   void _startRealtime() {
     final client = ChatRealtimeClient();
     _realtime = client;
@@ -197,7 +218,11 @@ class ChatController extends AutoDisposeNotifier<ChatUiState> {
 
   void _onRealtime(ChatRealtimeEvent event) {
     if (!_alive) return;
-    if (event is ChatInserted) {
+    if (event is ChatConnected) {
+      // Socket baru saja subscribe (pertama kali atau setelah reconnect):
+      // ambil ulang supaya pesan yang kelewat selama belum tersambung masuk.
+      unawaited(_refresh());
+    } else if (event is ChatInserted) {
       final msg = event.message;
       if (state.messages.any((m) => m.id == msg.id)) return;
       var updated = [...state.messages, msg];
@@ -283,6 +308,9 @@ class ChatController extends AutoDisposeNotifier<ChatUiState> {
             replyTarget: () => null,
           ));
       _checkBadges([sent]);
+      // Sama seperti Zenime: habis kirim, sinkron ulang dengan server.
+      await _refresh();
+      if (!_alive) return true;
       _startCooldown();
       return true;
     } catch (e) {
@@ -324,6 +352,7 @@ class ChatController extends AutoDisposeNotifier<ChatUiState> {
       await _repo.deleteMessage(message.id, state.myUid);
       _update((s) => s.copyWith(
             messages: s.messages.where((m) => m.id != message.id).toList(),
+            replyTarget: s.replyTarget?.id == message.id ? () => null : null,
           ));
     } catch (e) {
       _update((s) => s.copyWith(
