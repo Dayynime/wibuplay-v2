@@ -261,7 +261,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
               ),
               const SizedBox(width: 10),
               const Text(
-                'Wibuplay',
+                'Zenime',
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 21,
@@ -959,6 +959,7 @@ class _GoogleButton extends StatelessWidget {
     return _Pressable(
       onTap: onTap,
       child: Container(
+        width: double.infinity,
         height: 56,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(100),
