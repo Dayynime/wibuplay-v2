@@ -144,6 +144,7 @@ jobs:
       - name: Build Release APK
         run: >
           flutter build apk --release
+          --obfuscate --split-debug-info=build/symbols
           --build-name=$APP_VERSION_NAME --build-number=$APP_VERSION_CODE
           --dart-define=FIREBASE_API_KEY=${{ secrets.FIREBASE_API_KEY }}
           --dart-define=FIREBASE_APP_ID=${{ secrets.FIREBASE_APP_ID }}
@@ -206,6 +207,15 @@ jobs:
         run: |
           (cd dist && sha256sum "${APP_NAME}-v${APP_VERSION_NAME}.apk" | tee "${APP_NAME}-v${APP_VERSION_NAME}.apk.sha256")
           ls -lh dist
+
+      # Simbol debug hasil --obfuscate: buat membaca stack trace crash.
+      # Disimpan terpisah (BUKAN di GitHub Release publik).
+      - name: Upload simbol debug
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APP_NAME }}-symbols-v${{ env.APP_VERSION_NAME }}
+          path: build/symbols
+          retention-days: 90
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

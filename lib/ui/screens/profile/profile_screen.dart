@@ -255,16 +255,74 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           itemCount: favorites.length,
           itemBuilder: (context, i) {
             final fav = favorites[i];
-            return AnimePosterCard(
+            return Stack(
               key: ValueKey(fav.id),
-              anime: fav.toAnimeItem(),
-              width: cell,
-              onTap: () => widget.onAnimeClick(fav.id),
+              children: [
+                AnimePosterCard(
+                  anime: fav.toAnimeItem(),
+                  width: cell,
+                  onTap: () => widget.onAnimeClick(fav.id),
+                ),
+                // Tombol hapus favorit (kiri atas poster; badge status ada di kanan atas).
+                Positioned(
+                  top: 6,
+                  left: 6,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => _confirmRemoveFavorite(fav),
+                    child: Container(
+                      width: 28,
+                      height: 28,
+                      decoration: const BoxDecoration(
+                        color: Color(0xB31E1B2E),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.delete_outline,
+                        color: AppColors.errorRed,
+                        size: 17,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             );
           },
         );
       },
     );
+  }
+
+  Future<void> _confirmRemoveFavorite(FavoriteEntity fav) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surfaceDark,
+        surfaceTintColor: Colors.transparent,
+        title: const Text(
+          'Hapus dari Favorit?',
+          style: TextStyle(color: AppColors.textWhite),
+        ),
+        content: Text(
+          '"${fav.title}" akan dihapus dari daftar favoritmu.',
+          style: const TextStyle(color: AppColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Batal', style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: FilledButton.styleFrom(backgroundColor: AppColors.errorRed),
+            child: const Text('Hapus', style: TextStyle(color: AppColors.textWhite)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await _controller.removeFavorite(fav.id);
+    }
   }
 
   // --------------------------------------------------------------- riwayat
@@ -280,31 +338,40 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         ),
       );
     }
+    final user = ref.watch(authUserProvider).valueOrNull;
+    final profile = _zenimeProfile(user);
+    final name = _resolvedName(user, profile.data, profile.loading);
+    final avatarUrl = _resolvedAvatar(user, profile.data, profile.loading);
+    final premium = user != null &&
+        FirebaseConfig.ready &&
+        (ref.watch(premiumProvider(user.uid)).valueOrNull ?? false);
+
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+          padding: const EdgeInsets.fromLTRB(16, 0, 8, 8),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                '${history.length} Riwayat Tontonan',
-                style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
-              ),
-              GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: _confirmClearHistory,
-                child: const Padding(
-                  padding: EdgeInsets.all(4),
-                  child: Text(
-                    'Hapus Semua',
-                    style: TextStyle(
-                      color: AppColors.errorRed,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+              const Icon(Icons.history, color: AppColors.accentViolet, size: 20),
+              const SizedBox(width: 8),
+              const Text(
+                'Riwayat Tontonan',
+                style: TextStyle(
+                  color: AppColors.textWhite,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
                 ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '${history.length}',
+                style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+              ),
+              const Spacer(),
+              IconButton(
+                onPressed: _confirmClearHistory,
+                tooltip: 'Hapus Semua Riwayat',
+                icon: const Icon(Icons.delete_sweep, color: AppColors.accentViolet),
               ),
             ],
           ),
@@ -313,12 +380,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           child: ListView.separated(
             padding: const EdgeInsets.fromLTRB(16, 6, 16, 135),
             itemCount: history.length,
-            separatorBuilder: (context, i) => const SizedBox(height: 10),
+            separatorBuilder: (context, i) => const SizedBox(height: 22),
             itemBuilder: (context, i) {
               final h = history[i];
               return _WatchHistoryRow(
                 key: ValueKey(h.id),
                 history: h,
+                username: name,
+                avatarUrl: avatarUrl,
+                isPremium: premium,
                 onPlay: () => widget.onWatchEpisode(h.movieId, h.episodeId),
                 onDelete: () => _controller.deleteHistory(h.id),
               );
@@ -529,109 +599,191 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 }
 
-/// Port WatchHistoryRowItem.
+/// Baris riwayat flat ala feed Zenime: avatar mini + nama + waktu relatif di
+/// atas, thumbnail + judul/episode, lalu ikon play + progress bar + label waktu.
 class _WatchHistoryRow extends StatelessWidget {
   const _WatchHistoryRow({
     super.key,
     required this.history,
+    required this.username,
+    required this.avatarUrl,
+    required this.isPremium,
     required this.onPlay,
     required this.onDelete,
   });
 
   final WatchHistoryEntity history;
+  final String username;
+  final String? avatarUrl;
+  final bool isPremium;
   final VoidCallback onPlay;
   final VoidCallback onDelete;
+
+  static String _duration(int ms) {
+    if (ms <= 0) return '00:00';
+    final total = ms ~/ 1000;
+    final h = total ~/ 3600;
+    final m = (total % 3600) ~/ 60;
+    final sec = total % 60;
+    String two(int n) => n.toString().padLeft(2, '0');
+    return h > 0 ? '$h:${two(m)}:${two(sec)}' : '${two(m)}:${two(sec)}';
+  }
+
+  static String _relative(int ms) {
+    final diff = DateTime.now().millisecondsSinceEpoch - ms;
+    final d = diff < 0 ? 0 : diff;
+    final minutes = d ~/ 60000;
+    final hours = d ~/ 3600000;
+    final days = d ~/ 86400000;
+    if (minutes < 1) return 'Baru saja';
+    if (minutes < 60) return '$minutes menit lalu';
+    if (hours < 24) return '$hours jam lalu';
+    if (days < 30) return '$days hari lalu';
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
+      'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des',
+    ];
+    final dt = DateTime.fromMillisecondsSinceEpoch(ms);
+    return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
+  }
 
   @override
   Widget build(BuildContext context) {
     final title = history.episodeTitle.toLowerCase();
-    final epLabel = (title.contains('episode') || title.contains('ep'))
-        ? history.episodeTitle
-        : 'Episode ${history.episodeIndex}';
-    final percent = (history.progressFraction * 100).toInt();
-    final progressLabel = percent > 0 ? '$epLabel • $percent%' : epLabel;
+    final epLabel = history.episodeTitle.trim().isEmpty
+        ? 'Episode ${history.episodeIndex}'
+        : (title.contains('episode') || title.contains('ep'))
+            ? history.episodeTitle
+            : 'Episode ${history.episodeIndex}';
 
-    return Material(
-      color: AppColors.surfaceCard,
-      borderRadius: AppShapes.card,
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onPlay,
-        child: Padding(
-          padding: const EdgeInsets.all(10),
-          child: Row(
+    return InkWell(
+      onTap: onPlay,
+      borderRadius: BorderRadius.circular(8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Baris atas: avatar mini + nama + badge premium, waktu di kanan.
+          Row(
             children: [
-              // Thumbnail + bar progres
+              UserAvatar(username: username, url: avatarUrl, size: 28),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  username,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.textWhite,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              if (isPremium) ...[
+                const SizedBox(width: 4),
+                const PremiumCheckBadge(size: 14),
+              ],
+              const Spacer(),
+              Text(
+                _relative(history.lastWatchedTime),
+                style: const TextStyle(color: Color(0x73FFFFFF), fontSize: 11),
+              ),
+              const SizedBox(width: 4),
+              InkWell(
+                onTap: onDelete,
+                customBorder: const CircleBorder(),
+                child: const Padding(
+                  padding: EdgeInsets.all(4),
+                  child: Icon(Icons.delete_outline, color: AppColors.textMuted, size: 18),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          // Thumbnail + judul/episode.
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(8),
                 child: SizedBox(
-                  width: 90,
-                  height: 60,
+                  width: 72,
+                  height: 72,
                   child: ColoredBox(
                     color: AppColors.surfaceDark,
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        NetImage(history.moviePoster),
-                        Positioned(
-                          left: 0,
-                          right: 0,
-                          bottom: 0,
-                          height: 3,
-                          child: ColoredBox(
-                            color: AppColors.surfaceElevated,
-                            child: Align(
-                              alignment: Alignment.centerLeft,
-                              child: FractionallySizedBox(
-                                widthFactor: history.progressFraction,
-                                heightFactor: 1,
-                                child: const ColoredBox(color: AppColors.accentViolet),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                    child: NetImage(history.moviePoster),
                   ),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      history.movieTitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.textWhite,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        history.movieTitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.textWhite,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      progressLabel,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.accentViolet,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
+                      const SizedBox(height: 2),
+                      Text(
+                        epLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0x99FFFFFF),
+                          fontSize: 11,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              IconButton(
-                onPressed: onDelete,
-                tooltip: 'Hapus',
-                icon: const Icon(Icons.delete_outline, color: AppColors.textMuted, size: 20),
               ),
             ],
           ),
-        ),
+          const SizedBox(height: 10),
+          // Ikon play + progress bar + label waktu.
+          Row(
+            children: [
+              Container(
+                width: 26,
+                height: 26,
+                decoration: const BoxDecoration(
+                  color: Color(0x14FFFFFF),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.play_arrow, color: AppColors.textWhite, size: 15),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(2),
+                  child: SizedBox(
+                    height: 3,
+                    child: LinearProgressIndicator(
+                      value: history.progressFraction,
+                      color: AppColors.accentViolet,
+                      backgroundColor: const Color(0x26FFFFFF),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                '${_duration(history.playbackPositionMs)} / ${_duration(history.durationMs)}',
+                maxLines: 1,
+                style: const TextStyle(color: Color(0x80FFFFFF), fontSize: 10),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
