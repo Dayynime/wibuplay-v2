@@ -54,115 +54,17 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
   }
 
   void _openFilterSheet() {
+    final maxHeight = MediaQuery.of(context).size.height * 0.88;
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: AppColors.surfaceDark,
       isScrollControlled: true,
       useSafeArea: true,
+      constraints: BoxConstraints(maxHeight: maxHeight),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
-      builder: (sheetContext) {
-        return Consumer(
-          builder: (context, ref, _) {
-            final ui = ref.watch(exploreControllerProvider);
-            const types = ['TV', 'Movie', 'OVA', 'ONA', 'Special'];
-            const years = ['2026', '2025', '2024', '2023', '2022', '2021', '2020'];
-            return SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 44),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Filter Pencarian',
-                        style: TextStyle(
-                          color: AppColors.textWhite,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: () {
-                          _notifier.resetFilters();
-                          Navigator.of(sheetContext).pop();
-                        },
-                        child: const Padding(
-                          padding: EdgeInsets.all(4),
-                          child: Text(
-                            'Reset',
-                            style: TextStyle(
-                              color: AppColors.accentViolet,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 18),
-                  const Text(
-                    'Tipe',
-                    style: TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final type in types)
-                        GenreChip(
-                          text: type,
-                          isSelected: ui.selectedType == type,
-                          onTap: () {
-                            _notifier.onTypeSelected(type);
-                            Navigator.of(sheetContext).pop();
-                          },
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 18),
-                  const Text(
-                    'Tahun Rilis',
-                    style: TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        for (var i = 0; i < years.length; i++) ...[
-                          if (i > 0) const SizedBox(width: 8),
-                          GenreChip(
-                            text: years[i],
-                            isSelected: ui.selectedYear == years[i],
-                            onTap: () {
-                              _notifier.onYearSelected(years[i]);
-                              Navigator.of(sheetContext).pop();
-                            },
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
+      builder: (sheetContext) => const _FilterSheet(),
     );
   }
 
@@ -268,24 +170,22 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
               ),
             ),
 
-            // Chip cepat: urutan + genre
+            // Chip genre (semua genre dari API) + "Semua"
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
               child: Row(
                 children: [
                   GenreChip(
-                    text: 'Terpopuler',
-                    isSelected: ui.selectedSort == 'views',
-                    onTap: () => _notifier.onSortSelected('views'),
+                    text: 'Semua',
+                    isSelected: ui.selectedGenreId == null,
+                    onTap: () {
+                      if (ui.selectedGenreId != null) {
+                        _notifier.onGenreSelected(ui.selectedGenreId);
+                      }
+                    },
                   ),
-                  const SizedBox(width: 8),
-                  GenreChip(
-                    text: 'A - Z',
-                    isSelected: ui.selectedSort == 'alphabet',
-                    onTap: () => _notifier.onSortSelected('alphabet'),
-                  ),
-                  for (final genre in ui.genres.take(15)) ...[
+                  for (final genre in ui.genres) ...[
                     const SizedBox(width: 8),
                     GenreChip(
                       text: genre.name ?? '',
@@ -394,6 +294,206 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
           ],
         );
       },
+    );
+  }
+}
+
+
+/// Sheet filter: Status, Tipe, Genre, Tahun, Urutkan. Pilihan disimpan
+/// sementara dan baru diterapkan lewat tombol "Terapkan" (satu kali muat).
+/// Tombol ditaruh di footer tetap dengan padding system navigation bar, jadi
+/// tidak tertutup tombol navigasi HP.
+class _FilterSheet extends ConsumerStatefulWidget {
+  const _FilterSheet();
+
+  @override
+  ConsumerState<_FilterSheet> createState() => _FilterSheetState();
+}
+
+class _FilterSheetState extends ConsumerState<_FilterSheet> {
+  static const List<(String?, String)> _statuses = [
+    (null, 'Semua'),
+    ('ONGOING', 'Ongoing'),
+    ('FINISHED', 'Completed'),
+  ];
+  static const List<(String?, String)> _types = [
+    (null, 'Semua'),
+    ('TV', 'TV Series'),
+    ('Movie', 'Movie'),
+    ('OVA', 'OVA'),
+    ('ONA', 'ONA'),
+    ('Special', 'Special'),
+  ];
+  static const List<(String, String)> _sorts = [
+    ('views', 'Terpopuler'),
+    ('alphabet', 'A - Z'),
+  ];
+
+  late String? _genre;
+  late String? _status;
+  late String? _type;
+  late String? _year;
+  late String _sort;
+
+  @override
+  void initState() {
+    super.initState();
+    final s = ref.read(exploreControllerProvider);
+    _genre = s.selectedGenreId;
+    _status = s.selectedStatus;
+    _type = s.selectedType;
+    _year = s.selectedYear;
+    _sort = s.selectedSort;
+  }
+
+  void _reset() => setState(() {
+        _genre = null;
+        _status = null;
+        _type = null;
+        _year = null;
+        _sort = 'views';
+      });
+
+  void _apply() {
+    ref.read(exploreControllerProvider.notifier).applyFilters(
+          genreId: _genre,
+          status: _status,
+          type: _type,
+          year: _year,
+          sort: _sort,
+        );
+    Navigator.of(context).pop();
+  }
+
+  Widget _label(String text) => Padding(
+        padding: const EdgeInsets.only(top: 18, bottom: 8),
+        child: Text(
+          text,
+          style: const TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: 13,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      );
+
+  Widget _chips<T>(
+    List<(T, String)> options,
+    T selected,
+    ValueChanged<T> onSelect,
+  ) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        for (final o in options)
+          GenreChip(
+            text: o.$2,
+            isSelected: selected == o.$1,
+            onTap: () => setState(() => onSelect(o.$1)),
+          ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final genres = ref.watch(exploreControllerProvider.select((s) => s.genres));
+    final thisYear = DateTime.now().year;
+    final years = [for (var y = thisYear; y >= 2000; y--) '$y'];
+    // Tinggi system navigation bar (3 tombol / gesture bar).
+    final bottomInset = MediaQuery.of(context).viewPadding.bottom;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Filter Pencarian',
+                style: TextStyle(
+                  color: AppColors.textWhite,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: _reset,
+                child: const Padding(
+                  padding: EdgeInsets.all(4),
+                  child: Text(
+                    'Reset',
+                    style: TextStyle(
+                      color: AppColors.accentViolet,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        Flexible(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _label('Status'),
+                _chips<String?>(_statuses, _status, (v) => _status = v),
+                _label('Tipe'),
+                _chips<String?>(_types, _type, (v) => _type = v),
+                if (genres.isNotEmpty) ...[
+                  _label('Genre'),
+                  _chips<String?>(
+                    [
+                      (null, 'Semua'),
+                      for (final g in genres)
+                        if (g.id != null) (g.id, g.name ?? ''),
+                    ],
+                    _genre,
+                    (v) => _genre = v,
+                  ),
+                ],
+                _label('Tahun Rilis'),
+                _chips<String?>(
+                  [(null, 'Semua'), for (final y in years) (y, y)],
+                  _year,
+                  (v) => _year = v,
+                ),
+                _label('Urutkan'),
+                _chips<String>(_sorts, _sort, (v) => _sort = v),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        ),
+        Padding(
+          padding: EdgeInsets.fromLTRB(20, 12, 20, 16 + bottomInset),
+          child: SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: FilledButton(
+              onPressed: _apply,
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.accentViolet,
+                foregroundColor: AppColors.textWhite,
+                shape: const StadiumBorder(),
+              ),
+              child: const Text(
+                'Terapkan',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

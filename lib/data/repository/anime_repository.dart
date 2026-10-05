@@ -139,28 +139,96 @@ class AnimeRepository {
     return list;
   }
 
-  Future<List<AnimeItem>> explore({
+  /// API tidak punya endpoint pencarian gabungan, jadi satu filter dipilih
+  /// sebagai "endpoint utama" (prioritas: kata kunci > genre > tipe > tahun >
+  /// studio), lalu filter lainnya (status, tipe, tahun, genre) diterapkan di
+  /// sisi app dari hasil endpoint utama. Pola yang sama dengan Zenime.
+  ///
+  /// Kalau satu halaman habis tersaring, halaman berikutnya diminta otomatis
+  /// (maks 5 kali) supaya daftar tidak kosong padahal masih ada hasil.
+  /// [page] di hasil = halaman terakhir yang benar-benar diminta.
+  Future<({List<AnimeItem> items, int page, bool hasMore})> explore({
     String keyword = '',
     String? genreId,
+    String? genreName,
     String? type,
     String? year,
+    String? status,
     String? studio,
     String sort = 'views',
     int page = 0,
   }) async {
-    final ApiResponse resp;
-    if (!_blank(genreId)) {
-      resp = await _api.exploreByGenre(genreId!, sort: sort, page: page);
-    } else if (!_blank(type)) {
-      resp = await _api.exploreByType(type!, sort: sort, page: page);
-    } else if (!_blank(year)) {
-      resp = await _api.exploreByYear(year!, season: '', sort: sort, page: page);
-    } else if (!_blank(studio)) {
-      resp = await _api.exploreByStudio(studio!, sort: sort, page: page);
-    } else {
-      resp = await _api.exploreMovie(keyword: keyword, sort: sort, page: page);
+    final primary = _primaryFilter(keyword, genreId, type, year, studio);
+    var current = page;
+    for (var attempt = 0; attempt < 5; attempt++) {
+      final ApiResponse resp;
+      switch (primary) {
+        case 'keyword':
+          resp = await _api.exploreMovie(keyword: keyword, sort: sort, page: current);
+        case 'genre':
+          resp = await _api.exploreByGenre(genreId!, sort: sort, page: current);
+        case 'type':
+          resp = await _api.exploreByType(type!, sort: sort, page: current);
+        case 'year':
+          resp = await _api.exploreByYear(year!, season: '', sort: sort, page: current);
+        case 'studio':
+          resp = await _api.exploreByStudio(studio!, sort: sort, page: current);
+        default:
+          resp = await _api.exploreMovie(keyword: '', sort: sort, page: current);
+      }
+      final raw = JsonHelper.parseAnimeList(resp.data);
+      final hasMore = raw.isNotEmpty;
+      final items = _applyLocalFilters(
+        raw,
+        primary: primary,
+        genreName: genreName,
+        type: type,
+        year: year,
+        status: status,
+      );
+      if (items.isNotEmpty || !hasMore) {
+        return (items: items, page: current, hasMore: hasMore);
+      }
+      current++;
     }
-    return JsonHelper.parseAnimeList(resp.data);
+    return (items: const <AnimeItem>[], page: current - 1, hasMore: true);
+  }
+
+  static String _primaryFilter(
+    String keyword,
+    String? genreId,
+    String? type,
+    String? year,
+    String? studio,
+  ) {
+    if (!_blank(keyword)) return 'keyword';
+    if (!_blank(genreId)) return 'genre';
+    if (!_blank(type)) return 'type';
+    if (!_blank(year)) return 'year';
+    if (!_blank(studio)) return 'studio';
+    return 'none';
+  }
+
+  static List<AnimeItem> _applyLocalFilters(
+    List<AnimeItem> raw, {
+    required String primary,
+    String? genreName,
+    String? type,
+    String? year,
+    String? status,
+  }) {
+    bool eq(String? a, String b) =>
+        a != null && a.trim().toLowerCase() == b.trim().toLowerCase();
+    return raw.where((a) {
+      if (!_blank(status) && !eq(a.status, status!)) return false;
+      if (primary != 'type' && !_blank(type) && !eq(a.type, type!)) return false;
+      if (primary != 'year' && !_blank(year) && !eq(a.year, year!)) return false;
+      if (primary != 'genre' && !_blank(genreName)) {
+        final g = (a.genre ?? '').toLowerCase();
+        if (!g.contains(genreName!.trim().toLowerCase())) return false;
+      }
+      return true;
+    }).toList();
   }
 
   Future<AnimeItem> getMovieDetail(String id, {bool forceRefresh = false}) async {

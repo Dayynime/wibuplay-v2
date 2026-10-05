@@ -14,6 +14,7 @@ class ExploreUiState {
     this.selectedGenreId,
     this.selectedType,
     this.selectedYear,
+    this.selectedStatus,
     this.selectedStudio,
     this.selectedSort = 'views',
     this.genres = const [],
@@ -29,6 +30,7 @@ class ExploreUiState {
   final String? selectedGenreId;
   final String? selectedType;
   final String? selectedYear;
+  final String? selectedStatus;
   final String? selectedStudio;
   final String selectedSort;
   final List<GenreItem> genres;
@@ -40,7 +42,11 @@ class ExploreUiState {
   final int currentPage;
 
   bool get hasActiveFilter =>
-      selectedGenreId != null || selectedType != null || selectedYear != null;
+      selectedGenreId != null ||
+      selectedType != null ||
+      selectedYear != null ||
+      selectedStatus != null ||
+      selectedSort != 'views';
 
   /// Field nullable memakai fungsi supaya bisa diisi null secara eksplisit.
   ExploreUiState copyWith({
@@ -48,6 +54,7 @@ class ExploreUiState {
     String? Function()? selectedGenreId,
     String? Function()? selectedType,
     String? Function()? selectedYear,
+    String? Function()? selectedStatus,
     String? Function()? selectedStudio,
     String? selectedSort,
     List<GenreItem>? genres,
@@ -63,6 +70,7 @@ class ExploreUiState {
       selectedGenreId: selectedGenreId != null ? selectedGenreId() : this.selectedGenreId,
       selectedType: selectedType != null ? selectedType() : this.selectedType,
       selectedYear: selectedYear != null ? selectedYear() : this.selectedYear,
+      selectedStatus: selectedStatus != null ? selectedStatus() : this.selectedStatus,
       selectedStudio: selectedStudio != null ? selectedStudio() : this.selectedStudio,
       selectedSort: selectedSort ?? this.selectedSort,
       genres: genres ?? this.genres,
@@ -117,23 +125,10 @@ class ExploreController extends Notifier<ExploreUiState> {
     });
   }
 
+  /// Filter bisa dikombinasikan; tidak ada lagi yang saling mereset.
   void onGenreSelected(String? genreId) {
     final newGenre = state.selectedGenreId == genreId ? null : genreId;
-    _update((s) => s.copyWith(
-          selectedGenreId: () => newGenre,
-          selectedType: () => null,
-          selectedYear: () => null,
-        ));
-    _loadAnime(page: 0, isInitial: true);
-  }
-
-  void onTypeSelected(String? type) {
-    final newType = state.selectedType == type ? null : type;
-    _update((s) => s.copyWith(
-          selectedType: () => newType,
-          selectedGenreId: () => null,
-          selectedYear: () => null,
-        ));
+    _update((s) => s.copyWith(selectedGenreId: () => newGenre));
     _loadAnime(page: 0, isInitial: true);
   }
 
@@ -143,12 +138,33 @@ class ExploreController extends Notifier<ExploreUiState> {
     _loadAnime(page: 0, isInitial: true);
   }
 
-  void onYearSelected(String? year) {
-    final newYear = state.selectedYear == year ? null : year;
+  /// Terapkan semua pilihan dari sheet filter sekaligus (satu kali muat).
+  void applyFilters({
+    String? genreId,
+    String? status,
+    String? type,
+    String? year,
+    required String sort,
+  }) {
     _update((s) => s.copyWith(
-          selectedYear: () => newYear,
+          selectedGenreId: () => genreId,
+          selectedStatus: () => status,
+          selectedType: () => type,
+          selectedYear: () => year,
+          selectedSort: sort,
+        ));
+    _loadAnime(page: 0, isInitial: true);
+  }
+
+  /// Reset filter saja; kata kunci pencarian dibiarkan.
+  void clearFilters() {
+    _update((s) => s.copyWith(
           selectedGenreId: () => null,
+          selectedStatus: () => null,
           selectedType: () => null,
+          selectedYear: () => null,
+          selectedStudio: () => null,
+          selectedSort: 'views',
         ));
     _loadAnime(page: 0, isInitial: true);
   }
@@ -160,6 +176,7 @@ class ExploreController extends Notifier<ExploreUiState> {
           selectedGenreId: () => null,
           selectedType: () => null,
           selectedYear: () => null,
+          selectedStatus: () => null,
           selectedStudio: () => null,
           selectedSort: 'views',
         ));
@@ -185,22 +202,31 @@ class ExploreController extends Notifier<ExploreUiState> {
         ));
 
     try {
-      final newItems = await ref.read(repositoryProvider).explore(
+      String? genreName;
+      for (final g in snap.genres) {
+        if (g.id == snap.selectedGenreId) genreName = g.name;
+      }
+      final res = await ref.read(repositoryProvider).explore(
             keyword: snap.query,
             genreId: snap.selectedGenreId,
+            genreName: genreName,
             type: snap.selectedType,
             year: snap.selectedYear,
+            status: snap.selectedStatus,
             studio: snap.selectedStudio,
             sort: snap.selectedSort,
             page: page,
           );
       if (gen != _generation) return;
       _update((cur) {
-        final combined = isInitial ? newItems : [...cur.items, ...newItems];
+        // Buang duplikat kalau server mengulang isi yang sama antar halaman.
+        final known = isInitial ? <String?>{} : cur.items.map((e) => e.id).toSet();
+        final fresh = res.items.where((e) => known.add(e.id)).toList();
+        final combined = isInitial ? fresh : [...cur.items, ...fresh];
         return cur.copyWith(
           items: combined,
-          currentPage: page,
-          isEndOfList: newItems.isEmpty,
+          currentPage: res.page,
+          isEndOfList: !res.hasMore || (res.items.isNotEmpty && fresh.isEmpty),
           isLoading: false,
           isLoadingMore: false,
         );
