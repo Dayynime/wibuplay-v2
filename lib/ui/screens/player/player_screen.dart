@@ -827,8 +827,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                               final title = anime?.title ?? 'anime ini';
                               final idx = currentEp?.index;
                               final text = _blank(idx)
-                                  ? 'Nonton "$title" di Wibuplay!'
-                                  : 'Nonton "$title" Episode $idx di Wibuplay!';
+                                  ? 'Nonton "$title" di Zenime!'
+                                  : 'Nonton "$title" Episode $idx di Zenime!';
                               Share.share(text, subject: title);
                             },
                           ),

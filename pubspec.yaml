@@ -38,3 +38,4 @@ flutter:
   assets:
     - assets/images/logo.jpg
     - assets/images/ic_zcoin_badge.png
+    - assets/images/ic_premium_badge.png

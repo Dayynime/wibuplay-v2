@@ -384,6 +384,20 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ),
           const SizedBox(height: 10),
           _SettingsItem(
+            icon: Icons.workspace_premium_outlined,
+            title: 'Premium',
+            subtitle: '1080p, tanpa iklan, download offline, XP ×2',
+            onTap: () => openPremium(context),
+          ),
+          const SizedBox(height: 10),
+          _SettingsItem(
+            icon: Icons.monetization_on_outlined,
+            title: 'ZCoin',
+            subtitle: 'Cek saldo dan top up',
+            onTap: () => openCoin(context),
+          ),
+          const SizedBox(height: 10),
+          _SettingsItem(
             icon: Icons.logout,
             title: 'Keluar',
             subtitle: _displayName(user),

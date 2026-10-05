@@ -227,8 +227,8 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
                     user: user!,
                     onSearchClick: widget.onSearchClick,
                     onProfileClick: widget.onProfileClick,
-                    onPremiumClick: widget.onProfileClick,
-                    onCoinClick: widget.onProfileClick,
+                    onPremiumClick: () => openPremium(context),
+                    onCoinClick: () => openCoin(context),
                     onShieldClick: () => Navigator.of(context)
                         .push<void>(fadeRoute(const XpLeaderboardScreen())),
                   )

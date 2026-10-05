@@ -94,6 +94,8 @@ class JsonHelper {
         studio: _str(map['studio']),
         airedStart: _str(map['aired_start']),
         airedEnd: _str(map['aired_end']),
+        time: _str(map['time']),
+        keyTime: _str(map['key_time']),
       );
     } catch (_) {
       return null;

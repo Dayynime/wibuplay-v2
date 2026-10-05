@@ -8,4 +8,12 @@ class SupabaseConfig {
 
   static const String url = 'https://supabase.zenime.biz.id';
   static const String anonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzkwMTc4Njg0LCJleHAiOjE5NDc4NTg2ODR9.SH96iiwN4sQciG-8iIvO1bOFqEt58glG07z3AVYVrxE';
+
+  // Halaman pembayaran (storefront) Zenime, dibuka di browser dengan kode akun
+  // + id paket sebagai query. QRIS = otomatis, "manual" = pembeli luar negeri
+  // yang diverifikasi admin.
+  static const String premiumStorefrontUrl = 'https://zenime.biz.id/beli-premium';
+  static const String premiumManualStorefrontUrl = 'https://zenime.biz.id/bayar-manual';
+  static const String coinStorefrontUrl = 'https://zenime.biz.id/top-up-coin';
+  static const String coinManualStorefrontUrl = 'https://zenime.biz.id/coin-bayar-manual';
 }

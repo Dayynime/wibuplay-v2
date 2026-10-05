@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import 'screens/detail/detail_screen.dart';
 import 'screens/player/player_screen.dart';
+import 'screens/store/coin_screen.dart';
+import 'screens/store/premium_screen.dart';
 
 /// Transisi layar: layar baru fade-in 300ms, saat kembali fade-out 300ms
 /// (port enterTransition/popExitTransition di AppNavigation.kt).
@@ -40,4 +42,14 @@ void openPlayer(BuildContext context, String movieId, String episodeId) {
       ),
     ),
   );
+}
+
+/// Halaman beli Premium.
+void openPremium(BuildContext context) {
+  Navigator.of(context).push(fadeRoute(const PremiumScreen()));
+}
+
+/// Halaman top up ZCoin.
+void openCoin(BuildContext context) {
+  Navigator.of(context).push(fadeRoute(const CoinScreen()));
 }

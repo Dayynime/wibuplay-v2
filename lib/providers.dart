@@ -16,6 +16,8 @@ import 'data/models/clan_models.dart';
 import 'data/models/cuplix_item.dart';
 import 'data/models/support_models.dart';
 import 'data/models/xp_models.dart';
+import 'data/repository/store_repository.dart';
+import 'data/models/store_models.dart';
 import 'data/repository/xp_repository.dart';
 import 'data/supabase/supabase_client.dart';
 
@@ -86,6 +88,20 @@ final profileIdentityProvider = FutureProvider.family<ProfileIdentity, String>(
 /// Saldo ZCoin per uid. Gagal = 0.
 final coinBalanceProvider = FutureProvider.family<int, String>(
   (ref, uid) => ref.watch(accountRepositoryProvider).getCoinBalance(uid),
+);
+
+final storeRepositoryProvider = Provider<StoreRepository>(
+  (ref) => StoreRepository(ref.watch(supabaseDioProvider)),
+);
+
+/// Daftar paket Premium. Melempar kalau gagal (UI tampilkan coba lagi).
+final premiumPackagesProvider = FutureProvider.autoDispose<List<PremiumPackage>>(
+  (ref) => ref.watch(storeRepositoryProvider).getPremiumPackages(),
+);
+
+/// Daftar paket top up ZCoin. Melempar kalau gagal.
+final coinPackagesProvider = FutureProvider.autoDispose<List<CoinPackage>>(
+  (ref) => ref.watch(storeRepositoryProvider).getCoinPackages(),
 );
 
 /// Profil chat (username/avatar) per uid. Gagal = null.

@@ -17,6 +17,8 @@ class AnimeItem {
     this.studio,
     this.airedStart,
     this.airedEnd,
+    this.time,
+    this.keyTime,
   });
 
   final String? id;
@@ -34,6 +36,11 @@ class AnimeItem {
   final String? studio;
   final String? airedStart;
   final String? airedEnd;
+
+  /// Teks relatif dari server (mis. "2 jam lagi") dan jam tayang
+  /// "yyyy-MM-dd HH:mm:ss". Dipakai halaman jadwal.
+  final String? time;
+  final String? keyTime;
 
   String get posterUrl => buildFullUrl(imagePoster);
 
