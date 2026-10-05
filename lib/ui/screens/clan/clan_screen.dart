@@ -7,7 +7,9 @@ import '../../../data/models/clan_models.dart';
 import '../../../data/repository/clan_repository.dart';
 import '../../../providers.dart';
 import '../../components/game_badges.dart';
+import '../../app_routes.dart';
 import '../../components/hero_slides.dart' show heroGold;
+import 'clan_manage_screen.dart';
 import 'clan_widgets.dart';
 
 String _thousands(int v) {
@@ -80,6 +82,26 @@ class _ClanScreenState extends ConsumerState<ClanScreen> {
       _refreshAll();
       _toast('Donasi berhasil, terima kasih!');
     }
+  }
+
+  Future<void> _openManage(ClanDetailData d) async {
+    await Navigator.of(context).push<void>(
+      fadeRoute(ClanManageScreen(clanId: widget.clanId, myRole: d.myRole ?? ClanRoles.member)),
+    );
+    // Balik dari Kelola Clan: member/kuota mungkin berubah.
+    _refreshAll();
+  }
+
+  Future<void> _memberAction(ClanDetailData d, ClanMemberDisplay m) async {
+    final changed = await showDialog<bool>(
+      context: context,
+      builder: (_) => _MemberActionDialog(
+        clanId: widget.clanId,
+        target: m,
+        actorRole: d.myRole,
+      ),
+    );
+    if (changed == true) _refreshAll();
   }
 
   Future<void> _leave() async {
@@ -200,6 +222,7 @@ class _ClanScreenState extends ConsumerState<ClanScreen> {
                 onJoin: _join,
                 onDonate: _donate,
                 onLeave: _leave,
+                onManage: () => _openManage(d),
               ),
             ),
           ),
@@ -261,6 +284,9 @@ class _ClanScreenState extends ConsumerState<ClanScreen> {
                       level: d.levels[m.firebaseUid],
                       isPremium: d.premiumUids.contains(m.firebaseUid),
                       isMe: m.firebaseUid == d.myUid,
+                      onAction: m.firebaseUid != d.myUid && ClanRoles.canActOn(d.myRole, m.role)
+                          ? () => _memberAction(d, m)
+                          : null,
                     );
                   }
                   final e = donations[i];
@@ -288,6 +314,7 @@ class _HeaderCard extends StatelessWidget {
     required this.onJoin,
     required this.onDonate,
     required this.onLeave,
+    required this.onManage,
   });
 
   final ClanDetailData data;
@@ -295,6 +322,7 @@ class _HeaderCard extends StatelessWidget {
   final VoidCallback onJoin;
   final VoidCallback onDonate;
   final VoidCallback onLeave;
+  final VoidCallback onManage;
 
   @override
   Widget build(BuildContext context) {
@@ -452,10 +480,21 @@ class _HeaderCard extends StatelessWidget {
       case ClanCta.member:
         return Column(
           children: [
-            ClanGradientButton(
-              text: 'Donasi ZCoin',
-              icon: Icons.diamond_rounded,
-              onTap: onDonate,
+            Row(
+              children: [
+                Expanded(
+                  child: ClanGradientButton(
+                    text: 'Donasi ZCoin',
+                    icon: Icons.diamond_rounded,
+                    onTap: onDonate,
+                  ),
+                ),
+                // Officer ke atas boleh buka Kelola Clan.
+                if (ClanRoles.canManageClan(data.myRole)) ...[
+                  const SizedBox(width: 10),
+                  Expanded(child: _GlassButton(text: 'Kelola Clan', onTap: onManage)),
+                ],
+              ],
             ),
             // Leader tidak bisa keluar biasa (harus transfer/bubarkan clan dulu).
             if (data.myRole != ClanRoles.leader)
@@ -470,6 +509,49 @@ class _HeaderCard extends StatelessWidget {
           ],
         );
     }
+  }
+}
+
+class _GlassButton extends StatelessWidget {
+  const _GlassButton({required this.text, required this.onTap});
+
+  final String text;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Ink(
+          height: 50,
+          decoration: BoxDecoration(
+            color: const Color(0x14FFFFFF),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0x33FFFFFF)),
+          ),
+          child: Center(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.settings_rounded, size: 18, color: Colors.white),
+                const SizedBox(width: 8),
+                Text(
+                  text,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -769,6 +851,7 @@ class _MemberRow extends StatelessWidget {
     required this.level,
     required this.isPremium,
     required this.isMe,
+    this.onAction,
   });
 
   final ClanMemberDisplay member;
@@ -776,6 +859,9 @@ class _MemberRow extends StatelessWidget {
   final int? level;
   final bool isPremium;
   final bool isMe;
+
+  /// Menu titik tiga (ubah role / kick); null = tidak punya izin.
+  final VoidCallback? onAction;
 
   @override
   Widget build(BuildContext context) {
@@ -855,6 +941,15 @@ class _MemberRow extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           GemPill(amount: member.totalContribution),
+          if (onAction != null)
+            IconButton(
+              onPressed: onAction,
+              tooltip: 'Kelola member',
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints.tightFor(width: 32, height: 40),
+              icon: const Icon(Icons.more_vert_rounded, color: AppColors.textMuted, size: 20),
+            ),
         ],
       ),
     );
@@ -1042,6 +1137,153 @@ class _DonateDialogState extends State<_DonateDialog> {
                 )
               : const Text('Donasi'),
         ),
+      ],
+    );
+  }
+}
+
+/// Menu aksi member: ubah role (sesuai hierarki) atau kick (dengan konfirmasi).
+/// Pop(true) kalau ada perubahan.
+class _MemberActionDialog extends ConsumerStatefulWidget {
+  const _MemberActionDialog({
+    required this.clanId,
+    required this.target,
+    required this.actorRole,
+  });
+
+  final String clanId;
+  final ClanMemberDisplay target;
+  final String? actorRole;
+
+  @override
+  ConsumerState<_MemberActionDialog> createState() => _MemberActionDialogState();
+}
+
+class _MemberActionDialogState extends ConsumerState<_MemberActionDialog> {
+  bool _confirmKick = false;
+  bool _busy = false;
+  String? _error;
+
+  Future<void> _run(Future<void> Function() action) async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await action();
+      if (mounted) Navigator.of(context).pop(true);
+    } on ClanException catch (e) {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _error = e.message;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = widget.target;
+    final repo = ref.read(clanRepositoryProvider);
+    final assignable = ClanRoles.assignableRoles(widget.actorRole, t.role);
+    final canKick = ClanRoles.canKick(widget.actorRole, t.role);
+
+    return AlertDialog(
+      backgroundColor: AppColors.surfaceDark,
+      title: Text(t.username, style: const TextStyle(fontWeight: FontWeight.w800)),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (_confirmKick)
+            Text(
+              'Yakin mau kick ${t.username} dari clan?',
+              style: const TextStyle(color: AppColors.textSecondary),
+            )
+          else ...[
+            Row(
+              children: [
+                const Text(
+                  'Role sekarang:',
+                  style: TextStyle(color: AppColors.textSecondary, fontSize: 12.5),
+                ),
+                const SizedBox(width: 8),
+                ClanRoleChip(role: t.role),
+              ],
+            ),
+            if (assignable.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              const Text(
+                'Ubah jadi:',
+                style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+              ),
+              const SizedBox(height: 6),
+              for (final role in assignable)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 3),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: _busy
+                          ? null
+                          : () => _run(() => repo.setMemberRole(widget.clanId, t.firebaseUid, role)),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: clanRoleColor(role).withValues(alpha: 0.6)),
+                        foregroundColor: Colors.white,
+                      ),
+                      child: Text(
+                        ClanRoles.label(role),
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ],
+          if (_error != null) ...[
+            const SizedBox(height: 10),
+            Text(_error!, style: const TextStyle(color: Color(0xFFFF8A98), fontSize: 12)),
+          ],
+          if (_busy) ...[
+            const SizedBox(height: 12),
+            const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          ],
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: _busy
+              ? null
+              : () {
+                  if (_confirmKick) {
+                    setState(() => _confirmKick = false);
+                  } else {
+                    Navigator.of(context).pop(false);
+                  }
+                },
+          child: Text(_confirmKick ? 'Batal' : 'Tutup'),
+        ),
+        if (_confirmKick)
+          TextButton(
+            onPressed: _busy ? null : () => _run(() => repo.kickMember(widget.clanId, t.firebaseUid)),
+            child: const Text(
+              'Kick',
+              style: TextStyle(color: Color(0xFFFF8A98), fontWeight: FontWeight.w800),
+            ),
+          )
+        else if (canKick)
+          TextButton(
+            onPressed: _busy ? null : () => setState(() => _confirmKick = true),
+            child: const Text(
+              'Kick Member',
+              style: TextStyle(color: Color(0xFFFF8A98), fontWeight: FontWeight.w800),
+            ),
+          ),
       ],
     );
   }

@@ -243,6 +243,12 @@ final clanDetailProvider =
   );
 });
 
+/// Request join yang menunggu persetujuan (khusus officer ke atas).
+final clanPendingRequestsProvider = FutureProvider.autoDispose
+    .family<List<PendingJoinRequestDisplay>, String>(
+  (ref, clanId) => ref.watch(clanRepositoryProvider).getPendingJoinRequests(clanId),
+);
+
 /// Top 3 donatur buat slide carousel Beranda. Gagal = slide disembunyikan.
 final topSupportersProvider = FutureProvider.autoDispose<List<TopSupporter>>((ref) async {
   try {

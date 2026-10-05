@@ -252,4 +252,86 @@ class ClanRepository {
           options: Options(headers: {'Authorization': await _authHeader()}),
         );
       });
+
+  /// Daftar request join yang menunggu; cuma bisa dibaca officer ke atas
+  /// (dicek di Edge Function).
+  Future<List<PendingJoinRequestDisplay>> getPendingJoinRequests(String clanId) =>
+      _guard('Gagal ambil daftar request join', () async {
+        final res = await _dio.get<dynamic>(
+          'functions/v1/zenime-clan-pending-requests',
+          queryParameters: {'clan_id': clanId},
+          options: Options(headers: {'Authorization': await _authHeader()}),
+        );
+        final d = res.data;
+        final items = d is Map && d['requests'] is List
+            ? _rows(d['requests'])
+            : <Map<String, dynamic>>[];
+        final uids = [for (final it in items) (it['firebase_uid'] as String?) ?? ''];
+        final profiles = await _profiles(uids);
+        return [
+          for (final it in items)
+            PendingJoinRequestDisplay(
+              requestId: (it['id'] ?? '').toString(),
+              firebaseUid: (it['firebase_uid'] as String?) ?? '',
+              username: (profiles[it['firebase_uid']]?.username ?? '').isEmpty
+                  ? 'Pengguna'
+                  : profiles[it['firebase_uid']]!.username,
+              avatarUrl: profiles[it['firebase_uid']]?.avatarUrl,
+              requestedAt: (it['requested_at'] as String?) ?? '',
+            ),
+        ];
+      });
+
+  Future<void> respondJoinRequest(String requestId, bool approve) =>
+      _guard('Gagal memproses request join', () async {
+        await _dio.post<dynamic>(
+          'functions/v1/zenime-clan-respond-request',
+          data: {'request_id': requestId, 'approve': approve},
+          options: Options(headers: {'Authorization': await _authHeader()}),
+        );
+      });
+
+  Future<void> kickMember(String clanId, String targetUid) =>
+      _guard('Gagal kick member', () async {
+        await _dio.post<dynamic>(
+          'functions/v1/zenime-clan-kick',
+          data: {'clan_id': clanId, 'target_uid': targetUid},
+          options: Options(headers: {'Authorization': await _authHeader()}),
+        );
+      });
+
+  /// [role]: salah satu dari [ClanRoles] (vice_leader / admiral / co_leader / member).
+  Future<void> setMemberRole(String clanId, String targetUid, String role) =>
+      _guard('Gagal ubah role member', () async {
+        await _dio.post<dynamic>(
+          'functions/v1/zenime-clan-set-role',
+          data: {'clan_id': clanId, 'target_uid': targetUid, 'role': role},
+          options: Options(headers: {'Authorization': await _authHeader()}),
+        );
+      });
+
+  /// Ubah nama/tag clan (khusus leader). Field null tidak dikirim.
+  Future<void> updateClanSettings(String clanId, {String? name, String? tag}) =>
+      _guard('Gagal update settingan clan', () async {
+        await _dio.post<dynamic>(
+          'functions/v1/zenime-clan-settings',
+          data: {
+            'clan_id': clanId,
+            if (name != null) 'name': name,
+            if (tag != null) 'tag': tag,
+          },
+          options: Options(headers: {'Authorization': await _authHeader()}),
+        );
+      });
+
+  /// Beli [packs] paket kuota member pakai saldo donasi clan (khusus leader,
+  /// dicek di server).
+  Future<void> buyMemberSlots(String clanId, int packs) =>
+      _guard('Gagal beli kuota member', () async {
+        await _dio.post<dynamic>(
+          'functions/v1/zenime-clan-buy-slots',
+          data: {'clan_id': clanId, 'packs': packs},
+          options: Options(headers: {'Authorization': await _authHeader()}),
+        );
+      });
 }

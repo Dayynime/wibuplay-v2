@@ -91,7 +91,9 @@ manifest rilis bawaan Flutter tidak punya izin internet.
 - Alur: Beranda > tap panel TOP CLAN di slide leaderboard > `ClanBrowseScreen` (Semua Clan / Leaderboard / Clan Saya + cari) > tap clan > `ClanScreen` (detail).
 - Detail clan: header (avatar, nama, tag rainbow, level, progress XP ke level berikut, statistik Total XP / Member / Donasi hari ini), tombol aksi sesuai relasi user (Join Clan / Menunggu Persetujuan / Sudah Gabung Clan Lain / Donasi ZCoin + Keluar Clan), tab Members (cari, filter role, urut) dan Donasi hari ini.
 - Data: `ClanRepository` (`data/repository/clan_repository.dart`). Baca lewat PostgREST (`clans`, `clan_members`, `clan_donation_log`); aksi lewat Edge Function `zenime-clan-join-request`, `-donate`, `-leave`, `-my-request-status` dengan Firebase ID Token di header Authorization.
-- Belum dipindah dari Zenime: Buat Clan, Kelola Clan (kick, ubah role, terima/tolak request join, beli kuota member), centang role global di list member (cuma centang Premium). Rumus XP per level clan perkiraan (sama seperti Zenime).
+- Kelola Clan (`clan_manage_screen.dart`): tombol "Kelola Clan" muncul untuk Officer ke atas. Tab Request (terima/tolak) untuk Officer ke atas; tab Pengaturan (nama, tag 3 huruf, beli kuota member pakai saldo donasi) khusus Leader. Endpoint: `zenime-clan-pending-requests`, `-respond-request`, `-settings`, `-buy-slots`.
+- Ubah role dan kick: menu titik tiga di baris member (halaman clan), hanya muncul kalau role kita boleh bertindak ke target (`ClanRoles.canActOn`). Endpoint: `zenime-clan-set-role`, `zenime-clan-kick`. Aturan izin cuma buat UI; validasi asli di server.
+- Belum dipindah dari Zenime: Buat Clan, ganti foto clan (butuh image picker + upload), centang role global di list member (cuma centang Premium). Rumus XP per level clan perkiraan (sama seperti Zenime).
 - Belum ada tombol ke halaman Clan selain dari panel TOP CLAN di Beranda.
 
 ### Catatan Bubble Chat Global

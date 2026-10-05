@@ -37,6 +37,7 @@ class Clan {
     this.totalXp = 0,
     this.memberCount = 1,
     this.memberLimit = 30,
+    this.treasuryBalance = 0,
   });
 
   final String id;
@@ -50,6 +51,10 @@ class Clan {
   final int memberCount;
   final int memberLimit;
 
+  /// Saldo ZCoin hasil donasi yang bisa dibelanjakan (beli kuota member).
+  /// Terpisah dari totalXp (cuma buat level, tidak pernah berkurang).
+  final int treasuryBalance;
+
   factory Clan.fromJson(Map<String, dynamic> j) => Clan(
         id: (j['id'] as String?) ?? '',
         tag: (j['tag'] as String?) ?? '',
@@ -61,6 +66,7 @@ class Clan {
         totalXp: (j['total_xp'] as num?)?.toInt() ?? 0,
         memberCount: (j['member_count'] as num?)?.toInt() ?? 1,
         memberLimit: (j['member_limit'] as num?)?.toInt() ?? 30,
+        treasuryBalance: (j['treasury_balance'] as num?)?.toInt() ?? 0,
       );
 }
 
@@ -170,6 +176,66 @@ class ClanRoles {
       default:
         return 'MEMBER';
     }
+  }
+
+  // Aturan izin di bawah CUMA buat menampilkan/menyembunyikan tombol di UI.
+  // Validasi aslinya tetap dicek ulang di Edge Function (server).
+
+  /// Officer ke atas boleh buka Kelola Clan (terima/tolak request join).
+  static bool canManageClan(String? role) => rank(role) >= 1;
+
+  /// Vice Leader & Admiral (dan Leader) boleh kick target yang pangkatnya lebih rendah.
+  static bool canKick(String? actorRole, String? targetRole) =>
+      rank(actorRole) >= 2 && rank(targetRole) < rank(actorRole);
+
+  /// Role yang boleh dikasih [actorRole] ke target ber-role [targetRole]:
+  /// hanya target di bawah pangkat actor, dan hanya role di bawah pangkat actor.
+  ///  - Leader      -> Vice Leader / Admiral / Officer / Member
+  ///  - Vice Leader -> Admiral / Officer / Member
+  ///  - Admiral     -> Officer / Member
+  static List<String> assignableRoles(String? actorRole, String? targetRole) {
+    final actorRank = rank(actorRole);
+    if (actorRank < 2 || rank(targetRole) >= actorRank) return const [];
+    return [viceLeader, admiral, officer, member]
+        .where((r) => rank(r) < actorRank && r != targetRole)
+        .toList();
+  }
+
+  static bool canActOn(String? actorRole, String? targetRole) =>
+      canKick(actorRole, targetRole) || assignableRoles(actorRole, targetRole).isNotEmpty();
+}
+
+/// Request join yang menunggu persetujuan, digabung dengan profil chat.
+class PendingJoinRequestDisplay {
+  const PendingJoinRequestDisplay({
+    required this.requestId,
+    required this.firebaseUid,
+    required this.username,
+    this.avatarUrl,
+    this.requestedAt = '',
+  });
+
+  final String requestId;
+  final String firebaseUid;
+  final String username;
+  final String? avatarUrl;
+  final String requestedAt;
+}
+
+/// Harga & batas beli kuota member. CUMA buat tampilan UI; yang berlaku
+/// tetap konstanta di server (RPC buy_member_slots). Kalau diubah, ubah di
+/// dua tempat biar tampilan tidak beda dengan server.
+class ClanSlotShop {
+  ClanSlotShop._();
+
+  static const int slotsPerPack = 5;
+  static const int pricePerPack = 5000;
+  static const int maxMemberLimit = 150;
+
+  /// Berapa paket maksimal yang masih muat sampai batas [maxMemberLimit].
+  static int maxPacksFor(int memberLimit) {
+    final v = (maxMemberLimit - memberLimit) ~/ slotsPerPack;
+    return v < 0 ? 0 : v;
   }
 }
 
