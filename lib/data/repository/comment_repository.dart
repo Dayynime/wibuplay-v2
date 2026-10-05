@@ -92,4 +92,37 @@ class CommentRepository {
       queryParameters: {'id': 'eq.$id', 'firebase_uid': 'eq.$firebaseUid'},
     );
   }
+
+  /// Semua komentar/balasan MILIK 1 user lintas episode (tab Komentar di
+  /// Profil), terbaru dulu, maks 50.
+  Future<List<EpisodeComment>> getMyComments(String firebaseUid) async {
+    final res = await _dio.get<dynamic>(
+      'rest/v1/episode_comments',
+      queryParameters: {
+        'firebase_uid': 'eq.$firebaseUid',
+        'select': '$_columns,anime_title,anime_poster_url,episode_index',
+        'order': 'created_at.desc',
+        'limit': 50,
+      },
+    );
+    return _rows(res.data).map(EpisodeComment.fromJson).toList();
+  }
+
+  /// Total komentar+balasan 1 user, dibaca dari header Content-Range
+  /// ("0-0/123" atau "*/0"). null kalau gagal.
+  Future<int?> getMyCommentCount(String firebaseUid) async {
+    final res = await _dio.get<dynamic>(
+      'rest/v1/episode_comments',
+      queryParameters: {'firebase_uid': 'eq.$firebaseUid', 'select': 'id', 'limit': 1},
+      options: Options(
+        headers: {'Prefer': 'count=exact'},
+        validateStatus: (_) => true,
+      ),
+    );
+    final code = res.statusCode ?? 0;
+    if (code < 200 || code >= 300) return null;
+    final range = res.headers.value('content-range');
+    if (range == null || !range.contains('/')) return null;
+    return int.tryParse(range.substring(range.indexOf('/') + 1));
+  }
 }

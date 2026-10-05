@@ -15,6 +15,7 @@ import 'data/repository/comment_repository.dart';
 import 'data/models/account_models.dart';
 import 'data/models/chat_models.dart';
 import 'data/models/clan_models.dart';
+import 'data/models/comment_models.dart';
 import 'data/models/cuplix_item.dart';
 import 'data/models/support_models.dart';
 import 'data/models/xp_models.dart';
@@ -295,5 +296,31 @@ final homeCuplixProvider = FutureProvider.autoDispose<List<CuplixItem>>((ref) as
     return list.where((c) => c.thumbnailUrl.isNotEmpty).take(10).toList();
   } catch (_) {
     return const [];
+  }
+});
+
+/// Tag clan satu user (null = belum gabung clan / gagal).
+final userClanTagProvider = FutureProvider.autoDispose.family<String?, String>((ref, uid) async {
+  if (uid.isEmpty) return null;
+  try {
+    final map = await ref.watch(chatRepositoryProvider).getClanTagsForUids([uid]);
+    return map[uid];
+  } catch (_) {
+    return null;
+  }
+});
+
+/// Komentar milik 1 user (tab Komentar di Profil). Gagal = error (UI tampil pesan).
+final myCommentsProvider =
+    FutureProvider.autoDispose.family<List<EpisodeComment>, String>(
+  (ref, uid) => ref.watch(commentRepositoryProvider).getMyComments(uid),
+);
+
+/// Total komentar milik 1 user (stat di Profil). Gagal = null.
+final myCommentCountProvider = FutureProvider.autoDispose.family<int?, String>((ref, uid) async {
+  try {
+    return await ref.watch(commentRepositoryProvider).getMyCommentCount(uid);
+  } catch (_) {
+    return null;
   }
 });

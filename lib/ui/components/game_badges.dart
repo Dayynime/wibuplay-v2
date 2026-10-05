@@ -28,16 +28,20 @@ class _BadgeArrowClipper extends CustomClipper<Path> {
 
 /// Badge level emas bentuk panah ("Lv.N").
 class LevelBadge extends StatelessWidget {
-  const LevelBadge({super.key, required this.level});
+  const LevelBadge({super.key, required this.level, this.height});
 
   final int level;
+
+  /// Tinggi tetap (mis. 20 di header Profil); null = ikut isi.
+  final double? height;
 
   @override
   Widget build(BuildContext context) {
     return ClipPath(
       clipper: const _BadgeArrowClipper(),
       child: Container(
-        padding: const EdgeInsets.fromLTRB(8, 2, 10, 2),
+        height: height,
+        padding: EdgeInsets.fromLTRB(8, height == null ? 2 : 0, 10, height == null ? 2 : 0),
         decoration: const BoxDecoration(
           gradient: LinearGradient(
             colors: [Color(0xFFFFDE7A), Color(0xFFE8A317), Color(0xFFB8860B)],
@@ -45,8 +49,9 @@ class LevelBadge extends StatelessWidget {
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            const Icon(Icons.bolt, size: 11, color: Colors.white),
+            Image.asset('assets/images/ic_zcoin_badge.png', width: 11, height: 11),
             const SizedBox(width: 2),
             Text(
               'Lv.$level',
@@ -110,9 +115,12 @@ class _ClanHexBorderPainter extends CustomPainter {
 /// Badge tag clan rainbow animasi (fill geser + kilau + border berdenyut),
 /// port ClanRainbowBadge di GameBadges.kt.
 class ClanRainbowBadge extends StatefulWidget {
-  const ClanRainbowBadge({super.key, required this.text});
+  const ClanRainbowBadge({super.key, required this.text, this.height});
 
   final String text;
+
+  /// Tinggi tetap (mis. 20 di header Profil); null = ikut isi.
+  final double? height;
 
   @override
   State<ClanRainbowBadge> createState() => _ClanRainbowBadgeState();
@@ -190,10 +198,15 @@ class _ClanRainbowBadgeState extends State<ClanRainbowBadge>
             ),
           );
         },
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2.5),
+        child: Container(
+          height: widget.height,
+          padding: EdgeInsets.symmetric(
+            horizontal: 10,
+            vertical: widget.height == null ? 2.5 : 0,
+          ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               const Text('✦', style: star),
               const SizedBox(width: 3),

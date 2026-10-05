@@ -15,6 +15,9 @@ class EpisodeComment {
     required this.createdAt,
     this.isPinned = false,
     this.replyCount = 0,
+    this.animeTitle,
+    this.animePosterUrl,
+    this.episodeIndex,
   });
 
   final int id;
@@ -34,6 +37,11 @@ class EpisodeComment {
   final bool isPinned;
   final int replyCount;
 
+  /// Snapshot anime saat komentar dikirim (dipakai tab Komentar di Profil).
+  final String? animeTitle;
+  final String? animePosterUrl;
+  final String? episodeIndex;
+
   DateTime? get time => DateTime.tryParse(createdAt)?.toLocal();
 
   factory EpisodeComment.fromJson(Map<String, dynamic> j) {
@@ -50,6 +58,9 @@ class EpisodeComment {
       createdAt: (j['created_at'] as String?) ?? '',
       isPinned: (j['is_pinned'] as bool?) ?? false,
       replyCount: (j['reply_count'] as num?)?.toInt() ?? 0,
+      animeTitle: j['anime_title'] as String?,
+      animePosterUrl: j['anime_poster_url'] as String?,
+      episodeIndex: j['episode_index']?.toString(),
     );
   }
 }
