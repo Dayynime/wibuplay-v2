@@ -33,3 +33,23 @@ bool isEpisodeLocked(String? episodeIndex, int totalEpisodes, bool isPremium) {
   if (value == null) return false;
   return value > totalEpisodes - kLockedLatestEpisodesCount;
 }
+
+/// Kualitas maksimal (dalam "p") yang boleh diputar non-premium, sama dengan
+/// Zenime. Isi 0 (atau negatif) kalau mau semua kualitas terbuka untuk semua.
+const int kNonPremiumMaxQualityP = 480;
+
+/// Ekstrak angka resolusi dari label kualitas, misal "1080p" -> 1080.
+int? qualityValueP(String? quality) {
+  final m = RegExp(r'\d+').firstMatch(quality ?? '');
+  return m == null ? null : int.tryParse(m.group(0)!);
+}
+
+/// Terkunci cuma kalau angkanya kebaca DAN di atas batas. Label tanpa angka
+/// (mis. "HD", "Auto") dibiarkan lolos daripada salah kunci.
+bool isQualityLocked(String? quality, bool isPremium) {
+  if (isPremium) return false;
+  if (kNonPremiumMaxQualityP <= 0) return false;
+  final v = qualityValueP(quality);
+  if (v == null) return false;
+  return v > kNonPremiumMaxQualityP;
+}

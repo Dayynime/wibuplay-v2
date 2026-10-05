@@ -9,6 +9,7 @@ import 'data/repository/account_repository.dart';
 import 'data/repository/anime_repository.dart';
 import 'data/repository/auth_repository.dart';
 import 'data/repository/chat_repository.dart';
+import 'data/repository/comment_repository.dart';
 import 'data/models/account_models.dart';
 import 'data/models/chat_models.dart';
 import 'data/models/clan_models.dart';
@@ -39,6 +40,10 @@ final supabaseDioProvider = Provider<Dio>((ref) => createSupabaseDio());
 
 final chatRepositoryProvider = Provider<ChatRepository>(
   (ref) => ChatRepository(ref.watch(supabaseDioProvider)),
+);
+
+final commentRepositoryProvider = Provider<CommentRepository>(
+  (ref) => CommentRepository(ref.watch(supabaseDioProvider)),
 );
 
 final xpRepositoryProvider = Provider<XpRepository>(

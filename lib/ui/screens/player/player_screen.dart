@@ -5,6 +5,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:video_player/video_player.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
@@ -12,12 +13,19 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/premium_access.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/watch_xp_gate.dart';
+import '../../../data/models/comment_models.dart';
 import '../../../data/models/episode_item.dart';
 import '../../../data/models/stream_data.dart';
 import '../../../providers.dart';
 import '../../components/cards.dart';
 import '../../components/common_components.dart';
+import '../../components/net_image.dart';
+import '../comments/comments_section.dart';
 import 'player_controller.dart';
+import 'quality_sheet.dart';
+
+/// Link donasi Trakteer (sama dengan Zenime).
+const String _kTrakteerUrl = 'https://trakteer.id/Dayynimee';
 
 bool _blank(String? s) => s == null || s.trim().isEmpty;
 
@@ -102,6 +110,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
   bool _wasPlaying = false;
   String? _gestureText;
   bool _synopsisExpanded = false;
+  final GlobalKey _commentsKey = GlobalKey();
 
   final ScrollController _epScroll = ScrollController();
   final GlobalKey _epRowKey = GlobalKey();
@@ -179,7 +188,36 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
       return;
     }
     if (!gate.ready) return;
-    _loadLink(ui.selectedServer?.link);
+
+    // Non-premium dibatasi kualitas maksimal (sama seperti Zenime). Kalau
+    // server default ternyata di atas batas, turunkan ke yang tertinggi
+    // yang masih boleh; selectServer memicu _applyPlayback lagi.
+    final isPremium = ref.read(myPremiumProvider).valueOrNull ?? false;
+    final sel = ui.selectedServer;
+    if (!isPremium && sel != null && isQualityLocked(sel.quality, false)) {
+      final fallback = _bestUnlockedServer(ui.streamData?.server ?? const []);
+      if (fallback != null) {
+        _notifier.selectServer(fallback);
+        return;
+      }
+    }
+    _loadLink(sel?.link);
+  }
+
+  StreamServer? _bestUnlockedServer(List<StreamServer> servers) {
+    StreamServer? best;
+    var bestValue = -1;
+    for (final s in servers) {
+      final link = s.link;
+      if (link == null || link.trim().isEmpty) continue;
+      if (isQualityLocked(s.quality, false)) continue;
+      final v = qualityValueP(s.quality) ?: 0;
+      if (v > bestValue) {
+        best = s;
+        bestValue = v;
+      }
+    }
+    return best;
   }
 
   void _stopPlayer() {
@@ -354,55 +392,50 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     );
   }
 
+  void _showPremiumHint() {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Kualitas di atas 480p khusus Premium. Aktifkan Premium lewat menu Profil.',
+          ),
+        ),
+      );
+  }
+
   void _openServerSheet() {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: AppColors.surfaceDark,
-      isScrollControlled: true,
-      useSafeArea: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      builder: (sheetContext) {
-        return Consumer(
-          builder: (context, ref, _) {
-            final ui = ref.watch(playerControllerProvider(_args));
-            final servers = ui.streamData?.server ?? const <StreamServer>[];
-            return SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 44),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Pilih Server & Kualitas Video',
-                    style: TextStyle(
-                      color: AppColors.textWhite,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  if (servers.isEmpty)
-                    const Text(
-                      'Tidak ada server video alternatif.',
-                      style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
-                    )
-                  else
-                    for (final server in servers)
-                      _ServerTile(
-                        server: server,
-                        isSelected: identical(server, ui.selectedServer),
-                        onTap: () {
-                          _notifier.selectServer(server);
-                          Navigator.of(sheetContext).pop();
-                        },
-                      ),
-                ],
-              ),
-            );
-          },
-        );
-      },
+    final ui = ref.read(playerControllerProvider(_args));
+    showQualityPickerSheet(
+      context,
+      servers: ui.streamData?.server ?? const <StreamServer>[],
+      selected: ui.selectedServer,
+      isPremium: ref.read(myPremiumProvider).valueOrNull ?? false,
+      onSelect: _notifier.selectServer,
+      onLocked: _showPremiumHint,
+    );
+  }
+
+  Future<void> _openTrakteer() async {
+    final ok = await launchUrl(
+      Uri.parse(_kTrakteerUrl),
+      mode: LaunchMode.externalApplication,
+    );
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Tidak ada browser untuk membuka Trakteer')),
+      );
+    }
+  }
+
+  void _scrollToComments() {
+    final ctx = _commentsKey.currentContext;
+    if (ctx == null) return;
+    Scrollable.ensureVisible(
+      ctx,
+      duration: const Duration(milliseconds: 350),
+      curve: Curves.easeOut,
+      alignment: 0.0,
     );
   }
 
@@ -554,6 +587,17 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     // Loading dianggap premium biar ikon gembok tidak berkedip.
     final chipPremium = ref.watch(myPremiumProvider).valueOrNull ?? true;
     final totalEps = latestEpisodeIndex(ui.episodes.map((e) => e.index));
+    // Layar edge-to-edge: tanpa ini konten paling bawah tertutup tombol
+    // navigasi HP.
+    final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
+
+    final posterUrl = anime == null
+        ? ''
+        : (anime.posterUrl.isNotEmpty ? anime.posterUrl : anime.coverUrl);
+    final epTitle = currentEp?.title;
+    final viewsLabel = formatViewCount(anime?.views);
+    final aired = !_blank(anime?.airedStart) ? anime!.airedStart! : anime?.year;
+    final showComments = ui.currentEpisodeId.trim().isNotEmpty;
 
     return SafeArea(
       bottom: false,
@@ -577,157 +621,112 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
             ),
           ),
           Expanded(
-            child: ListView(
-              padding: const EdgeInsets.only(bottom: 32),
-              children: [
-                // Judul & badge
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        anime?.title ?? 'Anime',
-                        style: const TextStyle(
-                          color: AppColors.textWhite,
-                          fontSize: 17,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        'Episode ${currentEp?.index ?? ''} • ${currentEp?.title ?? ''}',
-                        style: const TextStyle(
-                          color: AppColors.accentViolet,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8,
-                        runSpacing: 4,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          if (!_blank(anime?.status))
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: AppColors.surfaceDark,
-                                borderRadius: BorderRadius.circular(4),
+            child: CustomScrollView(
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              slivers: [
+                // 1. Poster kecil + judul + info episode (gaya Zenime)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: SizedBox(
+                            width: 80,
+                            child: AspectRatio(
+                              aspectRatio: 2 / 3,
+                              child: ColoredBox(
+                                color: AppColors.surfaceVariantDark,
+                                child: NetImage(posterUrl),
                               ),
-                              child: Text(
-                                anime!.status!,
-                                style: const TextStyle(
-                                  color: AppColors.accentViolet,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                          if (!_blank(anime?.year))
-                            Text(
-                              anime!.year!,
-                              style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
-                            ),
-                          if (!_blank(anime?.views))
-                            Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  Icons.visibility_outlined,
-                                  size: 12,
-                                  color: AppColors.textMuted,
-                                ),
-                                const SizedBox(width: 3),
-                                Text(
-                                  anime!.views!,
-                                  style: const TextStyle(
-                                    color: AppColors.textMuted,
-                                    fontSize: 11,
-                                  ),
-                                ),
-                              ],
-                            ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Aksi: favorit, bagikan, server, next
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Flexible(
-                        child: Wrap(
-                          spacing: 10,
-                          runSpacing: 8,
-                          children: [
-                            _ActionIconButton(
-                              icon: isFavorite ? Icons.bookmark : Icons.bookmark_border,
-                              label: 'Favorit',
-                              tint: isFavorite ? AppColors.accentViolet : AppColors.textWhite,
-                              onTap: () => _notifier.toggleFavorite(),
-                            ),
-                            _ActionIconButton(
-                              icon: Icons.share_outlined,
-                              label: 'Bagikan',
-                              tint: AppColors.textWhite,
-                              onTap: () {
-                                final title = anime?.title ?? 'Zenime';
-                                Share.share(
-                                  'Nonton ${anime?.title ?? 'Anime'} di Zenime!',
-                                  subject: title,
-                                );
-                              },
-                            ),
-                            _ActionIconButton(
-                              icon: Icons.tune,
-                              label: ui.selectedServer?.quality ?? 'Server',
-                              tint: AppColors.textWhite,
-                              onTap: _openServerSheet,
-                            ),
-                          ],
-                        ),
-                      ),
-                      if (hasNext)
-                        Padding(
-                          padding: const EdgeInsets.only(left: 8),
-                          child: FilledButton.icon(
-                            onPressed: () {
-                              final id = nextEp?.id;
-                              if (id != null) _notifier.loadEpisodeStream(id);
-                            },
-                            style: FilledButton.styleFrom(
-                              backgroundColor: AppColors.accentViolet,
-                              foregroundColor: AppColors.textWhite,
-                              shape: const StadiumBorder(),
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                            ),
-                            icon: const Icon(Icons.skip_next, size: 18),
-                            label: const Text(
-                              'Next',
-                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
                             ),
                           ),
                         ),
-                    ],
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                anime?.title ?? 'Memuat...',
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: AppColors.textWhite,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Episode ${currentEp?.index ?? '-'}'
+                                '${_blank(epTitle) ? '' : ' \u2022 $epTitle'}',
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  if (viewsLabel != null) ...[
+                                    const Icon(
+                                      Icons.visibility_outlined,
+                                      size: 14,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      viewsLabel,
+                                      style: const TextStyle(
+                                        color: AppColors.textSecondary,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                  if (!_blank(aired)) ...[
+                                    if (viewsLabel != null)
+                                      const Padding(
+                                        padding: EdgeInsets.symmetric(horizontal: 8),
+                                        child: Text(
+                                          '\u2022',
+                                          style: TextStyle(
+                                            color: AppColors.textSecondary,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ),
+                                    Flexible(
+                                      child: Text(
+                                        aired!,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          color: AppColors.textSecondary,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
 
-                // Sinopsis
+                // 2. Sinopsis (expandable)
                 if (!_blank(syn))
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                    child: Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceDark,
-                        borderRadius: AppShapes.card,
-                      ),
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                       child: AnimatedSize(
                         duration: const Duration(milliseconds: 250),
                         curve: Curves.easeOut,
@@ -741,89 +740,223 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                 color: AppColors.textSecondary,
-                                fontSize: 12,
-                                height: 18 / 12,
+                                fontSize: 13,
+                                height: 20 / 13,
                               ),
                             ),
-                            if (syn!.length > 100)
-                              GestureDetector(
-                                behavior: HitTestBehavior.opaque,
-                                onTap: () =>
-                                    setState(() => _synopsisExpanded = !_synopsisExpanded),
-                                child: Padding(
-                                  padding: const EdgeInsets.only(top: 4),
-                                  child: Text(
-                                    _synopsisExpanded ? 'Tutup' : 'Baca selengkapnya',
-                                    style: const TextStyle(
-                                      color: AppColors.accentViolet,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                    ),
+                            GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: () =>
+                                  setState(() => _synopsisExpanded = !_synopsisExpanded),
+                              child: Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text(
+                                  _synopsisExpanded ? 'Sembunyikan' : 'Selengkapnya',
+                                  style: const TextStyle(
+                                    color: AppColors.accentViolet,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
                                   ),
                                 ),
                               ),
+                            ),
                           ],
                         ),
                       ),
                     ),
                   ),
 
-                // Daftar episode
-                const SizedBox(height: 8),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                  child: Text(
-                    'Daftar Episode (${ui.episodes.length})',
-                    style: const TextStyle(
-                      color: AppColors.textWhite,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
+                // 3. Tombol donasi Trakteer
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                    child: _TrakteerButton(onTap: _openTrakteer),
+                  ),
+                ),
+
+                // 4. Baris tombol aksi
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 20),
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Row(
+                        children: [
+                          _ActionIconButton(
+                            icon: Icons.high_quality,
+                            label: 'Kualitas',
+                            tint: AppColors.textSecondary,
+                            onTap: _openServerSheet,
+                          ),
+                          const SizedBox(width: 10),
+                          _ActionIconButton(
+                            icon: isFavorite ? Icons.bookmark : Icons.bookmark_border,
+                            label: 'Favorit',
+                            tint: isFavorite ? AppColors.accentViolet : AppColors.textSecondary,
+                            onTap: () => _notifier.toggleFavorite(),
+                          ),
+                          const SizedBox(width: 10),
+                          _ActionIconButton(
+                            icon: Icons.chat,
+                            label: 'Komentar',
+                            tint: AppColors.textSecondary,
+                            onTap: _scrollToComments,
+                          ),
+                          const SizedBox(width: 10),
+                          _ActionIconButton(
+                            icon: Icons.flag,
+                            label: 'Laporkan',
+                            tint: AppColors.textSecondary,
+                            onTap: () {
+                              ScaffoldMessenger.of(context)
+                                ..hideCurrentSnackBar()
+                                ..showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Fitur laporkan segera hadir'),
+                                  ),
+                                );
+                            },
+                          ),
+                          const SizedBox(width: 10),
+                          _ActionIconButton(
+                            icon: Icons.share,
+                            label: 'Bagikan',
+                            tint: AppColors.textSecondary,
+                            onTap: () {
+                              final title = anime?.title ?? 'anime ini';
+                              final idx = currentEp?.index;
+                              final text = _blank(idx)
+                                  ? 'Nonton "$title" di Wibuplay!'
+                                  : 'Nonton "$title" Episode $idx di Wibuplay!';
+                              Share.share(text, subject: title);
+                            },
+                          ),
+                          if (hasNext) ...[
+                            const SizedBox(width: 10),
+                            FilledButton.icon(
+                              onPressed: () {
+                                final id = nextEp?.id;
+                                if (id != null) _notifier.loadEpisodeStream(id);
+                              },
+                              style: FilledButton.styleFrom(
+                                backgroundColor: AppColors.accentViolet,
+                                foregroundColor: AppColors.textWhite,
+                                shape: const StadiumBorder(),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 10,
+                                ),
+                              ),
+                              icon: const Icon(Icons.skip_next, size: 18),
+                              label: const Text(
+                                'Next',
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
-                SingleChildScrollView(
-                  controller: _epScroll,
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Row(
-                    key: _epRowKey,
+
+                // 5. Daftar episode (tetap seperti sebelumnya)
+                SliverToBoxAdapter(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      for (var i = 0; i < ui.episodes.length; i++) ...[
-                        if (i > 0) const SizedBox(width: 10),
-                        _episodeChip(ui, ui.episodes[i], isEpisodeLocked(ui.episodes[i].index, totalEps, chipPremium)),
-                      ],
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                        child: Text(
+                          'Daftar Episode (${ui.episodes.length})',
+                          style: const TextStyle(
+                            color: AppColors.textWhite,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      SingleChildScrollView(
+                        controller: _epScroll,
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        child: Row(
+                          key: _epRowKey,
+                          children: [
+                            for (var i = 0; i < ui.episodes.length; i++) ...[
+                              if (i > 0) const SizedBox(width: 10),
+                              _episodeChip(
+                                ui,
+                                ui.episodes[i],
+                                isEpisodeLocked(ui.episodes[i].index, totalEps, chipPremium),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
                     ],
                   ),
                 ),
 
-                // Rekomendasi
-                if (ui.recommended.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  const SectionHeader(title: 'Mungkin Kamu Suka'),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    height: 290,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      itemCount: ui.recommended.length,
-                      separatorBuilder: (_, _) => const SizedBox(width: 12),
-                      itemBuilder: (context, i) {
-                        final rec = ui.recommended[i];
-                        return Align(
-                          alignment: Alignment.topCenter,
-                          child: AnimePosterCard(
-                            anime: rec,
-                            onTap: () {
-                              final id = rec.id;
-                              if (id != null) widget.onAnimeClick(id);
+                // 5b. Mungkin Kamu Suka (dipertahankan dari versi sebelumnya)
+                if (ui.recommended.isNotEmpty)
+                  SliverToBoxAdapter(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 16),
+                        const SectionHeader(title: 'Mungkin Kamu Suka'),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          height: 290,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            itemCount: ui.recommended.length,
+                            separatorBuilder: (_, _) => const SizedBox(width: 12),
+                            itemBuilder: (context, i) {
+                              final rec = ui.recommended[i];
+                              return Align(
+                                alignment: Alignment.topCenter,
+                                child: AnimePosterCard(
+                                  anime: rec,
+                                  onTap: () {
+                                    final id = rec.id;
+                                    if (id != null) widget.onAnimeClick(id);
+                                  },
+                                ),
+                              );
                             },
                           ),
-                        );
-                      },
+                        ),
+                      ],
                     ),
                   ),
-                ],
+
+                // 6. Komentar episode (inline, di bawah Daftar Episode)
+                if (showComments)
+                  CommentsSliver(
+                    key: ValueKey('comments-${ui.currentEpisodeId}'),
+                    args: (ui.currentEpisodeId, ui.movieId),
+                    meta: CommentMeta(
+                      animeTitle: anime?.title,
+                      animePosterUrl: posterUrl.isEmpty ? null : posterUrl,
+                      episodeIndex: currentEp?.index,
+                    ),
+                    headerKey: _commentsKey,
+                    onUpgradeClick: () => ScaffoldMessenger.of(context)
+                      ..hideCurrentSnackBar()
+                      ..showSnackBar(
+                        const SnackBar(
+                          content: Text(
+                            'Sorotan komentar khusus Premium. Aktifkan Premium lewat menu Profil.',
+                          ),
+                        ),
+                      ),
+                  ),
+
+                SliverToBoxAdapter(child: SizedBox(height: bottomInset + 28)),
               ],
             ),
           ),
@@ -1232,7 +1365,7 @@ class _ControlsOverlayState extends State<_ControlsOverlay> {
   }
 }
 
-/// Port ActionIconButton.
+/// Chip aksi di bawah video (gaya PlayerActionChip Zenime).
 class _ActionIconButton extends StatelessWidget {
   const _ActionIconButton({
     required this.icon,
@@ -1251,15 +1384,15 @@ class _ActionIconButton extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: AppColors.surfaceDark,
+          color: AppColors.surfaceVariantDark,
           borderRadius: AppShapes.pill,
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 18, color: tint),
+            Icon(icon, size: 16, color: tint),
             const SizedBox(width: 6),
             Text(
               label,
@@ -1272,69 +1405,65 @@ class _ActionIconButton extends StatelessWidget {
   }
 }
 
-class _ServerTile extends StatelessWidget {
-  const _ServerTile({required this.server, required this.isSelected, required this.onTap});
+/// Tombol "Bantu Admin Seikhlasnya" (Trakteer), sama dengan Zenime.
+class _TrakteerButton extends StatelessWidget {
+  const _TrakteerButton({required this.onTap});
 
-  final StreamServer server;
-  final bool isSelected;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Material(
-        color: isSelected
-            ? AppColors.accentViolet.withValues(alpha: 0.2)
-            : AppColors.surfaceElevated,
-        borderRadius: AppShapes.card,
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        server.name ?? 'Server Utama',
-                        style: TextStyle(
-                          color: isSelected ? AppColors.accentViolet : AppColors.textWhite,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                        ),
+    const blue = Color(0xFF29ABE2);
+    return Material(
+      color: blue.withValues(alpha: 0.14),
+      borderRadius: BorderRadius.circular(14),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: const BoxDecoration(color: blue, shape: BoxShape.circle),
+                child: const Icon(Icons.favorite, size: 20, color: Colors.white),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Bantu Admin Seikhlasnya',
+                      style: TextStyle(
+                        color: AppColors.textWhite,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
                       ),
-                      Text(
-                        'Tipe: ${server.type ?? 'direct'}',
-                        style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: isSelected ? AppColors.accentViolet : AppColors.surfaceDark,
-                    borderRadius: AppShapes.pill,
-                  ),
-                  child: Text(
-                    server.quality ?? 'Auto',
-                    style: const TextStyle(
-                      color: AppColors.textWhite,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
                     ),
-                  ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Traktir admin lewat Trakteer, ya!',
+                      style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
+}
+
+/// Angka mentah jadi label ringkas "24.5K"; null kalau kosong/tidak valid.
+String? formatViewCount(String? raw) {
+  final v = int.tryParse((raw ?? '').trim());
+  if (v == null) return null;
+  if (v >= 1000000) return '${(v / 1000000).toStringAsFixed(1)}M';
+  if (v >= 1000) return '${(v / 1000).toStringAsFixed(1)}K';
+  return v.toString();
 }
