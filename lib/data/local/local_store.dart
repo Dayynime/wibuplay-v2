@@ -51,6 +51,16 @@ class LocalStore extends ChangeNotifier {
     }
   }
 
+  // ---- Pop up pengumuman: id terakhir yang ditutup user ----
+
+  static const String _lastSeenPopupKey = 'last_seen_popup_id';
+
+  /// Kosong = belum pernah menutup popup apa pun.
+  String get lastSeenPopupId => _prefs.getString(_lastSeenPopupKey) ?? '';
+
+  Future<void> setLastSeenPopupId(String id) =>
+      _prefs.setString(_lastSeenPopupKey, id);
+
   // ---- Favorites (urut timestamp terbaru dulu) ----
 
   List<FavoriteEntity> get favorites => _favorites;
