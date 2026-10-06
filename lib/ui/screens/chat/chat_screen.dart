@@ -302,7 +302,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           level: s.levels[m.firebaseUid],
           clanTag: s.clanTags[m.firebaseUid],
           isPremium: s.premiumUids.contains(m.firebaseUid),
-          avatarUrl: s.avatarUrls[m.firebaseUid] ?? m.avatarUrl,
+          avatarUrl: m.firebaseUid == s.myUid
+              ? (s.avatarUrls[s.myUid] ?? s.myAvatarUrl ?? m.avatarUrl)
+              : (s.avatarUrls[m.firebaseUid] ?? m.avatarUrl),
+          onOwnAvatarTap: _openProfileDialog,
           onLongPress: () => _showActions(m, s),
           onReply: () => _controller.setReplyTarget(m),
           onDelete: m.firebaseUid == s.myUid ? () => _confirmDelete(m) : null,
@@ -456,12 +459,16 @@ class _MessageBubble extends StatelessWidget {
     this.isPremium = false,
     this.avatarUrl,
     this.onProfileTap,
+    this.onOwnAvatarTap,
   });
 
   final ChatMessage message;
 
   /// Tap avatar / nama = buka profil user (Tambah Teman). null untuk pesan sendiri.
   final VoidCallback? onProfileTap;
+
+  /// Tap avatar sendiri (kanan bubble) = buka dialog profil/ganti foto, seperti Zenime.
+  final VoidCallback? onOwnAvatarTap;
   final bool mine;
   final VoidCallback onLongPress;
   final VoidCallback onReply;
@@ -480,7 +487,7 @@ class _MessageBubble extends StatelessWidget {
     final m = message;
     final hasReply = (m.replyToUsername ?? '').isNotEmpty;
     // Warna bubble sendiri sama dengan bubble orang lain (seperti Zenime);
-    // bedanya cuma posisi (kanan) dan tidak ada avatar.
+    // bedanya cuma posisi (kanan) dan avatar ada di kanan bubble.
     const bubbleColor = AppColors.surfaceCard;
 
     final bubble = GestureDetector(
@@ -631,7 +638,11 @@ class _MessageBubble extends StatelessWidget {
           mainAxisAlignment: mine ? MainAxisAlignment.end : MainAxisAlignment.start,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: mine
-              ? [bubble]
+              ? [
+                  bubble,
+                  const SizedBox(width: 8),
+                  GestureDetector(onTap: onOwnAvatarTap, child: avatar),
+                ]
               : [
                   GestureDetector(onTap: onProfileTap, child: avatar),
                   const SizedBox(width: 8),
