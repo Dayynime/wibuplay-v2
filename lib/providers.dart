@@ -270,6 +270,12 @@ final topSupportersProvider = FutureProvider.autoDispose<List<TopSupporter>>((re
   }
 });
 
+/// Daftar Top Support lengkap buat halaman Top Support. Melempar kalau gagal
+/// (UI menampilkan error + coba lagi).
+final topSupportersFullProvider = FutureProvider.autoDispose<List<TopSupporter>>(
+  (ref) => ref.watch(xpRepositoryProvider).getTopSupporters(),
+);
+
 final xpLeaderboardProvider = FutureProvider.autoDispose<List<UserXpDisplay>>(
   (ref) => ref.watch(xpRepositoryProvider).getLeaderboardDisplay(),
 );

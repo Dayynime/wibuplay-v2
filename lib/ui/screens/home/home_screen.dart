@@ -11,6 +11,7 @@ import '../../../data/models/anime_item.dart';
 import '../../../data/models/home_sections.dart';
 import '../../../providers.dart';
 import '../../app_routes.dart';
+import '../support/top_support_screen.dart';
 import '../xp/xp_leaderboard_screen.dart';
 import '../clan/clan_browse_screen.dart';
 import '../../components/cards.dart';
@@ -304,6 +305,8 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
                     .push<void>(fadeRoute(const XpLeaderboardScreen())),
                 onClanLeaderboardClick: () => Navigator.of(context)
                     .push<void>(fadeRoute(const ClanBrowseScreen())),
+                onSupportClick: () => Navigator.of(context)
+                    .push<void>(fadeRoute(const TopSupportScreen())),
                 onItemClick: (item) {
                   final id = item.id;
                   if (id != null) widget.onAnimeClick(id);

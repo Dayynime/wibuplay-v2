@@ -35,6 +35,7 @@ class HeroBanner extends StatefulWidget {
     this.topSupport = const [],
     this.onLeaderboardClick,
     this.onClanLeaderboardClick,
+    this.onSupportClick,
   });
 
   final List<AnimeItem> sliderItems;
@@ -46,6 +47,9 @@ class HeroBanner extends StatefulWidget {
   final List<TopSupporter> topSupport;
   final VoidCallback? onLeaderboardClick;
   final VoidCallback? onClanLeaderboardClick;
+
+  /// Tap slide Top Support (buka halaman Top Support).
+  final VoidCallback? onSupportClick;
 
   @override
   State<HeroBanner> createState() => _HeroBannerState();
@@ -146,7 +150,10 @@ class _HeroBannerState extends State<HeroBanner> {
                       );
                     }
                     if (page == supportPage) {
-                      return HeroSupportSlide(supporters: widget.topSupport);
+                      return HeroSupportSlide(
+                        supporters: widget.topSupport,
+                        onTap: widget.onSupportClick,
+                      );
                     }
                     return _AutoPosterSlide(
                       items: items,

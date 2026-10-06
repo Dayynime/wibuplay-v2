@@ -372,14 +372,20 @@ class _RankBadge extends StatelessWidget {
 
 /// Slide "TOP SUPPORT" (podium 3 donatur SociaBuzz teratas).
 class HeroSupportSlide extends StatelessWidget {
-  const HeroSupportSlide({super.key, required this.supporters});
+  const HeroSupportSlide({super.key, required this.supporters, this.onTap});
 
   final List<TopSupporter> supporters;
+
+  /// Tap slide = buka halaman Top Support. Null = tidak bisa di-tap.
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final top = supporters.take(3).toList();
-    return Container(
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
       padding: const EdgeInsets.all(16),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -391,11 +397,11 @@ class HeroSupportSlide extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Icon(Icons.favorite, size: 18, color: heroPink),
-              SizedBox(width: 7),
-              Text(
+              const Icon(Icons.favorite, size: 18, color: heroPink),
+              const SizedBox(width: 7),
+              const Text(
                 'TOP SUPPORT',
                 style: TextStyle(
                   color: heroPink,
@@ -404,6 +410,18 @@ class HeroSupportSlide extends StatelessWidget {
                   letterSpacing: 0.6,
                 ),
               ),
+              const Spacer(),
+              if (onTap != null) ...const [
+                Text(
+                  'Lihat semua',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Icon(Icons.chevron_right_rounded, size: 16, color: AppColors.textSecondary),
+              ],
             ],
           ),
           const SizedBox(height: 2),
@@ -423,6 +441,7 @@ class HeroSupportSlide extends StatelessWidget {
           ),
         ],
       ),
+    ),
     );
   }
 }
