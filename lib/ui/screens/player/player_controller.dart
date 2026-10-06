@@ -236,6 +236,31 @@ class PlayerController
     }
   }
 
+  /// Id episode berikutnya (dari data stream, fallback ke urutan daftar episode).
+  String? get nextEpisodeId {
+    final id = state.streamData?.episodeNext?.id;
+    if (id != null && id.trim().isNotEmpty) return id;
+    return _findNextEpisodeIdInList();
+  }
+
+  /// Id episode sebelumnya menurut urutan daftar episode.
+  String? get previousEpisodeId {
+    final list = state.episodes;
+    final idx = list.indexWhere((e) => e.id == state.currentEpisodeId);
+    if (idx > 0) return list[idx - 1].id;
+    return null;
+  }
+
+  void playNext() {
+    final id = nextEpisodeId;
+    if (id != null && id.trim().isNotEmpty) loadEpisodeStream(id);
+  }
+
+  void playPrevious() {
+    final id = previousEpisodeId;
+    if (id != null && id.trim().isNotEmpty) loadEpisodeStream(id);
+  }
+
   String? _findNextEpisodeIdInList() {
     final list = state.episodes;
     final idx = list.indexWhere((e) => e.id == state.currentEpisodeId);

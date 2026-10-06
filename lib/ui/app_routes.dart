@@ -17,31 +17,48 @@ Route<T> fadeRoute<T>(Widget page) {
   );
 }
 
-/// Port Screen.Detail: detail/{movieId}.
-void openDetail(BuildContext context, String movieId) {
-  Navigator.of(context).push(
+/// Kunci Navigator root: dipakai mini player (di luar Navigator) untuk membuka
+/// kembali PlayerScreen. Dipasang di MaterialApp (main.dart).
+final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
+
+void _pushDetail(NavigatorState nav, String movieId) {
+  nav.push(
     fadeRoute(
       DetailScreen(
         movieId: movieId,
-        onBackClick: () => Navigator.of(context).maybePop(),
-        onWatchEpisode: (mId, epId) => openPlayer(context, mId, epId),
+        onBackClick: () => nav.maybePop(),
+        onWatchEpisode: (mId, epId) => _pushPlayer(nav, mId, epId),
       ),
     ),
   );
 }
 
-/// Port Screen.Player: player/{movieId}/{episodeId}.
-void openPlayer(BuildContext context, String movieId, String episodeId) {
-  Navigator.of(context).push(
+void _pushPlayer(NavigatorState nav, String movieId, String episodeId) {
+  nav.push(
     fadeRoute(
       PlayerScreen(
         movieId: movieId,
         episodeId: episodeId,
-        onBackClick: () => Navigator.of(context).maybePop(),
-        onAnimeClick: (nextMovieId) => openDetail(context, nextMovieId),
+        onBackClick: () => nav.maybePop(),
+        onAnimeClick: (nextMovieId) => _pushDetail(nav, nextMovieId),
       ),
     ),
   );
+}
+
+/// Port Screen.Detail: detail/{movieId}.
+void openDetail(BuildContext context, String movieId) =>
+    _pushDetail(Navigator.of(context), movieId);
+
+/// Port Screen.Player: player/{movieId}/{episodeId}.
+void openPlayer(BuildContext context, String movieId, String episodeId) =>
+    _pushPlayer(Navigator.of(context), movieId, episodeId);
+
+/// Dari kartu mini player: buka player penuh untuk episode yang sama.
+void openPlayerFromMini(String movieId, String episodeId) {
+  final nav = appNavigatorKey.currentState;
+  if (nav == null) return;
+  _pushPlayer(nav, movieId, episodeId);
 }
 
 /// Halaman beli Premium.

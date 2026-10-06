@@ -10,6 +10,7 @@ import 'package:video_player/video_player.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/pip_controller.dart';
 import '../../../core/premium_access.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/watch_xp_gate.dart';
@@ -19,13 +20,22 @@ import '../../../data/models/stream_data.dart';
 import '../../../providers.dart';
 import '../../components/cards.dart';
 import '../../components/common_components.dart';
+import '../../components/mini_player.dart';
 import '../../components/net_image.dart';
 import '../comments/comments_section.dart';
 import 'player_controller.dart';
+import 'player_gestures.dart';
+import 'player_settings_sheet.dart';
 import 'quality_sheet.dart';
 
 /// Link donasi Trakteer (sama dengan Zenime).
 const String _kTrakteerUrl = 'https://trakteer.id/Dayynimee';
+
+/// Perkiraan intro/outro (API tidak punya timestamp asli), sama dengan Zenime.
+const int _kIntroSkipMs = 90000;
+const int _kOutroWindowMs = 85000;
+// Episode pendek (OVA/klip) tidak di-skip otomatis.
+const int _kMinDurationForSkipMs = _kIntroSkipMs * 3;
 
 bool _blank(String? s) => s == null || s.trim().isEmpty;
 
@@ -109,6 +119,19 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
   bool _playerError = false;
   bool _wasPlaying = false;
   String? _gestureText;
+
+  // Fitur pemutar ala Zenime: kecepatan, gesture kecerahan/volume, skip
+  // intro/outro, flash seek, daftar episode di fullscreen.
+  final PlayerLevels _levels = PlayerLevels();
+  double _speed = 1.0;
+  bool _outroSkipped = false;
+  bool _showEpisodeList = false;
+  bool _flashVisible = false;
+  bool _flashForward = true;
+  Timer? _flashTimer;
+
+  /// Link dari mini player yang diambil alih (supaya tidak reload / ganti kualitas).
+  String? _adoptedLink;
   bool _synopsisExpanded = false;
   final GlobalKey _commentsKey = GlobalKey();
 
@@ -125,6 +148,25 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     WidgetsBinding.instance.addObserver(this);
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     _tick = Timer.periodic(const Duration(seconds: 1), _onTick);
+    _levels.init();
+    PipController.isInPip.addListener(_onPip);
+
+    // Dibuka dari mini player untuk episode yang sama: ambil alih controller
+    // yang sedang jalan (tanpa reload). Episode lain: mini player ditutup.
+    final mini = MiniPlayerManager.instance.consumeForExpand(widget.movieId, widget.episodeId);
+    if (mini != null) {
+      final vc = mini.controller;
+      _vc = vc;
+      _loadedLink = mini.info.link;
+      _adoptedLink = mini.info.link;
+      _speed = mini.info.speed;
+      vc.addListener(_onVideo);
+      _onVideo();
+      final sz = vc.value.size;
+      if (sz.width > 0 && sz.height > 0) {
+        PipController.setAspectRatio(sz.width.round(), sz.height.round());
+      }
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _applyPlayback();
@@ -142,6 +184,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     WatchXpGate.release(this);
     _hideTimer?.cancel();
     _tick?.cancel();
+    _flashTimer?.cancel();
+    _levels.dispose();
+    PipController.isInPip.removeListener(_onPip);
+    PipController.setCanEnter(false);
     final vc = _vc;
     _vc = null;
     vc?.removeListener(_onVideo);
@@ -237,6 +283,25 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
 
   Future<void> _loadLink(String? link) async {
     if (link == null || link.trim().isEmpty) return;
+    final adopted = _adoptedLink;
+    if (adopted != null) {
+      _adoptedLink = null;
+      if (link == adopted) return; // _loadedLink sudah sama
+      // Server default beda dengan yang sedang diputar mini player: pilih server
+      // yang cocok supaya video yang berjalan tidak diganti.
+      final ui = ref.read(playerControllerProvider(_args));
+      StreamServer? match;
+      for (final sv in ui.streamData?.server ?? const <StreamServer>[]) {
+        if (sv.link == adopted) {
+          match = sv;
+          break;
+        }
+      }
+      if (match != null) {
+        _notifier.selectServer(match);
+        return;
+      }
+    }
     if (link == _loadedLink) return;
     _loadedLink = link;
 
@@ -253,6 +318,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     }
     _vc = vc;
     _endedHandled = false;
+    _outroSkipped = false;
     _wasPlaying = false;
     _playerError = false;
     _pb.value = const _Playback();
@@ -262,10 +328,22 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     try {
       await vc.initialize();
       if (!mounted || _vc != vc) return;
-      if (resumeMs > 0) await vc.seekTo(Duration(milliseconds: resumeMs));
+      if (resumeMs > 0) {
+        await vc.seekTo(Duration(milliseconds: resumeMs));
+      } else if (ref.read(localStoreProvider).autoSkipIntro &&
+          vc.value.duration.inMilliseconds > _kMinDurationForSkipMs) {
+        // Episode dibuka dari awal: lompati intro.
+        await vc.seekTo(const Duration(milliseconds: _kIntroSkipMs));
+      }
       if (!mounted || _vc != vc) return;
+      final sz = vc.value.size;
+      if (sz.width > 0 && sz.height > 0) {
+        PipController.setAspectRatio(sz.width.round(), sz.height.round());
+      }
       vc.addListener(_onVideo);
       await vc.play();
+      if (!mounted || _vc != vc) return;
+      if (_speed != 1.0) await vc.setPlaybackSpeed(_speed);
       if (!mounted || _vc != vc) return;
       _onVideo();
       setState(() {});
@@ -294,6 +372,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     if (snap.isPlaying != _wasPlaying) {
       _wasPlaying = snap.isPlaying;
       WakelockPlus.toggle(enable: snap.isPlaying);
+      // Auto-PiP saat pindah app hanya selama video memutar.
+      PipController.setCanEnter(snap.isPlaying);
       _scheduleHide();
     }
 
@@ -312,6 +392,19 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     if (vc == null || !vc.value.isPlaying) return;
     _tickCount++;
     final dur = vc.value.duration.inMilliseconds;
+
+    // Auto-lanjut saat masuk zona outro (mepet habis), kalau ada episode
+    // berikutnya dan episodenya cukup panjang.
+    if (!_outroSkipped &&
+        dur > _kMinDurationForSkipMs &&
+        dur - vc.value.position.inMilliseconds <= _kOutroWindowMs &&
+        ref.read(localStoreProvider).autoSkipOutro &&
+        _notifier.nextEpisodeId != null) {
+      _outroSkipped = true;
+      _notifier.playNext();
+      return;
+    }
+
     if (_tickCount % 5 == 0 && dur > 0) {
       _notifier.saveProgress(vc.value.position.inMilliseconds, dur);
     }
@@ -349,6 +442,256 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
 
   // ---------------------------------------------------------------- kontrol
 
+  // ------------------------------------------------- PiP & mini player
+
+  bool get _inPip => PipController.isInPip.value;
+
+  void _onPip() {
+    if (!mounted) return;
+    setState(() {});
+    if (!_inPip) {
+      // Jendela PiP ditutup (X): activity berhenti, jadi hentikan suaranya.
+      // Kalau user justru membuka kembali (expand), app sudah di depan.
+      Future<void>.delayed(const Duration(milliseconds: 300), () {
+        if (mounted && !_inForeground) _vc?.pause();
+      });
+    }
+  }
+
+  Future<void> _enterPip() async {
+    final ok = await PipController.enter();
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(content: Text('Picture-in-Picture tidak tersedia di perangkat ini')),
+        );
+    }
+  }
+
+  /// Share sheet / browser memicu onUserLeaveHint; matikan auto-PiP sementara.
+  Future<void> _withoutPip(Future<void> Function() action) async {
+    await PipController.setCanEnter(false);
+    try {
+      await action();
+    } finally {
+      PipController.setCanEnter(_pb.value.isPlaying);
+    }
+  }
+
+  /// Back dari layar player: video dititipkan ke mini player (tetap jalan) alih-alih
+  /// dihentikan. Kalau belum siap / error / terkunci / sudah selesai, pop biasa.
+  void _minimizeAndPop(PlayerUiState ui) {
+    final vc = _vc;
+    final link = _loadedLink;
+    final gate = _gate(ui, ref.read(myPremiumProvider));
+    if (vc != null &&
+        link != null &&
+        vc.value.isInitialized &&
+        !_playerError &&
+        !gate.locked &&
+        !_endedHandled) {
+      final dur = vc.value.duration.inMilliseconds;
+      if (dur > 0) _notifier.saveProgress(vc.value.position.inMilliseconds, dur);
+      vc.removeListener(_onVideo);
+      _vc = null; // kepemilikan pindah ke mini player, jangan di-dispose di sini
+      _loadedLink = null;
+      final anime = ui.anime;
+      final ep = ui.streamData?.episode ?? _findEpisode(ui);
+      final poster = anime == null
+          ? ''
+          : (anime.posterUrl.isNotEmpty ? anime.posterUrl : anime.coverUrl);
+      MiniPlayerManager.instance.activate(
+        vc,
+        MiniPlayerInfo(
+          movieId: ui.movieId,
+          episodeId: ui.currentEpisodeId,
+          title: anime?.title ?? 'Anime',
+          episodeLabel: 'Ep ${ep?.index ?? ''}',
+          posterUrl: poster,
+          link: link,
+          speed: _speed,
+        ),
+      );
+      WakelockPlus.disable();
+    }
+    Navigator.of(context).pop();
+  }
+
+  void _seekBy(int deltaMs) {
+    _seekMs(_pb.value.positionMs + deltaMs);
+    _scheduleHide();
+  }
+
+  void _doubleTapSeek({required bool forward}) {
+    _seekMs(_pb.value.positionMs + (forward ? 10000 : -10000));
+    _flashTimer?.cancel();
+    setState(() {
+      _flashForward = forward;
+      _flashVisible = true;
+    });
+    _flashTimer = Timer(const Duration(milliseconds: 600), () {
+      if (mounted) setState(() => _flashVisible = false);
+    });
+  }
+
+  void _setSpeed(double v) {
+    _speed = v;
+    _vc?.setPlaybackSpeed(v);
+    if (mounted) setState(() {});
+  }
+
+  void _openSettingsSheet() {
+    final store = ref.read(localStoreProvider);
+    showPlayerSettingsSheet(
+      context,
+      speed: _speed,
+      autoSkipIntro: store.autoSkipIntro,
+      autoSkipOutro: store.autoSkipOutro,
+      onSpeed: _setSpeed,
+      onAutoSkipIntro: store.setAutoSkipIntro,
+      onAutoSkipOutro: store.setAutoSkipOutro,
+    );
+  }
+
+  /// Flash "10 detik" di sisi layar yang di-double-tap.
+  Widget _seekFlash() {
+    return IgnorePointer(
+      child: AnimatedOpacity(
+        opacity: _flashVisible ? 1 : 0,
+        duration: const Duration(milliseconds: 150),
+        child: Align(
+          alignment: _flashForward ? Alignment.centerRight : Alignment.centerLeft,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 36),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0x991E1B2E),
+                borderRadius: AppShapes.pill,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    _flashForward ? Icons.forward_10 : Icons.replay_10,
+                    color: AppColors.textWhite,
+                    size: 24,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    _flashForward ? '+10 dtk' : '-10 dtk',
+                    style: const TextStyle(
+                      color: AppColors.textWhite,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Panel daftar episode di fullscreen (port EpisodeListSidebar Zenime).
+  Widget _episodeSidebar(PlayerUiState ui) {
+    final isPremium = ref.watch(myPremiumProvider).valueOrNull ?? true;
+    final total = latestEpisodeIndex(ui.episodes.map((e) => e.index));
+    return Align(
+      alignment: Alignment.centerRight,
+      child: Container(
+        width: 280,
+        color: const Color(0xF21E1B2E),
+        child: SafeArea(
+          left: false,
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 4, 4),
+                child: Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Daftar Episode',
+                        style: TextStyle(
+                          color: AppColors.textWhite,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => setState(() => _showEpisodeList = false),
+                      icon: const Icon(Icons.close, color: AppColors.textWhite, size: 20),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: ListView.builder(
+                  itemCount: ui.episodes.length,
+                  itemBuilder: (context, i) {
+                    final ep = ui.episodes[i];
+                    final isCurrent = ep.id == ui.currentEpisodeId;
+                    final locked = isEpisodeLocked(ep.index, total, isPremium);
+                    return InkWell(
+                      onTap: () {
+                        final id = ep.id;
+                        setState(() => _showEpisodeList = false);
+                        if (id != null && !isCurrent) _notifier.loadEpisodeStream(id);
+                      },
+                      child: Container(
+                        color: isCurrent
+                            ? AppColors.accentViolet.withValues(alpha: 0.18)
+                            : Colors.transparent,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        child: Row(
+                          children: [
+                            if (locked) ...[
+                              const Icon(Icons.lock, size: 14, color: AppColors.accentViolet),
+                              const SizedBox(width: 6),
+                            ],
+                            Text(
+                              'Ep ${ep.index ?? ''}',
+                              style: TextStyle(
+                                color: isCurrent
+                                    ? AppColors.accentVioletLight
+                                    : AppColors.textWhite,
+                                fontSize: 13,
+                                fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
+                              ),
+                            ),
+                            if (!_blank(ep.title)) ...[
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  ep.title!,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _scheduleHide() {
     _hideTimer?.cancel();
     if (_showControls && _pb.value.isPlaying) {
@@ -364,6 +707,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
   }
 
   void _applyFullscreen(bool fullscreen) {
+    _showEpisodeList = false;
     if (fullscreen) {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
       SystemChrome.setPreferredOrientations(
@@ -417,10 +761,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
   }
 
   Future<void> _openTrakteer() async {
-    final ok = await launchUrl(
-      Uri.parse(_kTrakteerUrl),
-      mode: LaunchMode.externalApplication,
-    );
+    var ok = false;
+    await _withoutPip(() async {
+      ok = await launchUrl(
+        Uri.parse(_kTrakteerUrl),
+        mode: LaunchMode.externalApplication,
+      );
+    });
     if (!ok && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Tidak ada browser untuk membuka Trakteer')),
@@ -469,15 +816,26 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     );
 
     return PopScope(
-      canPop: !ui.isFullscreen,
+      canPop: false,
       onPopInvokedWithResult: (didPop, result) {
-        if (!didPop && ui.isFullscreen) _notifier.setFullscreen(false);
+        if (didPop) return;
+        if (ui.isFullscreen) {
+          if (_showEpisodeList) {
+            setState(() => _showEpisodeList = false);
+          } else {
+            _notifier.setFullscreen(false);
+          }
+          return;
+        }
+        _minimizeAndPop(ui);
       },
       child: Scaffold(
         backgroundColor: AppColors.backgroundDark,
-        body: ui.isFullscreen
-            ? _fullscreenLayout(ui, gate)
-            : _portraitLayout(ui, isFavorite, gate),
+        body: _inPip
+            ? SizedBox.expand(child: _videoSurface())
+            : (ui.isFullscreen
+                ? _fullscreenLayout(ui, gate)
+                : _portraitLayout(ui, isFavorite, gate)),
       ),
     );
   }
@@ -504,26 +862,66 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
   }
 
   Widget _controls(PlayerUiState ui, {required bool fullscreen}) {
+    final prevId = _notifier.previousEpisodeId;
+    final nextId = _notifier.nextEpisodeId;
     return ValueListenableBuilder<_Playback>(
       valueListenable: _pb,
       builder: (context, pb, _) {
-        return _ControlsOverlay(
-          pb: pb,
-          showControls: _showControls,
-          isFullscreen: fullscreen,
-          title: _overlayTitle(ui),
-          selectedServer: ui.selectedServer,
-          onTogglePlay: _togglePlay,
-          onSeek: (ms) {
-            _seekMs(ms);
-            _scheduleHide();
-          },
-          onToggleFullscreen: () => _notifier.setFullscreen(!fullscreen),
-          onOpenServers: _openServerSheet,
-          onDoubleTapLeft: () => _seekMs(_pb.value.positionMs - 10000),
-          onDoubleTapRight: () => _seekMs(_pb.value.positionMs + 10000),
-          onToggleOverlay: _toggleOverlay,
-          onBack: fullscreen ? () => _notifier.setFullscreen(false) : widget.onBackClick,
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            _ControlsOverlay(
+              pb: pb,
+              showControls: _showControls,
+              isFullscreen: fullscreen,
+              title: _overlayTitle(ui),
+              selectedServer: ui.selectedServer,
+              speed: _speed,
+              showSkipIntro:
+                  pb.positionMs < _kIntroSkipMs && pb.durationMs > _kMinDurationForSkipMs,
+              onTogglePlay: _togglePlay,
+              onSeek: (ms) {
+                _seekMs(ms);
+                _scheduleHide();
+              },
+              onToggleFullscreen: () => _notifier.setFullscreen(!fullscreen),
+              onOpenServers: _openServerSheet,
+              onOpenSettings: _openSettingsSheet,
+              onEnterPip: _enterPip,
+              onOpenEpisodes: fullscreen
+                  ? () => setState(() {
+                        _showEpisodeList = true;
+                        _showControls = false;
+                      })
+                  : null,
+              onRewind: () => _seekBy(-10000),
+              onForward: () => _seekBy(10000),
+              onPrev: prevId == null ? null : _notifier.playPrevious,
+              onNext: nextId == null ? null : _notifier.playNext,
+              onSkipIntro: () {
+                _seekMs(_kIntroSkipMs);
+                _scheduleHide();
+              },
+              onDoubleTapLeft: () => _doubleTapSeek(forward: false),
+              onDoubleTapRight: () => _doubleTapSeek(forward: true),
+              onToggleOverlay: _toggleOverlay,
+              onBack: fullscreen ? () => _notifier.setFullscreen(false) : widget.onBackClick,
+            ),
+            // Spinner buffering tetap tampil walau kontrol disembunyikan.
+            if (pb.isBuffering && !_showControls)
+              const IgnorePointer(
+                child: Center(
+                  child: SizedBox(
+                    width: 32,
+                    height: 32,
+                    child: CircularProgressIndicator(
+                      color: AppColors.accentViolet,
+                      strokeWidth: 3,
+                    ),
+                  ),
+                ),
+              ),
+          ],
         );
       },
     );
@@ -546,7 +944,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
         },
         onHorizontalDragEnd: (_) => setState(() => _gestureText = null),
         onHorizontalDragCancel: () => setState(() => _gestureText = null),
-        child: Stack(
+        child: PlayerGestureLayer(
+          levels: _levels,
+          child: Stack(
           fit: StackFit.expand,
           children: [
             _videoSurface(),
@@ -569,8 +969,16 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                 ),
               ),
             _controls(ui, fullscreen: true),
+            _seekFlash(),
+            if (_showEpisodeList)
+              GestureDetector(
+                // Serap swipe horizontal supaya tidak ikut menggeser video.
+                onHorizontalDragUpdate: (_) {},
+                child: _episodeSidebar(ui),
+              ),
             if (gate.locked) _lockedOverlay(fullscreen: true),
           ],
+        ),
         ),
       ),
     );
@@ -607,16 +1015,20 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
             aspectRatio: 16 / 9,
             child: ColoredBox(
               color: Colors.black,
-              child: Stack(
+              child: PlayerGestureLayer(
+                levels: _levels,
+                child: Stack(
                 fit: StackFit.expand,
                 children: [
                   _videoSurface(),
                   _controls(ui, fullscreen: false),
+                  _seekFlash(),
                   if (!gate.locked && (ui.streamError != null || _playerError)) _errorOverlay(),
                   if (!gate.locked && ui.autoNextCountdown != null)
                     _countdownOverlay(ui.autoNextCountdown!),
                   if (gate.locked) _lockedOverlay(fullscreen: false),
                 ],
+              ),
               ),
             ),
           ),
@@ -829,7 +1241,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                               final text = _blank(idx)
                                   ? 'Nonton "$title" di Zenime!'
                                   : 'Nonton "$title" Episode $idx di Zenime!';
-                              Share.share(text, subject: title);
+                              _withoutPip(() => Share.share(text, subject: title));
                             },
                           ),
                           if (hasNext) ...[
@@ -1153,10 +1565,20 @@ class _ControlsOverlay extends StatefulWidget {
     required this.isFullscreen,
     required this.title,
     required this.selectedServer,
+    required this.speed,
+    required this.showSkipIntro,
     required this.onTogglePlay,
     required this.onSeek,
     required this.onToggleFullscreen,
     required this.onOpenServers,
+    required this.onOpenSettings,
+    required this.onEnterPip,
+    required this.onOpenEpisodes,
+    required this.onRewind,
+    required this.onForward,
+    required this.onPrev,
+    required this.onNext,
+    required this.onSkipIntro,
     required this.onDoubleTapLeft,
     required this.onDoubleTapRight,
     required this.onToggleOverlay,
@@ -1168,10 +1590,24 @@ class _ControlsOverlay extends StatefulWidget {
   final bool isFullscreen;
   final String title;
   final StreamServer? selectedServer;
+  final double speed;
+  final bool showSkipIntro;
   final VoidCallback onTogglePlay;
   final ValueChanged<int> onSeek;
   final VoidCallback onToggleFullscreen;
   final VoidCallback onOpenServers;
+  final VoidCallback onOpenSettings;
+  final VoidCallback onEnterPip;
+
+  /// Hanya diisi di fullscreen (panel daftar episode).
+  final VoidCallback? onOpenEpisodes;
+  final VoidCallback onRewind;
+  final VoidCallback onForward;
+
+  /// null = tidak ada episode sebelumnya/berikutnya.
+  final VoidCallback? onPrev;
+  final VoidCallback? onNext;
+  final VoidCallback onSkipIntro;
   final VoidCallback onDoubleTapLeft;
   final VoidCallback onDoubleTapRight;
   final VoidCallback onToggleOverlay;
@@ -1244,6 +1680,62 @@ class _ControlsOverlayState extends State<_ControlsOverlay> {
                               ],
                             ),
                           ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (widget.onOpenEpisodes != null) ...[
+                                GestureDetector(
+                                  onTap: widget.onOpenEpisodes,
+                                  child: const Icon(
+                                    Icons.playlist_play,
+                                    color: AppColors.textWhite,
+                                    size: 24,
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                              ],
+                              GestureDetector(
+                                onTap: widget.onEnterPip,
+                                child: const Icon(
+                                  Icons.picture_in_picture_alt,
+                                  color: AppColors.textWhite,
+                                  size: 22,
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              GestureDetector(
+                                onTap: widget.onOpenSettings,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0x66FFFFFF),
+                                    borderRadius: AppShapes.pill,
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(
+                                        Icons.speed,
+                                        size: 13,
+                                        color: AppColors.textWhite,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        speedLabel(widget.speed),
+                                        style: const TextStyle(
+                                          color: AppColors.textWhite,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
                           GestureDetector(
                             onTap: widget.onOpenServers,
                             child: Container(
@@ -1262,13 +1754,24 @@ class _ControlsOverlayState extends State<_ControlsOverlay> {
                               ),
                             ),
                           ),
+                            ],
+                          ),
                         ],
                       ),
                     ),
                   ),
-                  // Tengah: play / pause / buffering
+                  // Tengah: prev / -10 / play-pause / +10 / next
                   Center(
-                    child: GestureDetector(
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (widget.onPrev != null) ...[
+                          _RoundControl(icon: Icons.skip_previous, onTap: widget.onPrev!),
+                          const SizedBox(width: 14),
+                        ],
+                        _RoundControl(icon: Icons.replay_10, onTap: widget.onRewind),
+                        const SizedBox(width: 14),
+                        GestureDetector(
                       onTap: widget.onTogglePlay,
                       child: Container(
                         width: 56,
@@ -1295,6 +1798,14 @@ class _ControlsOverlayState extends State<_ControlsOverlay> {
                         ),
                       ),
                     ),
+                        const SizedBox(width: 14),
+                        _RoundControl(icon: Icons.forward_10, onTap: widget.onForward),
+                        if (widget.onNext != null) ...[
+                          const SizedBox(width: 14),
+                          _RoundControl(icon: Icons.skip_next, onTap: widget.onNext!),
+                        ],
+                      ],
+                    ),
                   ),
                   // Bawah: waktu, fullscreen, seek bar
                   Align(
@@ -1305,7 +1816,6 @@ class _ControlsOverlayState extends State<_ControlsOverlay> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
                                 '${formatTime(pb.positionMs)} / ${formatTime(pb.durationMs)}',
@@ -1315,6 +1825,11 @@ class _ControlsOverlayState extends State<_ControlsOverlay> {
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
+                              const Spacer(),
+                              if (widget.showSkipIntro) ...[
+                                _SkipIntroPill(onTap: widget.onSkipIntro),
+                                const SizedBox(width: 8),
+                              ],
                               SizedBox(
                                 width: 32,
                                 height: 32,
@@ -1361,6 +1876,67 @@ class _ControlsOverlayState extends State<_ControlsOverlay> {
           ),
         );
       },
+    );
+  }
+}
+
+/// Tombol bulat transparan kecil di tengah pemutar (prev / -10 / +10 / next),
+/// dengan gaya yang sama seperti lingkaran play Wibuplay.
+class _RoundControl extends StatelessWidget {
+  const _RoundControl({required this.icon, required this.onTap});
+
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: const BoxDecoration(
+          color: Color(0x66000000),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon, color: AppColors.textWhite, size: 24),
+      ),
+    );
+  }
+}
+
+/// Pill "Lewati Intro" (muncul 90 detik pertama).
+class _SkipIntroPill extends StatelessWidget {
+  const _SkipIntroPill({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceDark,
+          borderRadius: AppShapes.pill,
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.fast_forward, size: 14, color: AppColors.accentViolet),
+            SizedBox(width: 4),
+            Text(
+              'Lewati Intro',
+              style: TextStyle(
+                color: AppColors.textWhite,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

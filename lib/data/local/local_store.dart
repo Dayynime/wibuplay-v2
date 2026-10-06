@@ -61,6 +61,24 @@ class LocalStore extends ChangeNotifier {
   Future<void> setLastSeenPopupId(String id) =>
       _prefs.setString(_lastSeenPopupKey, id);
 
+  // ---- Pengaturan pemutar (sama dengan Zenime: default aktif) ----
+
+  static const String _autoSkipIntroKey = 'player_auto_skip_intro';
+  static const String _autoSkipOutroKey = 'player_auto_skip_outro';
+
+  bool get autoSkipIntro => _prefs.getBool(_autoSkipIntroKey) ?? true;
+  bool get autoSkipOutro => _prefs.getBool(_autoSkipOutroKey) ?? true;
+
+  Future<void> setAutoSkipIntro(bool enabled) async {
+    await _prefs.setBool(_autoSkipIntroKey, enabled);
+    notifyListeners();
+  }
+
+  Future<void> setAutoSkipOutro(bool enabled) async {
+    await _prefs.setBool(_autoSkipOutroKey, enabled);
+    notifyListeners();
+  }
+
   // ---- Favorites (urut timestamp terbaru dulu) ----
 
   List<FavoriteEntity> get favorites => _favorites;

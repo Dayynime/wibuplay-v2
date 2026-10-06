@@ -9,6 +9,8 @@ import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
 import 'data/local/local_store.dart';
 import 'providers.dart';
+import 'ui/app_routes.dart';
+import 'ui/components/mini_player.dart';
 import 'ui/route_observer.dart';
 import 'ui/components/announcement_popup.dart';
 import 'ui/screens/auth/auth_gate.dart';
@@ -61,7 +63,15 @@ class ZenimeApp extends StatelessWidget {
       title: 'Zenime',
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(),
+      navigatorKey: appNavigatorKey,
       navigatorObservers: [routeObserver],
+      // Mini player ngambang di atas semua layar (di luar Navigator).
+      builder: (context, child) => Stack(
+        children: [
+          Positioned.fill(child: child ?? const SizedBox.shrink()),
+          const MiniPlayerOverlay(),
+        ],
+      ),
       home: const UpdateGate(
         child: AuthGate(child: AnnouncementHost(child: AppShell())),
       ),

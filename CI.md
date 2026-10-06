@@ -42,7 +42,9 @@ Jelajah (cari, filter, urutan, genre, scroll tak terbatas) dan Jadwal (per hari)
 Cuplix (feed vertikal, pemutaran per halaman dengan loop time_start..time_end, prefetch + cache URL stream,
 suka, bagikan, tombol tonton penuh, paginasi kursor, error/retry) dan Profil (header, tab Favorit / Riwayat /
 Pengaturan, hapus satu item, hapus semua riwayat dengan dialog) sudah, tersambung ke tab 3 dan 4 di app_shell.
-Belum: shared element transition poster, gesture kecerahan/volume di fullscreen (butuh plugin tambahan).
+Belum: shared element transition poster, download offline.
+PiP: `android_native/MainActivity.kt` (MethodChannel `wibuplay/pip`) disalin CI menimpa MainActivity bawaan + manifest `supportsPictureInPicture`; tombol PiP di kontrol + auto-PiP saat pindah app selama video memutar. Mini player: tekan back di player -> video lanjut di kartu mengambang (geser, tap = buka lagi, play/pause, X); `lib/ui/components/mini_player.dart`.
+Player ala Zenime: kecepatan putar, gesture kecerahan (kiri) / volume (kanan) lewat plugin `screen_brightness` + `volume_controller`, tombol prev/next/-10/+10, Lewati Intro, auto-skip intro/outro (default aktif), flash double-tap seek, daftar episode di fullscreen, spinner buffering saat kontrol tersembunyi.
 Drift/build_runner diganti shared_preferences supaya tidak butuh codegen.
 CI menambal AndroidManifest hasil flutter create (INTERNET, cleartext, nama app) karena
 manifest rilis bawaan Flutter tidak punya izin internet.
