@@ -150,7 +150,7 @@ class XpRepository {
     return list;
   }
 
-  /// Top Support (donatur SociaBuzz) lewat Edge Function
+  /// Top Support (donatur) lewat Edge Function
   /// `zenime-top-supporters`, urut nominal terbesar. Melempar kalau gagal.
   Future<List<TopSupporter>> getTopSupporters() async {
     final res = await _dio.get<dynamic>('functions/v1/zenime-top-supporters');

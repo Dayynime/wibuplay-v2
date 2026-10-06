@@ -9,15 +9,13 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/account_models.dart';
+import '../../../core/supabase_config.dart';
 import '../../../data/models/support_models.dart';
 import '../../../providers.dart';
 import '../../components/game_badges.dart';
 
-/// Link donasi SociaBuzz (sama dengan DonationConfig di Zenime).
-const String _sociaBuzzUrl = 'https://sociabuzz.com/Dayynime/support';
-
 /// Halaman Top Support: podium 3 donatur teratas + daftar peringkat + ajakan
-/// donasi lewat SociaBuzz. Dibuka dari slide TOP SUPPORT di carousel Beranda.
+/// donasi lewat halaman donasi Zenime Store (QRIS). Dibuka dari slide TOP SUPPORT di carousel Beranda.
 class TopSupportScreen extends ConsumerWidget {
   const TopSupportScreen({super.key});
 
@@ -42,7 +40,7 @@ class TopSupportScreen extends ConsumerWidget {
           children: [
             Text('Top Support', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18)),
             Text(
-              'Donatur SociaBuzz teratas',
+              'Donatur teratas',
               style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
             ),
           ],
@@ -838,12 +836,11 @@ class _DonateCardState extends State<_DonateCard> with SingleTickerProviderState
 
   Future<void> _donate() async {
     final code = widget.zenimeCode;
-    if (code != null && code.isNotEmpty) {
-      await Clipboard.setData(ClipboardData(text: code));
-      if (mounted) _toast('Kode disalin. Tempel di kolom pesan saat donasi ya!');
-    }
-    final ok = await launchUrl(Uri.parse(_sociaBuzzUrl), mode: LaunchMode.externalApplication);
-    if (!ok && mounted) _toast('Tidak bisa membuka SociaBuzz');
+    final uri = Uri.parse(SupabaseConfig.donationStorefrontUrl).replace(
+      queryParameters: (code != null && code.isNotEmpty) ? {'code': code} : null,
+    );
+    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!ok && mounted) _toast('Tidak bisa membuka halaman donasi');
   }
 
   @override
@@ -935,7 +932,7 @@ class _DonateCardState extends State<_DonateCard> with SingleTickerProviderState
                               ),
                               const SizedBox(width: 10),
                               const Text(
-                                'Donasi via SociaBuzz',
+                                'Donasi via QRIS',
                                 style: TextStyle(
                                   color: Colors.white,
                                   fontSize: 14.5,
@@ -957,7 +954,7 @@ class _DonateCardState extends State<_DonateCard> with SingleTickerProviderState
           const SizedBox(height: 6),
           const Center(
             child: Text(
-              'Kartu kredit, PayPal, QRIS / e-wallet',
+              'QRIS: semua e-wallet dan m-banking',
               style: TextStyle(color: AppColors.textMuted, fontSize: 11),
             ),
           ),
@@ -975,7 +972,7 @@ class _DonateCardState extends State<_DonateCard> with SingleTickerProviderState
             ),
             const SizedBox(height: 4),
             const Text(
-              'Tempel kode ini di kolom pesan saat donasi (otomatis disalin saat kamu tekan tombol di atas) supaya username dan foto profilmu muncul di daftar.',
+              'Kode ini otomatis terisi di halaman donasi (kolom Kode Zenime) supaya username dan foto profilmu muncul di daftar.',
               style: TextStyle(color: AppColors.textSecondary, fontSize: 11.5, height: 1.4),
             ),
             const SizedBox(height: 10),

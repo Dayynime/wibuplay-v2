@@ -1,5 +1,5 @@
 /// Satu baris Top Support (hasil Edge Function `zenime-top-supporters`,
-/// donatur SociaBuzz). Port TopSupporter dari Zenime.
+/// donatur). Port TopSupporter dari Zenime.
 class TopSupporter {
   const TopSupporter({
     required this.rank,

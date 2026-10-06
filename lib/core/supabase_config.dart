@@ -16,4 +16,8 @@ class SupabaseConfig {
   static const String premiumManualStorefrontUrl = 'https://zenime.biz.id/bayar-manual';
   static const String coinStorefrontUrl = 'https://zenime.biz.id/top-up-coin';
   static const String coinManualStorefrontUrl = 'https://zenime.biz.id/coin-bayar-manual';
+
+  // Halaman donasi ("Dukung Kami", bayar QRIS via Aulaa). Kode akun dikirim
+  // lewat query `code` supaya kolom Kode Zenime langsung terisi.
+  static const String donationStorefrontUrl = 'https://zenime.biz.id/donasi';
 }

@@ -370,7 +370,7 @@ class _RankBadge extends StatelessWidget {
   }
 }
 
-/// Slide "TOP SUPPORT" (podium 3 donatur SociaBuzz teratas).
+/// Slide "TOP SUPPORT" (podium 3 donatur teratas).
 class HeroSupportSlide extends StatelessWidget {
   const HeroSupportSlide({super.key, required this.supporters, this.onTap});
 
@@ -426,7 +426,7 @@ class HeroSupportSlide extends StatelessWidget {
           ),
           const SizedBox(height: 2),
           const Text(
-            'Donatur SociaBuzz teratas',
+            'Donatur teratas',
             style: TextStyle(color: AppColors.textMuted, fontSize: 11),
           ),
           Expanded(
