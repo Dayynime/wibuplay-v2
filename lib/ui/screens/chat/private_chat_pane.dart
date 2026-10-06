@@ -405,16 +405,19 @@ class _DmBubble extends StatelessWidget {
             bottomRight: Radius.circular(isOwn ? 4 : 16),
           ),
         ),
-        child: Column(
+        // IntrinsicWidth: lebar bubble mengikuti isi (pendek = sempit), baru
+        // mentok di 280, seperti bubble DM di Zenime. Tanpa ini Align jam
+        // memenuhi lebar maksimum sehingga semua bubble jadi lebar.
+        child: IntrinsicWidth(
+          child: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (replyAuthor != null) ...[
               // Kutipan reply: bar aksen di kiri + background gelap.
               ClipRRect(
                 borderRadius: BorderRadius.circular(10),
                 child: Container(
-                  width: double.infinity,
                   color: const Color(0x8C0B0B12),
                   child: IntrinsicHeight(
                     child: Row(
@@ -469,6 +472,7 @@ class _DmBubble extends StatelessWidget {
               ),
             ),
           ],
+          ),
         ),
       ),
     );

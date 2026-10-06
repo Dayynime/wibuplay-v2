@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/premium_access.dart';
@@ -31,10 +32,28 @@ class DetailScreen extends ConsumerStatefulWidget {
   ConsumerState<DetailScreen> createState() => _DetailScreenState();
 }
 
-class _DetailScreenState extends ConsumerState<DetailScreen> {
+class _DetailScreenState extends ConsumerState<DetailScreen>
+    with SingleTickerProviderStateMixin {
   static const List<String> _tabs = ['Ringkasan', 'Daftar Episode', 'Media & Cuplix'];
 
   final ScrollController _scroll = ScrollController();
+
+  /// Animasi masuk isi tab: muncul perlahan (fade) sambil naik sedikit.
+  /// Mulai dari value 1 supaya tampilan awal tidak ikut dianimasikan.
+  late final AnimationController _tabAnim = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 380),
+    value: 1,
+  );
+  late final CurvedAnimation _tabCurve =
+      CurvedAnimation(parent: _tabAnim, curve: Curves.easeOutCubic);
+
+  /// Satu pintu ganti tab (tap maupun swipe) supaya animasinya selalu jalan.
+  void _selectTab(int index) {
+    if (index == ref.read(detailControllerProvider(widget.movieId)).selectedTab) return;
+    _notifier.setTab(index);
+    _tabAnim.forward(from: 0);
+  }
   final TextEditingController _search = TextEditingController();
   bool _synopsisExpanded = false;
 
@@ -42,6 +61,18 @@ class _DetailScreenState extends ConsumerState<DetailScreen> {
   void initState() {
     super.initState();
     _scroll.addListener(_onScroll);
+  }
+
+  /// Swipe ke kiri = tab berikutnya, ke kanan = tab sebelumnya. Dipicu lewat
+  /// kecepatan lepas jari supaya geseran pelan atau miring tidak salah baca.
+  void _onSwipeTab(DragEndDetails d) {
+    final v = d.primaryVelocity ?? 0;
+    if (v.abs() < 300) return;
+    final current = ref.read(detailControllerProvider(widget.movieId)).selectedTab;
+    final next = v < 0 ? current + 1 : current - 1;
+    if (next < 0 || next >= _tabs.length) return;
+    HapticFeedback.selectionClick();
+    _selectTab(next);
   }
 
   /// Load more otomatis: begitu mendekati ujung bawah di tab Daftar Episode,
@@ -73,6 +104,8 @@ class _DetailScreenState extends ConsumerState<DetailScreen> {
   void dispose() {
     _scroll.removeListener(_onScroll);
     _scroll.dispose();
+    _tabCurve.dispose();
+    _tabAnim.dispose();
     _search.dispose();
     super.dispose();
   }
@@ -159,15 +192,34 @@ class _DetailScreenState extends ConsumerState<DetailScreen> {
                     },
                   ),
                 ),
-                CustomScrollView(
-                  controller: _scroll,
-                  slivers: [
-                    SliverToBoxAdapter(child: SizedBox(height: heroHeight)),
-                    SliverToBoxAdapter(child: _tabRow(ui)),
-                    SliverToBoxAdapter(child: _titleBlock(anime)),
-                    ..._tabContent(ui, anime),
-                    const SliverToBoxAdapter(child: SizedBox(height: 110)),
-                  ],
+                // Geser kiri/kanan di mana pun di halaman = pindah tab
+                // (Ringkasan / Daftar Episode / Media & Cuplix). Scroll vertikal
+                // dan list horizontal di dalam tab tidak terganggu karena
+                // gesture yang paling dalam menang.
+                GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onHorizontalDragEnd: _onSwipeTab,
+                  child: CustomScrollView(
+                    controller: _scroll,
+                    slivers: [
+                      SliverToBoxAdapter(child: SizedBox(height: heroHeight)),
+                      SliverToBoxAdapter(child: _tabRow(ui)),
+                      SliverToBoxAdapter(child: _titleBlock(anime)),
+                      // Isi tab: fade-in + naik 18px (easeOutCubic) tiap ganti tab.
+                      AnimatedBuilder(
+                        animation: _tabCurve,
+                        builder: (context, child) => SliverPadding(
+                          padding: EdgeInsets.only(top: 18 * (1 - _tabCurve.value)),
+                          sliver: child,
+                        ),
+                        child: SliverFadeTransition(
+                          opacity: _tabCurve,
+                          sliver: SliverMainAxisGroup(slivers: _tabContent(ui, anime)),
+                        ),
+                      ),
+                      const SliverToBoxAdapter(child: SizedBox(height: 110)),
+                    ],
+                  ),
                 ),
               ],
             );
@@ -276,7 +328,7 @@ class _DetailScreenState extends ConsumerState<DetailScreen> {
             Expanded(
               child: GestureDetector(
                 behavior: HitTestBehavior.opaque,
-                onTap: () => _notifier.setTab(i),
+                onTap: () => _selectTab(i),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   child: Column(
