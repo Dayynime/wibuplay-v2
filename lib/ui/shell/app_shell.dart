@@ -26,13 +26,23 @@ class _AppShellState extends State<AppShell> {
   /// Jadwal, dan Cuplix tidak memanggil API sebelum dikunjungi.
   final Set<int> _visited = {0};
 
-  void _goTab(int i) => setState(() {
-        _index = i;
-        _visited.add(i);
-      });
+  /// Arah perpindahan tab (+1 ke kanan, -1 ke kiri) untuk animasi geser.
+  int _dir = 1;
 
-  Widget _tab(int i, Widget Function() build) =>
-      _visited.contains(i) ? build() : const SizedBox.shrink();
+  void _goTab(int i) {
+    if (i == _index) return;
+    setState(() {
+      _dir = i > _index ? 1 : -1;
+      _index = i;
+      _visited.add(i);
+    });
+  }
+
+  Widget _tab(int i, Widget Function() build) => _AnimatedTab(
+        active: _index == i,
+        direction: _dir,
+        child: _visited.contains(i) ? build() : const SizedBox.shrink(),
+      );
 
   void _openDetail(String movieId) => openDetail(context, movieId);
 
@@ -45,17 +55,17 @@ class _AppShellState extends State<AppShell> {
       backgroundColor: AppColors.backgroundDark,
       body: Stack(
         children: [
-          IndexedStack(
-            index: _index,
+          Stack(
+            fit: StackFit.expand,
             children: [
-              HomeScreen(
+              _tab(0, () => HomeScreen(
                 onAnimeClick: _openDetail,
                 onWatchEpisode: _openPlayer,
                 onSearchClick: () => _goTab(1),
                 onSeeAllClick: (_) => _goTab(1),
                 onProfileClick: () => _goTab(4),
                 onCuplixClick: () => _goTab(3),
-              ),
+              )),
               _tab(1, () => ExploreScreen(onAnimeClick: _openDetail)),
               _tab(2, () => ScheduleScreen(onAnimeClick: _openDetail)),
               _tab(
@@ -79,6 +89,83 @@ class _AppShellState extends State<AppShell> {
             child: FloatingBottomBar(currentIndex: _index, onTabSelected: _goTab),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Satu tab di dalam Stack: state tetap terjaga (maintainState) dan perpindahan
+/// memakai fade-through. Tab lama memudar cepat, tab baru fade-in sambil
+/// bergeser halus sesuai arah perpindahan.
+class _AnimatedTab extends StatefulWidget {
+  const _AnimatedTab({
+    required this.active,
+    required this.direction,
+    required this.child,
+  });
+
+  final bool active;
+  final int direction;
+  final Widget child;
+
+  @override
+  State<_AnimatedTab> createState() => _AnimatedTabState();
+}
+
+class _AnimatedTabState extends State<_AnimatedTab>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 280),
+    value: widget.active ? 1.0 : 0.0,
+  )..addStatusListener((_) {
+      if (mounted) setState(() {});
+    });
+
+  late final Animation<double> _curve = CurvedAnimation(
+    parent: _c,
+    // Masuk: tunggu tab lama memudar dulu (35% awal), lalu muncul.
+    curve: const Interval(0.35, 1.0, curve: Curves.easeOutCubic),
+    // Keluar: memudar cepat di awal.
+    reverseCurve: const Interval(0.65, 1.0, curve: Curves.easeInCubic),
+  );
+
+  @override
+  void didUpdateWidget(_AnimatedTab old) {
+    super.didUpdateWidget(old);
+    if (old.active != widget.active) {
+      widget.active ? _c.forward() : _c.reverse();
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hidden = !widget.active && _c.isDismissed;
+    final dir = widget.active ? widget.direction : -widget.direction;
+    return Visibility(
+      visible: !hidden,
+      maintainState: true,
+      child: IgnorePointer(
+        ignoring: !widget.active,
+        child: RepaintBoundary(
+          child: FadeTransition(
+            opacity: _curve,
+            child: AnimatedBuilder(
+              animation: _curve,
+              child: widget.child,
+              builder: (context, child) => FractionalTranslation(
+                translation: Offset(dir * 0.05 * (1 - _curve.value), 0),
+                child: child,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
