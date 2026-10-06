@@ -1,7 +1,9 @@
 import 'dart:async';
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
@@ -142,17 +144,29 @@ class _HeroBannerState extends State<HeroBanner> {
                   onPageChanged: (i) => setState(() => _page = i),
                   itemBuilder: (context, page) {
                     if (page == lbPage) {
-                      return HeroLeaderboardSlide(
-                        entries: widget.topXp,
-                        clans: widget.topClans,
-                        onTap: widget.onLeaderboardClick ?? () {},
-                        onClanTap: widget.onClanLeaderboardClick,
+                      return _SlideHost(
+                        controller: _pager,
+                        index: page,
+                        builder: (context, active, offset) => HeroLeaderboardSlide(
+                          entries: widget.topXp,
+                          clans: widget.topClans,
+                          onTap: widget.onLeaderboardClick ?? () {},
+                          onClanTap: widget.onClanLeaderboardClick,
+                          active: active,
+                          pageOffset: offset,
+                        ),
                       );
                     }
                     if (page == supportPage) {
-                      return HeroSupportSlide(
-                        supporters: widget.topSupport,
-                        onTap: widget.onSupportClick,
+                      return _SlideHost(
+                        controller: _pager,
+                        index: page,
+                        builder: (context, active, offset) => HeroSupportSlide(
+                          supporters: widget.topSupport,
+                          onTap: widget.onSupportClick,
+                          active: active,
+                          pageOffset: offset,
+                        ),
                       );
                     }
                     return _AutoPosterSlide(
@@ -207,6 +221,89 @@ class _HeroBannerState extends State<HeroBanner> {
       ],
     );
   }
+}
+
+/// Pembungkus slide leaderboard/support: memberi tahu slide kapan ia kelihatan
+/// ([active] = mulai ada di layar sampai benar-benar keluar) dan seberapa jauh
+/// ia dari tengah ([offset] -1..1) untuk efek parallax. Cuma [active] yang
+/// memicu rebuild; [offset] lewat ValueNotifier supaya swipe tetap ringan.
+class _SlideHost extends StatefulWidget {
+  const _SlideHost({
+    required this.controller,
+    required this.index,
+    required this.builder,
+  });
+
+  final PageController controller;
+  final int index;
+  final Widget Function(BuildContext context, bool active, ValueListenable<double> offset)
+      builder;
+
+  @override
+  State<_SlideHost> createState() => _SlideHostState();
+}
+
+class _SlideHostState extends State<_SlideHost> {
+  final ValueNotifier<double> _offset = ValueNotifier<double>(0);
+  bool _active = false;
+
+  double _delta() {
+    final c = widget.controller;
+    final initial = c.initialPage.toDouble();
+    final page = c.hasClients ? (c.page ?? initial) : initial;
+    return (page - widget.index).clamp(-1.0, 1.0).toDouble();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    final d = _delta();
+    _offset.value = d;
+    _active = d.abs() < 0.98;
+    widget.controller.addListener(_onPage);
+  }
+
+  @override
+  void didUpdateWidget(_SlideHost old) {
+    super.didUpdateWidget(old);
+    if (old.controller != widget.controller) {
+      old.controller.removeListener(_onPage);
+      widget.controller.addListener(_onPage);
+    }
+    // Index slide bisa bergeser kalau data leaderboard/support datang belakangan.
+    final d = _delta();
+    _offset.value = d;
+    _active = d.abs() < 0.98;
+  }
+
+  void _onPage() {
+    // Pager kadang memberi notifikasi saat layout (mis. ganti ukuran layar):
+    // tunda ke akhir frame supaya setState aman.
+    if (SchedulerBinding.instance.schedulerPhase == SchedulerPhase.persistentCallbacks) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _apply();
+      });
+    } else {
+      _apply();
+    }
+  }
+
+  void _apply() {
+    final d = _delta();
+    _offset.value = d;
+    final a = d.abs() < 0.98;
+    if (a != _active) setState(() => _active = a);
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_onPage);
+    _offset.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.builder(context, _active, _offset);
 }
 
 /// Slide anime: satu kartu, gambar ganti sendiri mengikuti [index]. Chip
