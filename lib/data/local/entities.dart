@@ -122,3 +122,81 @@ class WatchHistoryEntity {
         lastWatchedTime: (j['lastWatchedTime'] as num?)?.toInt() ?? 0,
       );
 }
+
+/// Port DownloadedEpisodeEntity (tabel `downloaded_episodes` di Room Zenime).
+///
+/// Wibuplay belum punya fitur download sendiri; kelas ini hanya menyimpan data
+/// download dari Zenime (hasil migrasi Room) supaya tidak hilang. File videonya
+/// tetap ada di `getExternalFilesDir(MOVIES)/<animeId>/<episodeId>.mp4`.
+class DownloadedEpisodeEntity {
+  const DownloadedEpisodeEntity({
+    required this.episodeId,
+    required this.animeId,
+    required this.animeTitle,
+    this.posterUrl,
+    this.episodeTitle,
+    this.episodeIndex,
+    this.quality,
+    this.localFilePath,
+    this.totalBytes = 0,
+    this.downloadedBytes = 0,
+    this.status = 'QUEUED',
+    this.createdAt = 0,
+    this.updatedAt = 0,
+    this.episodeThumbnailUrl,
+  });
+
+  final String episodeId;
+  final String animeId;
+  final String animeTitle;
+  final String? posterUrl;
+  final String? episodeTitle;
+  final String? episodeIndex;
+  final String? quality;
+  final String? localFilePath;
+  final int totalBytes;
+  final int downloadedBytes;
+
+  /// QUEUED / DOWNLOADING / COMPLETED / FAILED (sama dengan DownloadStatus Zenime).
+  final String status;
+  final int createdAt;
+  final int updatedAt;
+  final String? episodeThumbnailUrl;
+
+  bool get isCompleted => status == 'COMPLETED';
+
+  Map<String, dynamic> toJson() => {
+        'episodeId': episodeId,
+        'animeId': animeId,
+        'animeTitle': animeTitle,
+        'posterUrl': posterUrl,
+        'episodeTitle': episodeTitle,
+        'episodeIndex': episodeIndex,
+        'quality': quality,
+        'localFilePath': localFilePath,
+        'totalBytes': totalBytes,
+        'downloadedBytes': downloadedBytes,
+        'status': status,
+        'createdAt': createdAt,
+        'updatedAt': updatedAt,
+        'episodeThumbnailUrl': episodeThumbnailUrl,
+      };
+
+  factory DownloadedEpisodeEntity.fromJson(Map<String, dynamic> j) =>
+      DownloadedEpisodeEntity(
+        episodeId: (j['episodeId'] as String?) ?? '',
+        animeId: (j['animeId'] as String?) ?? '',
+        animeTitle: (j['animeTitle'] as String?) ?? '',
+        posterUrl: j['posterUrl'] as String?,
+        episodeTitle: j['episodeTitle'] as String?,
+        episodeIndex: j['episodeIndex'] as String?,
+        quality: j['quality'] as String?,
+        localFilePath: j['localFilePath'] as String?,
+        totalBytes: (j['totalBytes'] as num?)?.toInt() ?? 0,
+        downloadedBytes: (j['downloadedBytes'] as num?)?.toInt() ?? 0,
+        status: (j['status'] as String?) ?? 'QUEUED',
+        createdAt: (j['createdAt'] as num?)?.toInt() ?? 0,
+        updatedAt: (j['updatedAt'] as num?)?.toInt() ?? 0,
+        episodeThumbnailUrl: j['episodeThumbnailUrl'] as String?,
+      );
+}

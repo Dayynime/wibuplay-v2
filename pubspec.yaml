@@ -18,6 +18,7 @@ dependencies:
   path_provider: ^2.1.4
   path: ^1.9.0
   shared_preferences: ^2.3.2
+  sqflite: ^2.3.3+1
   share_plus: ^10.1.4
   wakelock_plus: ^1.2.8
   screen_brightness: ^2.1.0

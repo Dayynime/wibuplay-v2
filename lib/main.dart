@@ -8,6 +8,7 @@ import 'core/remote_config_manager.dart';
 import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
 import 'data/local/local_store.dart';
+import 'data/local/zenime_room_migration.dart';
 import 'providers.dart';
 import 'ui/app_routes.dart';
 import 'ui/components/mini_player.dart';
@@ -32,6 +33,9 @@ Future<void> main() async {
   );
 
   final store = await LocalStore.open();
+  // Impor sekali favorit/riwayat/download dari database Room Zenime lama
+  // (applicationId sama), supaya data tidak hilang saat update ke Wibuplay.
+  await ZenimeRoomMigration.run(store);
 
   // Firebase (login Zenime). Kalau belum dikonfigurasi atau gagal init, app
   // tetap jalan normal; hanya login dan chat yang nonaktif.

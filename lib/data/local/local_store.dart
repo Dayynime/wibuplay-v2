@@ -10,14 +10,17 @@ import 'entities.dart';
 /// Setiap perubahan membuat list baru lalu memanggil notifyListeners(),
 /// sehingga UI (Riverpod `select`) ikut diperbarui seperti Flow di Room.
 class LocalStore extends ChangeNotifier {
-  LocalStore._(this._prefs, this._favorites, this._history);
+  LocalStore._(this._prefs, this._favorites, this._history, this._downloads);
 
   static const String _favKey = 'favorites_v1';
   static const String _histKey = 'watch_history_v1';
+  static const String _dlKey = 'zenime_downloads_v1';
+  static const String _roomMigratedKey = 'zenime_room_migrated_v1';
 
   final SharedPreferences _prefs;
   List<FavoriteEntity> _favorites;
   List<WatchHistoryEntity> _history;
+  List<DownloadedEpisodeEntity> _downloads;
 
   static Future<LocalStore> open() async {
     final prefs = await SharedPreferences.getInstance();
@@ -26,7 +29,12 @@ class LocalStore extends ChangeNotifier {
     final hist =
         _readList<WatchHistoryEntity>(prefs, _histKey, WatchHistoryEntity.fromJson)
           ..sort((a, b) => b.lastWatchedTime.compareTo(a.lastWatchedTime));
-    return LocalStore._(prefs, favs, hist);
+    final dls = _readList<DownloadedEpisodeEntity>(
+      prefs,
+      _dlKey,
+      DownloadedEpisodeEntity.fromJson,
+    )..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return LocalStore._(prefs, favs, hist, dls);
   }
 
   static List<T> _readList<T>(
@@ -144,5 +152,53 @@ class LocalStore extends ChangeNotifier {
       _histKey,
       jsonEncode(_history.map((e) => e.toJson()).toList()),
     );
+  }
+
+  // ---- Migrasi dari Room Zenime (zenime_database) ----
+
+  /// true = data Room Zenime sudah diimpor (atau memang tidak ada).
+  bool get roomMigrated => _prefs.getBool(_roomMigratedKey) ?? false;
+
+  Future<void> setRoomMigrated() => _prefs.setBool(_roomMigratedKey, true);
+
+  /// Gabungkan favorit hasil migrasi. Data yang sudah ada di Wibuplay tidak
+  /// ditimpa (lebih baru). Mengembalikan jumlah item baru.
+  Future<int> mergeFavorites(List<FavoriteEntity> incoming) async {
+    final have = _favorites.map((f) => f.id).toSet();
+    final fresh = incoming.where((f) => f.id.isNotEmpty && !have.contains(f.id)).toList();
+    if (fresh.isEmpty) return 0;
+    _favorites = [..._favorites, ...fresh]
+      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    await _saveFavorites();
+    return fresh.length;
+  }
+
+  Future<int> mergeHistory(List<WatchHistoryEntity> incoming) async {
+    final have = _history.map((h) => h.id).toSet();
+    final fresh = incoming.where((h) => h.movieId.isNotEmpty && !have.contains(h.id)).toList();
+    if (fresh.isEmpty) return 0;
+    _history = [..._history, ...fresh]
+      ..sort((a, b) => b.lastWatchedTime.compareTo(a.lastWatchedTime));
+    await _saveHistory();
+    return fresh.length;
+  }
+
+  // ---- Download Zenime (hanya data; belum ada UI/pemutaran offline) ----
+
+  List<DownloadedEpisodeEntity> get downloads => _downloads;
+
+  Future<int> mergeDownloads(List<DownloadedEpisodeEntity> incoming) async {
+    final have = _downloads.map((d) => d.episodeId).toSet();
+    final fresh =
+        incoming.where((d) => d.episodeId.isNotEmpty && !have.contains(d.episodeId)).toList();
+    if (fresh.isEmpty) return 0;
+    _downloads = [..._downloads, ...fresh]
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    notifyListeners();
+    await _prefs.setString(
+      _dlKey,
+      jsonEncode(_downloads.map((e) => e.toJson()).toList()),
+    );
+    return fresh.length;
   }
 }

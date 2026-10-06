@@ -102,3 +102,10 @@ manifest rilis bawaan Flutter tidak punya izin internet.
 
 - Lebar bubble sekarang tetap (270dp seperti Zenime, `_kBubbleMaxWidth` di `chat_screen.dart`), jadi semua bubble seragam apa pun panjang pesannya. Di layar sempit otomatis dikecilkan. Kutipan balasan ikut selebar bubble.
 - Bubble sendiri memakai warna yang sama dengan bubble orang lain (`surfaceCard`); bedanya cuma posisi (kanan) dan tanpa avatar.
+
+### Catatan Migrasi Data Zenime (Room -> Wibuplay)
+
+- Zenime (Kotlin) menyimpan favorit, riwayat tonton, dan data download di Room `databases/zenime_database` (v5); Wibuplay (Flutter) memakai shared_preferences. Karena applicationId sama, saat Wibuplay meng-update Zenime file Room itu masih ada tapi dulu tidak terbaca, sehingga riwayat/favorit tampak hilang.
+- `lib/data/local/zenime_room_migration.dart` (dipanggil di `main.dart` setelah `LocalStore.open()`) mengimpor sekali: `favorites`, `watch_history`, `downloaded_episodes` (via `sqflite`, hanya SELECT). Data yang sudah ada di Wibuplay tidak ditimpa. DB Room tidak diubah/dihapus. Flag `zenime_room_migrated_v1` baru ditulis kalau pembacaan sukses.
+- File video download Zenime ada di `getExternalFilesDir(MOVIES)/<animeId>/<episodeId>.mp4` (app-private) dan ikut bertahan saat update. Wibuplay baru menyimpan metadatanya (`LocalStore.downloads`); belum ada tab Download dan pemutaran offline.
+- Data hanya bertahan kalau APK meng-UPDATE (applicationId sama + tanda tangan sama + versionCode lebih besar). Kalau Android menolak update dan user harus uninstall dulu, semua data lokal ikut terhapus. Pakai hanya APK dari `release.yml` dengan keystore Zenime.
