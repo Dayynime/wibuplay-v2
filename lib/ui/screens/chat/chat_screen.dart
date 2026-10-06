@@ -10,8 +10,14 @@ import '../../../core/theme/app_theme.dart';
 import '../../../data/models/chat_models.dart';
 import '../../../data/repository/profile_image_uploader.dart';
 import '../../../providers.dart';
+import '../../app_routes.dart';
 import '../../components/game_badges.dart';
 import '../../components/role_badges.dart';
+import '../../components/swipe_to_reply.dart';
+import '../friends/friends_screen.dart';
+import '../friends/user_profile_sheet.dart';
+import 'private_chat_controller.dart';
+import 'private_chat_pane.dart';
 import 'chat_controller.dart';
 
 Color? _parseHex(String? hex) {
@@ -40,6 +46,9 @@ class ChatScreen extends ConsumerStatefulWidget {
 
 class _ChatScreenState extends ConsumerState<ChatScreen> {
   final TextEditingController _input = TextEditingController();
+
+  /// 0 = Chat Global, 1 = Chat Teman (tab Teman ala Zenime).
+  int _tab = 0;
 
   /// Id pesan yang masuk SETELAH layar selesai memuat (kena animasi masuk).
   final Set<int> _live = {};
@@ -160,29 +169,105 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       _controller.clearError();
     });
 
-    return Scaffold(
-      backgroundColor: AppColors.backgroundDark,
-      appBar: AppBar(
+    // Dipantau terus supaya state tab Teman (chat yang sedang dibuka) tidak
+    // hilang saat pindah tab. Belum ada request ke server sampai tab dibuka.
+    final inConversation =
+        ref.watch(privateChatControllerProvider.select((x) => x.selected != null));
+
+    return PopScope(
+      // Back saat membuka chat teman = kembali ke daftar chat, bukan keluar.
+      canPop: !(_tab == 1 && inConversation),
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) ref.read(privateChatControllerProvider.notifier).closeChat();
+      },
+      child: Scaffold(
         backgroundColor: AppColors.backgroundDark,
-        elevation: 0,
-        title: const Text('Chat Global'),
-        actions: [
-          // Pengaturan di pojok kanan atas -> Edit Profil Chat (sama dengan
-          // ikon Settings di Chat Global Zenime).
-          IconButton(
-            tooltip: 'Edit Profil',
-            onPressed: _openProfileDialog,
-            icon: const Icon(Icons.settings, color: Colors.white),
-          ),
-        ],
+        appBar: AppBar(
+          backgroundColor: AppColors.backgroundDark,
+          elevation: 0,
+          title: Text(_tab == 0 ? 'Chat Global' : 'Chat Teman'),
+          actions: [
+            if (_tab == 1)
+              IconButton(
+                tooltip: 'Teman',
+                onPressed: () =>
+                    Navigator.of(context).push<void>(fadeRoute(const FriendsScreen())),
+                icon: const Icon(Icons.people_alt_outlined, color: Colors.white),
+              ),
+            // Pengaturan di pojok kanan atas -> Edit Profil Chat (sama dengan
+            // ikon Settings di Chat Global Zenime).
+            IconButton(
+              tooltip: 'Edit Profil',
+              onPressed: _openProfileDialog,
+              icon: const Icon(Icons.settings, color: Colors.white),
+            ),
+          ],
+        ),
+        body: Column(
+          children: [
+            _buildChatTabs(),
+            Expanded(
+              child: _tab == 0
+                  ? Column(
+                      children: [
+                        Expanded(child: _buildList(s)),
+                        if (s.replyTarget != null) _buildReplyBar(s.replyTarget!),
+                        _buildInput(s),
+                      ],
+                    )
+                  : PrivateChatPane(
+                      myUid: s.myUid,
+                      onFriendProfileClick: (uid) => showUserProfileSheet(context, uid),
+                    ),
+            ),
+          ],
+        ),
       ),
-      body: Column(
-        children: [
-          Expanded(child: _buildList(s)),
-          if (s.replyTarget != null) _buildReplyBar(s.replyTarget!),
-          _buildInput(s),
-        ],
-      ),
+    );
+  }
+
+  /// Tab Global / Teman di bawah app bar (indikator pendek, gaya Zenime).
+  Widget _buildChatTabs() {
+    const labels = ['Global', 'Teman'];
+    return Column(
+      children: [
+        Row(
+          children: [
+            for (var i = 0; i < labels.length; i++)
+              Expanded(
+                child: InkWell(
+                  onTap: () => setState(() => _tab = i),
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 10, bottom: 6),
+                    child: Column(
+                      children: [
+                        Text(
+                          labels[i],
+                          style: TextStyle(
+                            color: _tab == i ? AppColors.textWhite : const Color(0x80FFFFFF),
+                            fontSize: 14,
+                            fontWeight: _tab == i ? FontWeight.w700 : FontWeight.w400,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          height: 3,
+                          width: _tab == i ? 28 : 0,
+                          decoration: BoxDecoration(
+                            color: AppColors.accentViolet,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+        Container(height: 1, color: const Color(0x14FFFFFF)),
+      ],
     );
   }
 
@@ -221,6 +306,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           onLongPress: () => _showActions(m, s),
           onReply: () => _controller.setReplyTarget(m),
           onDelete: m.firebaseUid == s.myUid ? () => _confirmDelete(m) : null,
+          onProfileTap: m.firebaseUid == s.myUid
+              ? null
+              : () => showUserProfileSheet(context, m.firebaseUid),
         );
         if (!_live.contains(m.id)) return bubble;
         return _EntryAnimation(
@@ -367,9 +455,13 @@ class _MessageBubble extends StatelessWidget {
     this.clanTag,
     this.isPremium = false,
     this.avatarUrl,
+    this.onProfileTap,
   });
 
   final ChatMessage message;
+
+  /// Tap avatar / nama = buka profil user (Tambah Teman). null untuk pesan sendiri.
+  final VoidCallback? onProfileTap;
   final bool mine;
   final VoidCallback onLongPress;
   final VoidCallback onReply;
@@ -405,14 +497,17 @@ class _MessageBubble extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Flexible(
-                  child: Text(
-                    m.username,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: nameColor ?? AppColors.accentVioletLight,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
+                  child: GestureDetector(
+                    onTap: onProfileTap,
+                    child: Text(
+                      m.username,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: nameColor ?? AppColors.accentVioletLight,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                 ),
@@ -530,14 +625,18 @@ class _MessageBubble extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
-      child: _SwipeToReply(
+      child: SwipeToReply(
         onReply: onReply,
         child: Row(
           mainAxisAlignment: mine ? MainAxisAlignment.end : MainAxisAlignment.start,
           crossAxisAlignment: CrossAxisAlignment.end,
           children: mine
               ? [bubble]
-              : [avatar, const SizedBox(width: 8), Flexible(child: bubble)],
+              : [
+                  GestureDetector(onTap: onProfileTap, child: avatar),
+                  const SizedBox(width: 8),
+                  Flexible(child: bubble),
+                ],
         ),
       ),
     );
@@ -562,86 +661,6 @@ class _FooterAction extends StatelessWidget {
           label,
           style: const TextStyle(color: AppColors.textSecondary, fontSize: 10),
         ),
-      ),
-    );
-  }
-}
-
-/// Geser ke kanan untuk membalas: bubble ikut bergeser, ikon + tulisan
-/// "Reply" muncul di kiri, lepas jari setelah melewati batas = reply terpicu.
-class _SwipeToReply extends StatefulWidget {
-  const _SwipeToReply({required this.child, required this.onReply});
-
-  final Widget child;
-  final VoidCallback onReply;
-
-  @override
-  State<_SwipeToReply> createState() => _SwipeToReplyState();
-}
-
-class _SwipeToReplyState extends State<_SwipeToReply> {
-  static const double _trigger = 64;
-  static const double _max = 96;
-
-  double _dx = 0;
-  bool _dragging = false;
-  bool _buzzed = false;
-
-  void _onUpdate(DragUpdateDetails d) {
-    final next = (_dx + d.delta.dx).clamp(0.0, _max);
-    if (!_buzzed && next >= _trigger) {
-      _buzzed = true;
-      HapticFeedback.selectionClick();
-    }
-    if (next < _trigger) _buzzed = false;
-    setState(() => _dx = next);
-  }
-
-  void _onEnd([DragEndDetails? _]) {
-    final fire = _dx >= _trigger;
-    setState(() {
-      _dragging = false;
-      _dx = 0;
-      _buzzed = false;
-    });
-    if (fire) widget.onReply();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final progress = (_dx / _trigger).clamp(0.0, 1.0);
-    return GestureDetector(
-      behavior: HitTestBehavior.translucent,
-      onHorizontalDragStart: (_) => setState(() => _dragging = true),
-      onHorizontalDragUpdate: _onUpdate,
-      onHorizontalDragEnd: _onEnd,
-      onHorizontalDragCancel: _onEnd,
-      child: Stack(
-        alignment: Alignment.centerLeft,
-        children: [
-          Opacity(
-            opacity: progress,
-            child: const Padding(
-              padding: EdgeInsets.only(left: 6),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.reply, size: 18, color: AppColors.accentVioletLight),
-                  SizedBox(width: 4),
-                  Text(
-                    'Reply',
-                    style: TextStyle(color: AppColors.accentVioletLight, fontSize: 11),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          AnimatedContainer(
-            duration: _dragging ? Duration.zero : const Duration(milliseconds: 180),
-            transform: Matrix4.translationValues(_dx, 0, 0),
-            child: widget.child,
-          ),
-        ],
       ),
     );
   }

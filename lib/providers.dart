@@ -12,6 +12,9 @@ import 'data/repository/chat_repository.dart';
 import 'data/repository/clan_repository.dart';
 import 'data/repository/public_profile_repository.dart';
 import 'data/repository/comment_repository.dart';
+import 'data/repository/friend_repository.dart';
+import 'data/repository/private_chat_repository.dart';
+import 'data/models/friend_models.dart';
 import 'data/models/account_models.dart';
 import 'data/models/chat_models.dart';
 import 'data/models/clan_models.dart';
@@ -328,5 +331,28 @@ final myCommentCountProvider = FutureProvider.autoDispose.family<int?, String>((
     return await ref.watch(commentRepositoryProvider).getMyCommentCount(uid);
   } catch (_) {
     return null;
+  }
+});
+
+final friendRepositoryProvider = Provider<FriendRepository>(
+  (ref) => FriendRepository(
+    ref.watch(supabaseDioProvider),
+    ref.watch(chatRepositoryProvider),
+  ),
+);
+
+final privateChatRepositoryProvider = Provider<PrivateChatRepository>(
+  (ref) => PrivateChatRepository(ref.watch(supabaseDioProvider)),
+);
+
+/// Jumlah permintaan pertemanan masuk yang belum direspon (badge di Profil).
+/// Gagal / belum login = 0.
+final incomingFriendRequestsProvider = FutureProvider.autoDispose<int>((ref) async {
+  final uid = ref.watch(authUserProvider).valueOrNull?.uid;
+  if (uid == null || uid.isEmpty) return 0;
+  try {
+    return await ref.watch(friendRepositoryProvider).countIncomingRequests(uid);
+  } catch (_) {
+    return 0;
   }
 });

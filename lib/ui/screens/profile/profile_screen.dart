@@ -21,6 +21,7 @@ import '../../components/role_badges.dart';
 import '../auth/login_screen.dart';
 import '../chat/chat_screen.dart';
 import '../clan/clan_browse_screen.dart';
+import '../friends/friends_screen.dart';
 import '../xp/xp_leaderboard_screen.dart';
 import 'my_xp_card.dart';
 import 'profile_controller.dart';
@@ -130,6 +131,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         uid.isEmpty ? 0 : (ref.watch(myCommentCountProvider(uid)).valueOrNull ?? 0);
     final uniqueAnime = history.map((h) => h.movieId).toSet().length;
     final topPad = MediaQuery.paddingOf(context).top;
+    final incomingRequests =
+        uid.isEmpty ? 0 : (ref.watch(incomingFriendRequestsProvider).valueOrNull ?? 0);
 
     return Stack(
       children: [
@@ -289,6 +292,29 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ),
                 ),
               ),
+              if (user != null) ...[
+                const SizedBox(height: 10),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: OutlinedButton.icon(
+                      onPressed: () => Navigator.of(context)
+                          .push<void>(fadeRoute(const FriendsScreen())),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        side: const BorderSide(color: Color(0x59FFFFFF)),
+                        shape: const StadiumBorder(),
+                      ),
+                      icon: const Icon(Icons.people_alt_outlined, size: 18),
+                      label: Text(
+                        incomingRequests > 0 ? 'Teman ($incomingRequests permintaan)' : 'Teman',
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
