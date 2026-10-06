@@ -22,6 +22,7 @@ class UserXpDisplay {
     required this.level,
     required this.username,
     this.avatarUrl,
+    this.clanTag,
     this.isPremium = false,
   });
 
@@ -30,6 +31,9 @@ class UserXpDisplay {
   final int level;
   final String username;
   final String? avatarUrl;
+
+  /// Tag clan user (null = belum gabung clan).
+  final String? clanTag;
   final bool isPremium;
 }
 

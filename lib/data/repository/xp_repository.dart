@@ -185,17 +185,20 @@ class XpRepository {
         .where((u) => u.isNotEmpty)
         .toList();
 
-    // Profil, level, dan Premium diambil BARENGAN, bukan berurutan.
+    // Profil, level, tag clan, dan Premium diambil BARENGAN, bukan berurutan.
+    // Tag clan gagal diambil = badge clan saja yang hilang, leaderboard tetap jalan.
     final results = await Future.wait<Object>([
       _chat.getProfilesForUids(uids),
       getLevelsForUids(uids).catchError((_) => <String, int>{}),
       Future.wait(uids.map((u) async => MapEntry(u, await isPremium(u)))),
+      _chat.getClanTagsForUids(uids).catchError((_) => <String, String>{}),
     ]);
     final profiles = results[0] as Map<String, ChatProfile>;
     final levels = results[1] as Map<String, int>;
     final premium = {
       for (final e in results[2] as List<MapEntry<String, bool>>) e.key: e.value,
     };
+    final clanTags = results[3] as Map<String, String>;
 
     final list = top.map((row) {
       final uid = (row['firebase_uid'] as String?) ?? '';
@@ -207,6 +210,7 @@ class XpRepository {
         level: levels[uid] ?? 1,
         username: name.isEmpty ? 'Pengguna' : name,
         avatarUrl: profile?.avatarUrl,
+        clanTag: clanTags[uid],
         isPremium: premium[uid] == true,
       );
     }).toList()
