@@ -19,6 +19,7 @@ class HomeProfileHeader extends ConsumerWidget {
     super.key,
     required this.user,
     required this.onSearchClick,
+    required this.onNotificationClick,
     required this.onProfileClick,
     required this.onPremiumClick,
     required this.onCoinClick,
@@ -27,6 +28,9 @@ class HomeProfileHeader extends ConsumerWidget {
 
   final User user;
   final VoidCallback onSearchClick;
+
+  /// Ikon lonceng (permintaan pertemanan masuk), membuka layar Teman.
+  final VoidCallback onNotificationClick;
   final VoidCallback onProfileClick;
   final VoidCallback onPremiumClick;
   final VoidCallback onCoinClick;
@@ -42,6 +46,7 @@ class HomeProfileHeader extends ConsumerWidget {
     final premium = ref.watch(premiumStatusProvider(uid)).valueOrNull ?? const PremiumStatus();
     final coins = ref.watch(coinBalanceProvider(uid)).valueOrNull ?? 0;
     final level = ref.watch(myXpProvider(uid)).valueOrNull?.level ?? 1;
+    final friendRequests = ref.watch(incomingFriendRequestsProvider).valueOrNull ?? 0;
 
     final chatName = chat?.username ?? '';
     final authName = user.displayName ?? '';
@@ -66,7 +71,9 @@ class HomeProfileHeader extends ConsumerWidget {
             zenimeCode: code,
             premium: premium,
             coins: coins,
+            friendRequests: friendRequests,
             onSearchClick: onSearchClick,
+            onNotificationClick: onNotificationClick,
             onProfileClick: onProfileClick,
             onPremiumClick: onPremiumClick,
             onCoinClick: onCoinClick,
@@ -92,7 +99,9 @@ class _ProfileCard extends StatelessWidget {
     required this.zenimeCode,
     required this.premium,
     required this.coins,
+    required this.friendRequests,
     required this.onSearchClick,
+    required this.onNotificationClick,
     required this.onProfileClick,
     required this.onPremiumClick,
     required this.onCoinClick,
@@ -105,7 +114,9 @@ class _ProfileCard extends StatelessWidget {
   final String? zenimeCode;
   final PremiumStatus premium;
   final int coins;
+  final int friendRequests;
   final VoidCallback onSearchClick;
+  final VoidCallback onNotificationClick;
   final VoidCallback onProfileClick;
   final VoidCallback onPremiumClick;
   final VoidCallback onCoinClick;
@@ -199,6 +210,13 @@ class _ProfileCard extends StatelessWidget {
                     ],
                   ),
                 ),
+              ),
+              const SizedBox(width: 8),
+              _CircleIconButton(
+                icon: Icons.notifications,
+                tooltip: 'Permintaan Pertemanan',
+                onTap: onNotificationClick,
+                badgeCount: friendRequests,
               ),
               const SizedBox(width: 8),
               _CircleIconButton(icon: Icons.search, tooltip: 'Cari Anime', onTap: onSearchClick),
@@ -368,11 +386,19 @@ class _RingAvatar extends StatelessWidget {
 }
 
 class _CircleIconButton extends StatelessWidget {
-  const _CircleIconButton({required this.icon, required this.tooltip, required this.onTap});
+  const _CircleIconButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+    this.badgeCount = 0,
+  });
 
   final IconData icon;
   final String tooltip;
   final VoidCallback onTap;
+
+  /// > 0 menampilkan badge angka (9+ kalau lebih dari 9) di pojok ikon.
+  final int badgeCount;
 
   @override
   Widget build(BuildContext context) {
@@ -387,7 +413,13 @@ class _CircleIconButton extends StatelessWidget {
             color: AppColors.surfaceVariantDark.withValues(alpha: 0.7),
             shape: BoxShape.circle,
           ),
-          child: Icon(icon, size: 18, color: AppColors.textSecondary),
+          child: Badge(
+            isLabelVisible: badgeCount > 0,
+            backgroundColor: AppColors.errorRed,
+            textColor: Colors.white,
+            label: Text(badgeCount > 9 ? '9+' : '$badgeCount'),
+            child: Icon(icon, size: 18, color: AppColors.textSecondary),
+          ),
         ),
       ),
     );

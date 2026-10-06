@@ -15,7 +15,7 @@ import '../../components/game_badges.dart';
 import '../../components/role_badges.dart';
 import '../../components/swipe_to_reply.dart';
 import '../friends/friends_screen.dart';
-import '../friends/user_profile_sheet.dart';
+import '../profile/public_profile_screen.dart';
 import 'private_chat_controller.dart';
 import 'private_chat_pane.dart';
 import 'chat_controller.dart';
@@ -217,7 +217,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     )
                   : PrivateChatPane(
                       myUid: s.myUid,
-                      onFriendProfileClick: (uid) => showUserProfileSheet(context, uid),
+                      onFriendProfileClick: (uid) => openPublicProfile(context, uid),
                     ),
             ),
           ],
@@ -308,7 +308,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           onDelete: m.firebaseUid == s.myUid ? () => _confirmDelete(m) : null,
           onProfileTap: m.firebaseUid == s.myUid
               ? null
-              : () => showUserProfileSheet(context, m.firebaseUid),
+              : () => openPublicProfile(context, m.firebaseUid),
         );
         if (!_live.contains(m.id)) return bubble;
         return _EntryAnimation(

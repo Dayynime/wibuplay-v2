@@ -9,6 +9,7 @@ class TopSupporter {
     required this.totalAmount,
     this.donationCount = 0,
     this.isLinked = false,
+    this.firebaseUid,
   });
 
   final int rank;
@@ -23,6 +24,10 @@ class TopSupporter {
   /// true = donasi sudah terhubung ke akun Zenime (nama/foto dari akun).
   final bool isLinked;
 
+  /// UID akun yang terhubung -- hanya terisi kalau Edge Function top-supporters
+  /// mengirim `firebase_uid`. Dipakai untuk membuka profil publik donatur.
+  final String? firebaseUid;
+
   factory TopSupporter.fromJson(Map<String, dynamic> j) {
     final name = (j['name'] as String?)?.trim();
     return TopSupporter(
@@ -33,6 +38,7 @@ class TopSupporter {
       totalAmount: (j['total_amount'] as num?)?.toInt() ?? 0,
       donationCount: (j['donation_count'] as num?)?.toInt() ?? 0,
       isLinked: j['is_linked'] == true,
+      firebaseUid: j['firebase_uid'] as String?,
     );
   }
 }

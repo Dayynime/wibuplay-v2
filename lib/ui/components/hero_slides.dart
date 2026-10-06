@@ -5,6 +5,7 @@ import '../../data/models/clan_models.dart';
 import '../../data/models/support_models.dart';
 import '../../data/models/xp_models.dart';
 import 'game_badges.dart';
+import '../screens/profile/public_profile_screen.dart';
 
 const Color heroGold = Color(0xFFFFC107);
 const Color heroPink = Color(0xFFFF5C8A);
@@ -130,6 +131,7 @@ class HeroLeaderboardSlide extends StatelessWidget {
                                 ),
                                 title: entries[i].username,
                                 value: '${_compactCount(entries[i].xp)} XP',
+                                onTap: () => openPublicProfile(context, entries[i].firebaseUid),
                               ),
                           ],
                         ),
@@ -274,6 +276,7 @@ class _BoardRow extends StatelessWidget {
     required this.avatar,
     required this.title,
     required this.value,
+    this.onTap,
   });
 
   final int rank;
@@ -281,10 +284,16 @@ class _BoardRow extends StatelessWidget {
   final String title;
   final String value;
 
+  /// Tap baris = buka profil publik user (null = ikut tap panel).
+  final VoidCallback? onTap;
+
   @override
   Widget build(BuildContext context) {
     final ring = rank <= 3 ? _rankColor(rank) : const Color(0x26FFFFFF);
-    return SizedBox(
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: SizedBox(
       height: 28,
       child: Row(
         children: [
@@ -336,6 +345,7 @@ class _BoardRow extends StatelessWidget {
           ),
         ],
       ),
+    ),
     );
   }
 }
@@ -458,7 +468,10 @@ class _Podium extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = _rankColor(rank);
     final avatar = rank == 1 ? 40.0 : 32.0;
-    return Padding(
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: (s.firebaseUid) == null || (s.firebaseUid)!.isEmpty ? null : () => openPublicProfile(context, s.firebaseUid!),
+      child: Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -507,6 +520,7 @@ class _Podium extends StatelessWidget {
           ),
         ],
       ),
+    ),
     );
   }
 }

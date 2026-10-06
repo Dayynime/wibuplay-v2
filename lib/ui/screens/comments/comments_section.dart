@@ -7,6 +7,7 @@ import '../../../providers.dart';
 import '../../components/game_badges.dart';
 import '../../components/role_badges.dart';
 import 'comments_controller.dart';
+import '../profile/public_profile_screen.dart';
 
 const Color _kPinnedGold = Color(0xFFE8A317);
 const Color _kSheetColor = AppColors.backgroundDarkSecondary;
@@ -515,7 +516,11 @@ class CommentItem extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          UserAvatar(username: comment.username, url: avatarUrl, size: 34),
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => openPublicProfile(context, comment.firebaseUid),
+            child: UserAvatar(username: comment.username, url: avatarUrl, size: 34),
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -524,7 +529,10 @@ class CommentItem extends StatelessWidget {
                 Row(
                   children: [
                     Flexible(
-                      child: Text(
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => openPublicProfile(context, comment.firebaseUid),
+                        child: Text(
                         comment.username,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -533,6 +541,7 @@ class CommentItem extends StatelessWidget {
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
                         ),
+                      ),
                       ),
                     ),
                     Padding(

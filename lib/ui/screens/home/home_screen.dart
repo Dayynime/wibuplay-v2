@@ -14,6 +14,7 @@ import '../../app_routes.dart';
 import '../support/top_support_screen.dart';
 import '../xp/xp_leaderboard_screen.dart';
 import '../clan/clan_browse_screen.dart';
+import '../friends/friends_screen.dart';
 import '../../components/cards.dart';
 import '../../components/chat_ticker.dart';
 import '../../components/common_components.dart';
@@ -228,6 +229,9 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
                 ? HomeProfileHeader(
                     user: user!,
                     onSearchClick: widget.onSearchClick,
+                    onNotificationClick: () => Navigator.of(context)
+                        .push<void>(fadeRoute(const FriendsScreen()))
+                        .then((_) => ref.invalidate(incomingFriendRequestsProvider)),
                     onProfileClick: widget.onProfileClick,
                     onPremiumClick: () => openPremium(context),
                     onCoinClick: () => openCoin(context),

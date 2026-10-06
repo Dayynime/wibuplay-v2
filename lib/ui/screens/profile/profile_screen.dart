@@ -161,7 +161,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           child: Column(
             children: [
               // Avatar polos, tanpa border/ring.
-              _ProfileAvatar(url: avatarUrl, seed: uid.isEmpty ? name : uid, label: name, size: 120),
+              ProfileAvatar(url: avatarUrl, seed: uid.isEmpty ? name : uid, label: name, size: 120),
               const SizedBox(height: 14),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -241,7 +241,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 child: Row(
                   children: [
                     Expanded(
-                      child: _PillButton(
+                      child: ProfilePillButton(
                         icon: Icons.groups,
                         label: 'Clan',
                         color: Colors.white,
@@ -252,7 +252,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     ),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: _PillButton(
+                      child: ProfilePillButton(
                         icon: Icons.leaderboard,
                         label: 'Leaderboard',
                         color: AppColors.accentViolet,
@@ -467,14 +467,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           MyXpCard(firebaseUid: user.uid),
           const SizedBox(height: 8),
         ] else ...[
-          _InfoCard(
+          ProfileInfoCard(
             text: 'Masuk pakai akun Zenime buat dapat Level, Clan, dan Chat Global',
             action: 'Masuk',
             onTap: _openLogin,
           ),
           const SizedBox(height: 8),
         ],
-        _InfoCard(
+        ProfileInfoCard(
           text: 'Gabung atau bikin Clan bareng sesama penonton',
           action: 'Lihat',
           onTap: () =>
@@ -482,7 +482,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         ),
         const SizedBox(height: 8),
         if (user != null && !premium) ...[
-          _InfoCard(
+          ProfileInfoCard(
             text: 'Upgrade Premium buat upload banner profil sendiri',
             action: 'Lihat',
             outlined: true,
@@ -536,13 +536,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _SectionHeader(
+        ProfileSectionHeader(
           icon: Icons.favorite,
           title: 'Favorite Shows',
           trailing: favorites.isEmpty ? null : '${favorites.length} Anime',
         ),
         if (favorites.isEmpty)
-          const _EmptyBox(text: 'Belum ada anime favorit.')
+          const ProfileEmptyBox(text: 'Belum ada anime favorit.')
         else
           SizedBox(
             height: cardW * 1.5 + 62,
@@ -632,7 +632,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Widget _buildComments(User? user, bool premium, String name, String? avatarUrl) {
     Widget body;
     if (user == null) {
-      body = const _EmptyBox(text: 'Masuk untuk melihat komentarmu.');
+      body = const ProfileEmptyBox(text: 'Masuk untuk melihat komentarmu.');
     } else {
       final async = ref.watch(myCommentsProvider(user.uid));
       body = async.when(
@@ -649,15 +649,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
           ),
         ),
-        error: (e, _) => _EmptyBox(text: errorMessage(e, 'Gagal memuat komentar')),
+        error: (e, _) => ProfileEmptyBox(text: errorMessage(e, 'Gagal memuat komentar')),
         data: (list) => list.isEmpty
-            ? const _EmptyBox(text: 'Belum pernah komentar di episode manapun.')
+            ? const ProfileEmptyBox(text: 'Belum pernah komentar di episode manapun.')
             : Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Column(
                   children: [
                     for (var i = 0; i < list.length; i++) ...[
-                      _CommentFeedRow(
+                      ProfileCommentFeedRow(
                         item: list[i],
                         firebaseUid: user.uid,
                         username: name,
@@ -678,7 +678,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _SectionHeader(
+        ProfileSectionHeader(
           icon: Icons.chat,
           title: 'Komentar',
           trailing: count == 0 ? null : '$count Komentar',
@@ -725,14 +725,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ),
         ),
         if (history.isEmpty)
-          const _EmptyBox(text: 'Belum ada riwayat tontonan.')
+          const ProfileEmptyBox(text: 'Belum ada riwayat tontonan.')
         else
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
             child: Column(
               children: [
                 for (var i = 0; i < history.length; i++) ...[
-                  _WatchHistoryRow(
+                  ProfileWatchHistoryRow(
                     key: ValueKey(history[i].id),
                     history: history[i],
                     firebaseUid: user?.uid ?? '',
@@ -955,8 +955,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 // ====================================================== widget pendukung
 
 /// Avatar bulat: foto kalau ada, kalau tidak avatar otomatis (warna + inisial).
-class _ProfileAvatar extends StatelessWidget {
-  const _ProfileAvatar({
+class ProfileAvatar extends StatelessWidget {
+  const ProfileAvatar({
     required this.url,
     required this.seed,
     required this.label,
@@ -986,8 +986,8 @@ class _ProfileAvatar extends StatelessWidget {
   }
 }
 
-class _PillButton extends StatelessWidget {
-  const _PillButton({
+class ProfilePillButton extends StatelessWidget {
+  const ProfilePillButton({
     required this.icon,
     required this.label,
     required this.color,
@@ -1017,8 +1017,8 @@ class _PillButton extends StatelessWidget {
   }
 }
 
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.icon, required this.title, this.trailing});
+class ProfileSectionHeader extends StatelessWidget {
+  const ProfileSectionHeader({required this.icon, required this.title, this.trailing});
 
   final IconData icon;
   final String title;
@@ -1049,8 +1049,8 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-class _EmptyBox extends StatelessWidget {
-  const _EmptyBox({required this.text});
+class ProfileEmptyBox extends StatelessWidget {
+  const ProfileEmptyBox({required this.text});
 
   final String text;
 
@@ -1076,8 +1076,8 @@ class _EmptyBox extends StatelessWidget {
   }
 }
 
-class _InfoCard extends StatelessWidget {
-  const _InfoCard({
+class ProfileInfoCard extends StatelessWidget {
+  const ProfileInfoCard({
     required this.text,
     required this.action,
     required this.onTap,
@@ -1134,8 +1134,8 @@ class _InfoCard extends StatelessWidget {
 
 /// Baris komentar flat ala feed: avatar mini + nama + waktu, thumbnail anime
 /// + judul + episode, isi komentar, jumlah balasan.
-class _CommentFeedRow extends StatelessWidget {
-  const _CommentFeedRow({
+class ProfileCommentFeedRow extends StatelessWidget {
+  const ProfileCommentFeedRow({
     required this.item,
     required this.firebaseUid,
     required this.username,
@@ -1163,7 +1163,7 @@ class _CommentFeedRow extends StatelessWidget {
         children: [
           Row(
             children: [
-              _ProfileAvatar(url: avatarUrl, seed: firebaseUid, label: username, size: 28),
+              ProfileAvatar(url: avatarUrl, seed: firebaseUid, label: username, size: 28),
               const SizedBox(width: 8),
               Flexible(
                 child: Text(
@@ -1181,7 +1181,7 @@ class _CommentFeedRow extends StatelessWidget {
               UserCheckBadge(firebaseUid: firebaseUid, isPremium: isPremium, size: 14),
               const Spacer(),
               Text(
-                _WatchHistoryRow._relative(created),
+                ProfileWatchHistoryRow._relative(created),
                 style: const TextStyle(color: Color(0x73FFFFFF), fontSize: 11),
               ),
             ],
@@ -1566,7 +1566,7 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
                               color: AppColors.surfaceDark,
                               shape: BoxShape.circle,
                             ),
-                            child: _ProfileAvatar(
+                            child: ProfileAvatar(
                               url: _avatarUrl,
                               seed: widget.uid,
                               label: _username,
@@ -1685,8 +1685,8 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
 
 /// Baris riwayat flat ala feed Zenime: avatar mini + nama + waktu relatif di
 /// atas, thumbnail + judul/episode, lalu ikon play + progress bar + label waktu.
-class _WatchHistoryRow extends StatelessWidget {
-  const _WatchHistoryRow({
+class ProfileWatchHistoryRow extends StatelessWidget {
+  const ProfileWatchHistoryRow({
     super.key,
     required this.history,
     required this.firebaseUid,
@@ -1694,7 +1694,7 @@ class _WatchHistoryRow extends StatelessWidget {
     required this.avatarUrl,
     required this.isPremium,
     required this.onPlay,
-    required this.onDelete,
+    this.onDelete,
   });
 
   final WatchHistoryEntity history;
@@ -1703,7 +1703,9 @@ class _WatchHistoryRow extends StatelessWidget {
   final String? avatarUrl;
   final bool isPremium;
   final VoidCallback onPlay;
-  final VoidCallback onDelete;
+
+  /// null = tidak ada tombol hapus (dipakai di profil publik orang lain).
+  final VoidCallback? onDelete;
 
   static String _duration(int ms) {
     if (ms <= 0) return '00:00';
@@ -1751,7 +1753,7 @@ class _WatchHistoryRow extends StatelessWidget {
           // Baris atas: avatar mini + nama + badge premium, waktu di kanan.
           Row(
             children: [
-              _ProfileAvatar(url: avatarUrl, seed: firebaseUid, label: username, size: 28),
+              ProfileAvatar(url: avatarUrl, seed: firebaseUid, label: username, size: 28),
               const SizedBox(width: 8),
               Flexible(
                 child: Text(
@@ -1772,15 +1774,17 @@ class _WatchHistoryRow extends StatelessWidget {
                 _relative(history.lastWatchedTime),
                 style: const TextStyle(color: Color(0x73FFFFFF), fontSize: 11),
               ),
-              const SizedBox(width: 4),
-              InkWell(
-                onTap: onDelete,
-                customBorder: const CircleBorder(),
-                child: const Padding(
-                  padding: EdgeInsets.all(4),
-                  child: Icon(Icons.delete_outline, color: AppColors.textMuted, size: 18),
+              if (onDelete != null) ...[
+                const SizedBox(width: 4),
+                InkWell(
+                  onTap: onDelete,
+                  customBorder: const CircleBorder(),
+                  child: const Padding(
+                    padding: EdgeInsets.all(4),
+                    child: Icon(Icons.delete_outline, color: AppColors.textMuted, size: 18),
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
           const SizedBox(height: 10),

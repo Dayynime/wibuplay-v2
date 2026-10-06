@@ -6,7 +6,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../data/models/friend_models.dart';
 import '../../../providers.dart';
 import '../../components/friend_avatar.dart';
-import 'user_profile_sheet.dart';
+import '../profile/public_profile_screen.dart';
 
 /// Layar Teman: permintaan masuk (terima/tolak), daftar teman (tap buat buka
 /// profil, tombol X buat hapus), dan permintaan terkirim (batalkan).
@@ -284,7 +284,7 @@ class _FriendRow extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         child: InkWell(
           borderRadius: BorderRadius.circular(14),
-          onTap: () => showUserProfileSheet(context, item.firebaseUid),
+          onTap: () => openPublicProfile(context, item.firebaseUid),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Row(

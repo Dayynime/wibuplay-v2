@@ -13,6 +13,7 @@ import '../../../core/supabase_config.dart';
 import '../../../data/models/support_models.dart';
 import '../../../providers.dart';
 import '../../components/game_badges.dart';
+import '../profile/public_profile_screen.dart';
 
 /// Halaman Top Support: podium 3 donatur teratas + daftar peringkat + ajakan
 /// donasi lewat halaman donasi Zenime Store (QRIS). Dibuka dari slide TOP SUPPORT di carousel Beranda.
@@ -338,7 +339,10 @@ class _SupportSlot extends StatelessWidget {
         final bob = math.sin(l * 2 + rank) * (rank == 1 ? 3.0 : 2.0);
         final pulse = 0.5 + 0.5 * math.sin(l * 2 + rank);
 
-        return Column(
+        return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: (s.firebaseUid) == null || (s.firebaseUid)!.isEmpty ? null : () => openPublicProfile(context, s.firebaseUid!),
+      child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Opacity(
@@ -379,7 +383,8 @@ class _SupportSlot extends StatelessWidget {
             const SizedBox(height: 10),
             _pedestal(pedestalHeight * ped, ped, loop.value),
           ],
-        );
+        ),
+    );
       },
     );
   }
@@ -1086,7 +1091,10 @@ class _SupporterRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final nameColor = _parseHex(s.usernameColor) ?? AppColors.textWhite;
-    return Container(
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: (s.firebaseUid) == null || (s.firebaseUid)!.isEmpty ? null : () => openPublicProfile(context, s.firebaseUid!),
+      child: Container(
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
@@ -1193,6 +1201,7 @@ class _SupporterRow extends StatelessWidget {
           ),
         ],
       ),
+    ),
     );
   }
 }

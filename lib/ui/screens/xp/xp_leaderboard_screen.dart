@@ -10,6 +10,7 @@ import '../../../data/models/xp_models.dart';
 import '../../../providers.dart';
 import '../../components/game_badges.dart';
 import '../../components/role_badges.dart';
+import '../profile/public_profile_screen.dart';
 
 /// Leaderboard XP: podium top-3 futuristik + daftar peringkat, lengkap dengan
 /// badge clan & level (setara tampilan Zenime). XP yang tampil adalah XP nonton
@@ -296,7 +297,10 @@ class _PodiumSlot extends StatelessWidget {
         final bob = math.sin(l * 2 + rank) * (rank == 1 ? 3.0 : 2.0);
         final pulse = 0.5 + 0.5 * math.sin(l * 2 + rank);
 
-        return Column(
+        return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => openPublicProfile(context, entry.firebaseUid),
+      child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Opacity(
@@ -337,7 +341,8 @@ class _PodiumSlot extends StatelessWidget {
             const SizedBox(height: 10),
             _pedestal(pedestalHeight * ped, ped, loop.value),
           ],
-        );
+        ),
+    );
       },
     );
   }
@@ -722,7 +727,10 @@ class _RankRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasClan = entry.clanTag != null && entry.clanTag!.isNotEmpty;
-    return Container(
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => openPublicProfile(context, entry.firebaseUid),
+      child: Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
@@ -832,6 +840,7 @@ class _RankRow extends StatelessWidget {
           ),
         ],
       ),
+    ),
     );
   }
 }

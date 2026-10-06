@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
 import '../local/entities.dart';
+import '../models/public_profile_models.dart';
 
 /// Sinkronisasi Favorit & Riwayat Tontonan ke Supabase (`user_favorites`,
 /// `user_watch_history`), sama seperti PublicProfileRepository.kt di Zenime.
@@ -121,5 +122,65 @@ class PublicProfileRepository {
     } catch (e) {
       debugPrint('PublicProfileSync: syncHistoryRemoved EXCEPTION: $e');
     }
+  }
+
+  // ---------------------------------------------------------------- baca publik
+
+  static List<Map<String, dynamic>> _rows(dynamic data) {
+    if (data is! List) return const [];
+    return data.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+  }
+
+  /// Favorit/riwayat user LAIN lewat PostgREST. Toggle privasi dibaca dulu dari
+  /// `chat_profiles` (supaya "privat" beda dari "publik tapi kosong"); tabel
+  /// konten baru ditarik, BARENGAN, hanya kalau toggle-nya nyala. Port
+  /// PublicProfileRepository.getPublicContent di Zenime.
+  Future<PublicProfileContent> getPublicContent(String targetFirebaseUid) async {
+    final profileRes = await _dio.get<dynamic>(
+      'rest/v1/chat_profiles',
+      queryParameters: {
+        'firebase_uid': 'eq.$targetFirebaseUid',
+        'select': 'favorites_public,history_public',
+        'limit': 1,
+      },
+    );
+    final profile = _rows(profileRes.data).firstOrNull;
+    final favPublic = profile?['favorites_public'] == true;
+    final histPublic = profile?['history_public'] == true;
+
+    Future<List<PublicFavoriteRow>?> favs() async {
+      if (!favPublic) return null;
+      final res = await _dio.get<dynamic>(
+        'rest/v1/user_favorites',
+        queryParameters: {
+          'firebase_uid': 'eq.$targetFirebaseUid',
+          'select': 'anime_id,title,poster_url,type,status',
+          'order': 'created_at.desc',
+        },
+      );
+      return _rows(res.data).map(PublicFavoriteRow.fromJson).toList();
+    }
+
+    Future<List<PublicHistoryRow>?> hist() async {
+      if (!histPublic) return null;
+      final res = await _dio.get<dynamic>(
+        'rest/v1/user_watch_history',
+        queryParameters: {
+          'firebase_uid': 'eq.$targetFirebaseUid',
+          'select':
+              'anime_id,anime_title,poster_url,episode_id,episode_title,episode_index,progress_ms,duration_ms,last_updated',
+          'order': 'last_updated.desc',
+        },
+      );
+      return _rows(res.data).map(PublicHistoryRow.fromJson).toList();
+    }
+
+    final results = await Future.wait<Object?>([favs(), hist()]);
+    return PublicProfileContent(
+      favoritesPublic: favPublic,
+      historyPublic: histPublic,
+      favorites: results[0] as List<PublicFavoriteRow>?,
+      history: results[1] as List<PublicHistoryRow>?,
+    );
   }
 }

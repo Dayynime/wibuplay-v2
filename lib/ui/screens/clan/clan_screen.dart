@@ -12,6 +12,7 @@ import '../../app_routes.dart';
 import '../../components/hero_slides.dart' show heroGold;
 import 'clan_manage_screen.dart';
 import 'clan_widgets.dart';
+import '../profile/public_profile_screen.dart';
 
 String _thousands(int v) {
   final s = v.abs().toString();
@@ -866,7 +867,10 @@ class _MemberRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => openPublicProfile(context, member.firebaseUid),
+      child: Container(
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
       decoration: BoxDecoration(
         color: clanSurface,
@@ -957,6 +961,7 @@ class _MemberRow extends StatelessWidget {
             ),
         ],
       ),
+    ),
     );
   }
 }
@@ -978,7 +983,10 @@ class _DonationRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final medal = showRank ? clanMedal(rank) : null;
     final joined = member == null ? '' : formatJoinShort(member!.joinedAt);
-    return Container(
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => openPublicProfile(context, entry.firebaseUid),
+      child: Container(
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
       decoration: BoxDecoration(
         color: clanSurface,
@@ -1047,6 +1055,7 @@ class _DonationRow extends StatelessWidget {
           GemPill(amount: entry.amountToday),
         ],
       ),
+    ),
     );
   }
 }

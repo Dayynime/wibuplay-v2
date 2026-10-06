@@ -15,6 +15,7 @@ import 'data/repository/comment_repository.dart';
 import 'data/repository/friend_repository.dart';
 import 'data/repository/private_chat_repository.dart';
 import 'data/models/friend_models.dart';
+import 'data/models/public_profile_models.dart';
 import 'data/models/account_models.dart';
 import 'data/models/chat_models.dart';
 import 'data/models/clan_models.dart';
@@ -53,6 +54,12 @@ final supabaseDioProvider = Provider<Dio>((ref) => createSupabaseDio());
 /// Sync favorit + riwayat tonton ke Supabase (port PublicProfileRepository.kt).
 final publicProfileRepositoryProvider = Provider<PublicProfileRepository>(
   (ref) => PublicProfileRepository(ref.watch(supabaseDioProvider)),
+);
+
+/// Favorit/riwayat publik milik user lain (profil publik). Gagal = lempar error.
+final publicProfileContentProvider =
+    FutureProvider.autoDispose.family<PublicProfileContent, String>(
+  (ref, uid) => ref.watch(publicProfileRepositoryProvider).getPublicContent(uid),
 );
 
 final chatRepositoryProvider = Provider<ChatRepository>(
