@@ -9,7 +9,8 @@ import '../../../data/models/media_item.dart';
 import '../../../providers.dart';
 
 /// Port DetailUiState. selectedTab: 0 = Ringkasan, 1 = Daftar Episode,
-/// 2 = Media & Cuplix.
+/// 2 = Media & Cuplix. Default 1: halaman detail langsung terbuka di tab
+/// Daftar Episode.
 class DetailUiState {
   const DetailUiState({
     this.anime,
@@ -19,7 +20,7 @@ class DetailUiState {
     this.posters = const [],
     this.cuplix = const [],
     this.episodeSearch = '',
-    this.selectedTab = 0,
+    this.selectedTab = 1,
     this.isLoading = false,
     this.isLoadingEpisodes = false,
     this.isLoadingMoreEpisodes = false,
