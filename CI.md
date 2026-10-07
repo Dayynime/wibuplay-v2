@@ -117,3 +117,9 @@ manifest rilis bawaan Flutter tidak punya izin internet.
 - Gating: HANYA memulai download baru yang khusus Premium (`isDownloadAllowed` di `core/premium_access.dart`; non-premium dapat ajakan Premium di Detail). Melihat daftar Download, memutar file offline (tanpa cek Premium/kunci episode, jalan juga tanpa internet), dan menghapus download terbuka untuk semua user.
 - UI: ikon download di tiap item Daftar Episode (Detail), halaman Download (Profil > ikon gear Pengaturan > Download), pemutaran offline lewat server "Offline" di player (fallback ke file lokal kalau stream gagal / tidak ada internet).
 - Beranda saat gagal memuat (offline) dan ada download tersimpan: menampilkan daftar "Video yang sudah didownload" bergaya feed YouTube yang bisa langsung diputar (`ui/screens/download/offline_downloads_view.dart`, port fallback HomeScreen Zenime).
+
+### Pengaturan (port Zenime)
+
+- Halaman `ui/screens/profile/settings_screen.dart` (ikon gear di Profil): kartu Akun (profil + keluar, status Premium AKTIF/BELUM AKTIF + sisa hari, ZCoin, Chat Global), Pemutaran Video (Kualitas Video Default 1080p/720p/480p/360p, Lewati Intro Otomatis, Auto-Lanjut Episode), Download, Bersihkan Cache, Tentang Aplikasi (logo, versi dari package_info_plus).
+- Kualitas default disimpan di `LocalStore.defaultQuality` dan dipakai `PlayerController` untuk memilih server awal.
+- Tidak diport: Mode Tema / Dynamic Color (warna Wibuplay hard-coded gelap, desain tidak boleh berubah), Tampilan Beranda (hero carousel, sengaja dilewati), Panel Admin (belum ada di Wibuplay).

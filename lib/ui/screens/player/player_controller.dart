@@ -152,14 +152,20 @@ class PlayerController
 
     try {
       final data = await repo.getEpisodeStream(episodeId);
+      // Server dengan kualitas sesuai pengaturan (Pengaturan > Kualitas Video
+      // Default); kalau tidak ada yang cocok, pakai server valid pertama.
+      final prefQuality = ref.read(localStoreProvider).defaultQuality;
       StreamServer? defaultServer;
+      StreamServer? firstValid;
       for (final s in data.server) {
         final link = s.link;
-        if (link != null && link.trim().isNotEmpty) {
+        if (link == null || link.trim().isEmpty) continue;
+        firstValid ??= s;
+        if (defaultServer == null && (s.quality ?? '').contains(prefQuality)) {
           defaultServer = s;
-          break;
         }
       }
+      defaultServer ??= firstValid;
       // File offline jadi pilihan pertama (hemat kuota, tetap bisa ganti server).
       final merged = localServer == null
           ? data

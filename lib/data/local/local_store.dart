@@ -73,6 +73,7 @@ class LocalStore extends ChangeNotifier {
 
   static const String _autoSkipIntroKey = 'player_auto_skip_intro';
   static const String _autoSkipOutroKey = 'player_auto_skip_outro';
+  static const String _defaultQualityKey = 'player_default_quality';
 
   bool get autoSkipIntro => _prefs.getBool(_autoSkipIntroKey) ?? true;
   bool get autoSkipOutro => _prefs.getBool(_autoSkipOutroKey) ?? true;
@@ -84,6 +85,14 @@ class LocalStore extends ChangeNotifier {
 
   Future<void> setAutoSkipOutro(bool enabled) async {
     await _prefs.setBool(_autoSkipOutroKey, enabled);
+    notifyListeners();
+  }
+
+  /// Kualitas video default saat memuat episode (port defaultQualityFlow Zenime).
+  String get defaultQuality => _prefs.getString(_defaultQualityKey) ?? '720p';
+
+  Future<void> setDefaultQuality(String quality) async {
+    await _prefs.setString(_defaultQualityKey, quality);
     notifyListeners();
   }
 
