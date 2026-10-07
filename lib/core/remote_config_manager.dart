@@ -70,6 +70,9 @@ class RemoteConfigManager {
 
   static const String _keyBaseUrl = 'api_base_url';
 
+  // Base URL API donghua (Anichin). Parameter TERPISAH dari api_base_url.
+  static const String _keyAnichinBaseUrl = 'anichin_base_url';
+
   // Pop up pengumuman (parameter sama dengan Zenime).
   static const String _keyPopupEnabled = 'popup_enabled';
   static const String _keyPopupId = 'popup_id';
@@ -121,6 +124,17 @@ class RemoteConfigManager {
     final rc = _instance;
     if (rc == null) return null;
     final v = rc.getString(_keyBaseUrl).trim();
+    if (v.isEmpty) return null;
+    return v.endsWith('/') ? v : '$v/';
+  }
+
+  /// Base URL API Anichin (donghua), murni dari Remote Config parameter
+  /// `anichin_base_url`. Sama seperti [baseUrl]: null kalau kosong / belum
+  /// pernah fetch sukses, TIDAK ada fallback hardcode.
+  static String? get anichinBaseUrl {
+    final rc = _instance;
+    if (rc == null) return null;
+    final v = rc.getString(_keyAnichinBaseUrl).trim();
     if (v.isEmpty) return null;
     return v.endsWith('/') ? v : '$v/';
   }

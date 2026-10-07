@@ -3,6 +3,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/dio_client.dart';
+import 'data/api/anichin_network.dart';
+import 'data/api/premium_token_manager.dart';
+import 'data/models/anichin_models.dart';
+import 'data/repository/anichin_repository.dart';
 import 'data/api/api_service.dart';
 import 'data/download/episode_download_manager.dart';
 import 'data/local/local_store.dart';
@@ -67,6 +71,37 @@ final publicProfileContentProvider =
     FutureProvider.autoDispose.family<PublicProfileContent, String>(
   (ref, uid) => ref.watch(publicProfileRepositoryProvider).getPublicContent(uid),
 );
+
+/// Token premium bertanda tangan server (buat endpoint donghua).
+final premiumTokenManagerProvider = Provider<PremiumTokenManager>(
+  (ref) => PremiumTokenManager(ref.watch(supabaseDioProvider)),
+);
+
+/// Dio khusus API Anichin (donghua), base URL dari Remote Config `anichin_base_url`.
+final anichinDioProvider = Provider<Dio>(
+  (ref) => createAnichinDio(ref.watch(premiumTokenManagerProvider)),
+);
+
+final anichinRepositoryProvider = Provider<AnichinRepository>(
+  (ref) => AnichinRepository(ref.watch(anichinDioProvider)),
+);
+
+/// 3 kartu donghua pertama buat section "Donghua" di Beranda (bento top 3).
+/// Gagal / kosong -> section tidak tampil.
+final donghuaHotProvider = FutureProvider.autoDispose<List<AnichinCard>>((ref) async {
+  try {
+    final res = await ref.watch(anichinRepositoryProvider).getHome();
+    final seen = <String?>{};
+    return res.results
+        .expand((s) => s.cards)
+        .where((c) => (c.slug ?? '').isNotEmpty && (c.thumbnail ?? '').isNotEmpty)
+        .where((c) => seen.add(c.slug))
+        .take(3)
+        .toList();
+  } catch (_) {
+    return const [];
+  }
+});
 
 final chatRepositoryProvider = Provider<ChatRepository>(
   (ref) => ChatRepository(ref.watch(supabaseDioProvider)),

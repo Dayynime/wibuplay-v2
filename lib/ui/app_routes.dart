@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 
 import 'screens/detail/detail_screen.dart';
+import 'screens/donghua/donghua_detail_screen.dart';
+import 'screens/donghua/donghua_player_screen.dart';
+import 'screens/donghua/donghua_premium_gate.dart';
+import 'screens/donghua/donghua_screen.dart';
 import 'screens/player/player_screen.dart';
 import 'screens/store/coin_screen.dart';
 import 'screens/store/premium_screen.dart';
@@ -87,6 +91,62 @@ void openPlayerFromMini(String movieId, String episodeId) {
   if (nav == null) return;
   _pushPlayer(nav, movieId, episodeId);
 }
+
+// ---------------------------------------------------------------- Donghua
+
+/// Port Screen.Donghua / DonghuaDetail / DonghuaPlayer (NavGraph.kt).
+void _pushDonghua(NavigatorState nav) {
+  nav.push(
+    fadeRoute(
+      DonghuaScreen(
+        onBackClick: () => nav.maybePop(),
+        onDonghuaClick: (slug) => _pushDonghuaDetail(nav, slug),
+      ),
+    ),
+  );
+}
+
+void _pushDonghuaDetail(NavigatorState nav, String slug) {
+  nav.push(
+    fadeRoute(
+      DonghuaDetailScreen(
+        slug: slug,
+        onBackClick: () => nav.maybePop(),
+        onEpisodeClick: (episodeSlug) => _pushDonghuaPlayer(nav, episodeSlug),
+      ),
+    ),
+  );
+}
+
+/// Player donghua dibungkus gate Premium. Ganti episode dari dalam player
+/// MENGGANTI layar player (bukan menumpuk), seperti popUpTo inclusive di Zenime.
+void _pushDonghuaPlayer(NavigatorState nav, String slug, {bool replace = false}) {
+  void upgrade() => nav.push(fadeRoute(const PremiumScreen()));
+  final route = fadeRoute<void>(
+    DonghuaPremiumGate(
+      onBackClick: () => nav.maybePop(),
+      onUpgradeClick: upgrade,
+      child: DonghuaPlayerScreen(
+        slug: slug,
+        onBackClick: () => nav.maybePop(),
+        onEpisodeChange: (next) => _pushDonghuaPlayer(nav, next, replace: true),
+        onUpgradeClick: upgrade,
+      ),
+    ),
+  );
+  if (replace) {
+    nav.pushReplacement(route);
+  } else {
+    nav.push(route);
+  }
+}
+
+/// Halaman daftar Donghua (dari section Donghua di Beranda).
+void openDonghua(BuildContext context) => _pushDonghua(Navigator.of(context));
+
+/// Detail donghua. [slug] boleh slug anime maupun slug episode.
+void openDonghuaDetail(BuildContext context, String slug) =>
+    _pushDonghuaDetail(Navigator.of(context), slug);
 
 /// Halaman beli Premium.
 void openPremium(BuildContext context) {

@@ -30,7 +30,7 @@ import 'player_settings_sheet.dart';
 import 'quality_sheet.dart';
 
 /// Link donasi Trakteer (sama dengan Zenime).
-const String _kTrakteerUrl = 'https://trakteer.id/Dayynimee';
+const String kTrakteerUrl = 'https://trakteer.id/Dayynimee';
 
 /// Perkiraan intro/outro (API tidak punya timestamp asli), sama dengan Zenime.
 const int _kIntroSkipMs = 90000;
@@ -52,8 +52,8 @@ String formatTime(int millis) {
 }
 
 /// Snapshot status pemutar (pengganti state `isPlaying/currentPosition/...`).
-class _Playback {
-  const _Playback({
+class PlayerPlayback {
+  const PlayerPlayback({
     this.isPlaying = false,
     this.isBuffering = true,
     this.positionMs = 0,
@@ -65,7 +65,7 @@ class _Playback {
   final int positionMs;
   final int durationMs;
 
-  _Playback copyWith({int? positionMs}) => _Playback(
+  PlayerPlayback copyWith({int? positionMs}) => PlayerPlayback(
         isPlaying: isPlaying,
         isBuffering: isBuffering,
         positionMs: positionMs ?? this.positionMs,
@@ -74,7 +74,7 @@ class _Playback {
 
   @override
   bool operator ==(Object other) =>
-      other is _Playback &&
+      other is PlayerPlayback &&
       other.isPlaying == isPlaying &&
       other.isBuffering == isBuffering &&
       other.positionMs == positionMs &&
@@ -110,7 +110,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
 
   VideoPlayerController? _vc;
   String? _loadedLink;
-  final ValueNotifier<_Playback> _pb = ValueNotifier<_Playback>(const _Playback());
+  final ValueNotifier<PlayerPlayback> _pb = ValueNotifier<PlayerPlayback>(const PlayerPlayback());
 
   bool _showControls = true;
   Timer? _hideTimer;
@@ -280,7 +280,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     vc.removeListener(_onVideo);
     vc.pause();
     vc.dispose();
-    _pb.value = const _Playback(isBuffering: false);
+    _pb.value = const PlayerPlayback(isBuffering: false);
     _wasPlaying = false;
     _playerError = false;
     WakelockPlus.disable();
@@ -329,7 +329,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     _outroSkipped = false;
     _wasPlaying = false;
     _playerError = false;
-    _pb.value = const _Playback();
+    _pb.value = const PlayerPlayback();
     if (mounted) setState(() {});
     await old?.dispose();
 
@@ -357,7 +357,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
       setState(() {});
     } catch (_) {
       if (mounted && _vc == vc) {
-        _pb.value = const _Playback(isBuffering: false);
+        _pb.value = const PlayerPlayback(isBuffering: false);
         setState(() => _playerError = true);
       }
     }
@@ -369,7 +369,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     final v = vc.value;
     if (v.hasError && !_playerError) setState(() => _playerError = true);
 
-    final snap = _Playback(
+    final snap = PlayerPlayback(
       isPlaying: v.isPlaying,
       isBuffering: v.hasError ? false : (v.isBuffering || !v.isInitialized),
       positionMs: v.position.inMilliseconds,
@@ -772,7 +772,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     var ok = false;
     await _withoutPip(() async {
       ok = await launchUrl(
-        Uri.parse(_kTrakteerUrl),
+        Uri.parse(kTrakteerUrl),
         mode: LaunchMode.externalApplication,
       );
     });
@@ -872,13 +872,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
   Widget _controls(PlayerUiState ui, {required bool fullscreen}) {
     final prevId = _notifier.previousEpisodeId;
     final nextId = _notifier.nextEpisodeId;
-    return ValueListenableBuilder<_Playback>(
+    return ValueListenableBuilder<PlayerPlayback>(
       valueListenable: _pb,
       builder: (context, pb, _) {
         return Stack(
           fit: StackFit.expand,
           children: [
-            _ControlsOverlay(
+            PlayerControlsOverlay(
               pb: pb,
               showControls: _showControls,
               isFullscreen: fullscreen,
@@ -1190,7 +1190,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                    child: _TrakteerButton(onTap: _openTrakteer),
+                    child: PlayerTrakteerButton(onTap: _openTrakteer),
                   ),
                 ),
 
@@ -1566,8 +1566,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
 // ---------------------------------------------------------------- komponen
 
 /// Port PlayerControlsOverlay.
-class _ControlsOverlay extends StatefulWidget {
-  const _ControlsOverlay({
+class PlayerControlsOverlay extends StatefulWidget {
+  const PlayerControlsOverlay({
     required this.pb,
     required this.showControls,
     required this.isFullscreen,
@@ -1593,7 +1593,7 @@ class _ControlsOverlay extends StatefulWidget {
     required this.onBack,
   });
 
-  final _Playback pb;
+  final PlayerPlayback pb;
   final bool showControls;
   final bool isFullscreen;
   final String title;
@@ -1622,10 +1622,10 @@ class _ControlsOverlay extends StatefulWidget {
   final VoidCallback onBack;
 
   @override
-  State<_ControlsOverlay> createState() => _ControlsOverlayState();
+  State<PlayerControlsOverlay> createState() => PlayerControlsOverlayState();
 }
 
-class _ControlsOverlayState extends State<_ControlsOverlay> {
+class PlayerControlsOverlayState extends State<PlayerControlsOverlay> {
   double _downX = 0;
 
   @override
@@ -1990,8 +1990,8 @@ class _ActionIconButton extends StatelessWidget {
 }
 
 /// Tombol "Bantu Admin Seikhlasnya" (Trakteer), sama dengan Zenime.
-class _TrakteerButton extends StatelessWidget {
-  const _TrakteerButton({required this.onTap});
+class PlayerTrakteerButton extends StatelessWidget {
+  const PlayerTrakteerButton({required this.onTap});
 
   final VoidCallback onTap;
 

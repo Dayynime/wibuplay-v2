@@ -19,6 +19,7 @@ import '../friends/friends_screen.dart';
 import '../../components/cards.dart';
 import '../../components/chat_ticker.dart';
 import '../../components/common_components.dart';
+import '../../components/donghua_hot_section.dart';
 import '../../components/hero_banner.dart';
 import '../../components/home_profile_header.dart';
 import '../../components/shimmer.dart';
@@ -201,6 +202,7 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
     final sections = widget.sections;
     final history = ref.watch(localStoreProvider.select((s) => s.history));
     final cuplixClips = ref.watch(homeCuplixProvider).valueOrNull ?? const [];
+    final donghuaHot = ref.watch(donghuaHotProvider).valueOrNull ?? const [];
     final user = ref.watch(authUserProvider).valueOrNull;
     final showProfileHeader = user != null && FirebaseConfig.ready;
 
@@ -421,6 +423,18 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
             delayMs: 300,
             title: 'Judul Baru',
             child: _posterRow(sections.newRelease, showNewBadge: true),
+          ),
+
+        // Donghua (API Anichin): bento top 3, gagal/kosong = section tidak tampil.
+        if (donghuaHot.isNotEmpty)
+          StaggeredSection(
+            visible: _animateSections,
+            delayMs: 320,
+            child: DonghuaHotSection(
+              cards: donghuaHot,
+              onCardClick: (slug) => openDonghuaDetail(context, slug),
+              onSeeAllClick: () => openDonghua(context),
+            ),
           ),
 
         // 7. Terpopuler - kartu berperingkat
