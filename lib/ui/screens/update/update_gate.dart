@@ -17,9 +17,18 @@ enum _Phase { checking, blocked, ok }
 /// Gagal cek (offline, repo belum ada release, timeout) = lanjut normal.
 /// Hanya jalan di Android (APK).
 class UpdateGate extends StatefulWidget {
-  const UpdateGate({super.key, required this.child});
+  const UpdateGate({
+    super.key,
+    required this.child,
+    this.minSplash = Duration.zero,
+  });
 
   final Widget child;
+
+  /// Lama minimal splash tampil (dihitung dari awal cek update). Dipakai saat
+  /// pertama kali buka app supaya splash terlihat dulu sebelum intro; untuk
+  /// buka-buka berikutnya biarkan [Duration.zero] biar app tidak tertahan.
+  final Duration minSplash;
 
   @override
   State<UpdateGate> createState() => _UpdateGateState();
@@ -50,6 +59,7 @@ class _UpdateGateState extends State<UpdateGate> {
       if (mounted) setState(() => _phase = _Phase.ok);
       return;
     }
+    final started = DateTime.now();
     UpdateInfo? update;
     var current = '';
     try {
@@ -59,6 +69,8 @@ class _UpdateGateState extends State<UpdateGate> {
     } catch (_) {
       update = null; // gagal cek -> jangan blokir user
     }
+    final remaining = widget.minSplash - DateTime.now().difference(started);
+    if (remaining > Duration.zero) await Future<void>.delayed(remaining);
     if (!mounted) return;
     setState(() {
       _info = update;

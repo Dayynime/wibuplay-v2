@@ -1,7 +1,12 @@
 package com.dayynime.wibuplay
 
 import android.app.DownloadManager
+import android.accessibilityservice.AccessibilityServiceInfo
 import android.app.PictureInPictureParams
+import android.content.Intent
+import android.content.pm.ApplicationInfo
+import android.view.accessibility.AccessibilityManager
+import java.security.MessageDigest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.content.res.Configuration
@@ -63,6 +68,23 @@ class MainActivity : FlutterActivity() {
         }
         channel = ch
 
+        // Channel "wibuplay/security" (port IntegrityGuard.kt + PremiumStatusCache Zenime).
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "wibuplay/security")
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "detectedTool" -> {
+                        val extra = call.argument<List<String>>("extra") ?: emptyList()
+                        result.success(try { detectedTool(extra) } catch (e: Exception) { null })
+                    }
+                    "signatureHashes" -> result.success(try { signatureHashes() } catch (e: Exception) { emptyList<String>() })
+                    "hmacSign" -> {
+                        val data = call.argument<String>("data") ?: ""
+                        result.success(try { hmacSign(data) } catch (e: Exception) { "" })
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "wibuplay/download")
             .setMethodCallHandler { call, result ->
                 val dm = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
@@ -123,6 +145,107 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+    }
+
+    // ---------------------------------------------------------------- security
+
+    private val toolKeywords = listOf(
+        "reqable", "httptoolkit", "httpcanary", "pcapdroid", "remote_capture",
+        "sslcapture", "mitm", "charles", "fiddler", "wireshark",
+        // Auto clicker. Jangan pakai kata umum ("clicker"/"tap"/"macro").
+        "autoclick", "auto click", "autotap", "auto tap", "klik otomatis", "pengklik"
+    )
+
+    private val accessibilityWhitelist = setOf(
+        "com.google.android.marvin.talkback",
+        "com.android.talkback",
+        "com.samsung.android.accessibility.talkback",
+        "com.google.android.apps.accessibility.voiceaccess"
+    )
+
+    /** Nama app terlarang yang terdeteksi, atau null kalau aman. */
+    private fun detectedTool(extra: List<String>): String? {
+        val pm = packageManager
+        val launcher = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+        val apps = if (Build.VERSION.SDK_INT >= 33) {
+            pm.queryIntentActivities(launcher, PackageManager.ResolveInfoFlags.of(0))
+        } else {
+            @Suppress("DEPRECATION")
+            pm.queryIntentActivities(launcher, 0)
+        }
+        val keys = (toolKeywords + extra).map { it.lowercase() }
+        for (info in apps) {
+            val pkg = info.activityInfo.packageName
+            if (pkg == packageName) continue
+            val label = info.loadLabel(pm).toString()
+            val haystack = "$pkg $label".lowercase()
+            if (keys.any { it in haystack }) return label
+        }
+        return detectedGestureService()
+    }
+
+    /** Auto clicker butuh Accessibility Service yang boleh dispatch gesture. */
+    private fun detectedGestureService(): String? {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return null
+        val am = getSystemService(Context.ACCESSIBILITY_SERVICE) as? AccessibilityManager ?: return null
+        val pm = packageManager
+        val services = try {
+            am.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
+        } catch (e: Exception) {
+            return null
+        }
+        for (info in services) {
+            val serviceInfo = info.resolveInfo?.serviceInfo ?: continue
+            val pkg = serviceInfo.packageName
+            if (pkg == packageName || pkg in accessibilityWhitelist) continue
+            val appFlags = serviceInfo.applicationInfo?.flags ?: 0
+            val isSystem = appFlags and (ApplicationInfo.FLAG_SYSTEM or ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
+            if (isSystem) continue
+            val canGesture = info.capabilities and AccessibilityServiceInfo.CAPABILITY_CAN_PERFORM_GESTURES != 0
+            if (canGesture) {
+                return serviceInfo.applicationInfo?.loadLabel(pm)?.toString() ?: pkg
+            }
+        }
+        return null
+    }
+
+    /** SHA-256 (hex kecil) semua sertifikat penandatangan APK ini. */
+    @Suppress("DEPRECATION")
+    private fun signatureHashes(): List<String> {
+        val pm = packageManager
+        val certs = if (Build.VERSION.SDK_INT >= 28) {
+            val info = pm.getPackageInfo(packageName, PackageManager.GET_SIGNING_CERTIFICATES)
+            val si = info.signingInfo ?: return emptyList()
+            if (si.hasMultipleSigners()) si.apkContentsSigners else si.signingCertificateHistory
+        } else {
+            pm.getPackageInfo(packageName, PackageManager.GET_SIGNATURES).signatures
+        }
+        if (certs == null) return emptyList()
+        val md = MessageDigest.getInstance("SHA-256")
+        return certs.map { sig -> md.digest(sig.toByteArray()).joinToString("") { "%02x".format(it) } }
+    }
+
+    /** HMAC-SHA256 pakai key AndroidKeyStore (tidak bisa diekspor dari device). */
+    private fun hmacSign(data: String): String {
+        val alias = "wibuplay_premium_cache_hmac"
+        val ks = java.security.KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+        var key = ks.getKey(alias, null) as? javax.crypto.SecretKey
+        if (key == null) {
+            val gen = javax.crypto.KeyGenerator.getInstance(
+                android.security.keystore.KeyProperties.KEY_ALGORITHM_HMAC_SHA256,
+                "AndroidKeyStore"
+            )
+            gen.init(
+                android.security.keystore.KeyGenParameterSpec.Builder(
+                    alias,
+                    android.security.keystore.KeyProperties.PURPOSE_SIGN
+                ).build()
+            )
+            key = gen.generateKey()
+        }
+        val mac = javax.crypto.Mac.getInstance("HmacSHA256")
+        mac.init(key)
+        return mac.doFinal(data.toByteArray()).joinToString("") { "%02x".format(it) }
     }
 
     private fun enterPip(force: Boolean): Boolean {

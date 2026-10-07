@@ -9,6 +9,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import '../../core/firebase_config.dart';
 import '../models/chat_models.dart';
 import 'chat_repository.dart';
+import '../local/premium_status_cache.dart';
 
 /// Error login/daftar dengan pesan yang siap ditampilkan ke user.
 class AuthFailure implements Exception {
@@ -225,6 +226,7 @@ class AuthRepository {
       await GoogleSignIn().signOut();
     } catch (_) {}
     await FirebaseAuth.instance.signOut();
+    await PremiumStatusCache.clear();
     _publish(null);
   }
 

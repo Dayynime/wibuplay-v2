@@ -21,7 +21,7 @@ class PublicProfileRepository {
   void _logIfFailed(String action, Response<dynamic> res) {
     final code = res.statusCode ?? 0;
     if (code < 200 || code >= 300) {
-      debugPrint('PublicProfileSync: $action GAGAL -- HTTP $code: ${res.data}');
+      if (kDebugMode) debugPrint('PublicProfileSync: $action GAGAL -- HTTP $code: ${res.data}');
     }
   }
 
@@ -44,7 +44,7 @@ class PublicProfileRepository {
       );
       _logIfFailed('syncFavoriteAdded', res);
     } catch (e) {
-      debugPrint('PublicProfileSync: syncFavoriteAdded EXCEPTION: $e');
+      if (kDebugMode) debugPrint('PublicProfileSync: syncFavoriteAdded EXCEPTION: $e');
     }
   }
 
@@ -60,7 +60,7 @@ class PublicProfileRepository {
       );
       _logIfFailed('syncFavoriteRemoved', res);
     } catch (e) {
-      debugPrint('PublicProfileSync: syncFavoriteRemoved EXCEPTION: $e');
+      if (kDebugMode) debugPrint('PublicProfileSync: syncFavoriteRemoved EXCEPTION: $e');
     }
   }
 
@@ -98,7 +98,7 @@ class PublicProfileRepository {
       );
       _logIfFailed('syncWatchProgress', res);
     } catch (e) {
-      debugPrint('PublicProfileSync: syncWatchProgress EXCEPTION: $e');
+      if (kDebugMode) debugPrint('PublicProfileSync: syncWatchProgress EXCEPTION: $e');
     }
   }
 
@@ -120,7 +120,7 @@ class PublicProfileRepository {
       );
       _logIfFailed('syncHistoryRemoved', res);
     } catch (e) {
-      debugPrint('PublicProfileSync: syncHistoryRemoved EXCEPTION: $e');
+      if (kDebugMode) debugPrint('PublicProfileSync: syncHistoryRemoved EXCEPTION: $e');
     }
   }
 

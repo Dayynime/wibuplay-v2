@@ -88,6 +88,13 @@ manifest rilis bawaan Flutter tidak punya izin internet.
 - Logo di layar login: `assets/images/logo.jpg` (logo Zenime).
 - Nama paket Dart (`wibuplay` di `pubspec.yaml`) dan namespace Android sengaja tidak diubah, karena hanya internal dan tidak terlihat di app.
 
+### Catatan Splash + Intro (ala Zenime)
+
+- Urutan buka app: IntegrityGate -> splash (`UpdateGate`, sekalian cek update) -> intro (`OnboardingGate`, sekali saja) -> login (`AuthGate`) -> app.
+- Intro: 6 slide (Anime, Offline, Komik & Donghua, Chat + Clan, Level + XP, Premium) dengan background aurora, parallax, indikator, tombol bergradasi mengikuti slide, tombol "Lewati", dan back = mundur slide. File: `lib/ui/screens/onboarding/`.
+- Flag `onboarding_seen_v1` di shared_preferences (`LocalStore.onboardingSeen`). User lama yang update akan melihat intro sekali karena flag belum ada.
+- Splash ditahan minimal 1,8 detik (`UpdateGate.minSplash`) hanya saat intro belum pernah dilihat; buka app berikutnya tidak tertahan.
+
 ### Catatan Halaman Clan
 
 - Alur: Beranda > tap panel TOP CLAN di slide leaderboard > `ClanBrowseScreen` (Semua Clan / Leaderboard / Clan Saya + cari) > tap clan > `ClanScreen` (detail).
@@ -137,3 +144,12 @@ manifest rilis bawaan Flutter tidak punya izin internet.
 - Download episode: tekan lama kartu episode (khusus Premium; tekan lama pada episode yang sudah didownload = hapus).
 - Tab Season memakai `AnimeRepository.getSeasons` (daftar season dari respons detail). Rating bintang "4.8" Zenime tidak diport karena angkanya hard-coded, bukan data asli.
 - Section "Lanjutkan Menonton" di Beranda dihapus (riwayat tonton tetap tersimpan dan tampil di Profil).
+
+## Keamanan dan fix bug (port dari Zenime)
+
+- **IntegrityGuard** (`lib/core/integrity_guard.dart` + channel `wibuplay/security` di `MainActivity.kt`): blokir app kalau terdeteksi (1) tanda tangan APK beda dari yang resmi, (2) app proxy/MITM (Reqable, HTTP Toolkit, dll), (3) auto clicker (kata kunci nama app + Accessibility Service gesture). Dicek di `IntegrityGate` (`ui/screens/security/integrity_gate.dart`) SEBELUM init Firebase/Remote Config, jadi tidak ada request jaringan kalau kedeteksi; dicek lagi tiap app balik ke foreground.
+- **Cek tanda tangan**: `release.yml` menghitung SHA-256 sertifikat dari keystore rilis lalu mengirimnya lewat `--dart-define=APK_SIG_SHA256`. Build `build.yml` (debug/profile) tidak mengisinya, jadi cek tanda tangan dilewati (tidak ke-block). Butuh `KEY_ALIAS` dan `STORE_PASSWORD` benar di secret.
+- **Cache status Premium** (`lib/data/local/premium_status_cache.dart`): fallback saat cek live gagal karena jaringan (offline/timeout/5xx). Ditandatangani HMAC (key AndroidKeyStore), terikat uid, TTL 3 hari, dan mati kalau `expires_at` lewat. Penolakan server (4xx) tidak memakai cache. Dihapus saat logout.
+- **Manifest** (patch di workflow): `allowBackup=false`, cleartext HTTP hanya untuk host di `android_res/xml/network_security_config.xml` (bukan global lagi), `<queries>` untuk deteksi app lain. Catatan: aturan ini berlaku untuk video_player/ExoPlayer; Dio (dart:io) tidak terpengaruh.
+- **Fix jaringan lemot (WiFi/Indihome)**: retry GET sekarang juga untuk connect timeout (jeda 300ms), connectTimeout API utama 10 detik (sama Zenime). Tidak dipindah: tuning buffer/timeout ExoPlayer (`PlayerConfig.kt`), karena plugin video_player tidak membuka opsi itu.
+- **Log**: semua `debugPrint` dibungkus `kDebugMode`, tidak ada log di release.

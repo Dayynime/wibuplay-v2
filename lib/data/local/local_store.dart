@@ -69,6 +69,15 @@ class LocalStore extends ChangeNotifier {
   Future<void> setLastSeenPopupId(String id) =>
       _prefs.setString(_lastSeenPopupKey, id);
 
+  // ---- Intro / onboarding: tampil sekali (install baru) setelah splash ----
+
+  static const String _onboardingSeenKey = 'onboarding_seen_v1';
+
+  bool get onboardingSeen => _prefs.getBool(_onboardingSeenKey) ?? false;
+
+  Future<void> setOnboardingSeen(bool seen) =>
+      _prefs.setBool(_onboardingSeenKey, seen);
+
   // ---- Pengaturan pemutar (sama dengan Zenime: default aktif) ----
 
   static const String _autoSkipIntroKey = 'player_auto_skip_intro';

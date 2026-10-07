@@ -140,7 +140,8 @@ class _AnichinRetryInterceptor extends Interceptor {
   Future<void> onError(DioException err, ErrorInterceptorHandler handler) async {
     final o = err.requestOptions;
     final retryable = o.method.toUpperCase() == 'GET' &&
-        err.type == DioExceptionType.connectionError &&
+        (err.type == DioExceptionType.connectionError ||
+            err.type == DioExceptionType.connectionTimeout) &&
         o.extra[_retriedKey] != true;
     if (!retryable) {
       handler.next(err);

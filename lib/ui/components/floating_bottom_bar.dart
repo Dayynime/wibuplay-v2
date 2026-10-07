@@ -15,7 +15,7 @@ class BottomTab {
     BottomTab('home', 'Beranda', Icons.home_outlined),
     BottomTab('explore', 'Jelajah', Icons.explore_outlined),
     BottomTab('schedule', 'Jadwal', Icons.calendar_month_outlined),
-    BottomTab('cuplix', 'Cuplix', Icons.video_library_outlined),
+    BottomTab('comic', 'Komik', Icons.menu_book_outlined),
     BottomTab('profile', 'Profil', Icons.person_outline),
   ];
 }

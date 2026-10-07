@@ -5,7 +5,7 @@ import '../../core/theme/app_colors.dart';
 import '../../providers.dart';
 import '../app_routes.dart';
 import '../components/floating_bottom_bar.dart';
-import '../screens/cuplix/cuplix_screen.dart';
+import '../screens/comic/comic_screen.dart';
 import '../screens/explore/explore_screen.dart';
 import '../screens/home/home_screen.dart';
 import '../screens/profile/profile_screen.dart';
@@ -73,15 +73,15 @@ class _AppShellState extends ConsumerState<AppShell> {
                 onSearchClick: () => _goTab(1),
                 onSeeAllClick: (_) => _goTab(1),
                 onProfileClick: () => _goTab(4),
-                onCuplixClick: () => _goTab(3),
+                onCuplixClick: () => openCuplix(context),
+                onComicSeeAllClick: () => _goTab(3),
               )),
               _tab(1, () => ExploreScreen(onAnimeClick: _openDetail)),
               _tab(2, () => ScheduleScreen(onAnimeClick: _openDetail)),
               _tab(
                 3,
-                () => CuplixScreen(
-                  isTabActive: _index == 3,
-                  onWatchAnime: _openPlayer,
+                () => ComicScreen(
+                  onComicClick: (key) => openComicDetail(context, key),
                 ),
               ),
               _tab(

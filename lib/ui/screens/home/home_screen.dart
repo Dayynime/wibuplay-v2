@@ -18,6 +18,7 @@ import '../download/offline_downloads_view.dart';
 import '../friends/friends_screen.dart';
 import '../../components/cards.dart';
 import '../../components/chat_ticker.dart';
+import '../../components/comic_home_section.dart';
 import '../../components/common_components.dart';
 import '../../components/donghua_hot_section.dart';
 import '../../components/hero_banner.dart';
@@ -37,6 +38,7 @@ class HomeScreen extends ConsumerWidget {
     required this.onSeeAllClick,
     required this.onProfileClick,
     required this.onCuplixClick,
+    required this.onComicSeeAllClick,
   });
 
   final ValueChanged<String> onAnimeClick;
@@ -46,6 +48,9 @@ class HomeScreen extends ConsumerWidget {
 
   /// Ketuk klip / "Lihat semua" di section Cuplix: buka tab Cuplix.
   final VoidCallback onCuplixClick;
+
+  /// "Lihat semua" di section Komik: buka tab Komik.
+  final VoidCallback onComicSeeAllClick;
 
   /// Ketuk kartu profil / chip Premium / chip ZCoin / tombol Premium: buka tab Profil.
   final VoidCallback onProfileClick;
@@ -94,6 +99,7 @@ class HomeScreen extends ConsumerWidget {
         onSeeAllClick: onSeeAllClick,
         onProfileClick: onProfileClick,
         onCuplixClick: onCuplixClick,
+        onComicSeeAllClick: onComicSeeAllClick,
       );
     }
 
@@ -122,6 +128,7 @@ class _HomeContent extends ConsumerStatefulWidget {
     required this.onSeeAllClick,
     required this.onProfileClick,
     required this.onCuplixClick,
+    required this.onComicSeeAllClick,
   });
 
   final HomeSectionData sections;
@@ -131,6 +138,9 @@ class _HomeContent extends ConsumerStatefulWidget {
   final ValueChanged<String> onSeeAllClick;
   final VoidCallback onProfileClick;
   final VoidCallback onCuplixClick;
+
+  /// "Lihat semua" di section Komik: buka tab Komik.
+  final VoidCallback onComicSeeAllClick;
 
   @override
   ConsumerState<_HomeContent> createState() => _HomeContentState();
@@ -403,6 +413,16 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
               onSeeAllClick: () => openDonghua(context),
             ),
           ),
+
+        // Komik terbaru (API Sanka / Bacakomik): gagal/kosong = section tidak tampil.
+        StaggeredSection(
+          visible: _animateSections,
+          delayMs: 330,
+          child: ComicHomeSection(
+            onComicClick: (key) => openComicDetail(context, key),
+            onSeeAllClick: widget.onComicSeeAllClick,
+          ),
+        ),
 
         // 7. Terpopuler - kartu berperingkat
         if (sections.popular.isNotEmpty)

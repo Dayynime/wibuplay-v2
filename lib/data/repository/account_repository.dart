@@ -1,5 +1,10 @@
-import 'package:dio/dio.dart';
+import 'dart:async';
 
+import 'package:dio/dio.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+import '../../core/firebase_config.dart';
+import '../local/premium_status_cache.dart';
 import '../models/account_models.dart';
 
 /// Data akun untuk kartu profil Beranda. Backend sama dengan Zenime
@@ -22,14 +27,40 @@ class AccountRepository {
   }
 
   /// `zenime-check-premium` -> is_premium + expires_at.
+  ///
+  /// Untuk akun yang sedang login, hasil sukses disimpan ke
+  /// [PremiumStatusCache]; kalau cek live gagal karena jaringan (offline,
+  /// timeout, 5xx) dipakai fallback cache bertanda tangan (port Zenime), bukan
+  /// langsung dianggap non-premium. Penolakan server (4xx) TIDAK memakai cache.
   Future<PremiumStatus> getPremiumStatus(String firebaseUid) async {
     if (firebaseUid.isEmpty) return const PremiumStatus();
+    final isMe = FirebaseConfig.ready &&
+        FirebaseAuth.instance.currentUser?.uid == firebaseUid;
     try {
       final data = await _post('zenime-check-premium', firebaseUid);
-      return data == null ? const PremiumStatus() : PremiumStatus.fromJson(data);
-    } catch (_) {
+      if (data == null) return const PremiumStatus();
+      final status = PremiumStatus.fromJson(data);
+      if (isMe) {
+        unawaited(PremiumStatusCache.save(firebaseUid, status.isPremium, status.expiresAt));
+      }
+      return status;
+    } catch (e) {
+      if (isMe && _isNetworkFailure(e)) {
+        final cached = await PremiumStatusCache.getValidOffline(firebaseUid);
+        if (cached != null) {
+          return PremiumStatus(isPremium: cached.isPremium, expiresAt: cached.expiresAt);
+        }
+      }
       return const PremiumStatus();
     }
+  }
+
+  static bool _isNetworkFailure(Object e) {
+    if (e is! DioException) return true;
+    if (e.type == DioExceptionType.badResponse) {
+      return (e.response?.statusCode ?? 0) >= 500;
+    }
+    return true;
   }
 
   /// `zenime-get-code` -> zenime_code + user_number.

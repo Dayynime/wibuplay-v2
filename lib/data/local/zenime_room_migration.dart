@@ -54,7 +54,7 @@ class ZenimeRoomMigration {
           final msg = e.toString();
           if (msg.contains('no such table')) return const [];
           readOk = false;
-          debugPrint('ZenimeRoomMigration: gagal baca ($sql): $e');
+          if (kDebugMode) debugPrint('ZenimeRoomMigration: gagal baca ($sql): $e');
           return const [];
         }
       }
@@ -126,7 +126,7 @@ class ZenimeRoomMigration {
       if (readOk) await store.setRoomMigrated();
     } catch (e) {
       // Jangan ganggu start app; dicoba lagi di peluncuran berikutnya.
-      debugPrint('ZenimeRoomMigration: gagal: $e');
+      if (kDebugMode) debugPrint('ZenimeRoomMigration: gagal: $e');
     } finally {
       await db?.close();
     }

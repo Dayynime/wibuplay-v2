@@ -15,8 +15,26 @@ import 'ui/components/mini_player.dart';
 import 'ui/route_observer.dart';
 import 'ui/components/announcement_popup.dart';
 import 'ui/screens/auth/auth_gate.dart';
+import 'ui/screens/onboarding/onboarding_gate.dart';
+import 'ui/screens/security/integrity_gate.dart';
 import 'ui/screens/update/update_gate.dart';
 import 'ui/shell/app_shell.dart';
+
+/// Firebase (login Zenime) + Remote Config. Dipanggil [IntegrityGate] HANYA
+/// setelah lolos cek keamanan, jadi tidak ada request jaringan sama sekali
+/// kalau app terlarang terdeteksi. Kalau belum dikonfigurasi atau gagal init,
+/// app tetap jalan normal; hanya login dan chat yang nonaktif.
+Future<void> _initBackend() async {
+  if (!FirebaseConfig.isConfigured) return;
+  try {
+    await Firebase.initializeApp(options: FirebaseConfig.options);
+    FirebaseConfig.ready = true;
+    // Base URL API dari Remote Config harus siap sebelum request pertama.
+    await RemoteConfigManager.refresh();
+  } catch (_) {
+    FirebaseConfig.ready = false;
+  }
+}
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -37,19 +55,6 @@ Future<void> main() async {
   // (applicationId sama), supaya data tidak hilang saat update ke Wibuplay.
   await ZenimeRoomMigration.run(store);
 
-  // Firebase (login Zenime). Kalau belum dikonfigurasi atau gagal init, app
-  // tetap jalan normal; hanya login dan chat yang nonaktif.
-  if (FirebaseConfig.isConfigured) {
-    try {
-      await Firebase.initializeApp(options: FirebaseConfig.options);
-      FirebaseConfig.ready = true;
-      // Base URL API dari Remote Config harus siap sebelum request pertama.
-      await RemoteConfigManager.refresh();
-    } catch (_) {
-      FirebaseConfig.ready = false;
-    }
-  }
-
   runApp(
     ProviderScope(
       overrides: [localStoreProvider.overrideWith((ref) => store)],
@@ -58,11 +63,16 @@ Future<void> main() async {
   );
 }
 
-class ZenimeApp extends StatelessWidget {
+class ZenimeApp extends ConsumerWidget {
   const ZenimeApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Urutan buka app: IntegrityGate -> splash (UpdateGate) -> intro
+    // (OnboardingGate, sekali saja) -> login (AuthGate) -> app. Splash ditahan
+    // minimal 1,8 detik hanya saat intro belum pernah dilihat, supaya buka app
+    // berikutnya tetap cepat.
+    final introSeen = ref.read(localStoreProvider).onboardingSeen;
     return MaterialApp(
       title: 'Zenime',
       debugShowCheckedModeBanner: false,
@@ -76,8 +86,14 @@ class ZenimeApp extends StatelessWidget {
           const MiniPlayerOverlay(),
         ],
       ),
-      home: const UpdateGate(
-        child: AuthGate(child: AnnouncementHost(child: AppShell())),
+      home: IntegrityGate(
+        onClear: _initBackend,
+        child: UpdateGate(
+          minSplash: introSeen ? Duration.zero : const Duration(milliseconds: 1800),
+          child: const OnboardingGate(
+            child: AuthGate(child: AnnouncementHost(child: AppShell())),
+          ),
+        ),
       ),
     );
   }

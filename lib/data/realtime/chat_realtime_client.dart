@@ -163,7 +163,7 @@ class ChatRealtimeClient {
         // supabase_realtime) datang lewat event ini, bukan lewat phx_reply.
         final p = json['payload'];
         if (p is Map && p['status'] == 'error') {
-          debugPrint('RT subscribe gagal: ${jsonEncode(p)}');
+          if (kDebugMode) debugPrint('RT subscribe gagal: ${jsonEncode(p)}');
         }
         return;
       }
@@ -188,7 +188,7 @@ class ChatRealtimeClient {
           break;
       }
     } catch (e) {
-      debugPrint('RT frame error: $e');
+      if (kDebugMode) debugPrint('RT frame error: $e');
     }
   }
 
@@ -199,7 +199,7 @@ class ChatRealtimeClient {
     if (status == 'ok') {
       if (!_events.isClosed) _events.add(const ChatConnected());
     } else {
-      debugPrint('RT join gagal: ${jsonEncode(payload)}');
+      if (kDebugMode) debugPrint('RT join gagal: ${jsonEncode(payload)}');
     }
   }
 

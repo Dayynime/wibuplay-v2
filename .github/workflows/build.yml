@@ -74,7 +74,7 @@ jobs:
 
       # flutter create tidak menaruh INTERNET di manifest utama (hanya debug/profile),
       # dan Android 9+ memblokir HTTP polos. Samakan dengan manifest Kotlin:
-      # INTERNET, ACCESS_NETWORK_STATE, usesCleartextTraffic, label "Zenime".
+      # INTERNET, ACCESS_NETWORK_STATE, networkSecurityConfig, label "Zenime".
       - name: Atur AndroidManifest (internet + cleartext + nama)
         run: |
           python3 - <<'PY'
@@ -87,12 +87,17 @@ jobs:
               s = s.replace('<application', '<uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>\n    <application', 1)
           if 'supportsPictureInPicture' not in s:
               s = s.replace('<activity', '<activity android:supportsPictureInPicture="true"', 1)
-          if 'usesCleartextTraffic' not in s:
-              s = s.replace('<application', '<application android:usesCleartextTraffic="true"', 1)
+          # Keamanan (sama dengan Zenime): cleartext HTTP cuma untuk host di
+          # res/xml/network_security_config.xml (bukan global), backup dimatikan,
+          # <queries> supaya IntegrityGuard bisa melihat app lain di Android 11+.
+          if 'networkSecurityConfig' not in s:
+              s = s.replace('<application', '<application android:networkSecurityConfig="@xml/network_security_config" android:allowBackup="false"', 1)
+          if '<queries>' not in s:
+              s = s.replace('<application', '<queries>\n        <intent>\n            <action android:name="android.intent.action.MAIN"/>\n            <category android:name="android.intent.category.LAUNCHER"/>\n        </intent>\n    </queries>\n    <application', 1)
           s = re.sub(r'android:label="[^"]*"', 'android:label="Zenime"', s, count=1)
           open(p, 'w', encoding='utf-8').write(s)
           PY
-          grep -n "INTERNET\|REQUEST_INSTALL_PACKAGES\|usesCleartextTraffic\|supportsPictureInPicture\|android:label" android/app/src/main/AndroidManifest.xml
+          grep -n "INTERNET\|REQUEST_INSTALL_PACKAGES\|networkSecurityConfig\|allowBackup\|queries\|supportsPictureInPicture\|android:label" android/app/src/main/AndroidManifest.xml
 
       # Picture-in-Picture: MainActivity bawaan flutter create diganti versi
       # dengan MethodChannel "wibuplay/pip" (android_native/MainActivity.kt).

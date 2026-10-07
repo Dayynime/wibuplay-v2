@@ -21,6 +21,7 @@ import '../../components/role_badges.dart';
 import '../auth/login_screen.dart';
 import '../clan/clan_browse_screen.dart';
 import 'settings_screen.dart';
+import '../comic/comic_profile_section.dart';
 import '../friends/friends_screen.dart';
 import '../xp/xp_leaderboard_screen.dart';
 import 'my_xp_card.dart';
@@ -602,6 +603,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               },
             ),
           ),
+        const ComicFavoritesBlock(),
       ],
     );
   }
@@ -759,6 +761,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ],
             ),
           ),
+        const ComicProgressBlock(),
       ],
     );
   }

@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 
+import 'screens/comic/comic_detail_screen.dart';
+import 'screens/comic/comic_reader_controller.dart' show ComicReaderArgs;
+import 'screens/comic/comic_reader_screen.dart';
+import 'screens/cuplix/cuplix_screen.dart';
 import 'screens/detail/detail_screen.dart';
 import 'screens/donghua/donghua_detail_screen.dart';
 import 'screens/donghua/donghua_player_screen.dart';
@@ -156,4 +160,93 @@ void openPremium(BuildContext context) {
 /// Halaman top up ZCoin.
 void openCoin(BuildContext context) {
   Navigator.of(context).push(fadeRoute(const CoinScreen()));
+}
+
+
+/// Detail komik. [comicKey] = kunci komik (ComicKey); dari Beranda/tab Komik
+/// /Profil cukup oper slug apa adanya dari ComicRepository.
+void openComicDetail(BuildContext context, String comicKey) =>
+    _pushComicDetail(Navigator.of(context), comicKey);
+
+void _pushComicDetail(NavigatorState nav, String comicKey) {
+  nav.push(
+    fadeRoute(
+      ComicDetailScreen(
+        comicKey: comicKey,
+        onBackClick: () => nav.maybePop(),
+        onChapterClick: (chapterSlug, title, cover) => nav.push(
+          fadeRoute(
+            ComicReaderScreen(
+              args: ComicReaderArgs(
+                chapterSlug: chapterSlug,
+                comicKey: comicKey,
+                title: title,
+                cover: cover,
+              ),
+              onBackClick: () => nav.maybePop(),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+/// Buka reader langsung di chapter tertentu (mis. "Lanjutkan Baca" dari Profil).
+void openComicReader(
+  BuildContext context, {
+  required String comicKey,
+  required String chapterSlug,
+  String? title,
+  String? cover,
+}) {
+  final nav = Navigator.of(context);
+  nav.push(
+    fadeRoute(
+      ComicReaderScreen(
+        args: ComicReaderArgs(
+          chapterSlug: chapterSlug,
+          comicKey: comicKey,
+          title: title,
+          cover: cover,
+        ),
+        onBackClick: () => nav.maybePop(),
+      ),
+    ),
+  );
+}
+
+/// Cuplix tidak lagi punya tab sendiri; section Cuplix di Beranda membukanya
+/// sebagai halaman biasa (tombol back di kiri atas).
+void openCuplix(BuildContext context) {
+  final nav = Navigator.of(context);
+  nav.push(
+    fadeRoute(
+      Scaffold(
+        backgroundColor: Colors.black,
+        body: Stack(
+          children: [
+            CuplixScreen(
+              isTabActive: true,
+              onWatchAnime: (movieId, episodeId) =>
+                  _pushPlayer(nav, movieId, episodeId),
+            ),
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: Material(
+                  color: Colors.black.withValues(alpha: 0.45),
+                  shape: const CircleBorder(),
+                  child: IconButton(
+                    onPressed: () => nav.maybePop(),
+                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
 }

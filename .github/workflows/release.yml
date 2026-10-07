@@ -111,7 +111,7 @@ jobs:
 
       # flutter create tidak menaruh INTERNET di manifest utama (hanya debug/profile),
       # dan Android 9+ memblokir HTTP polos. Samakan dengan manifest Kotlin:
-      # INTERNET, ACCESS_NETWORK_STATE, usesCleartextTraffic, label "Zenime".
+      # INTERNET, ACCESS_NETWORK_STATE, networkSecurityConfig, label "Zenime".
       - name: Atur AndroidManifest (internet + cleartext + nama)
         run: |
           python3 - <<'PY'
@@ -124,12 +124,17 @@ jobs:
               s = s.replace('<application', '<uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>\n    <application', 1)
           if 'supportsPictureInPicture' not in s:
               s = s.replace('<activity', '<activity android:supportsPictureInPicture="true"', 1)
-          if 'usesCleartextTraffic' not in s:
-              s = s.replace('<application', '<application android:usesCleartextTraffic="true"', 1)
+          # Keamanan (sama dengan Zenime): cleartext HTTP cuma untuk host di
+          # res/xml/network_security_config.xml (bukan global), backup dimatikan,
+          # <queries> supaya IntegrityGuard bisa melihat app lain di Android 11+.
+          if 'networkSecurityConfig' not in s:
+              s = s.replace('<application', '<application android:networkSecurityConfig="@xml/network_security_config" android:allowBackup="false"', 1)
+          if '<queries>' not in s:
+              s = s.replace('<application', '<queries>\n        <intent>\n            <action android:name="android.intent.action.MAIN"/>\n            <category android:name="android.intent.category.LAUNCHER"/>\n        </intent>\n    </queries>\n    <application', 1)
           s = re.sub(r'android:label="[^"]*"', 'android:label="Zenime"', s, count=1)
           open(p, 'w', encoding='utf-8').write(s)
           PY
-          grep -n "INTERNET\|REQUEST_INSTALL_PACKAGES\|usesCleartextTraffic\|supportsPictureInPicture\|android:label" android/app/src/main/AndroidManifest.xml
+          grep -n "INTERNET\|REQUEST_INSTALL_PACKAGES\|networkSecurityConfig\|allowBackup\|queries\|supportsPictureInPicture\|android:label" android/app/src/main/AndroidManifest.xml
 
       # Picture-in-Picture: MainActivity bawaan flutter create diganti versi
       # dengan MethodChannel "wibuplay/pip" (android_native/MainActivity.kt).
@@ -154,6 +159,22 @@ jobs:
       - name: Ambil dependency
         run: flutter pub get
 
+      # SHA-256 sertifikat penandatangan RESMI, dipakai IntegrityGuard buat
+      # mendeteksi APK yang di-decompile lalu di-sign ulang pakai key lain.
+      # Dihitung dari keystore rilis (sama dengan yang dipakai apksigner nanti),
+      # jadi tidak butuh secret baru.
+      - name: Hitung SHA-256 sertifikat rilis
+        env:
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          SHA=$(keytool -list -v -keystore "$KEYSTORE_PATH" -alias "${KEY_ALIAS:-upload}" -storepass "$STORE_PASSWORD" 2>/dev/null | grep -m1 'SHA256:' | sed 's/.*SHA256: *//' | tr -d ':' | tr 'A-F' 'a-f')
+          if [ -z "$SHA" ]; then
+            echo "::error::Gagal membaca SHA-256 sertifikat dari keystore (cek KEY_ALIAS dan STORE_PASSWORD)"
+            exit 1
+          fi
+          echo "APK_SIG_SHA256=$SHA" >> "$GITHUB_ENV"
+
       # Firebase Zenime (project yang sama dengan app Kotlin), dari google-services.json.
       - name: Build Release APK
         run: >
@@ -162,6 +183,7 @@ jobs:
           --build-name=$APP_VERSION_NAME --build-number=$APP_VERSION_CODE
           --dart-define=FIREBASE_API_KEY=${{ secrets.FIREBASE_API_KEY }}
           --dart-define=FIREBASE_APP_ID=${{ secrets.FIREBASE_APP_ID }}
+          --dart-define=APK_SIG_SHA256=$APK_SIG_SHA256
 
       # Flutter menandatangani APK rilis dengan debug key kalau gradle belum diatur.
       # Daripada menambal build.gradle.kts, APK ditandatangani ulang di sini pakai

@@ -252,7 +252,7 @@ class EpisodeDownloadManager {
         final f = File(path);
         if (await f.exists()) await f.delete();
       } catch (e) {
-        debugPrint('EpisodeDownloadManager: gagal hapus file: $e');
+        if (kDebugMode) debugPrint('EpisodeDownloadManager: gagal hapus file: $e');
       }
     }
     await _store.deleteDownloadRow(episodeId);

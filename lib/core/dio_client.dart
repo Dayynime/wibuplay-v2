@@ -39,9 +39,10 @@ class HeaderInterceptor extends Interceptor {
   }
 }
 
-/// Port RetryInterceptor: GET yang gagal karena error koneksi diulang 1x.
-/// Timeout (connect/receive/send) tidak diulang, sama seperti versi Kotlin
-/// yang mengecualikan SocketTimeoutException.
+/// Port RetryInterceptor: GET yang gagal karena error koneksi diulang 1x
+/// (jeda 300ms). Connect timeout IKUT diulang (jalur WiFi/ISP sering gagal di
+/// percobaan pertama tapi lancar di kedua, fix Zenime); receive/send timeout
+/// tetap tidak diulang karena menunggu 2x lipat cuma bikin user makin lama.
 class RetryInterceptor extends Interceptor {
   RetryInterceptor(this._dio);
 
@@ -53,10 +54,12 @@ class RetryInterceptor extends Interceptor {
     final options = err.requestOptions;
     final isGet = options.method.toUpperCase() == 'GET';
     final alreadyRetried = options.extra[_retriedKey] == true;
-    final isConnectionError = err.type == DioExceptionType.connectionError;
+    final isConnectionError = err.type == DioExceptionType.connectionError ||
+        err.type == DioExceptionType.connectionTimeout;
 
     if (isGet && isConnectionError && !alreadyRetried) {
       options.extra[_retriedKey] = true;
+      await Future<void>.delayed(const Duration(milliseconds: 300));
       try {
         final response = await _dio.fetch<dynamic>(options);
         handler.resolve(response);
@@ -79,7 +82,7 @@ Dio createDio() {
     BaseOptions(
       // Placeholder; host sebenarnya diisi DynamicBaseUrlInterceptor tiap request.
       baseUrl: 'https://placeholder.invalid/',
-      connectTimeout: const Duration(seconds: 20),
+      connectTimeout: const Duration(seconds: 10), // sama dengan Zenime; gagal cepat lalu diulang
       receiveTimeout: const Duration(seconds: 60),
       responseType: ResponseType.plain,
     ),
