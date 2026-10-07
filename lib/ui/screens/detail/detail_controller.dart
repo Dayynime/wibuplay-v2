@@ -8,9 +8,9 @@ import '../../../data/models/episode_item.dart';
 import '../../../data/models/media_item.dart';
 import '../../../providers.dart';
 
-/// Port DetailUiState. selectedTab: 0 = Ringkasan, 1 = Daftar Episode,
-/// 2 = Media & Cuplix. Default 1: halaman detail langsung terbuka di tab
-/// Daftar Episode.
+/// Port DetailUiState. selectedTab (urutan sama dengan DetailTab Zenime):
+/// 0 = Info, 1 = Episode, 2 = Season, 3 = Cuplix, 4 = Cover, 5 = Poster.
+/// Default 1: halaman detail langsung terbuka di tab Episode.
 class DetailUiState {
   const DetailUiState({
     this.anime,
@@ -19,6 +19,11 @@ class DetailUiState {
     this.covers = const [],
     this.posters = const [],
     this.cuplix = const [],
+    this.seasons = const [],
+    this.isLoadingSeasons = false,
+    this.seasonsLoaded = false,
+    this.seasonsError,
+    this.isLoadingGallery = true,
     this.episodeSearch = '',
     this.selectedTab = 1,
     this.isLoading = false,
@@ -37,6 +42,16 @@ class DetailUiState {
   final List<MediaGalleryItem> covers;
   final List<MediaGalleryItem> posters;
   final List<CuplixItem> cuplix;
+
+  /// Tab Season (dimuat saat tab pertama kali dibuka).
+  final List<AnimeItem> seasons;
+  final bool isLoadingSeasons;
+  final bool seasonsLoaded;
+  final String? seasonsError;
+
+  /// True sampai cover/poster/cuplix selesai dimuat (supaya tab tidak
+  /// menampilkan "kosong" sebelum datanya datang).
+  final bool isLoadingGallery;
   final String episodeSearch;
   final int selectedTab;
   final bool isLoading;
@@ -57,6 +72,11 @@ class DetailUiState {
     List<MediaGalleryItem>? covers,
     List<MediaGalleryItem>? posters,
     List<CuplixItem>? cuplix,
+    List<AnimeItem>? seasons,
+    bool? isLoadingSeasons,
+    bool? seasonsLoaded,
+    String? Function()? seasonsError,
+    bool? isLoadingGallery,
     String? episodeSearch,
     int? selectedTab,
     bool? isLoading,
@@ -72,6 +92,11 @@ class DetailUiState {
       covers: covers ?? this.covers,
       posters: posters ?? this.posters,
       cuplix: cuplix ?? this.cuplix,
+      seasons: seasons ?? this.seasons,
+      isLoadingSeasons: isLoadingSeasons ?? this.isLoadingSeasons,
+      seasonsLoaded: seasonsLoaded ?? this.seasonsLoaded,
+      seasonsError: seasonsError != null ? seasonsError() : this.seasonsError,
+      isLoadingGallery: isLoadingGallery ?? this.isLoadingGallery,
       episodeSearch: episodeSearch ?? this.episodeSearch,
       selectedTab: selectedTab ?? this.selectedTab,
       isLoading: isLoading ?? this.isLoading,
@@ -108,7 +133,28 @@ class DetailController extends AutoDisposeFamilyNotifier<DetailUiState, String> 
     if (_alive) state = f(state);
   }
 
-  void setTab(int index) => _update((s) => s.copyWith(selectedTab: index));
+  void setTab(int index) {
+    _update((s) => s.copyWith(selectedTab: index));
+    if (index == 2) loadSeasons();
+  }
+
+  /// Muat tab Season sekali (dipanggil saat tab dibuka); [force] untuk coba lagi.
+  Future<void> loadSeasons({bool force = false}) async {
+    if (state.isLoadingSeasons) return;
+    if (state.seasonsLoaded && !force) return;
+    _update((s) => s.copyWith(isLoadingSeasons: true, seasonsError: () => null));
+    try {
+      final list = await ref.read(repositoryProvider).getSeasons(movieId);
+      _update((s) => s.copyWith(
+            seasons: list,
+            isLoadingSeasons: false,
+            seasonsLoaded: true,
+          ));
+    } catch (e) {
+      final msg = errorMessage(e, 'Gagal memuat season');
+      _update((s) => s.copyWith(isLoadingSeasons: false, seasonsError: () => msg));
+    }
+  }
 
   void onEpisodeSearchChange(String query) {
     _update((s) => s.copyWith(episodeSearch: query));
@@ -210,7 +256,12 @@ class DetailController extends AutoDisposeFamilyNotifier<DetailUiState, String> 
         () => repo.getMoviePosters(movieId), const []);
     final cuplix =
         await _orDefault<List<CuplixItem>>(() => repo.getMovieCuplix(movieId), const []);
-    _update((s) => s.copyWith(covers: covers, posters: posters, cuplix: cuplix));
+    _update((s) => s.copyWith(
+          covers: covers,
+          posters: posters,
+          cuplix: cuplix,
+          isLoadingGallery: false,
+        ));
   }
 
   Future<void> toggleFavorite() async {

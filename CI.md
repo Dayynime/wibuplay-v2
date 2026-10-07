@@ -130,3 +130,10 @@ manifest rilis bawaan Flutter tidak punya izin internet.
 - Warna hard-coded di layar (gradien login/update/pengumuman, latar overlay, dll.) sudah dipetakan ke palet yang sama. Warna semantik (badge role, badge game, biru Google/Instagram, pilihan warna username) sengaja tidak diubah.
 - Splash/launch native (`android_res/values-v31/styles.xml`, `drawable*/launch_background.xml`) memakai `#0B0E14`.
 - Tema tidak bisa diganti saat runtime: warna dipakai sebagai `const` di ratusan tempat, jadi ganti palet = ubah `app_colors.dart` lalu build ulang.
+
+### Detail Anime (layout Zenime)
+
+- `ui/screens/detail/detail_screen.dart`: hero cover penuh 360dp (judul, metadata, tombol favorit/bookmark, tombol play crimson bulat = lanjut episode terakhir atau episode pertama), baris 6 tab Info | Episode | Season | Cuplix | Cover | Poster (swipe kiri/kanan untuk pindah tab), daftar episode grid 3 kolom (nomor di pojok kanan bawah, bingkai untuk episode terakhir ditonton, gembok Premium, badge download, pita NEW).
+- Download episode: tekan lama kartu episode (khusus Premium; tekan lama pada episode yang sudah didownload = hapus).
+- Tab Season memakai `AnimeRepository.getSeasons` (daftar season dari respons detail). Rating bintang "4.8" Zenime tidak diport karena angkanya hard-coded, bukan data asli.
+- Section "Lanjutkan Menonton" di Beranda dihapus (riwayat tonton tetap tersimpan dan tampil di Profil).

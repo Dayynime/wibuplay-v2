@@ -294,6 +294,34 @@ class AnimeRepository {
     }
   }
 
+  /// Season lain dari anime ini. Daftar season ada di respons detail (key apa
+  /// pun yang mengandung "season" dan berisi list), sama seperti getSeasons
+  /// Zenime. Kosong = anime ini belum punya season lain.
+  Future<List<AnimeItem>> getSeasons(String movieId) async {
+    final resp = await _api.getMovieDetail(movieId);
+    final data = resp.data;
+    if (data is! Map) return const [];
+
+    List<dynamic>? findList(Map m) {
+      for (final e in m.entries) {
+        if (e.key.toString().toLowerCase().contains('season') && e.value is List) {
+          return e.value as List<dynamic>;
+        }
+      }
+      return null;
+    }
+
+    final inner = data['movie'];
+    final list = findList(data) ?? (inner is Map ? findList(inner) : null) ?? const [];
+    final out = <AnimeItem>[];
+    for (final raw in list) {
+      if (raw is! Map) continue;
+      final item = JsonHelper.parseAnimeItem(raw);
+      if (item != null && (item.id ?? '').isNotEmpty) out.add(item);
+    }
+    return out;
+  }
+
   Future<List<EpisodeItem>> getMovieEpisodes(String id,
       {int page = 0, String search = ''}) async {
     final resp = await _api.getMovieEpisodes(id, page: page, search: search);
