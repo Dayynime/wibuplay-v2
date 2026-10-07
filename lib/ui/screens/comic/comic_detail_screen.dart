@@ -62,23 +62,34 @@ class ComicDetailScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.backgroundDark,
+      // Body Scaffold dikasih constraint LONGGAR. Stack yang isinya cuma
+      // Positioned + satu anak biasa (SafeArea) mengecil seukuran anak itu,
+      // jadi daftar di bawah kepotong setinggi baris tombol. fit: expand
+      // memaksa Stack memenuhi layar.
       body: Stack(
+        fit: StackFit.expand,
         children: [
           Positioned.fill(child: body),
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              child: Row(
-                children: [
-                  _RoundIcon(icon: Icons.arrow_back, onTap: onBackClick),
-                  const Spacer(),
-                  if (ui.detail != null)
-                    _RoundIcon(
-                      icon: isFav ? Icons.bookmark : Icons.bookmark_border,
-                      color: isFav ? _starYellow : Colors.white,
-                      onTap: ctrl.toggleFavorite,
-                    ),
-                ],
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: Row(
+                  children: [
+                    _RoundIcon(icon: Icons.arrow_back, onTap: onBackClick),
+                    const Spacer(),
+                    if (ui.detail != null)
+                      _RoundIcon(
+                        icon: isFav ? Icons.bookmark : Icons.bookmark_border,
+                        color: isFav ? _starYellow : Colors.white,
+                        onTap: ctrl.toggleFavorite,
+                      ),
+                  ],
+                ),
               ),
             ),
           ),

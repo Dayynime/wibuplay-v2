@@ -106,6 +106,10 @@ manifest rilis bawaan Flutter tidak punya izin internet.
 
 - Cover di detail komik dulu di-decode lewat `memCacheWidth: 900` (ukuran asli bisa sangat tinggi, layar jadi kosong setelah cover). Sekarang `ComicImage(maxSide: 1200)` memakai `ResizeImage(policy: fit)` jadi decode dibatasi 1200 px sisi terpanjang dengan proporsi tetap.
 
+### Catatan Layout Detail Komik
+
+- Bug detail komik "cover kepotong, bawahnya kosong": body `Scaffold` memberi constraint longgar, dan `Stack` yang hanya berisi `Positioned.fill` + satu anak biasa (`SafeArea` tombol back/bookmark) mengecil seukuran anak itu, jadi daftar chapter ikut kepotong. Perbaikan: `Stack(fit: StackFit.expand)` dan tombol dibungkus `Positioned(top: 0, left: 0, right: 0)`. (`ComicCoverImage` tetap dipakai untuk cover.)
+
 ### Catatan Halaman Clan
 
 - Alur: Beranda > tap panel TOP CLAN di slide leaderboard > `ClanBrowseScreen` (Semua Clan / Leaderboard / Clan Saya + cari) > tap clan > `ClanScreen` (detail).
