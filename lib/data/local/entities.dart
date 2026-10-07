@@ -125,9 +125,9 @@ class WatchHistoryEntity {
 
 /// Port DownloadedEpisodeEntity (tabel `downloaded_episodes` di Room Zenime).
 ///
-/// Wibuplay belum punya fitur download sendiri; kelas ini hanya menyimpan data
-/// download dari Zenime (hasil migrasi Room) supaya tidak hilang. File videonya
-/// tetap ada di `getExternalFilesDir(MOVIES)/<animeId>/<episodeId>.mp4`.
+/// Data download episode (offline, khusus Premium). Berisi download dari Wibuplay
+/// sendiri dan hasil migrasi Room Zenime. File videonya ada di
+/// `getExternalFilesDir(MOVIES)/<animeId>/<episodeId>.mp4` (app-private).
 class DownloadedEpisodeEntity {
   const DownloadedEpisodeEntity({
     required this.episodeId,
@@ -144,6 +144,7 @@ class DownloadedEpisodeEntity {
     this.createdAt = 0,
     this.updatedAt = 0,
     this.episodeThumbnailUrl,
+    this.workRequestId,
   });
 
   final String episodeId;
@@ -163,7 +164,35 @@ class DownloadedEpisodeEntity {
   final int updatedAt;
   final String? episodeThumbnailUrl;
 
+  /// ID DownloadManager sistem Android (disimpan sebagai string, sama dengan Zenime).
+  final String? workRequestId;
+
   bool get isCompleted => status == 'COMPLETED';
+  bool get isActive => status == 'QUEUED' || status == 'DOWNLOADING';
+
+  DownloadedEpisodeEntity copyWith({
+    int? totalBytes,
+    int? downloadedBytes,
+    String? status,
+    int? updatedAt,
+  }) =>
+      DownloadedEpisodeEntity(
+        episodeId: episodeId,
+        animeId: animeId,
+        animeTitle: animeTitle,
+        posterUrl: posterUrl,
+        episodeTitle: episodeTitle,
+        episodeIndex: episodeIndex,
+        quality: quality,
+        localFilePath: localFilePath,
+        totalBytes: totalBytes ?? this.totalBytes,
+        downloadedBytes: downloadedBytes ?? this.downloadedBytes,
+        status: status ?? this.status,
+        createdAt: createdAt,
+        updatedAt: updatedAt ?? this.updatedAt,
+        episodeThumbnailUrl: episodeThumbnailUrl,
+        workRequestId: workRequestId,
+      );
 
   Map<String, dynamic> toJson() => {
         'episodeId': episodeId,
@@ -180,6 +209,7 @@ class DownloadedEpisodeEntity {
         'createdAt': createdAt,
         'updatedAt': updatedAt,
         'episodeThumbnailUrl': episodeThumbnailUrl,
+        'workRequestId': workRequestId,
       };
 
   factory DownloadedEpisodeEntity.fromJson(Map<String, dynamic> j) =>
@@ -198,5 +228,6 @@ class DownloadedEpisodeEntity {
         createdAt: (j['createdAt'] as num?)?.toInt() ?? 0,
         updatedAt: (j['updatedAt'] as num?)?.toInt() ?? 0,
         episodeThumbnailUrl: j['episodeThumbnailUrl'] as String?,
+        workRequestId: j['workRequestId']?.toString(),
       );
 }

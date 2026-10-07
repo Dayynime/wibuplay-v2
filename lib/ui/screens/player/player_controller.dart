@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/error_message.dart';
+import '../../../core/premium_access.dart';
 import '../../../data/models/anime_item.dart';
 import '../../../data/models/episode_item.dart';
 import '../../../data/models/stream_data.dart';
@@ -147,6 +148,9 @@ class PlayerController
     // Posisi tersimpan untuk melanjutkan tontonan
     final resumeMs = repo.historyForEpisode(episodeId)?.playbackPositionMs ?? 0;
 
+    // Episode yang sudah didownload (khusus Premium) diputar dari file lokal.
+    final localServer = await _localServer(episodeId);
+
     try {
       final data = await repo.getEpisodeStream(episodeId);
       StreamServer? defaultServer;
@@ -157,15 +161,65 @@ class PlayerController
           break;
         }
       }
+      // File offline jadi pilihan pertama (hemat kuota, tetap bisa ganti server).
+      final merged = localServer == null
+          ? data
+          : StreamData(
+              episode: data.episode,
+              episodeNext: data.episodeNext,
+              hasNextEpisode: data.hasNextEpisode,
+              server: [localServer, ...data.server],
+            );
       _update((s) => s.copyWith(
-            streamData: data,
-            selectedServer: () => defaultServer,
+            streamData: merged,
+            selectedServer: () => localServer ?? defaultServer,
             isLoadingStream: false,
             resumePositionMs: resumeMs,
           ));
     } catch (e) {
+      if (localServer != null) {
+        // Gagal ambil stream (kemungkinan offline) tapi file lokal ada:
+        // putar dari file; next episode / ganti server disembunyikan.
+        final dl = ref.read(localStoreProvider).downloadFor(episodeId);
+        _update((s) => s.copyWith(
+              streamData: StreamData(
+                episode: EpisodeItem(
+                  id: episodeId,
+                  title: dl?.episodeTitle,
+                  index: dl?.episodeIndex,
+                ),
+                server: [localServer],
+              ),
+              selectedServer: () => localServer,
+              isLoadingStream: false,
+              resumePositionMs: resumeMs,
+            ));
+        return;
+      }
       final msg = errorMessage(e, 'Gagal memuat server video');
       _update((s) => s.copyWith(isLoadingStream: false, streamError: () => msg));
+    }
+  }
+
+  /// Server "Offline" dari file hasil download, atau null kalau tidak berlaku:
+  /// bukan Premium, belum didownload, atau file sudah tidak ada di disk.
+  Future<StreamServer?> _localServer(String episodeId) async {
+    try {
+      final file = ref.read(episodeDownloadManagerProvider).localFileFor(episodeId);
+      if (file == null) return null;
+      final user = await ref.read(authUserProvider.future);
+      final uid = user?.uid;
+      if (uid == null || uid.isEmpty) return null;
+      final premium = await ref.read(premiumProvider(uid).future);
+      if (!isDownloadAllowed(premium)) return null;
+      return StreamServer(
+        link: Uri.file(file.path).toString(),
+        quality: 'Offline',
+        type: 'offline',
+        name: 'Offline',
+      );
+    } catch (_) {
+      return null;
     }
   }
 
@@ -194,11 +248,12 @@ class PlayerController
     }
     ep ??= s.streamData?.episode;
     final anime = s.anime;
-    if (s.currentEpisodeId.trim().isNotEmpty && anime != null) {
+    final dl = ref.read(localStoreProvider).downloadFor(s.currentEpisodeId);
+    if (s.currentEpisodeId.trim().isNotEmpty && (anime != null || dl != null)) {
       await ref.read(repositoryProvider).saveWatchProgress(
             movieId: s.movieId,
-            movieTitle: anime.title ?? 'Anime',
-            moviePoster: anime.posterUrl,
+            movieTitle: anime?.title ?? dl?.animeTitle ?? 'Anime',
+            moviePoster: anime?.posterUrl ?? dl?.posterUrl ?? '',
             episodeId: s.currentEpisodeId,
             episodeIndex: ep?.index ?? '1',
             episodeTitle: ep?.title ?? 'Episode',

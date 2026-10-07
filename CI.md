@@ -107,5 +107,12 @@ manifest rilis bawaan Flutter tidak punya izin internet.
 
 - Zenime (Kotlin) menyimpan favorit, riwayat tonton, dan data download di Room `databases/zenime_database` (v5); Wibuplay (Flutter) memakai shared_preferences. Karena applicationId sama, saat Wibuplay meng-update Zenime file Room itu masih ada tapi dulu tidak terbaca, sehingga riwayat/favorit tampak hilang.
 - `lib/data/local/zenime_room_migration.dart` (dipanggil di `main.dart` setelah `LocalStore.open()`) mengimpor sekali: `favorites`, `watch_history`, `downloaded_episodes` (via `sqflite`, hanya SELECT). Data yang sudah ada di Wibuplay tidak ditimpa. DB Room tidak diubah/dihapus. Flag `zenime_room_migrated_v1` baru ditulis kalau pembacaan sukses.
-- File video download Zenime ada di `getExternalFilesDir(MOVIES)/<animeId>/<episodeId>.mp4` (app-private) dan ikut bertahan saat update. Wibuplay baru menyimpan metadatanya (`LocalStore.downloads`); belum ada tab Download dan pemutaran offline.
+- File video download Zenime ada di `getExternalFilesDir(MOVIES)/<animeId>/<episodeId>.mp4` (app-private) dan ikut bertahan saat update; metadatanya diimpor ke `LocalStore.downloads`.
 - Data hanya bertahan kalau APK meng-UPDATE (applicationId sama + tanda tangan sama + versionCode lebih besar). Kalau Android menolak update dan user harus uninstall dulu, semua data lokal ikut terhapus. Pakai hanya APK dari `release.yml` dengan keystore Zenime.
+
+### Download Offline (khusus Premium)
+
+- Port EpisodeDownloadManager Zenime: `lib/data/download/episode_download_manager.dart` + MethodChannel `wibuplay/download` di `android_native/MainActivity.kt` (android.app.DownloadManager sistem; tetap jalan walau app di-swipe, ada notifikasi bawaan).
+- File: `getExternalFilesDir(MOVIES)/<animeId>/<episodeId>.mp4`, sama dengan Zenime. Batas 15 episode offline (`kMaxActiveDownloads`).
+- Gating: `isDownloadAllowed(isPremium)` di `core/premium_access.dart`. Non-premium: tombol download di Detail menampilkan ajakan Premium, tab Download terkunci, file offline tidak diputar (file tetap aman di perangkat dan terbuka lagi begitu Premium aktif).
+- UI: ikon download di tiap item Daftar Episode (Detail), tab "Download" di Profil, pemutaran offline lewat server "Offline" di player (fallback ke file lokal kalau stream gagal / tidak ada internet).

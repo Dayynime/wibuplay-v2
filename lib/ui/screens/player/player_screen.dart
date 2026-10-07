@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -311,7 +312,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
 
     final VideoPlayerController vc;
     try {
-      vc = VideoPlayerController.networkUrl(Uri.parse(link));
+      vc = link.startsWith('file://')
+          ? VideoPlayerController.file(File.fromUri(Uri.parse(link)))
+          : VideoPlayerController.networkUrl(Uri.parse(link));
     } catch (_) {
       if (mounted) setState(() => _playerError = true);
       return;

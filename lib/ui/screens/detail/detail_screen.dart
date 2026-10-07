@@ -11,6 +11,7 @@ import '../../components/cards.dart';
 import '../../components/common_components.dart';
 import '../../components/net_image.dart';
 import '../../components/poster_holder.dart';
+import '../download/download_actions.dart';
 import 'detail_controller.dart';
 
 bool _blank(String? s) => s == null || s.trim().isEmpty;
@@ -538,6 +539,8 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
     // Loading dianggap premium biar gembok tidak berkedip; player tetap
     // menegakkan kunci dengan status yang sudah pasti.
     final premium = ref.watch(myPremiumProvider).valueOrNull ?? true;
+    // Daftar download (status/progres) -- rebuild tiap ada perubahan.
+    final downloads = ref.watch(localStoreProvider.select((s) => s.downloads));
     return [
       SliverToBoxAdapter(
         child: Padding(
@@ -606,6 +609,14 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
             return EpisodeListItem(
               episode: ep,
               isLocked: isEpisodeLocked(ep.index, ui.totalEpisodes, premium),
+              download: downloads.where((d) => d.episodeId == ep.id).firstOrNull,
+              onDownloadTap: () => onEpisodeDownloadTap(
+                context,
+                ref,
+                movieId: widget.movieId,
+                anime: ui.anime,
+                episode: ep,
+              ),
               onTap: () {
                 final id = ep.id;
                 if (id != null) widget.onWatchEpisode(widget.movieId, id);

@@ -21,6 +21,7 @@ import '../../components/role_badges.dart';
 import '../auth/login_screen.dart';
 import '../chat/chat_screen.dart';
 import '../clan/clan_browse_screen.dart';
+import '../download/downloads_tab.dart';
 import '../friends/friends_screen.dart';
 import '../xp/xp_leaderboard_screen.dart';
 import 'my_xp_card.dart';
@@ -50,6 +51,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     'Favorit',
     'Komentar',
     'Riwayat',
+    'Download',
     'Pengaturan',
   ];
 
@@ -453,6 +455,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         return _buildComments(user, premium, name, avatarUrl);
       case 3:
         return _buildHistory(history, user, premium, name, avatarUrl);
+      case 4:
+        return DownloadsTab(onPlay: widget.onWatchEpisode);
       default:
         return _buildSettings();
     }

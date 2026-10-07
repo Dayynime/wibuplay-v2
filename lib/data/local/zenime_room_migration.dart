@@ -115,6 +115,7 @@ class ZenimeRoomMigration {
               createdAt: num0(r['createdAt']),
               updatedAt: num0(r['updatedAt']),
               episodeThumbnailUrl: str(r['episodeThumbnailUrl']),
+              workRequestId: str(r['workRequestId']),
             ),
       ];
 

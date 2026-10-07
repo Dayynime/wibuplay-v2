@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/dio_client.dart';
 import 'data/api/api_service.dart';
+import 'data/download/episode_download_manager.dart';
 import 'data/local/local_store.dart';
 import 'data/repository/account_repository.dart';
 import 'data/repository/anime_repository.dart';
@@ -31,6 +32,11 @@ import 'data/supabase/supabase_client.dart';
 /// Di-override di main() setelah LocalStore.open() selesai.
 final localStoreProvider = ChangeNotifierProvider<LocalStore>(
   (ref) => throw UnimplementedError('localStoreProvider harus di-override di main()'),
+);
+
+/// Download episode offline (khusus Premium). Satu instance selama app hidup.
+final episodeDownloadManagerProvider = Provider<EpisodeDownloadManager>(
+  (ref) => EpisodeDownloadManager(ref.read(localStoreProvider)),
 );
 
 final dioProvider = Provider<Dio>((ref) => createDio());

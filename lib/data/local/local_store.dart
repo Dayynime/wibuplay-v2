@@ -187,6 +187,36 @@ class LocalStore extends ChangeNotifier {
 
   List<DownloadedEpisodeEntity> get downloads => _downloads;
 
+  DownloadedEpisodeEntity? downloadFor(String episodeId) {
+    for (final d in _downloads) {
+      if (d.episodeId == episodeId) return d;
+    }
+    return null;
+  }
+
+  /// Download yang dihitung ke kuota: selesai + sedang jalan (FAILED tidak).
+  int get activeDownloadCount => _downloads.where((d) => d.status != 'FAILED').length;
+
+  /// Simpan/ganti satu baris download. [persist] false = hanya memori + UI
+  /// (dipakai untuk update progres yang sering, supaya tidak menulis terus).
+  Future<void> upsertDownload(DownloadedEpisodeEntity entry, {bool persist = true}) async {
+    _downloads = [entry, ..._downloads.where((d) => d.episodeId != entry.episodeId)]
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    notifyListeners();
+    if (persist) await _saveDownloads();
+  }
+
+  Future<void> deleteDownloadRow(String episodeId) async {
+    _downloads = _downloads.where((d) => d.episodeId != episodeId).toList();
+    notifyListeners();
+    await _saveDownloads();
+  }
+
+  Future<void> _saveDownloads() => _prefs.setString(
+        _dlKey,
+        jsonEncode(_downloads.map((e) => e.toJson()).toList()),
+      );
+
   Future<int> mergeDownloads(List<DownloadedEpisodeEntity> incoming) async {
     final have = _downloads.map((d) => d.episodeId).toSet();
     final fresh =

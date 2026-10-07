@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../providers.dart';
 import '../app_routes.dart';
 import '../components/floating_bottom_bar.dart';
 import '../screens/cuplix/cuplix_screen.dart';
@@ -12,15 +14,22 @@ import '../screens/schedule/schedule_screen.dart';
 /// Port AppNavigation.kt: 5 tab + bottom bar melayang.
 /// Beranda, Jelajah, Jadwal, Cuplix, Profil; Detail dan Player dibuka lewat
 /// openDetail/openPlayer (app_routes.dart).
-class AppShell extends StatefulWidget {
+class AppShell extends ConsumerStatefulWidget {
   const AppShell({super.key});
 
   @override
-  State<AppShell> createState() => _AppShellState();
+  ConsumerState<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends State<AppShell> {
+class _AppShellState extends ConsumerState<AppShell> {
   int _index = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // Sambung lagi polling progres download yang masih jalan di sistem.
+    ref.read(episodeDownloadManagerProvider).reconcileActiveDownloads();
+  }
 
   /// Tab dibuat saat pertama kali dibuka (seperti NavHost), supaya Jelajah,
   /// Jadwal, dan Cuplix tidak memanggil API sebelum dikunjungi.

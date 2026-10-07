@@ -53,3 +53,12 @@ bool isQualityLocked(String? quality, bool isPremium) {
   if (v == null) return false;
   return v > kNonPremiumMaxQualityP;
 }
+
+/// Download untuk nonton offline KHUSUS Premium (port isDownloadAllowed):
+/// non-premium tidak boleh download episode apa pun, juga tidak memutar file
+/// offline dan tidak membuka tab Download.
+bool isDownloadAllowed(bool isPremium) => isPremium;
+
+/// Batas episode offline bersamaan (selesai + sedang jalan), murni proteksi
+/// storage dan sama untuk semua user Premium (sama dengan Zenime).
+const int kMaxActiveDownloads = 15;

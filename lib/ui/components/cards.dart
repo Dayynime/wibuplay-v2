@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
+import '../../data/local/entities.dart';
 import '../../data/models/anime_item.dart';
 import '../../data/models/episode_item.dart';
 import 'net_image.dart';
@@ -352,10 +353,17 @@ class EpisodeListItem extends StatelessWidget {
     required this.episode,
     required this.onTap,
     this.isLocked = false,
+    this.download,
+    this.onDownloadTap,
   });
 
   final EpisodeItem episode;
   final VoidCallback onTap;
+
+  /// Status download episode ini (null = belum pernah). Tombol download hanya
+  /// tampil kalau [onDownloadTap] diisi dan episode tidak terkunci.
+  final DownloadedEpisodeEntity? download;
+  final VoidCallback? onDownloadTap;
 
   /// Episode terbaru khusus Premium (ikon gembok menggantikan ikon play).
   final bool isLocked;
@@ -432,11 +440,50 @@ class EpisodeListItem extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (onDownloadTap != null && !isLocked)
+                  _DownloadButton(entry: download, onTap: onDownloadTap!),
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Ikon status download di kanan item episode: belum ada / progres / selesai / gagal.
+class _DownloadButton extends StatelessWidget {
+  const _DownloadButton({required this.entry, required this.onTap});
+
+  final DownloadedEpisodeEntity? entry;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final e = entry;
+    final Widget icon;
+    if (e == null) {
+      icon = const Icon(Icons.download_outlined, color: AppColors.textMuted, size: 22);
+    } else if (e.isActive) {
+      final p = e.totalBytes > 0 ? (e.downloadedBytes / e.totalBytes).clamp(0.0, 1.0) : null;
+      icon = SizedBox(
+        width: 20,
+        height: 20,
+        child: CircularProgressIndicator(
+          value: p,
+          strokeWidth: 2.2,
+          color: AppColors.accentViolet,
+        ),
+      );
+    } else if (e.isCompleted) {
+      icon = const Icon(Icons.download_done, color: Color(0xFF4CAF50), size: 22);
+    } else {
+      icon = const Icon(Icons.error_outline, color: Color(0xFFE57373), size: 22);
+    }
+    return InkResponse(
+      onTap: onTap,
+      radius: 22,
+      child: Padding(padding: const EdgeInsets.all(8), child: icon),
     );
   }
 }
