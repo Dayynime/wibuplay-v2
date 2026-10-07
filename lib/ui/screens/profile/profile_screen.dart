@@ -19,9 +19,8 @@ import '../../components/game_badges.dart';
 import '../../components/net_image.dart';
 import '../../components/role_badges.dart';
 import '../auth/login_screen.dart';
-import '../chat/chat_screen.dart';
 import '../clan/clan_browse_screen.dart';
-import '../download/downloads_tab.dart';
+import 'settings_screen.dart';
 import '../friends/friends_screen.dart';
 import '../xp/xp_leaderboard_screen.dart';
 import 'my_xp_card.dart';
@@ -51,8 +50,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     'Favorit',
     'Komentar',
     'Riwayat',
-    'Download',
-    'Pengaturan',
   ];
 
   int _selectedTab = 0;
@@ -320,6 +317,20 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ],
           ),
         ),
+        Positioned(
+          top: topPad + 8,
+          right: 12,
+          child: Material(
+            color: const Color(0x59000000),
+            shape: const CircleBorder(),
+            child: IconButton(
+              onPressed: () => Navigator.of(context)
+                  .push<void>(fadeRoute(const ProfileSettingsScreen())),
+              tooltip: 'Pengaturan',
+              icon: const Icon(Icons.settings_outlined, color: Colors.white),
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -453,12 +464,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         return _buildFavorites(favorites);
       case 2:
         return _buildComments(user, premium, name, avatarUrl);
-      case 3:
-        return _buildHistory(history, user, premium, name, avatarUrl);
-      case 4:
-        return DownloadsTab(onPlay: widget.onWatchEpisode);
       default:
-        return _buildSettings();
+        return _buildHistory(history, user, premium, name, avatarUrl);
     }
   }
 
@@ -758,79 +765,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   // ------------------------------------------------------------ pengaturan
 
-  Widget _buildSettings() {
-    const sectionStyle = TextStyle(
-      color: AppColors.accentViolet,
-      fontSize: 12,
-      fontWeight: FontWeight.w700,
-    );
-    final user = ref.watch(authUserProvider).valueOrNull;
-    final profile = _zenimeProfile(user);
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Akun Zenime', style: sectionStyle),
-          const SizedBox(height: 10),
-          if (user == null)
-            _SettingsItem(
-              icon: Icons.login,
-              title: 'Masuk',
-              subtitle: 'Pakai akun Zenime yang sama untuk chat dan data lain',
-              onTap: _openLogin,
-            )
-          else ...[
-            _SettingsItem(
-              icon: Icons.forum_outlined,
-              title: 'Chat Global',
-              subtitle: 'Ngobrol bareng sesama pengguna Zenime',
-              onTap: _openChat,
-            ),
-            const SizedBox(height: 10),
-            _SettingsItem(
-              icon: Icons.workspace_premium_outlined,
-              title: 'Premium',
-              subtitle: '1080p, tanpa iklan, download offline, XP ×2',
-              onTap: () => openPremium(context),
-            ),
-            const SizedBox(height: 10),
-            _SettingsItem(
-              icon: Icons.monetization_on_outlined,
-              title: 'ZCoin',
-              subtitle: 'Cek saldo dan top up',
-              onTap: () => openCoin(context),
-            ),
-            const SizedBox(height: 10),
-            _SettingsItem(
-              icon: Icons.logout,
-              title: 'Keluar',
-              subtitle: _resolvedName(user, profile.data, profile.loading),
-              onTap: _confirmSignOut,
-            ),
-          ],
-          const SizedBox(height: 20),
-          const Text('Penyimpanan & Cache', style: sectionStyle),
-          const SizedBox(height: 10),
-          _SettingsItem(
-            icon: Icons.cleaning_services_outlined,
-            title: 'Bersihkan Cache Memori',
-            subtitle: 'Mengosongkan cache cover dan metadata',
-            onTap: _clearCache,
-          ),
-          const SizedBox(height: 20),
-          const Text('Tentang Aplikasi', style: sectionStyle),
-          const SizedBox(height: 10),
-          const _SettingsItem(
-            icon: Icons.info_outline,
-            title: 'Zenime v1.0',
-            subtitle: 'Aplikasi streaming anime modern & Cuplix',
-          ),
-        ],
-      ),
-    );
-  }
-
   Future<void> _confirmClearHistory() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -898,62 +832,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     return ok == true;
   }
 
-  Future<void> _openChat() async {
-    if (!FirebaseConfig.ready) {
-      await _openLogin();
-      return;
-    }
-    if (ref.read(authRepositoryProvider).currentUser == null) {
-      final ok = await _openLogin();
-      if (!ok || !mounted) return;
-    }
-    if (!mounted) return;
-    await Navigator.of(context).push<void>(fadeRoute(const ChatScreen()));
-  }
-
-  Future<void> _confirmSignOut() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surfaceDark,
-        title: const Text('Keluar?', style: TextStyle(color: AppColors.textWhite)),
-        content: const Text(
-          'Kamu perlu masuk lagi untuk memakai Chat.',
-          style: TextStyle(color: AppColors.textSecondary),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Batal')),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Keluar')),
-        ],
-      ),
-    );
-    if (confirmed == true) await ref.read(authRepositoryProvider).signOut();
-  }
-
-  /// Di Kotlin tombol ini hanya menampilkan Toast. Di sini cache gambar di
-  /// memori benar-benar dikosongkan (cache disk cover tidak disentuh).
-  void _clearCache() {
-    final cache = PaintingBinding.instance.imageCache;
-    cache.clear();
-    cache.clearLiveImages();
-    final messenger = ScaffoldMessenger.maybeOf(context);
-    if (messenger == null) return;
-    messenger
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: const Text('Cache berhasil dibersihkan'),
-          duration: const Duration(seconds: 2),
-          behavior: SnackBarBehavior.floating,
-          margin: EdgeInsets.fromLTRB(
-            20,
-            0,
-            20,
-            100 + MediaQuery.paddingOf(context).bottom,
-          ),
-        ),
-      );
-  }
 }
 
 // ====================================================== widget pendukung
@@ -1881,65 +1759,3 @@ class ProfileWatchHistoryRow extends StatelessWidget {
   }
 }
 
-/// Port SettingsItem.
-class _SettingsItem extends StatelessWidget {
-  const _SettingsItem({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    this.onTap,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.surfaceCard,
-      borderRadius: AppShapes.card,
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap ?? () {},
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: const BoxDecoration(
-                  color: AppColors.surfaceDark,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, color: AppColors.accentViolet, size: 20),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        color: AppColors.textWhite,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    Text(
-                      subtitle,
-                      style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}

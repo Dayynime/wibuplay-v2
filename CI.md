@@ -115,4 +115,4 @@ manifest rilis bawaan Flutter tidak punya izin internet.
 - Port EpisodeDownloadManager Zenime: `lib/data/download/episode_download_manager.dart` + MethodChannel `wibuplay/download` di `android_native/MainActivity.kt` (android.app.DownloadManager sistem; tetap jalan walau app di-swipe, ada notifikasi bawaan).
 - File: `getExternalFilesDir(MOVIES)/<animeId>/<episodeId>.mp4`, sama dengan Zenime. Batas 15 episode offline (`kMaxActiveDownloads`).
 - Gating: `isDownloadAllowed(isPremium)` di `core/premium_access.dart`. Non-premium: tombol download di Detail menampilkan ajakan Premium, tab Download terkunci, file offline tidak diputar (file tetap aman di perangkat dan terbuka lagi begitu Premium aktif).
-- UI: ikon download di tiap item Daftar Episode (Detail), tab "Download" di Profil, pemutaran offline lewat server "Offline" di player (fallback ke file lokal kalau stream gagal / tidak ada internet).
+- UI: ikon download di tiap item Daftar Episode (Detail), halaman Download (Profil > ikon gear Pengaturan > Download), pemutaran offline lewat server "Offline" di player (fallback ke file lokal kalau stream gagal / tidak ada internet).
