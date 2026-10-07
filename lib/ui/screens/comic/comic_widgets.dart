@@ -34,6 +34,7 @@ class ComicImage extends StatelessWidget {
     this.fit = BoxFit.cover,
     this.alignment = Alignment.center,
     this.memCacheWidth,
+    this.maxSide,
   });
 
   final String? url;
@@ -41,11 +42,40 @@ class ComicImage extends StatelessWidget {
   final Alignment alignment;
   final int? memCacheWidth;
 
+  /// Batas sisi terpanjang hasil decode (px), proporsi gambar dijaga. Dipakai
+  /// untuk gambar yang ukuran aslinya tidak bisa dipastikan (cover detail):
+  /// gambar sangat tinggi/lebar tidak lagi di-decode penuh ke memori/GPU.
+  final int? maxSide;
+
   @override
   Widget build(BuildContext context) {
     final u = ComicNetwork.normalizeImageUrl(url);
     if (u == null) {
       return const ColoredBox(color: AppColors.surfaceDark, child: SizedBox.expand());
+    }
+    if (maxSide != null) {
+      return Image(
+        image: ResizeImage(
+          CachedNetworkImageProvider(u, headers: ComicNetwork.imageHeaders),
+          width: maxSide,
+          height: maxSide,
+          policy: ResizeImagePolicy.fit,
+        ),
+        fit: fit,
+        alignment: alignment,
+        width: double.infinity,
+        height: double.infinity,
+        gaplessPlayback: true,
+        frameBuilder: (context, child, frame, sync) => (sync || frame != null)
+            ? child
+            : const SizedBox.expand(child: ShimmerBox(borderRadius: BorderRadius.zero)),
+        errorBuilder: (_, __, ___) => const ColoredBox(
+          color: AppColors.surfaceCard,
+          child: Center(
+            child: Icon(Icons.broken_image_outlined, color: AppColors.textMuted),
+          ),
+        ),
+      );
     }
     return CachedNetworkImage(
       imageUrl: u,

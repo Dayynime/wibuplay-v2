@@ -19,6 +19,11 @@ const double _stage = 300;
 const Cubic _backOut = Cubic(0.34, 1.56, 0.64, 1.0);
 const Color _gold = Color(0xFFFFB020);
 
+// Poster asli untuk slide Komik & Donghua (Douluo Dalu: donghua dan manhua-nya).
+// CDN publik MyAnimeList, cuma di-link seperti kLoginPosters, tidak di-bundle.
+const String _kDonghuaPoster = 'https://cdn.myanimelist.net/images/anime/1438/101531l.jpg';
+const String _kComicPoster = 'https://cdn.myanimelist.net/images/manga/4/221353l.jpg';
+
 class _Slide {
   const _Slide(this.title, this.highlight, this.desc, this.a, this.b);
 
@@ -1219,130 +1224,63 @@ class _DonghuaIllustration extends StatelessWidget {
   final Color a;
   final Color b;
 
-  Widget _card({required double scale, required double alpha, required double dy}) {
-    return Transform.translate(
-      offset: Offset(0, dy),
-      child: Transform.scale(
-        scale: scale,
-        child: Container(
-          width: 230,
-          height: 150,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [a.withValues(alpha: alpha), b.withValues(alpha: alpha)],
-            ),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.18 * alpha)),
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        _GlowOrb(a, 280),
-        _card(scale: 0.78, alpha: 0.35, dy: -62),
-        Transform.translate(
-          offset: const Offset(-64, -20),
-          child: Transform.rotate(
-            angle: -10 * math.pi / 180,
-            child: Container(
-              width: 110,
-              height: 150,
-              decoration: _glass(18),
-              child: Icon(
-                Icons.menu_book_rounded,
-                color: Colors.white.withValues(alpha: 0.75),
-                size: 44,
-              ),
-            ),
-          ),
-        ),
-        _Reveal(
-          active: active,
-          dy: 30,
-          scaleFrom: 0.85,
-          durationMs: 650,
-          curve: _backOut,
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0, end: active ? 1 : 0),
+      duration: const Duration(milliseconds: 900),
+      curve: Curves.easeOutBack,
+      builder: (context, spread, _) {
+        return Stack(
           alignment: Alignment.center,
-          child: _Floating(
-            periodMs: 3600,
-            amplitude: 6,
-            child: Container(
-              width: 230,
-              height: 150,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(24),
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [a, b],
+          children: [
+            _GlowOrb(a, 280),
+            // Poster komik (belakang, miring ke kiri).
+            Transform.translate(
+              offset: Offset(-62 * spread, 22 * spread),
+              child: Transform.rotate(
+                angle: -11 * math.pi / 180 * spread,
+                child: Transform.scale(
+                  scale: 0.86,
+                  child: _Poster(url: _kComicPoster, tint: b),
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: a.withValues(alpha: 0.45),
-                    blurRadius: 28,
-                    offset: const Offset(0, 12),
-                  ),
-                ],
-              ),
-              child: Stack(
-                children: [
-                  const Center(
-                    child: Icon(Icons.movie_filter_rounded, color: Colors.white, size: 64),
-                  ),
-                  Positioned(
-                    left: 18,
-                    right: 18,
-                    bottom: 16,
-                    child: _Loop(
-                      period: const Duration(milliseconds: 3000),
-                      builder: (context, t) => ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: LinearProgressIndicator(
-                          value: 0.15 + 0.7 * t,
-                          minHeight: 5,
-                          backgroundColor: Colors.white.withValues(alpha: 0.25),
-                          valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
               ),
             ),
-          ),
-        ),
-        Positioned(
-          right: 0,
-          top: 26,
-          child: _PopChip(
-            active: active,
-            delayMs: 250,
-            icon: Icons.local_fire_department_rounded,
-            label: 'Donghua',
-            tint: _gold,
-          ),
-        ),
-        Positioned(
-          left: 4,
-          bottom: 30,
-          child: _PopChip(
-            active: active,
-            delayMs: 400,
-            icon: Icons.menu_book_rounded,
-            label: 'Komik',
-            tint: b,
-            startMs: 500,
-          ),
-        ),
-      ],
+            // Poster donghua (depan, melayang, ada tombol play).
+            Transform.translate(
+              offset: Offset(36 * spread, 0),
+              child: _Floating(
+                periodMs: 3600,
+                amplitude: 6,
+                child: _Poster(url: _kDonghuaPoster, tint: a, showPlay: true),
+              ),
+            ),
+            Positioned(
+              right: 0,
+              top: 20,
+              child: _PopChip(
+                active: active,
+                delayMs: 250,
+                icon: Icons.local_fire_department_rounded,
+                label: 'Donghua',
+                tint: _gold,
+              ),
+            ),
+            Positioned(
+              left: 0,
+              bottom: 26,
+              child: _PopChip(
+                active: active,
+                delayMs: 400,
+                icon: Icons.menu_book_rounded,
+                label: 'Komik',
+                tint: b,
+                startMs: 500,
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }
@@ -1620,7 +1558,7 @@ class _LevelIllustration extends StatelessWidget {
             active: active,
             delayMs: 300,
             icon: Icons.bolt_rounded,
-            label: '+50 XP',
+            label: '+70 XP',
             tint: _gold,
           ),
         ),

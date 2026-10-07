@@ -102,6 +102,10 @@ manifest rilis bawaan Flutter tidak punya izin internet.
 - Cek update memperlakukan `2.3` dan `2.3.0` sama, jadi tidak ada loop wajib update.
 - Rilis berikutnya naikkan tag (mis. `v2.4.0`); applicationId dan keystore harus sama dengan Zenime supaya APK bisa menimpa.
 
+### Catatan Cover Detail Komik
+
+- Cover di detail komik dulu di-decode lewat `memCacheWidth: 900` (ukuran asli bisa sangat tinggi, layar jadi kosong setelah cover). Sekarang `ComicImage(maxSide: 1200)` memakai `ResizeImage(policy: fit)` jadi decode dibatasi 1200 px sisi terpanjang dengan proporsi tetap.
+
 ### Catatan Halaman Clan
 
 - Alur: Beranda > tap panel TOP CLAN di slide leaderboard > `ClanBrowseScreen` (Semua Clan / Leaderboard / Clan Saya + cari) > tap clan > `ClanScreen` (detail).
