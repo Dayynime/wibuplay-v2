@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/error_message.dart';
 import '../../../data/models/anichin_models.dart';
+import '../../../data/repository/anichin_repository.dart';
 import '../../../providers.dart';
 
 class DonghuaDetailState {
@@ -42,38 +43,87 @@ class DonghuaDetailController
 
   static bool _isEpisodeSlug(String slug) => _episodeSlug.hasMatch(slug);
 
-  static String _animeSlugFromEpisode(String slug) =>
-      slug.replaceFirst(_episodeTail, '').replaceFirst(_subtitleTail, '');
+  AnichinRepository get _repo => ref.read(anichinRepositoryProvider);
+
+  Future<_Fetch> _fetch(String target) async {
+    try {
+      return _Fetch(data: await _repo.getDetail(target));
+    } catch (e) {
+      return _Fetch(error: e);
+    }
+  }
+
+  /// Slug anime induk dari /episode/{slug} (null kalau gagal / tidak ada).
+  Future<String?> _rootOf(String slug) async {
+    try {
+      final root = (await _repo.getEpisode(slug)).root;
+      return (root == null || root.trim().isEmpty) ? null : root;
+    } catch (_) {
+      return null;
+    }
+  }
 
   Future<void> load() async {
     _update(const DonghuaDetailState(isLoading: true));
-    final repo = ref.read(anichinRepositoryProvider);
-    try {
-      final slug = arg;
-      AnichinAnimeDetail detail;
-      if (!_isEpisodeSlug(slug)) {
-        detail = await repo.getDetail(slug);
-      } else {
-        try {
-          detail = await repo.getDetail(_animeSlugFromEpisode(slug));
-          // Scraper balas "Unknown Title" kalau slug anime-nya tidak cocok.
-          if (detail.name == 'Unknown Title') throw Exception('unknown');
-        } catch (_) {
-          // Cadangan: tanya halaman episode, ambil slug anime induknya.
-          final ep = await repo.getEpisode(slug);
-          final root = ep.root;
-          if (root == null || root.isEmpty) rethrow;
-          detail = await repo.getDetail(root);
+    final slug = arg;
+    _Fetch result;
+
+    if (!_isEpisodeSlug(slug)) {
+      result = await _fetch(slug);
+
+      // Slug film/episode tanpa "-episode-N" (mis. "xxx-movie-subtitle-indonesia")
+      // dibalas API sebagai "Unknown Title" karena endpoint detail cuma paham
+      // slug anime. Cari slug anime induknya lewat "root" episode, atau buang
+      // ekor "-subtitle-indonesia".
+      if (result.isUnknownTitle) {
+        final root = await _rootOf(slug);
+        final candidates = <String>{
+          if (root != null) root,
+          slug.replaceAll(_subtitleTail, ''),
+        }.where((c) => c.trim().isNotEmpty && c != slug).toList();
+        for (final candidate in candidates) {
+          final r = await _fetch(candidate);
+          if (!r.isUnknownTitle) {
+            result = r;
+            break;
+          }
         }
       }
-      _update(DonghuaDetailState(detail: detail, isLoading: false));
-    } catch (e) {
+    } else {
+      // 1) Tebak slug anime dari slug episode (buang "-episode-160-subtitle-indonesia").
+      final derived = slug.replaceAll(_episodeTail, '');
+      result = await _fetch(derived);
+
+      // 2) Tebakan meleset (typo di slug, dll) -> tanya /episode/{slug} buat
+      //    dapetin "root".
+      if (result.isUnusable) {
+        final root = await _rootOf(slug);
+        if (root != null && root != derived) result = await _fetch(root);
+      }
+    }
+
+    final data = result.data;
+    if (data != null) {
+      _update(DonghuaDetailState(detail: data, isLoading: false));
+    } else {
       _update(DonghuaDetailState(
         isLoading: false,
-        error: errorMessage(e, 'Gagal memuat detail donghua.'),
+        error: errorMessage(result.error ?? 'x', 'Gagal memuat detail donghua.'),
       ));
     }
   }
+}
+
+class _Fetch {
+  const _Fetch({this.data, this.error});
+
+  final AnichinAnimeDetail? data;
+  final Object? error;
+
+  bool get isUnknownTitle => data != null && data!.name == 'Unknown Title';
+
+  bool get isUnusable =>
+      data == null || data!.name == 'Unknown Title' || data!.episodes.isEmpty;
 }
 
 final donghuaDetailControllerProvider = NotifierProvider.autoDispose
