@@ -155,9 +155,7 @@ class _ContentState extends State<_Content> {
               fit: StackFit.expand,
               children: [
                 const ColoredBox(color: AppColors.surfaceDark),
-                RepaintBoundary(
-                  child: ComicImage(d.cover, alignment: Alignment.topCenter, maxSide: 1200),
-                ),
+                RepaintBoundary(child: ComicCoverImage(d.cover)),
                 DecoratedBox(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(

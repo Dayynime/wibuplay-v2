@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:firebase_remote_config/firebase_remote_config.dart';
+import 'package:flutter/foundation.dart' show ValueNotifier;
 
 import 'firebase_config.dart';
 
@@ -52,6 +53,21 @@ class AnnouncementData {
       Object.hash(id, title, message, buttonText, buttonUrl, footnote, repeat);
 }
 
+/// Status maintenance dari Remote Config (port maintenance_* di Zenime).
+class MaintenanceInfo {
+  const MaintenanceInfo({required this.title, required this.message});
+
+  final String title;
+  final String message;
+
+  @override
+  bool operator ==(Object other) =>
+      other is MaintenanceInfo && other.title == title && other.message == message;
+
+  @override
+  int get hashCode => Object.hash(title, message);
+}
+
 /// Port RemoteConfigManager.kt: base URL API dibaca dari Firebase Remote
 /// Config (parameter `api_base_url`), project Firebase yang SAMA dengan Zenime.
 ///
@@ -82,6 +98,13 @@ class RemoteConfigManager {
   static const String _keyPopupButtonUrl = 'popup_button_url';
   static const String _keyPopupFootnote = 'popup_footnote';
   static const String _keyPopupRepeat = 'popup_repeat';
+  // Mode maintenance: blokir total app tanpa rilis versi baru.
+  //   maintenance_mode     (Boolean) saklar utama
+  //   maintenance_title    (String)  judul, kosong = pakai default
+  //   maintenance_message  (String)  isi pesan, kosong = pakai default
+  static const String _keyMaintenanceMode = 'maintenance_mode';
+  static const String _keyMaintenanceTitle = 'maintenance_title';
+  static const String _keyMaintenanceMessage = 'maintenance_message';
   static const Duration _fetchTimeout = Duration(seconds: 8);
   static const Duration _minFetchInterval = Duration(hours: 1);
 
@@ -106,6 +129,7 @@ class RemoteConfigManager {
       // Fetch gagal (offline dll): lanjut pakai nilai fetch sukses terakhir
       // yang di-cache SDK Firebase di device ini.
     }
+    syncMaintenance();
   }
 
   /// Fetch + activate (hormati cache 1 jam). Panggil sekali saat app start,
@@ -138,6 +162,42 @@ class RemoteConfigManager {
     if (v.isEmpty) return null;
     return v.endsWith('/') ? v : '$v/';
   }
+  /// Status maintenance yang sedang berlaku (null = normal). UI cukup
+  /// mendengarkan notifier ini; isinya diperbarui tiap fetch/activate dan
+  /// tiap update real-time dari Console.
+  static final ValueNotifier<MaintenanceInfo?> maintenance =
+      ValueNotifier<MaintenanceInfo?>(null);
+
+  static MaintenanceInfo? _readMaintenance() {
+    final rc = _instance;
+    if (rc == null || !rc.getBool(_keyMaintenanceMode)) return null;
+    final title = rc.getString(_keyMaintenanceTitle).replaceAll(r'\n', '\n').trim();
+    final message = rc.getString(_keyMaintenanceMessage).replaceAll(r'\n', '\n').trim();
+    return MaintenanceInfo(
+      title: title.isEmpty ? 'Sedang Maintenance' : title,
+      message: message.isEmpty
+          ? 'Server sedang dalam perbaikan. Wibuplay akan kembali normal sebentar lagi.'
+          : message,
+    );
+  }
+
+  /// Baca ulang status maintenance dari config yang sedang aktif.
+  static void syncMaintenance() {
+    final v = _readMaintenance();
+    if (v != maintenance.value) maintenance.value = v;
+  }
+
+  static StreamSubscription<RemoteConfigUpdate>? _maintenanceSub;
+
+  /// Pantau maintenance_* secara REAL-TIME selama app hidup: begitu kamu
+  /// Publish di Console, [maintenance] berubah dan layar maintenance muncul
+  /// (atau hilang) di user yang sedang membuka app, tanpa restart / relog.
+  static void watchMaintenance() {
+    if (_maintenanceSub != null) return;
+    _maintenanceSub = listenUpdates(syncMaintenance);
+    syncMaintenance();
+  }
+
   /// Pop up yang sedang aktif, atau null kalau saklar `popup_enabled` OFF /
   /// judul dan isi sama-sama kosong.
   static AnnouncementData? currentPopup() {

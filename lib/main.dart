@@ -15,6 +15,7 @@ import 'ui/components/mini_player.dart';
 import 'ui/route_observer.dart';
 import 'ui/components/announcement_popup.dart';
 import 'ui/screens/auth/auth_gate.dart';
+import 'ui/screens/maintenance/maintenance_screen.dart';
 import 'ui/screens/onboarding/onboarding_gate.dart';
 import 'ui/screens/security/integrity_gate.dart';
 import 'ui/screens/update/update_gate.dart';
@@ -30,7 +31,12 @@ Future<void> _initBackend() async {
     await Firebase.initializeApp(options: FirebaseConfig.options);
     FirebaseConfig.ready = true;
     // Base URL API dari Remote Config harus siap sebelum request pertama.
-    await RemoteConfigManager.refresh();
+    // forceRefresh (bukan refresh) SENGAJA: app yang baru di-update mewarisi
+    // cache Remote Config sesi lama dan bisa melewatkan fetch sampai 1 jam,
+    // padahal maintenance_mode harus langsung kebaca saat app dibuka.
+    await RemoteConfigManager.forceRefresh();
+    // Pantau maintenance_* real-time selama app terbuka.
+    RemoteConfigManager.watchMaintenance();
   } catch (_) {
     FirebaseConfig.ready = false;
   }
@@ -84,6 +90,8 @@ class ZenimeApp extends ConsumerWidget {
         children: [
           Positioned.fill(child: child ?? const SizedBox.shrink()),
           const MiniPlayerOverlay(),
+          // Paling atas: menutup semua halaman (juga yang di-push) saat maintenance.
+          const MaintenanceOverlay(),
         ],
       ),
       home: IntegrityGate(

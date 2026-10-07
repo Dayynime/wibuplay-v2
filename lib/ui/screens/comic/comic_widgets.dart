@@ -98,6 +98,122 @@ class ComicImage extends StatelessWidget {
   }
 }
 
+/// Cover untuk header detail. Gambar di-decode dengan batas sisi terpanjang
+/// [maxSide] (proporsi dijaga), lalu rasionya dicek: cover yang bentuknya
+/// tidak wajar (mis. potongan webtoon sangat tinggi) TIDAK digambar dan diganti
+/// ikon buku, supaya satu gambar bermasalah tidak merusak halaman.
+class ComicCoverImage extends StatefulWidget {
+  const ComicCoverImage(
+    this.url, {
+    super.key,
+    this.maxSide = 900,
+    this.maxAspect = 3.0,
+    this.alignment = Alignment.topCenter,
+  });
+
+  final String? url;
+  final int maxSide;
+
+  /// Rasio sisi terpanjang : terpendek yang masih dianggap cover wajar.
+  final double maxAspect;
+  final Alignment alignment;
+
+  @override
+  State<ComicCoverImage> createState() => _ComicCoverImageState();
+}
+
+class _ComicCoverImageState extends State<ComicCoverImage> {
+  ImageStream? _stream;
+  ImageInfo? _info;
+  bool _failed = false;
+  late final ImageStreamListener _listener =
+      ImageStreamListener(_onImage, onError: _onError);
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _resolve();
+  }
+
+  @override
+  void didUpdateWidget(ComicCoverImage old) {
+    super.didUpdateWidget(old);
+    if (old.url != widget.url || old.maxSide != widget.maxSide) _resolve(force: true);
+  }
+
+  void _resolve({bool force = false}) {
+    final u = ComicNetwork.normalizeImageUrl(widget.url);
+    if (u == null) {
+      _detach();
+      _failed = true;
+      return;
+    }
+    final provider = ResizeImage(
+      CachedNetworkImageProvider(u, headers: ComicNetwork.imageHeaders),
+      width: widget.maxSide,
+      height: widget.maxSide,
+      policy: ResizeImagePolicy.fit,
+    );
+    final stream = provider.resolve(createLocalImageConfiguration(context));
+    if (!force && stream.key == _stream?.key) return;
+    _detach();
+    _failed = false;
+    _stream = stream..addListener(_listener);
+  }
+
+  void _detach() {
+    _stream?.removeListener(_listener);
+    _stream = null;
+    _info?.dispose();
+    _info = null;
+  }
+
+  void _onImage(ImageInfo info, bool synchronousCall) {
+    final old = _info;
+    setState(() => _info = info);
+    old?.dispose();
+  }
+
+  void _onError(Object error, StackTrace? stack) {
+    if (mounted) setState(() => _failed = true);
+  }
+
+  @override
+  void dispose() {
+    _detach();
+    super.dispose();
+  }
+
+  Widget _placeholder(IconData icon) => ColoredBox(
+        color: AppColors.surfaceCard,
+        child: Center(child: Icon(icon, size: 48, color: AppColors.textMuted)),
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    if (_failed) return _placeholder(Icons.broken_image_outlined);
+    final info = _info;
+    if (info == null) {
+      return const SizedBox.expand(child: ShimmerBox(borderRadius: BorderRadius.zero));
+    }
+    final w = info.image.width.toDouble();
+    final h = info.image.height.toDouble();
+    if (w <= 0 || h <= 0) return _placeholder(Icons.broken_image_outlined);
+    final aspect = h / w;
+    if (aspect > widget.maxAspect || aspect < 1 / widget.maxAspect) {
+      return _placeholder(Icons.menu_book_rounded);
+    }
+    return RawImage(
+      image: info.image,
+      scale: info.scale,
+      fit: BoxFit.cover,
+      alignment: widget.alignment,
+      width: double.infinity,
+      height: double.infinity,
+    );
+  }
+}
+
 /// Kartu poster komik (2:3) + judul. Lebar ditentukan parent. Mengecil sedikit
 /// saat ditekan.
 class ComicPosterCard extends StatefulWidget {
