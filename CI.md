@@ -95,6 +95,13 @@ manifest rilis bawaan Flutter tidak punya izin internet.
 - Flag `onboarding_seen_v1` di shared_preferences (`LocalStore.onboardingSeen`). User lama yang update akan melihat intro sekali karena flag belum ada.
 - Splash ditahan minimal 1,8 detik (`UpdateGate.minSplash`) hanya saat intro belum pernah dilihat; buka app berikutnya tidak tertahan.
 
+### Catatan Versi (disamakan dengan Zenime)
+
+- Zenime terakhir: versionName `2.3`, versionCode `13`. Wibuplay mulai dari `2.3.0+13` (`pubspec.yaml`).
+- Build rilis (`release.yml`) mengambil versi dari tag: `git tag v2.3.0 && git push origin v2.3.0` -> versionName `2.3.0`, versionCode `20300` (rumus major*10000 + minor*100 + patch, jauh di atas 13, jadi bisa menimpa Zenime lama). Format tag wajib x.y.z, jadi pakai `v2.3.0`, bukan `v2.3`.
+- Cek update memperlakukan `2.3` dan `2.3.0` sama, jadi tidak ada loop wajib update.
+- Rilis berikutnya naikkan tag (mis. `v2.4.0`); applicationId dan keystore harus sama dengan Zenime supaya APK bisa menimpa.
+
 ### Catatan Halaman Clan
 
 - Alur: Beranda > tap panel TOP CLAN di slide leaderboard > `ClanBrowseScreen` (Semua Clan / Leaderboard / Clan Saya + cari) > tap clan > `ClanScreen` (detail).
@@ -147,7 +154,7 @@ manifest rilis bawaan Flutter tidak punya izin internet.
 
 ## Keamanan dan fix bug (port dari Zenime)
 
-- **IntegrityGuard** (`lib/core/integrity_guard.dart` + channel `wibuplay/security` di `MainActivity.kt`): blokir app kalau terdeteksi (1) tanda tangan APK beda dari yang resmi, (2) app proxy/MITM (Reqable, HTTP Toolkit, dll), (3) auto clicker (kata kunci nama app + Accessibility Service gesture). Dicek di `IntegrityGate` (`ui/screens/security/integrity_gate.dart`) SEBELUM init Firebase/Remote Config, jadi tidak ada request jaringan kalau kedeteksi; dicek lagi tiap app balik ke foreground.
+- **IntegrityGuard** (`lib/core/integrity_guard.dart` + channel `wibuplay/security` di `MainActivity.kt`): blokir app kalau terdeteksi (1) tanda tangan APK beda dari yang resmi, (2) app proxy/MITM (Reqable, HTTP Toolkit, dll). Deteksi auto clicker sudah dihapus. Dicek di `IntegrityGate` (`ui/screens/security/integrity_gate.dart`) SEBELUM init Firebase/Remote Config, jadi tidak ada request jaringan kalau kedeteksi; dicek lagi tiap app balik ke foreground.
 - **Cek tanda tangan**: `release.yml` menghitung SHA-256 sertifikat dari keystore rilis lalu mengirimnya lewat `--dart-define=APK_SIG_SHA256`. Build `build.yml` (debug/profile) tidak mengisinya, jadi cek tanda tangan dilewati (tidak ke-block). Butuh `KEY_ALIAS` dan `STORE_PASSWORD` benar di secret.
 - **Cache status Premium** (`lib/data/local/premium_status_cache.dart`): fallback saat cek live gagal karena jaringan (offline/timeout/5xx). Ditandatangani HMAC (key AndroidKeyStore), terikat uid, TTL 3 hari, dan mati kalau `expires_at` lewat. Penolakan server (4xx) tidak memakai cache. Dihapus saat logout.
 - **Manifest** (patch di workflow): `allowBackup=false`, cleartext HTTP hanya untuk host di `android_res/xml/network_security_config.xml` (bukan global lagi), `<queries>` untuk deteksi app lain. Catatan: aturan ini berlaku untuk video_player/ExoPlayer; Dio (dart:io) tidak terpengaruh.

@@ -451,7 +451,7 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
-                            'v${snap.data?.version ?? '1.0.0'}',
+                            'v${snap.data?.version ?? '2.3.0'}',
                             style: const TextStyle(
                               color: AppColors.accentViolet,
                               fontSize: 11,

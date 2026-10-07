@@ -5,7 +5,6 @@ import 'package:flutter/services.dart';
 /// `wibuplay/security` (MainActivity.kt):
 ///  1. APK ditandatangani sertifikat beda dari yang resmi (APK mod re-sign).
 ///  2. App proxy/MITM (Reqable, HTTP Toolkit, dll).
-///  3. Auto clicker (kata kunci nama app + Accessibility Service gesture).
 ///
 /// SHA-256 sertifikat resmi dikirim saat build lewat
 /// `--dart-define=APK_SIG_SHA256=...` (diisi otomatis di release.yml dari

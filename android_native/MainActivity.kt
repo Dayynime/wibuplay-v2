@@ -1,11 +1,8 @@
 package com.dayynime.wibuplay
 
 import android.app.DownloadManager
-import android.accessibilityservice.AccessibilityServiceInfo
 import android.app.PictureInPictureParams
 import android.content.Intent
-import android.content.pm.ApplicationInfo
-import android.view.accessibility.AccessibilityManager
 import java.security.MessageDigest
 import android.content.Context
 import android.content.pm.PackageManager
@@ -151,16 +148,7 @@ class MainActivity : FlutterActivity() {
 
     private val toolKeywords = listOf(
         "reqable", "httptoolkit", "httpcanary", "pcapdroid", "remote_capture",
-        "sslcapture", "mitm", "charles", "fiddler", "wireshark",
-        // Auto clicker. Jangan pakai kata umum ("clicker"/"tap"/"macro").
-        "autoclick", "auto click", "autotap", "auto tap", "klik otomatis", "pengklik"
-    )
-
-    private val accessibilityWhitelist = setOf(
-        "com.google.android.marvin.talkback",
-        "com.android.talkback",
-        "com.samsung.android.accessibility.talkback",
-        "com.google.android.apps.accessibility.voiceaccess"
+        "sslcapture", "mitm", "charles", "fiddler", "wireshark"
     )
 
     /** Nama app terlarang yang terdeteksi, atau null kalau aman. */
@@ -180,31 +168,6 @@ class MainActivity : FlutterActivity() {
             val label = info.loadLabel(pm).toString()
             val haystack = "$pkg $label".lowercase()
             if (keys.any { it in haystack }) return label
-        }
-        return detectedGestureService()
-    }
-
-    /** Auto clicker butuh Accessibility Service yang boleh dispatch gesture. */
-    private fun detectedGestureService(): String? {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return null
-        val am = getSystemService(Context.ACCESSIBILITY_SERVICE) as? AccessibilityManager ?: return null
-        val pm = packageManager
-        val services = try {
-            am.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
-        } catch (e: Exception) {
-            return null
-        }
-        for (info in services) {
-            val serviceInfo = info.resolveInfo?.serviceInfo ?: continue
-            val pkg = serviceInfo.packageName
-            if (pkg == packageName || pkg in accessibilityWhitelist) continue
-            val appFlags = serviceInfo.applicationInfo?.flags ?: 0
-            val isSystem = appFlags and (ApplicationInfo.FLAG_SYSTEM or ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
-            if (isSystem) continue
-            val canGesture = info.capabilities and AccessibilityServiceInfo.CAPABILITY_CAN_PERFORM_GESTURES != 0
-            if (canGesture) {
-                return serviceInfo.applicationInfo?.loadLabel(pm)?.toString() ?: pkg
-            }
         }
         return null
     }
