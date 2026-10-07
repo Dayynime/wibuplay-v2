@@ -85,7 +85,7 @@ class _AnimePosterCardState extends State<AnimePosterCard> {
                               gradient: LinearGradient(
                                 begin: Alignment.topCenter,
                                 end: Alignment.bottomCenter,
-                                colors: [Colors.transparent, Color(0xCC1E1B2E)],
+                                colors: [Colors.transparent, Color(0xCC0B0E14)],
                               ),
                             ),
                           ),
@@ -98,7 +98,7 @@ class _AnimePosterCardState extends State<AnimePosterCard> {
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                               decoration: BoxDecoration(
-                                color: const Color(0xCC1E1B2E),
+                                color: const Color(0xCC0B0E14),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Text(

@@ -113,7 +113,7 @@ class _ForceUpdateScreenState extends State<ForceUpdateScreen>
                           ShaderMask(
                             blendMode: BlendMode.srcIn,
                             shaderCallback: (r) => const LinearGradient(
-                              colors: [Colors.white, Color(0xFFCFC8FF)],
+                              colors: [Colors.white, Color(0xFFFFD3D8)],
                             ).createShader(r),
                             child: const Text(
                               'Update Tersedia',
@@ -362,10 +362,10 @@ class _Logo extends StatelessWidget {
                     shape: BoxShape.circle,
                     gradient: SweepGradient(
                       colors: [
-                        Color(0x00988BF5),
-                        Color(0xFF988BF5),
-                        Color(0xFFFF9BDA),
-                        Color(0x00FF9BDA),
+                        Color(0x00EE5B6D),
+                        Color(0xFFEE5B6D),
+                        Color(0xFFFFA38F),
+                        Color(0x00FFA38F),
                       ],
                       stops: [0.0, 0.45, 0.7, 1.0],
                     ),
@@ -454,7 +454,7 @@ class _EyebrowState extends State<_Eyebrow> with SingleTickerProviderStateMixin 
           const Text(
             'PEMBARUAN WAJIB',
             style: TextStyle(
-              color: Color(0xFFCFC8FF),
+              color: Color(0xFFFFD3D8),
               fontSize: 11.5,
               fontWeight: FontWeight.w800,
               letterSpacing: 1.4,
@@ -509,7 +509,7 @@ class _VersionChip extends StatelessWidget {
           Text(
             'v$latest',
             style: const TextStyle(
-              color: Color(0xFFB9ADFF),
+              color: Color(0xFFFFB3BB),
               fontSize: 13.5,
               fontWeight: FontWeight.w800,
             ),
@@ -627,7 +627,7 @@ class _ProgressPanel extends StatelessWidget {
               Text(
                 known ? '${state.progress}%' : '',
                 style: const TextStyle(
-                  color: Color(0xFFB9ADFF),
+                  color: Color(0xFFFFB3BB),
                   fontSize: 14,
                   fontWeight: FontWeight.w800,
                 ),
@@ -655,7 +655,7 @@ class _ProgressPanel extends StatelessWidget {
                         child: DecoratedBox(
                           decoration: const BoxDecoration(
                             gradient: LinearGradient(
-                              colors: [Color(0xFF9486FF), Color(0xFFFF9BDA)],
+                              colors: [Color(0xFFEE5B6D), Color(0xFFFFA38F)],
                             ),
                           ),
                           child: ClipRect(
@@ -693,7 +693,7 @@ class _ProgressPanel extends StatelessWidget {
                             child: const DecoratedBox(
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
-                                  colors: [Color(0xFF9486FF), Color(0xFFFF9BDA)],
+                                  colors: [Color(0xFFEE5B6D), Color(0xFFFFA38F)],
                                 ),
                               ),
                             ),
@@ -744,7 +744,7 @@ class _ActionButton extends StatelessWidget {
         height: 56,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(100),
-          gradient: const LinearGradient(colors: [Color(0xFF9486FF), Color(0xFF6352E4)]),
+          gradient: const LinearGradient(colors: [Color(0xFFEE5B6D), Color(0xFFC42A3E)]),
           boxShadow: [
             BoxShadow(
               color: AppColors.accentViolet.withValues(alpha: 0.45),
@@ -891,7 +891,7 @@ class _Aurora extends StatelessWidget {
             ),
             _blob(
               Alignment(1.0 + 0.2 * math.cos(a + 1), 0.8 + 0.2 * math.sin(a)),
-              const Color(0xFFE056C8),
+              const Color(0xFFFF8A5C),
               480,
               0.18,
             ),

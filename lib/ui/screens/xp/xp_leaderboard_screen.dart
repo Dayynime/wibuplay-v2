@@ -222,7 +222,7 @@ class _PodiumState extends State<_Podium> with TickerProviderStateMixin {
           gradient: const LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Color(0xFF2B2358), Color(0xFF15111F)],
+            colors: [Color(0xFF3A1520), Color(0xFF0D1017)],
           ),
           border: Border.all(color: _Neon.cyan.withValues(alpha: 0.22)),
           boxShadow: [

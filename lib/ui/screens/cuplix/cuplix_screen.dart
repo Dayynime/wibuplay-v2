@@ -418,7 +418,7 @@ class _CuplixVideoItemState extends State<CuplixVideoItem> {
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    colors: [Color(0x991E1B2E), Colors.transparent],
+                    colors: [Color(0x990B0E14), Colors.transparent],
                   ),
                 ),
               ),
@@ -433,7 +433,7 @@ class _CuplixVideoItemState extends State<CuplixVideoItem> {
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    colors: [Colors.transparent, Color(0xDD1E1B2E), Color(0xFF1E1B2E)],
+                    colors: [Colors.transparent, Color(0xDD0B0E14), Color(0xFF0B0E14)],
                   ),
                 ),
               ),

@@ -217,7 +217,7 @@ class _Hero extends StatelessWidget {
         borderRadius: BorderRadius.circular(28),
         border: Border.all(color: kPremiumGold.withValues(alpha: 0.28)),
         gradient: const LinearGradient(
-          colors: [Color(0xFF3A3358), AppColors.surfaceCard],
+          colors: [Color(0xFF252C3A), AppColors.surfaceCard],
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
         ),

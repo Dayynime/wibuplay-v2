@@ -170,9 +170,9 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                       colors: [
-                        Color(0x331E1B2E),
-                        Color(0x661E1B2E),
-                        Color(0xE61E1B2E),
+                        Color(0x330B0E14),
+                        Color(0x660B0E14),
+                        Color(0xE60B0E14),
                         AppColors.backgroundDark,
                       ],
                       stops: [0.0, 0.40, 0.68, 1.0],
@@ -241,7 +241,7 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
                 width: 42,
                 height: 42,
                 decoration: const BoxDecoration(
-                  color: Color(0x881E1B2E),
+                  color: Color(0x880B0E14),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(Icons.arrow_back, color: AppColors.textWhite, size: 20),
@@ -261,7 +261,7 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [Colors.transparent, Color(0xE61E1B2E), AppColors.backgroundDark],
+              colors: [Colors.transparent, Color(0xE60B0E14), AppColors.backgroundDark],
             ),
           ),
           child: SafeArea(

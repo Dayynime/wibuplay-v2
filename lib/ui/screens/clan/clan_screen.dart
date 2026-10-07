@@ -674,7 +674,7 @@ class _TabSwitch extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12),
                     gradient: i == selected
                         ? const LinearGradient(
-                            colors: [AppColors.accentViolet, Color(0xFFB06CF0)],
+                            colors: [AppColors.accentViolet, Color(0xFFFF6B4A)],
                           )
                         : null,
                   ),

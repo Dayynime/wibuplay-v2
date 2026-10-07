@@ -371,7 +371,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
               ShaderMask(
                 blendMode: BlendMode.srcIn,
                 shaderCallback: (r) => const LinearGradient(
-                  colors: [Color(0xFFB9ADFF), Color(0xFFFF9BDA)],
+                  colors: [Color(0xFFFFB3BB), Color(0xFFFFA38F)],
                 ).createShader(r),
                 child: const Text(
                   'Masuk dulu, yuk.',
@@ -635,7 +635,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(100),
               gradient: const LinearGradient(
-                colors: [Color(0xFF9486FF), Color(0xFF6352E4)],
+                colors: [Color(0xFFEE5B6D), Color(0xFFC42A3E)],
               ),
               boxShadow: [
                 BoxShadow(
@@ -853,7 +853,7 @@ class _Aurora extends StatelessWidget {
             ),
             _blob(
               Alignment(0.95 + 0.2 * math.cos(a * 0.5 + 1), 0.0 + 0.22 * math.sin(a * 0.5)),
-              const Color(0xFFE056C8),
+              const Color(0xFFFF8A5C),
               480,
               0.24,
             ),
@@ -952,7 +952,7 @@ class _GoogleButton extends StatelessWidget {
   final Animation<double> shine;
   final VoidCallback? onTap;
 
-  static const _ink = Color(0xFF1E1B2E);
+  static const _ink = Color(0xFF0B0E14);
 
   @override
   Widget build(BuildContext context) {

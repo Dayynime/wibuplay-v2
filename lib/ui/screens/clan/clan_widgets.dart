@@ -69,7 +69,7 @@ class ClanAvatar extends StatelessWidget {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF3B3470), Color(0xFF241F4A)],
+          colors: [Color(0xFF5A1B26), Color(0xFF3A1219)],
         ),
       ),
       clipBehavior: Clip.antiAlias,
@@ -184,7 +184,7 @@ class ClanGradientButton extends StatelessWidget {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
               gradient: const LinearGradient(
-                colors: [AppColors.accentViolet, Color(0xFFB06CF0)],
+                colors: [AppColors.accentViolet, Color(0xFFFF6B4A)],
               ),
               boxShadow: [
                 BoxShadow(

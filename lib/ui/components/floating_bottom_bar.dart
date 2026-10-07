@@ -44,7 +44,7 @@ class FloatingBottomBar extends StatelessWidget {
             end: Alignment.bottomCenter,
             colors: [
               AppColors.surfaceDark.withValues(alpha: 0.96),
-              const Color(0xF0181524),
+              const Color(0xF0080B10),
             ],
           ),
           border: Border.all(

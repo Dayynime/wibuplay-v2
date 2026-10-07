@@ -265,7 +265,7 @@ class _AnnouncementHostState extends ConsumerState<AnnouncementHost>
                 colors: [
                   AppColors.accentVioletLight.withValues(alpha: 0.9),
                   AppColors.accentViolet.withValues(alpha: 0.18),
-                  const Color(0xFFFF8AD8).withValues(alpha: 0.45),
+                  const Color(0xFFFFA38F).withValues(alpha: 0.45),
                 ],
               ),
               boxShadow: [
@@ -279,7 +279,7 @@ class _AnnouncementHostState extends ConsumerState<AnnouncementHost>
             child: ClipRRect(
               borderRadius: BorderRadius.circular(radius - 1.3),
               child: ColoredBox(
-                color: const Color(0xFF211E33),
+                color: const Color(0xFF151A23),
                 child: Stack(
                   children: [
                     // Cahaya lembut di bagian atas kartu.
@@ -439,7 +439,7 @@ class _AnnouncementHostState extends ConsumerState<AnnouncementHost>
                 gradient: const LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [Color(0xFFA99CFF), Color(0xFF6352E4)],
+                  colors: [Color(0xFFFF8896), Color(0xFFC42A3E)],
                 ),
                 border: Border.all(color: Colors.white.withValues(alpha: 0.28), width: 1.2),
                 boxShadow: [
@@ -497,7 +497,7 @@ class _FootnoteChip extends StatelessWidget {
             child: Text(
               text,
               style: const TextStyle(
-                color: Color(0xFFCFC8FF),
+                color: Color(0xFFFFD3D8),
                 fontSize: 12.5,
                 height: 1.4,
                 fontWeight: FontWeight.w600,
@@ -551,7 +551,7 @@ class _PrimaryButton extends StatelessWidget {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(100),
           gradient: const LinearGradient(
-            colors: [Color(0xFF9486FF), Color(0xFF6352E4)],
+            colors: [Color(0xFFEE5B6D), Color(0xFFC42A3E)],
           ),
           boxShadow: [
             BoxShadow(

@@ -268,7 +268,7 @@ class _SupportPodiumState extends State<_SupportPodium> with TickerProviderState
           gradient: const LinearGradient(
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
-            colors: [Color(0xFF4A1D38), Color(0xFF1A1220)],
+            colors: [Color(0xFF3A1219), Color(0xFF10121A)],
           ),
           border: Border.all(color: _Tone.rose.withValues(alpha: 0.28)),
           boxShadow: [
@@ -432,7 +432,7 @@ class _SupportSlot extends StatelessWidget {
               padding: const EdgeInsets.all(2),
               decoration: const BoxDecoration(
                 shape: BoxShape.circle,
-                color: Color(0xFF1A1220),
+                color: Color(0xFF10121A),
               ),
               child: UserAvatar(username: s.name, url: s.avatarUrl, size: avatarSize),
             ),
@@ -451,7 +451,7 @@ class _SupportSlot extends StatelessWidget {
                   end: Alignment.bottomRight,
                   colors: [Colors.white, color],
                 ),
-                border: Border.all(color: const Color(0xFF1A1220), width: 2),
+                border: Border.all(color: const Color(0xFF10121A), width: 2),
                 boxShadow: [BoxShadow(color: color.withValues(alpha: 0.6), blurRadius: 8)],
               ),
               child: Text(

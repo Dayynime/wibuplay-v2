@@ -585,7 +585,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                             width: 28,
                             height: 28,
                             decoration: const BoxDecoration(
-                              color: Color(0xB31E1B2E),
+                              color: Color(0xB30B0E14),
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(

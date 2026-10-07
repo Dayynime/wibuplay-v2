@@ -16,7 +16,7 @@ const Color _silver = Color(0xFFC7CDD8);
 const Color _bronze = Color(0xFFCE8946);
 const Color _ink = Color(0xFF15213B);
 const Color _xpBlue = Color(0xFF4FC3F7);
-const Color _clanPurple = Color(0xFFB57BFF);
+const Color _clanPurple = Color(0xFFFF6B4A);
 
 String _compactCount(int v) {
   if (v >= 1000000) return '${(v / 1000000).toStringAsFixed(1).replaceAll('.0', '')}M';
@@ -1097,7 +1097,7 @@ class HeroSupportSlide extends StatelessWidget {
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [Color(0xFF3A1A2C), Color(0xFF1E1B2E)],
+                colors: [Color(0xFF3A1219), Color(0xFF0B0E14)],
               ),
             ),
             child: Stack(

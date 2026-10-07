@@ -390,7 +390,7 @@ class _DmBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final m = message;
-    final quoteAccent = isOwn ? Colors.white : const Color(0xFFB8AEFF);
+    final quoteAccent = isOwn ? Colors.white : const Color(0xFFFFB3BB);
     final bubble = GestureDetector(
       onLongPress: onLongPress,
       child: Container(

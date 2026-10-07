@@ -385,7 +385,7 @@ class _HeroCard extends StatelessWidget {
                 colors: [
                   Color(0x40000000),
                   Colors.transparent,
-                  Color(0xF2120F1F),
+                  Color(0xF20B0E14),
                 ],
                 stops: [0.0, 0.42, 1.0],
               ),
@@ -576,7 +576,7 @@ class _MiniCard extends StatelessWidget {
                   colors: [
                     Color(0x33000000),
                     Colors.transparent,
-                    Color(0xF2120F1F),
+                    Color(0xF20B0E14),
                   ],
                   stops: [0.0, 0.40, 1.0],
                 ),

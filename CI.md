@@ -83,7 +83,7 @@ manifest rilis bawaan Flutter tidak punya izin internet.
 ## Ikon dan splash screen Zenime
 
 - Nama app (label) dan nama artifact/APK: `Zenime`.
-- Ikon launcher (adaptive, sama dengan app Zenime) dan splash screen (latar `#1E1B2E` + logo Zenime) ada di folder `android_res/`.
+- Ikon launcher (adaptive, sama dengan app Zenime) dan splash screen (latar `#0B0E14` + logo Zenime) ada di folder `android_res/`.
 - Langkah "Pasang ikon dan splash Zenime" di `build.yml` dan `release.yml` menyalin `android_res/` ke `android/app/src/main/res/` setelah `flutter create`, dan menghapus `ic_launcher.png` bawaan Flutter supaya tidak bentrok dengan `ic_launcher.webp`.
 - Logo di layar login: `assets/images/logo.jpg` (logo Zenime).
 - Nama paket Dart (`wibuplay` di `pubspec.yaml`) dan namespace Android sengaja tidak diubah, karena hanya internal dan tidak terlihat di app.
@@ -123,3 +123,10 @@ manifest rilis bawaan Flutter tidak punya izin internet.
 - Halaman `ui/screens/profile/settings_screen.dart` (ikon gear di Profil): kartu Akun (profil + keluar, status Premium AKTIF/BELUM AKTIF + sisa hari, ZCoin, Chat Global), Pemutaran Video (Kualitas Video Default 1080p/720p/480p/360p, Lewati Intro Otomatis, Auto-Lanjut Episode), Download, Bersihkan Cache, Tentang Aplikasi (logo, versi dari package_info_plus).
 - Kualitas default disimpan di `LocalStore.defaultQuality` dan dipakai `PlayerController` untuk memilih server awal.
 - Tidak diport: Mode Tema / Dynamic Color (warna Wibuplay hard-coded gelap, desain tidak boleh berubah), Tampilan Beranda (hero carousel, sengaja dilewati), Panel Admin (belum ada di Wibuplay).
+
+### Palet Warna (Zenime Crimson Dark)
+
+- Palet Wibuplay sekarang = palet Zenime: aksen crimson `#E4344A` di atas navy `#0B0E14` (surface `#151A23`, variant `#1C222E`, teks `#F5F5F7` / `#9AA0AC`). Semua ada di `lib/core/theme/app_colors.dart`; nama `accentViolet*` dipertahankan tapi nilainya crimson.
+- Warna hard-coded di layar (gradien login/update/pengumuman, latar overlay, dll.) sudah dipetakan ke palet yang sama. Warna semantik (badge role, badge game, biru Google/Instagram, pilihan warna username) sengaja tidak diubah.
+- Splash/launch native (`android_res/values-v31/styles.xml`, `drawable*/launch_background.xml`) memakai `#0B0E14`.
+- Tema tidak bisa diganti saat runtime: warna dipakai sebagai `const` di ratusan tempat, jadi ganti palet = ubah `app_colors.dart` lalu build ulang.
