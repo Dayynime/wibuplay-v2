@@ -7,7 +7,6 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/local/entities.dart';
 import '../../../providers.dart';
-import '../../app_routes.dart';
 import '../../components/net_image.dart';
 import '../profile/profile_screen.dart';
 import 'download_actions.dart';
@@ -19,9 +18,8 @@ String _formatBytes(int b) {
   return '${(b / mb).toStringAsFixed(b >= 100 * mb ? 0 : 1)} MB';
 }
 
-/// Tab "Download" di Profil: semua episode offline lintas anime. KHUSUS
-/// Premium -- non-premium hanya melihat ajakan Premium (file tetap aman di
-/// perangkat dan terbuka lagi begitu Premium aktif).
+/// Daftar episode offline lintas anime. Menonton hasil download TIDAK butuh
+/// Premium; yang khusus Premium hanya memulai download baru.
 class DownloadsTab extends ConsumerWidget {
   const DownloadsTab({super.key, required this.onPlay});
 
@@ -31,71 +29,6 @@ class DownloadsTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final downloads = ref.watch(localStoreProvider.select((s) => s.downloads));
-    final premiumAsync = ref.watch(myPremiumProvider);
-    final isPremium = premiumAsync.valueOrNull ?? false;
-
-    if (premiumAsync.isLoading) {
-      return const SizedBox(
-        height: 130,
-        child: Center(
-          child: SizedBox(
-            width: 28,
-            height: 28,
-            child: CircularProgressIndicator(strokeWidth: 3, color: AppColors.accentViolet),
-          ),
-        ),
-      );
-    }
-
-    if (!isPremium) {
-      return Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: AppColors.surfaceCard,
-            borderRadius: AppShapes.card,
-          ),
-          child: Column(
-            children: [
-              const Icon(Icons.lock, color: AppColors.accentViolet, size: 34),
-              const SizedBox(height: 12),
-              const Text(
-                'Download khusus Premium',
-                style: TextStyle(
-                  color: AppColors.textWhite,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                downloads.isEmpty
-                    ? 'Download episode dan nonton offline tanpa kuota dengan Premium.'
-                    : '${downloads.length} episode tersimpan di perangkat ini. '
-                        'Aktifkan Premium untuk memutarnya lagi.',
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                height: 46,
-                child: FilledButton(
-                  onPressed: () => openPremium(context),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.accentViolet,
-                    shape: const StadiumBorder(),
-                  ),
-                  child: const Text('Lihat Premium',
-                      style: TextStyle(fontWeight: FontWeight.w700)),
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -108,7 +41,7 @@ class DownloadsTab extends ConsumerWidget {
         if (downloads.isEmpty)
           const ProfileEmptyBox(
             text: 'Belum ada download. Ketuk ikon download di daftar episode '
-                'untuk menyimpan episode dan nonton offline.',
+                'untuk menyimpan episode dan nonton offline (download khusus Premium).',
           )
         else
           Padding(

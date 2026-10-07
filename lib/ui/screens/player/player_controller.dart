@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/error_message.dart';
-import '../../../core/premium_access.dart';
 import '../../../data/models/anime_item.dart';
 import '../../../data/models/episode_item.dart';
 import '../../../data/models/stream_data.dart';
@@ -201,17 +200,13 @@ class PlayerController
     }
   }
 
-  /// Server "Offline" dari file hasil download, atau null kalau tidak berlaku:
-  /// bukan Premium, belum didownload, atau file sudah tidak ada di disk.
+  /// Server "Offline" dari file hasil download, atau null kalau episode ini
+  /// belum didownload / filenya sudah tidak ada di disk. Memutar file offline
+  /// TIDAK butuh Premium (hanya memulai download yang khusus Premium).
   Future<StreamServer?> _localServer(String episodeId) async {
     try {
       final file = ref.read(episodeDownloadManagerProvider).localFileFor(episodeId);
       if (file == null) return null;
-      final user = await ref.read(authUserProvider.future);
-      final uid = user?.uid;
-      if (uid == null || uid.isEmpty) return null;
-      final premium = await ref.read(premiumProvider(uid).future);
-      if (!isDownloadAllowed(premium)) return null;
       return StreamServer(
         link: Uri.file(file.path).toString(),
         quality: 'Offline',

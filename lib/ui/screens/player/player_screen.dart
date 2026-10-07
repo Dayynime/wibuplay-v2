@@ -217,6 +217,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
   /// ready = sudah cukup data buat memutuskan (status premium + daftar episode).
   /// Sebelum itu video tidak diputar, supaya suara episode terkunci tidak bocor.
   ({bool ready, bool locked}) _gate(PlayerUiState ui, AsyncValue<bool> premium) {
+    // File hasil download diputar tanpa cek Premium/kunci episode (dan tanpa
+    // menunggu status Premium, yang tidak bisa dicek saat offline).
+    if (ui.selectedServer?.link?.startsWith('file://') == true) {
+      return (ready: true, locked: false);
+    }
     final isPremium = premium.valueOrNull ?? false;
     final decided = premium.hasValue || premium.hasError;
     if (isPremium) return (ready: true, locked: false);

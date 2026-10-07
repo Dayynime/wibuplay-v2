@@ -14,6 +14,7 @@ import '../../app_routes.dart';
 import '../support/top_support_screen.dart';
 import '../xp/xp_leaderboard_screen.dart';
 import '../clan/clan_browse_screen.dart';
+import '../download/offline_downloads_view.dart';
 import '../friends/friends_screen.dart';
 import '../../components/cards.dart';
 import '../../components/chat_ticker.dart';
@@ -56,17 +57,29 @@ class HomeScreen extends ConsumerWidget {
     if (state.isLoading && !state.hasValue) {
       body = const _HomeLoadingSkeleton(key: ValueKey('loading'));
     } else if (state.hasError && !state.hasValue) {
-      body = Center(
-        key: const ValueKey('error'),
-        child: ErrorState(
-          message: _cleanError(state.error),
-          onRetry: () async {
-            // Paksa ambil api_base_url terbaru dulu (kalau baru di-Publish).
-            await RemoteConfigManager.forceRefresh();
-            ref.read(homeControllerProvider.notifier).loadHomeData(forceRefresh: true);
-          },
-        ),
-      );
+      Future<void> retry() async {
+        // Paksa ambil api_base_url terbaru dulu (kalau baru di-Publish).
+        await RemoteConfigManager.forceRefresh();
+        ref.read(homeControllerProvider.notifier).loadHomeData(forceRefresh: true);
+      }
+
+      // Gagal memuat (biasanya offline) tapi ada video yang sudah didownload:
+      // tampilkan daftarnya supaya tetap bisa ditonton, seperti Zenime.
+      final hasDownloads = ref.watch(localStoreProvider.select((s) => s.downloads.isNotEmpty));
+      body = hasDownloads
+          ? OfflineDownloadsView(
+              key: const ValueKey('offline'),
+              message: _cleanError(state.error),
+              onRetry: retry,
+              onPlay: onWatchEpisode,
+            )
+          : Center(
+              key: const ValueKey('error'),
+              child: ErrorState(
+                message: _cleanError(state.error),
+                onRetry: retry,
+              ),
+            );
     } else if (state.isLoading) {
       // Muat ulang paksa: tampil skeleton lagi seperti HomeUiState.Loading
       body = const _HomeLoadingSkeleton(key: ValueKey('loading'));

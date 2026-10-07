@@ -75,9 +75,9 @@ void _snack(BuildContext context, String msg) {
     ..showSnackBar(SnackBar(content: Text(msg)));
 }
 
-/// Aksi tombol download di satu episode (Detail): non-premium -> ajakan
-/// Premium; sudah selesai -> hapus; sedang jalan -> info; belum/gagal -> pilih
-/// kualitas lalu download. Port alur Detail Zenime.
+/// Aksi tombol download di satu episode (Detail): sudah selesai -> hapus;
+/// sedang jalan -> info; belum/gagal -> (khusus Premium, non-premium dapat
+/// ajakan Premium) pilih kualitas lalu download. Port alur Detail Zenime.
 Future<void> onEpisodeDownloadTap(
   BuildContext context,
   WidgetRef ref, {
@@ -87,12 +87,6 @@ Future<void> onEpisodeDownloadTap(
 }) async {
   final id = episode.id;
   if (id == null || id.isEmpty) return;
-
-  final isPremium = ref.read(myPremiumProvider).valueOrNull ?? false;
-  if (!isPremium) {
-    await showDownloadPremiumDialog(context);
-    return;
-  }
 
   final manager = ref.read(episodeDownloadManagerProvider);
   final entry = ref.read(localStoreProvider).downloadFor(id);
@@ -106,6 +100,13 @@ Future<void> onEpisodeDownloadTap(
   }
   if (entry != null && entry.isActive) {
     _snack(context, 'Episode ini sedang didownload');
+    return;
+  }
+
+  // Memulai download baru (belum ada / gagal) khusus Premium.
+  final isPremium = ref.read(myPremiumProvider).valueOrNull ?? false;
+  if (!isPremium) {
+    await showDownloadPremiumDialog(context);
     return;
   }
 

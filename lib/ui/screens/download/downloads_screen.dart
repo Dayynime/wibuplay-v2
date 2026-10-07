@@ -5,7 +5,7 @@ import '../../app_routes.dart';
 import 'downloads_tab.dart';
 
 /// Halaman Download (dibuka dari Pengaturan): episode offline lintas anime.
-/// Khusus Premium -- lihat [DownloadsTab].
+/// Bisa dibuka semua user; yang khusus Premium hanya memulai download baru.
 class DownloadsScreen extends StatelessWidget {
   const DownloadsScreen({super.key});
 
