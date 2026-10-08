@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../core/error_message.dart';
 import '../../../core/firebase_config.dart';
+import '../../../core/gif_quota.dart';
 import '../../../core/image_prep.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
@@ -1260,19 +1261,37 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
     }
   }
 
+  /// Cek aturan GIF. Return pesan error kalau ditolak, null kalau boleh.
+  /// Khusus Premium dan maks [GifQuota.maxPerDay]x ganti per hari.
+  Future<String?> _gifBlockReason(String path) async {
+    if (!await ImagePrep.isGif(path)) return null;
+    if (!widget.premium) return 'GIF khusus member Premium';
+    if (await GifQuota.remaining(widget.uid) <= 0) {
+      return 'Jatah ganti GIF hari ini habis (maks ${GifQuota.maxPerDay}x per hari)';
+    }
+    return null;
+  }
+
   Future<void> _pickAvatar() async {
     // Tanpa resize di picker: GIF harus tetap utuh (resize/kompres picker
     // mengubahnya jadi JPEG statis). Pengecilan dilakukan ImagePrep.
     final x = await _picker.pickImage(source: ImageSource.gallery);
     if (x == null || !mounted) return;
+    final block = await _gifBlockReason(x.path);
+    if (block != null) {
+      if (mounted) setState(() => _error = block);
+      return;
+    }
     setState(() {
       _uploadingAvatar = true;
       _error = null;
     });
     try {
+      final isGif = await ImagePrep.isGif(x.path);
       final path = await ImagePrep.prepare(x.path, maxSide: 512);
       final url = await ProfileImageUploader.uploadAvatar(path, widget.uid);
       await _persist(avatar: url);
+      if (isGif) await GifQuota.consume(widget.uid);
       if (!mounted) return;
       setState(() {
         _avatarUrl = url;
@@ -1294,14 +1313,21 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
     }
     final x = await _picker.pickImage(source: ImageSource.gallery);
     if (x == null || !mounted) return;
+    final block = await _gifBlockReason(x.path);
+    if (block != null) {
+      if (mounted) setState(() => _error = block);
+      return;
+    }
     setState(() {
       _uploadingBanner = true;
       _error = null;
     });
     try {
+      final isGif = await ImagePrep.isGif(x.path);
       final path = await ImagePrep.prepare(x.path, maxSide: 1280);
       final url = await ProfileImageUploader.uploadBanner(path, widget.uid);
       await _persist(banner: url);
+      if (isGif) await GifQuota.consume(widget.uid);
       if (!mounted) return;
       setState(() {
         _bannerUrl = url;
