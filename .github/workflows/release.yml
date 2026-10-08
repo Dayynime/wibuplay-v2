@@ -2,13 +2,13 @@ name: Release APK (signed)
 
 on:
   push:
-    tags: [ 'v*' ]          # contoh: git tag v1.0.1 && git push origin v1.0.1
+    tags: [ 'v*' ]          # contoh: git tag v2.4 && git push origin v2.4 (x.y atau x.y.z)
   workflow_dispatch:
     inputs:
       version_name:
-        description: 'Versi (format x.y.z, contoh 1.0.1)'
+        description: 'Versi (format x.y atau x.y.z, contoh 2.4)'
         required: true
-        default: '1.0.0'
+        default: '2.3'
       publish:
         description: 'Buat GitHub Release + upload APK?'
         type: boolean
@@ -38,11 +38,12 @@ jobs:
           else
             V="$INPUT_VERSION"
           fi
-          if ! echo "$V" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "::error::Versi '$V' tidak valid. Pakai format x.y.z (contoh 1.0.1)"
+          if ! echo "$V" | grep -Eq '^[0-9]+\.[0-9]+(\.[0-9]+)?$'; then
+            echo "::error::Versi '$V' tidak valid. Pakai format x.y atau x.y.z (contoh 2.4)"
             exit 1
           fi
           IFS=. read -r MA MI PA <<< "$V"
+          PA=${PA:-0}
           CODE=$(( MA * 10000 + MI * 100 + PA ))
           echo "APP_VERSION_NAME=$V" >> "$GITHUB_ENV"
           echo "APP_VERSION_CODE=$CODE" >> "$GITHUB_ENV"

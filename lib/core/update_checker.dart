@@ -30,10 +30,10 @@ class UpdateInfo {
 class GithubUpdateChecker {
   GithubUpdateChecker._();
 
-  /// GANTI kalau repo rilis Wibuplay berbeda. Repo salah / belum ada release
+  /// Sama dengan Zenime (Kotlin): cek rilis di RMBLOGG/zenime. Repo salah / belum ada release
   /// = dianggap "tidak ada update" (app tidak pernah terkunci karena ini).
   static const String repo =
-      String.fromEnvironment('UPDATE_REPO', defaultValue: 'RMBLOGG/wibuplay-v2');
+      String.fromEnvironment('UPDATE_REPO', defaultValue: 'RMBLOGG/zenime');
 
   static const Duration _timeout = Duration(seconds: 6);
 

@@ -5,8 +5,8 @@ Workflow diadaptasi dari `android-workflow-template`. Kode di `lib/` dan `test/`
 ## Cara pakai
 
 - Push ke `main`/`master` atau buka PR: `build.yml` jalan, APK debug dan profile ada di Artifacts.
-- Rilis: `git tag v1.0.1 && git push origin v1.0.1`: `release.yml` build, tanda tangan, verifikasi, publish ke GitHub Release.
-- `versionCode` rilis dari versi: `1.2.3` menjadi `10203`.
+- Rilis: `git tag v2.4 && git push origin v2.4` (format tag seperti Zenime: `x.y`, atau `x.y.z`): `release.yml` build, tanda tangan, verifikasi, publish ke GitHub Release.
+- `versionCode` rilis dari versi: `1.2.3` menjadi `10203`; `2.3` menjadi `20300`.
 
 ## Package name (applicationId)
 
@@ -98,7 +98,8 @@ manifest rilis bawaan Flutter tidak punya izin internet.
 ### Catatan Versi (disamakan dengan Zenime)
 
 - Zenime terakhir: versionName `2.3`, versionCode `13`. Wibuplay mulai dari `2.3.0+13` (`pubspec.yaml`).
-- Build rilis (`release.yml`) mengambil versi dari tag: `git tag v2.3.0 && git push origin v2.3.0` -> versionName `2.3.0`, versionCode `20300` (rumus major*10000 + minor*100 + patch, jauh di atas 13, jadi bisa menimpa Zenime lama). Format tag wajib x.y.z, jadi pakai `v2.3.0`, bukan `v2.3`.
+- Build rilis (`release.yml`) mengambil versi dari tag: `git tag v2.3 && git push origin v2.3` -> versionName `2.3`, versionCode `20300` (rumus major*10000 + minor*100 + patch, patch kosong = 0; jauh di atas 13, jadi bisa menimpa Zenime lama). Tag `x.y` dan `x.y.z` sama-sama diterima.
+- Cek update default ke repo `RMBLOGG/zenime` (sama dengan Zenime Kotlin); ganti lewat `--dart-define=UPDATE_REPO=owner/repo`.
 - Cek update memperlakukan `2.3` dan `2.3.0` sama, jadi tidak ada loop wajib update.
 - Rilis berikutnya naikkan tag (mis. `v2.4.0`); applicationId dan keystore harus sama dengan Zenime supaya APK bisa menimpa.
 
