@@ -2,6 +2,11 @@
 /// String ('developer' | 'admin' | 'moderator'); konversi ke ZenimeRole
 /// dilakukan di layer UI (lihat `ZenimeRole.fromValue` di role_badges.dart).
 
+bool _blank(String? s) => s == null || s.trim().isEmpty;
+
+/// Teks pengganti kalau user belum punya username (UID Firebase sengaja tidak ditampilkan).
+const String adminNoUsername = 'Tanpa username';
+
 /// Role user yang sedang login (zenime-admin-get-role). role null = user biasa.
 class AdminMyRole {
   const AdminMyRole({this.role, this.badgeColor});
@@ -34,6 +39,20 @@ class AdminRoleEntry {
   final String createdAt;
   final String? username;
   final String? avatarUrl;
+
+  /// Username untuk ditampilkan.
+  String get displayName => _blank(username) ? adminNoUsername : username!;
+
+  /// Salinan dengan username/avatar yang kosong diisi dari profil chat.
+  AdminRoleEntry withProfile({String? username, String? avatarUrl}) => AdminRoleEntry(
+        firebaseUid: firebaseUid,
+        role: role,
+        badgeColor: badgeColor,
+        assignedBy: assignedBy,
+        createdAt: createdAt,
+        username: _blank(this.username) ? username : this.username,
+        avatarUrl: _blank(this.avatarUrl) ? avatarUrl : this.avatarUrl,
+      );
 
   factory AdminRoleEntry.fromJson(Map<String, dynamic> j) => AdminRoleEntry(
         firebaseUid: (j['firebase_uid'] as String?) ?? '',
@@ -72,9 +91,22 @@ class AdminUser {
   final bool bannedAccount;
   final bool bannedDevice;
 
-  /// Nama yang ditampilkan (username, kalau kosong UID).
-  String get displayName =>
-      (username != null && username!.trim().isNotEmpty) ? username! : firebaseUid;
+  /// Username untuk ditampilkan.
+  String get displayName => _blank(username) ? adminNoUsername : username!;
+
+  /// Salinan dengan username/avatar yang kosong diisi dari profil chat.
+  AdminUser withProfile({String? username, String? avatarUrl}) => AdminUser(
+        firebaseUid: firebaseUid,
+        username: _blank(this.username) ? username : this.username,
+        avatarUrl: _blank(this.avatarUrl) ? avatarUrl : this.avatarUrl,
+        zenimeCode: zenimeCode,
+        userNumber: userNumber,
+        lastDeviceId: lastDeviceId,
+        role: role,
+        badgeColor: badgeColor,
+        bannedAccount: bannedAccount,
+        bannedDevice: bannedDevice,
+      );
 
   factory AdminUser.fromJson(Map<String, dynamic> j) => AdminUser(
         firebaseUid: (j['firebase_uid'] as String?) ?? '',

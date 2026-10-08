@@ -5,7 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/admin_models.dart';
+import '../../../data/models/chat_models.dart' show ChatProfile;
 import '../../../data/repository/admin_repository.dart';
+import '../../../data/repository/chat_repository.dart' show ChatRepository;
 import '../../../providers.dart';
 import '../../components/game_badges.dart' show UserAvatar;
 import '../../components/role_badges.dart';
@@ -22,6 +24,51 @@ typedef AdminRun = Future<void> Function(Future<void> Function() action, String 
 
 String _errorText(Object e, [String fallback = 'Terjadi kesalahan, coba lagi']) =>
     e is AdminException ? e.message : fallback;
+
+bool _blank(String? s) => s == null || s.trim().isEmpty;
+
+/// Profil chat (username/avatar) untuk [uids]; gagal = kosong (nama tetap
+/// "Tanpa username"). Dipakai karena Edge Function admin tidak selalu
+/// mengirim username.
+Future<Map<String, ChatProfile>> _profilesFor(ChatRepository chat, Iterable<String> uids) async {
+  final list = uids.where((u) => u.isNotEmpty).toList();
+  if (list.isEmpty) return const {};
+  try {
+    return await chat.getProfilesForUids(list);
+  } catch (_) {
+    return const {};
+  }
+}
+
+Future<List<AdminUser>> _fillUsers(ChatRepository chat, List<AdminUser> users) async {
+  final profiles = await _profilesFor(
+    chat,
+    users.where((u) => _blank(u.username)).map((u) => u.firebaseUid),
+  );
+  if (profiles.isEmpty) return users;
+  return [
+    for (final u in users)
+      if (profiles[u.firebaseUid] case final p?)
+        u.withProfile(username: p.username, avatarUrl: p.avatarUrl)
+      else
+        u,
+  ];
+}
+
+Future<List<AdminRoleEntry>> _fillRoles(ChatRepository chat, List<AdminRoleEntry> roles) async {
+  final profiles = await _profilesFor(
+    chat,
+    roles.where((r) => _blank(r.username)).map((r) => r.firebaseUid),
+  );
+  if (profiles.isEmpty) return roles;
+  return [
+    for (final r in roles)
+      if (profiles[r.firebaseUid] case final p?)
+        r.withProfile(username: p.username, avatarUrl: p.avatarUrl)
+      else
+        r,
+  ];
+}
 
 String _roleName(ZenimeRole r) {
   switch (r) {
@@ -459,8 +506,9 @@ class _UserListTabState extends ConsumerState<_UserListTab> {
       });
     }
     try {
-      final (list, more) =
+      final (rawList, more) =
           await ref.read(adminRepositoryProvider).listUsers(search: _search.text, offset: 0);
+      final list = await _fillUsers(ref.read(chatRepositoryProvider), rawList);
       if (!mounted || id != _req) return;
       setState(() {
         _users = list;
@@ -482,9 +530,10 @@ class _UserListTabState extends ConsumerState<_UserListTab> {
     final id = _req;
     setState(() => _loadingMore = true);
     try {
-      final (list, more) = await ref
+      final (rawList, more) = await ref
           .read(adminRepositoryProvider)
           .listUsers(search: _search.text, offset: _users.length);
+      final list = await _fillUsers(ref.read(chatRepositoryProvider), rawList);
       if (!mounted) return;
       if (id != _req) {
         setState(() => _loadingMore = false);
@@ -835,7 +884,8 @@ class _RoleHoldersTabState extends ConsumerState<_RoleHoldersTab> {
       });
     }
     try {
-      final list = await ref.read(adminRepositoryProvider).listRoles();
+      final rawList = await ref.read(adminRepositoryProvider).listRoles();
+      final list = await _fillRoles(ref.read(chatRepositoryProvider), rawList);
       if (!mounted) return;
       setState(() {
         _roles = list;
@@ -852,7 +902,7 @@ class _RoleHoldersTabState extends ConsumerState<_RoleHoldersTab> {
   }
 
   Future<void> _remove(AdminRoleEntry entry) async {
-    final name = (entry.username ?? '').isNotEmpty ? entry.username! : entry.firebaseUid;
+    final name = entry.displayName;
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -912,7 +962,7 @@ class _RoleHoldersTabState extends ConsumerState<_RoleHoldersTab> {
         final e = _roles[i];
         final info = roleInfoFrom(e.role, e.badgeColor);
         if (info == null) return const SizedBox.shrink();
-        final name = (e.username ?? '').isNotEmpty ? e.username! : e.firebaseUid;
+        final name = e.displayName;
         return _Card(
           child: Row(
             children: [
