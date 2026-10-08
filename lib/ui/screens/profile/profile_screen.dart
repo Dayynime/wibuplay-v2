@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../core/error_message.dart';
 import '../../../core/firebase_config.dart';
+import '../../../core/image_prep.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/local/entities.dart';
@@ -1260,19 +1261,17 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
   }
 
   Future<void> _pickAvatar() async {
-    final x = await _picker.pickImage(
-      source: ImageSource.gallery,
-      maxWidth: 512,
-      maxHeight: 512,
-      imageQuality: 82,
-    );
+    // Tanpa resize di picker: GIF harus tetap utuh (resize/kompres picker
+    // mengubahnya jadi JPEG statis). Pengecilan dilakukan ImagePrep.
+    final x = await _picker.pickImage(source: ImageSource.gallery);
     if (x == null || !mounted) return;
     setState(() {
       _uploadingAvatar = true;
       _error = null;
     });
     try {
-      final url = await ProfileImageUploader.uploadAvatar(x.path, widget.uid);
+      final path = await ImagePrep.prepare(x.path, maxSide: 512);
+      final url = await ProfileImageUploader.uploadAvatar(path, widget.uid);
       await _persist(avatar: url);
       if (!mounted) return;
       setState(() {
@@ -1293,19 +1292,15 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
       setState(() => _error = 'Upload banner profil khusus buat member Premium');
       return;
     }
-    final x = await _picker.pickImage(
-      source: ImageSource.gallery,
-      maxWidth: 1280,
-      maxHeight: 1280,
-      imageQuality: 82,
-    );
+    final x = await _picker.pickImage(source: ImageSource.gallery);
     if (x == null || !mounted) return;
     setState(() {
       _uploadingBanner = true;
       _error = null;
     });
     try {
-      final url = await ProfileImageUploader.uploadBanner(x.path, widget.uid);
+      final path = await ImagePrep.prepare(x.path, maxSide: 1280);
+      final url = await ProfileImageUploader.uploadBanner(path, widget.uid);
       await _persist(banner: url);
       if (!mounted) return;
       setState(() {

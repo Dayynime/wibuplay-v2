@@ -20,10 +20,14 @@ class ProfileImageUploader {
   );
 
   static Future<String> _upload(String filePath, String publicId) async {
+    final dot = filePath.lastIndexOf('.');
+    final ext = dot >= 0 && filePath.length - dot <= 5
+        ? filePath.substring(dot + 1).toLowerCase()
+        : 'jpg';
     final form = FormData.fromMap({
       'upload_preset': _uploadPreset,
       'public_id': publicId,
-      'file': await MultipartFile.fromFile(filePath, filename: '${publicId.split('/').last}.jpg'),
+      'file': await MultipartFile.fromFile(filePath, filename: '${publicId.split('/').last}.$ext'),
     });
     final res = await _dio.post<dynamic>(_url, data: form);
     final data = res.data;
@@ -34,11 +38,11 @@ class ProfileImageUploader {
     return url;
   }
 
-  /// [filePath] sudah dikecilkan (maks 512px) oleh image_picker.
+  /// [filePath] hasil ImagePrep.prepare (GIF tetap utuh, selain itu maks 512px).
   static Future<String> uploadAvatar(String filePath, String firebaseUid) =>
       _upload(filePath, 'avatars/$firebaseUid-${DateTime.now().millisecondsSinceEpoch}');
 
-  /// [filePath] sudah dikecilkan (maks 1280px) oleh image_picker.
+  /// [filePath] hasil ImagePrep.prepare (GIF tetap utuh, selain itu maks 1280px).
   static Future<String> uploadBanner(String filePath, String firebaseUid) =>
       _upload(filePath, 'banners/$firebaseUid-${DateTime.now().millisecondsSinceEpoch}');
 }
