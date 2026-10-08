@@ -332,8 +332,13 @@ class ClanRepository {
         );
       });
 
-  /// Ubah nama/tag clan (khusus leader). Field null tidak dikirim.
-  Future<void> updateClanSettings(String clanId, {String? name, String? tag}) =>
+  /// Ubah nama/tag/foto clan (khusus leader). Field null tidak dikirim.
+  Future<void> updateClanSettings(
+    String clanId, {
+    String? name,
+    String? tag,
+    String? photoUrl,
+  }) =>
       _guard('Gagal update settingan clan', () async {
         await _dio.post<dynamic>(
           'functions/v1/zenime-clan-settings',
@@ -341,6 +346,7 @@ class ClanRepository {
             'clan_id': clanId,
             if (name != null) 'name': name,
             if (tag != null) 'tag': tag,
+            if (photoUrl != null) 'photo_url': photoUrl,
           },
           options: Options(headers: {'Authorization': await _authHeader()}),
         );

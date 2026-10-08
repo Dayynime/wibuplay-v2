@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/clan_models.dart';
+import '../../../data/repository/clan_photo_uploader.dart';
 import '../../../data/repository/clan_repository.dart';
 import '../../../providers.dart';
 import '../../components/game_badges.dart';
@@ -339,6 +341,8 @@ class _SettingsTab extends ConsumerStatefulWidget {
 class _SettingsTabState extends ConsumerState<_SettingsTab> {
   late final TextEditingController _name = TextEditingController(text: widget.clan.name);
   late final TextEditingController _tag = TextEditingController(text: widget.clan.tag);
+  final _picker = ImagePicker();
+  bool _uploadingPhoto = false;
   bool _saving = false;
   String? _feedback;
   bool _feedbackError = false;
@@ -353,6 +357,67 @@ class _SettingsTabState extends ConsumerState<_SettingsTab> {
     _name.dispose();
     _tag.dispose();
     super.dispose();
+  }
+
+  /// Pilih foto dari galeri -> upload ke Cloudinary -> simpan photo_url ke clan.
+  Future<void> _changePhoto() async {
+    if (_uploadingPhoto || _saving) return;
+    final XFile? picked;
+    try {
+      picked = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 512,
+        maxHeight: 512,
+        imageQuality: 82,
+      );
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _feedback = 'Gagal membuka galeri';
+          _feedbackError = true;
+        });
+      }
+      return;
+    }
+    if (picked == null) return;
+
+    setState(() {
+      _uploadingPhoto = true;
+      _feedback = null;
+    });
+    try {
+      // pathKey WAJIB unik tiap upload (pakai timestamp). Upload unsigned
+      // Cloudinary tidak boleh menimpa public_id yang sudah ada, jadi kalau
+      // pathKey-nya cuma clanId, foto kedua dst akan balik ke foto lama.
+      final url = await ClanPhotoUploader.uploadClanPhoto(
+        picked.path,
+        '${widget.clan.id}-${DateTime.now().millisecondsSinceEpoch}',
+      );
+      await ref.read(clanRepositoryProvider).updateClanSettings(widget.clan.id, photoUrl: url);
+      widget.onChanged();
+      if (mounted) {
+        setState(() {
+          _feedback = 'Foto clan berhasil diganti';
+          _feedbackError = false;
+        });
+      }
+    } on ClanException catch (e) {
+      if (mounted) {
+        setState(() {
+          _feedback = e.message;
+          _feedbackError = true;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _feedback = 'Gagal upload foto. Periksa koneksi lalu coba lagi.';
+          _feedbackError = true;
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _uploadingPhoto = false);
+    }
   }
 
   Future<void> _save() async {
@@ -450,7 +515,14 @@ class _SettingsTabState extends ConsumerState<_SettingsTab> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 28),
       children: [
-        Center(child: ClanAvatar(tag: clan.tag, url: clan.photoUrl, size: 84)),
+        Center(
+          child: _PhotoButton(
+            tag: clan.tag,
+            url: clan.photoUrl,
+            uploading: _uploadingPhoto,
+            onTap: _changePhoto,
+          ),
+        ),
         const SizedBox(height: 18),
         TextField(
           controller: _name,
@@ -592,6 +664,69 @@ class _SettingsTabState extends ConsumerState<_SettingsTab> {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Avatar clan yang bisa diketuk buat ganti foto (ada badge kamera + spinner).
+class _PhotoButton extends StatelessWidget {
+  const _PhotoButton({
+    required this.tag,
+    required this.url,
+    required this.uploading,
+    required this.onTap,
+  });
+
+  final String tag;
+  final String? url;
+  final bool uploading;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    const size = 84.0;
+    return GestureDetector(
+      onTap: uploading ? null : onTap,
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            ClanAvatar(tag: tag, url: url, size: size),
+            if (uploading)
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Colors.black54,
+                    borderRadius: BorderRadius.circular(size * 0.3),
+                  ),
+                  child: const Center(
+                    child: SizedBox(
+                      width: 26,
+                      height: 26,
+                      child: CircularProgressIndicator(strokeWidth: 3, color: Colors.white),
+                    ),
+                  ),
+                ),
+              ),
+            Positioned(
+              right: -4,
+              bottom: -4,
+              child: Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.accentViolet,
+                  border: Border.all(color: AppColors.backgroundDark, width: 2),
+                ),
+                child: const Icon(Icons.camera_alt_rounded, size: 16, color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
