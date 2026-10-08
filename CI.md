@@ -115,9 +115,9 @@ manifest rilis bawaan Flutter tidak punya izin internet.
 - Alur: Beranda > tap panel TOP CLAN di slide leaderboard > `ClanBrowseScreen` (Semua Clan / Leaderboard / Clan Saya + cari) > tap clan > `ClanScreen` (detail).
 - Detail clan: header (avatar, nama, tag rainbow, level, progress XP ke level berikut, statistik Total XP / Member / Donasi hari ini), tombol aksi sesuai relasi user (Join Clan / Menunggu Persetujuan / Sudah Gabung Clan Lain / Donasi ZCoin + Keluar Clan), tab Members (cari, filter role, urut) dan Donasi hari ini.
 - Data: `ClanRepository` (`data/repository/clan_repository.dart`). Baca lewat PostgREST (`clans`, `clan_members`, `clan_donation_log`); aksi lewat Edge Function `zenime-clan-join-request`, `-donate`, `-leave`, `-my-request-status` dengan Firebase ID Token di header Authorization.
-- Kelola Clan (`clan_manage_screen.dart`): tombol "Kelola Clan" muncul untuk Officer ke atas. Tab Request (terima/tolak) untuk Officer ke atas; tab Pengaturan (nama, tag 3 huruf, beli kuota member pakai saldo donasi) khusus Leader. Endpoint: `zenime-clan-pending-requests`, `-respond-request`, `-settings`, `-buy-slots`.
+- Kelola Clan (`clan_manage_screen.dart`): tombol "Kelola Clan" muncul untuk Officer ke atas. Tab Request (terima/tolak) untuk Officer ke atas; tab Pengaturan (ganti foto, nama, tag, beli kuota member pakai saldo donasi) khusus Leader. Foto clan: pilih dari galeri, upload ke Cloudinary dengan nama file unik (`<clanId>-<millis>`, upload unsigned tidak boleh menimpa nama yang sudah ada), lalu `photo_url` dikirim lewat `zenime-clan-settings`. Endpoint: `zenime-clan-pending-requests`, `-respond-request`, `-settings`, `-buy-slots`.
 - Ubah role dan kick: menu titik tiga di baris member (halaman clan), hanya muncul kalau role kita boleh bertindak ke target (`ClanRoles.canActOn`). Endpoint: `zenime-clan-set-role`, `zenime-clan-kick`. Aturan izin cuma buat UI; validasi asli di server.
-- Belum dipindah dari Zenime: Buat Clan, ganti foto clan (butuh image picker + upload), centang role global di list member (cuma centang Premium). Rumus XP per level clan perkiraan (sama seperti Zenime).
+- Belum dipindah dari Zenime: centang role global di list member (cuma centang Premium). Rumus XP per level clan perkiraan (sama seperti Zenime).
 - Belum ada tombol ke halaman Clan selain dari panel TOP CLAN di Beranda.
 
 ### Catatan Bubble Chat Global
@@ -168,3 +168,13 @@ manifest rilis bawaan Flutter tidak punya izin internet.
 - **Manifest** (patch di workflow): `allowBackup=false`, cleartext HTTP hanya untuk host di `android_res/xml/network_security_config.xml` (bukan global lagi), `<queries>` untuk deteksi app lain. Catatan: aturan ini berlaku untuk video_player/ExoPlayer; Dio (dart:io) tidak terpengaruh.
 - **Fix jaringan lemot (WiFi/Indihome)**: retry GET sekarang juga untuk connect timeout (jeda 300ms), connectTimeout API utama 10 detik (sama Zenime). Tidak dipindah: tuning buffer/timeout ExoPlayer (`PlayerConfig.kt`), karena plugin video_player tidak membuka opsi itu.
 - **Log**: semua `debugPrint` dibungkus `kDebugMode`, tidak ada log di release.
+
+### Catatan Panel Admin
+
+- Port AdminScreen.kt Zenime. Tombol "Panel Admin" muncul di Pengaturan (grup akun, di bawah Chat Global) hanya kalau user punya role (developer/admin/moderator), dibaca dari `user_roles` (SELECT publik, sama dengan badge role). Role dicek ulang ke server (`zenime-admin-get-role`) saat panel dibuka, dan tiap aksi dicek lagi di server.
+- File: `lib/ui/screens/admin/admin_screen.dart`, `lib/data/repository/admin_repository.dart`, `lib/data/models/admin_models.dart`; provider `adminRepositoryProvider` di `providers.dart`.
+- Tab: Semua User (cari nama/kode Zenime/UID, 20 per halaman; aksi per baris), Pemegang Role (khusus developer, cabut role), Info.
+- Izin: developer = set/cabut role + ban/unban akun + ban/unban device; admin = ban/unban akun; moderator = lihat daftar saja. Akun yang punya role tidak bisa di-ban (ditolak server).
+- Backend: Edge Function `zenime-admin-get-role`, `-list-roles`, `-list-users`, `-set-role`, `-ban-user`, `-unban-user`, `-ban-device`, `-unban-device`, semua dengan Firebase ID Token di header Authorization. Function ini dipakai bersama Zenime, tidak ada di repo ini.
+- Belum dipindah: hapus pesan orang lain di Chat Global oleh admin (`zenime-admin-delete-message`); `deleteMessage` di chat saat ini hanya untuk pesan sendiri.
+

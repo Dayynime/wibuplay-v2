@@ -10,6 +10,8 @@ import '../../../data/models/account_models.dart';
 import '../../../data/models/chat_models.dart';
 import '../../../providers.dart';
 import '../../app_routes.dart';
+import '../../components/role_badges.dart';
+import '../admin/admin_screen.dart';
 import '../auth/login_screen.dart';
 import '../chat/chat_screen.dart';
 import '../download/downloads_screen.dart';
@@ -122,6 +124,10 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
       profileLoading = async.isLoading;
       premium = ref.watch(premiumStatusProvider(user.uid)).valueOrNull;
     }
+    // Punya role (developer/admin/moderator)? Cuma buat memunculkan tombol Panel
+    // Admin; role dicek ulang di server saat panelnya dibuka.
+    final isStaff =
+        user != null && ref.watch(roleInfoProvider(user.uid)).valueOrNull != null;
     final downloadCount = ref.watch(localStoreProvider.select((s) => s.downloads.length));
     final store = ref.watch(localStoreProvider);
 
@@ -298,6 +304,17 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
                     trailing: const Icon(Icons.chevron_right, color: AppColors.textMuted),
                     onTap: _openChat,
                   ),
+                  if (isStaff) ...[
+                    const _RowDivider(),
+                    _SettingsRow(
+                      leading: const _IconChip(icon: Icons.shield_outlined),
+                      title: 'Panel Admin',
+                      subtitle: 'Kelola role, ban, dan moderasi',
+                      trailing: const Icon(Icons.chevron_right, color: AppColors.textMuted),
+                      onTap: () => Navigator.of(context)
+                          .push<void>(fadeRoute(const AdminScreen())),
+                    ),
+                  ],
                 ],
               ),
 

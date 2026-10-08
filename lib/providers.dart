@@ -11,6 +11,7 @@ import 'data/api/api_service.dart';
 import 'data/download/episode_download_manager.dart';
 import 'data/local/local_store.dart';
 import 'data/repository/account_repository.dart';
+import 'data/repository/admin_repository.dart';
 import 'data/repository/anime_repository.dart';
 import 'data/repository/auth_repository.dart';
 import 'data/repository/chat_repository.dart';
@@ -203,6 +204,11 @@ final heroTopClansProvider = FutureProvider.autoDispose<List<ClanSummary>>((ref)
     return const [];
   }
 });
+
+/// Panel Admin (role, ban akun/device). Aksi lewat Edge Function + Firebase ID Token.
+final adminRepositoryProvider = Provider<AdminRepository>(
+  (ref) => AdminRepository(ref.watch(supabaseDioProvider)),
+);
 
 final clanRepositoryProvider = Provider<ClanRepository>(
   (ref) => ClanRepository(
