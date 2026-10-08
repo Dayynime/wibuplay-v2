@@ -14,7 +14,7 @@ import 'clan_widgets.dart';
 /// Biaya bikin clan (ZCoin), sama dengan Zenime (CREATE_CLAN_COST).
 const int createClanCost = 2500;
 
-/// Buat Clan: foto (opsional), nama 3-30 karakter, tag persis 3 huruf/angka.
+/// Buat Clan: foto (opsional), nama 3-30 karakter, tag 3-4 huruf/angka.
 /// Port CreateClanScreen.kt. Pop dengan clanId kalau berhasil.
 class CreateClanScreen extends ConsumerStatefulWidget {
   const CreateClanScreen({super.key, required this.firebaseUid});
@@ -47,7 +47,7 @@ class _CreateClanScreenState extends ConsumerState<CreateClanScreen> {
     return n >= 3 && n <= 30;
   }
 
-  bool get _tagValid => RegExp(r'^[A-Z0-9]{3}$').hasMatch(_tagCtrl.text.trim().toUpperCase());
+  bool get _tagValid => RegExp(r'^[A-Z0-9]{3,4}$').hasMatch(_tagCtrl.text.trim().toUpperCase());
 
   Future<void> _pickPhoto() async {
     try {
@@ -210,7 +210,7 @@ class _CreateClanScreenState extends ConsumerState<CreateClanScreen> {
             const SizedBox(height: 12),
             TextField(
               controller: _tagCtrl,
-              maxLength: 3,
+              maxLength: 4,
               textCapitalization: TextCapitalization.characters,
               inputFormatters: [
                 FilteringTextInputFormatter.allow(RegExp('[a-zA-Z0-9]')),
@@ -225,8 +225,8 @@ class _CreateClanScreenState extends ConsumerState<CreateClanScreen> {
                 'Tag (singkatan)',
                 'Contoh: OCT',
                 _tagCtrl.text.isNotEmpty && !_tagValid
-                    ? 'Harus 3 huruf/angka'
-                    : 'Persis 3 karakter, jadi identitas singkat clan',
+                    ? 'Harus 3-4 huruf/angka'
+                    : '3-4 karakter, jadi identitas singkat clan',
                 error: _tagCtrl.text.isNotEmpty && !_tagValid,
               ),
             ),

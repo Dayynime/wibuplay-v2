@@ -465,14 +465,14 @@ class _SettingsTabState extends ConsumerState<_SettingsTab> {
           enabled: !_saving,
           textCapitalization: TextCapitalization.characters,
           inputFormatters: [
-            LengthLimitingTextInputFormatter(3),
+            LengthLimitingTextInputFormatter(4),
             TextInputFormatter.withFunction(
               (old, v) => v.copyWith(text: v.text.toUpperCase()),
             ),
           ],
           style: const TextStyle(color: Colors.white),
           cursorColor: AppColors.accentViolet,
-          decoration: _decoration('Tag (3 huruf)'),
+          decoration: _decoration('Tag (3-4 huruf)'),
         ),
         if (_feedback != null) ...[
           const SizedBox(height: 10),
