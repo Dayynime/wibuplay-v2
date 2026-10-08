@@ -16,6 +16,7 @@ import 'ui/route_observer.dart';
 import 'ui/components/announcement_popup.dart';
 import 'ui/screens/auth/auth_gate.dart';
 import 'ui/screens/maintenance/maintenance_screen.dart';
+import 'ui/screens/security/ban_overlay.dart';
 import 'ui/screens/onboarding/onboarding_gate.dart';
 import 'ui/screens/security/integrity_gate.dart';
 import 'ui/screens/update/update_gate.dart';
@@ -92,6 +93,8 @@ class ZenimeApp extends ConsumerWidget {
           const MiniPlayerOverlay(),
           // Paling atas: menutup semua halaman (juga yang di-push) saat maintenance.
           const MaintenanceOverlay(),
+          // Muncul real-time saat admin ban user yang lagi buka app.
+          const BanOverlay(),
         ],
       ),
       home: IntegrityGate(

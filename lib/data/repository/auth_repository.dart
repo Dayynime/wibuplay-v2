@@ -244,6 +244,14 @@ class AuthRepository {
     unawaited(_chat.ensureProfile(user.uid, _defaultUsername(user), user.photoURL));
   }
 
+  /// Cek ban untuk sesi yang lagi aktif (dipakai BanWatcher, real-time saat
+  /// app terbuka). Tidak login = tidak diban.
+  Future<BanStatus> checkCurrentSessionBan() async {
+    final user = _current;
+    if (user == null) return const BanStatus();
+    return _checkBan(user);
+  }
+
   /// Edge Function `zenime-check-ban` butuh Firebase ID Token asli di header
   /// Authorization. Gagal cek (jaringan/server) dianggap tidak diban, sama
   /// seperti Zenime.

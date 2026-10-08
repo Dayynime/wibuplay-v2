@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/firebase_config.dart';
 import '../../../providers.dart';
+import '../security/ban_overlay.dart';
 import 'login_screen.dart';
 
 /// Gerbang wajib login. Belum login -> LoginScreen, sudah login -> [child]
@@ -30,7 +31,7 @@ class AuthGate extends ConsumerWidget {
       switchInCurve: Curves.easeOutCubic,
       switchOutCurve: Curves.easeInCubic,
       child: user != null
-          ? KeyedSubtree(key: const ValueKey('app'), child: child)
+          ? KeyedSubtree(key: const ValueKey('app'), child: BanWatcher(child: child))
           : const LoginScreen(key: ValueKey('login')),
     );
   }
