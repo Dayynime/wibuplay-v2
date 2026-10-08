@@ -24,6 +24,7 @@ class PremiumPackage {
     required this.durationText,
     required this.price,
     this.badge,
+    this.bonusCoin = 0,
   });
 
   final String id;
@@ -32,12 +33,17 @@ class PremiumPackage {
   final int price;
   final String? badge;
 
+  /// Bonus ZCoin yang dikasih server setelah pembayaran premium terverifikasi
+  /// (0 = tanpa bonus / server belum kirim field-nya).
+  final int bonusCoin;
+
   factory PremiumPackage.fromJson(Map<String, dynamic> j) => PremiumPackage(
         id: j['id']?.toString() ?? '',
         label: j['label']?.toString() ?? '',
         durationText: j['duration_text']?.toString() ?? '',
         price: _int(j['price']),
         badge: _strOrNull(j['badge']),
+        bonusCoin: _int(j['bonus_coin']),
       );
 
   /// "12 bulan" -> 12, "1 tahun" -> 12. null kalau teks durasi tidak berangka.
