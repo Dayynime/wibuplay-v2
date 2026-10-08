@@ -97,7 +97,7 @@ manifest rilis bawaan Flutter tidak punya izin internet.
 
 ### Catatan Versi (disamakan dengan Zenime)
 
-- Zenime terakhir: versionName `2.3`, versionCode `13`. Wibuplay mulai dari `2.3.0+13` (`pubspec.yaml`).
+- Zenime terakhir: versionName `2.3`, versionCode `13`. Wibuplay mulai dari `2.3.0+13`, sekarang `2.4.0+20400` (`pubspec.yaml`).
 - Build rilis (`release.yml`) mengambil versi dari tag: `git tag v2.3 && git push origin v2.3` -> versionName `2.3`, versionCode `20300` (rumus major*10000 + minor*100 + patch, patch kosong = 0; jauh di atas 13, jadi bisa menimpa Zenime lama). Tag `x.y` dan `x.y.z` sama-sama diterima.
 - Cek update default ke repo `RMBLOGG/zenime` (sama dengan Zenime Kotlin); ganti lewat `--dart-define=UPDATE_REPO=owner/repo`.
 - Cek update memperlakukan `2.3` dan `2.3.0` sama, jadi tidak ada loop wajib update.
