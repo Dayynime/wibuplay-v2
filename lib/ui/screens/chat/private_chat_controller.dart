@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/error_message.dart';
 import '../../../data/models/friend_models.dart';
-import '../../../data/realtime/private_chat_realtime_client.dart';
 import '../../../providers.dart';
 
 const int _maxDmLength = 1000;
@@ -79,8 +78,8 @@ class PrivateChatController extends AutoDisposeNotifier<PrivateChatState> {
   bool _started = false;
   List<FriendDisplay> _friends = const [];
   List<PrivateMessage> _recent = const [];
-  PrivateChatRealtimeClient? _realtime;
-  StreamSubscription<PrivateMessage>? _sub;
+  Timer? _poll;
+  bool _polling = false;
 
   String get _myUid => ref.read(authRepositoryProvider).currentUser?.uid ?? '';
 
@@ -89,8 +88,7 @@ class PrivateChatController extends AutoDisposeNotifier<PrivateChatState> {
     _alive = true;
     ref.onDispose(() {
       _alive = false;
-      _sub?.cancel();
-      _realtime?.stop();
+      _poll?.cancel();
     });
     return const PrivateChatState();
   }
@@ -112,14 +110,32 @@ class PrivateChatController extends AutoDisposeNotifier<PrivateChatState> {
     }
     _started = true;
     loadConversations();
-    final client = PrivateChatRealtimeClient(
-      uid,
-      // Setelah (re)connect, muat ulang supaya pesan yang kelewat ikut masuk.
-      onJoined: () => loadConversations(showLoading: false),
-    );
-    _realtime = client;
-    _sub = client.incoming.listen(_applyIncoming);
-    client.start();
+    // Realtime DM dimatikan di server (privasi), jadi cek pesan baru tiap beberapa detik.
+    _poll = Timer.periodic(const Duration(seconds: 6), (_) => _pollTick());
+  }
+
+  Future<void> _pollTick() async {
+    if (!_alive || _polling) return;
+    final uid = _myUid;
+    if (uid.isEmpty) return;
+    _polling = true;
+    try {
+      final repo = ref.read(privateChatRepositoryProvider);
+      final open = state.selected;
+      final msgs = open != null
+          ? await repo.getConversation(uid, open.firebaseUid)
+          : await repo.getRecent(uid);
+      if (!_alive) return;
+      final fresh = msgs.where((m) => m.recipientUid == uid).toList()
+        ..sort((a, b) => a.id.compareTo(b.id));
+      for (final m in fresh) {
+        _applyIncoming(m);
+      }
+    } catch (_) {
+      // Polling senyap: gagal sesekali tidak perlu mengganggu pengguna.
+    } finally {
+      _polling = false;
+    }
   }
 
   Future<void> loadConversations({bool showLoading = true}) async {
@@ -221,6 +237,7 @@ class PrivateChatController extends AutoDisposeNotifier<PrivateChatState> {
           sendError: () => null,
           replyTarget: () => null,
         ));
+    loadConversations(showLoading: false);
   }
 
   void setReplyTarget(PrivateMessage m) => _update((s) => s.copyWith(replyTarget: () => m));

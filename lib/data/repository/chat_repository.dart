@@ -38,6 +38,17 @@ class ChatRepository {
     return _rows(res.data).map(ChatMessage.fromJson).toList().reversed.toList();
   }
 
+  /// Pesan error dari body Edge Function (mis. "Terlalu cepat, tunggu sebentar").
+  static String? _serverMessage(Object e) {
+    if (e is! DioException) return null;
+    final d = e.response?.data;
+    final msg = d is Map ? d['error'] : null;
+    return (msg is String && msg.trim().isNotEmpty) ? msg.trim() : null;
+  }
+
+  /// Kirim pesan lewat Edge Function `chat-global`. UID, username, avatar, dan
+  /// kutipan balasan diisi SERVER; parameter lama dipertahankan hanya agar
+  /// pemanggil tidak berubah dan tidak ada yang dikirim ke server.
   Future<ChatMessage> sendMessage({
     required String firebaseUid,
     required String username,
@@ -47,34 +58,38 @@ class ChatRepository {
     String? replyToUsername,
     String? replyToMessage,
   }) async {
-    final res = await _dio.post<dynamic>(
-      'rest/v1/global_chat_messages',
-      data: {
-        'firebase_uid': firebaseUid,
-        'username': username,
-        'avatar_url': avatarUrl,
-        'message': message,
-        'reply_to_id': replyToId,
-        'reply_to_username': replyToUsername,
-        'reply_to_message': replyToMessage,
-        'message_type': 'text',
-      },
-      options: Options(headers: {'Prefer': 'return=representation'}),
-    );
-    final rows = _rows(res.data);
-    if (rows.isEmpty) {
-      throw Exception('Server tidak mengembalikan pesan yang terkirim');
+    try {
+      final res = await _dio.post<dynamic>(
+        'functions/v1/chat-global',
+        data: {'action': 'send', 'message': message, 'reply_to_id': replyToId},
+        options: await _authOptions(),
+      );
+      final d = res.data;
+      if (d is! Map) {
+        throw Exception('Server tidak mengembalikan pesan yang terkirim');
+      }
+      return ChatMessage.fromJson(Map<String, dynamic>.from(d));
+    } catch (e) {
+      final m = _serverMessage(e);
+      if (m != null) throw Exception(m);
+      rethrow;
     }
-    return ChatMessage.fromJson(rows.first);
   }
 
-  /// Hapus pesan milik sendiri. Filter firebase_uid ikut dikirim di query
-  /// (sama seperti Zenime) supaya request tidak bisa dipakai menghapus pesan orang lain.
+  /// Hapus pesan milik sendiri. Server hanya menghapus kalau pesan itu milik
+  /// uid di token.
   Future<void> deleteMessage(int id, String firebaseUid) async {
-    await _dio.delete<dynamic>(
-      'rest/v1/global_chat_messages',
-      queryParameters: {'id': 'eq.$id', 'firebase_uid': 'eq.$firebaseUid'},
-    );
+    try {
+      await _dio.post<dynamic>(
+        'functions/v1/chat-global',
+        data: {'action': 'delete', 'id': id},
+        options: await _authOptions(),
+      );
+    } catch (e) {
+      final m = _serverMessage(e);
+      if (m != null) throw Exception(m);
+      rethrow;
+    }
   }
 
   Future<ChatProfile?> getProfile(String firebaseUid) async {
