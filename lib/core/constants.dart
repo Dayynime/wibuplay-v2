@@ -7,7 +7,9 @@ class Constants {
   /// Base URL API dari Firebase Remote Config (`api_base_url`), tanpa fallback
   /// hardcode. String kosong = belum tersedia (lihat [RemoteConfigManager]).
   static String get baseUrl => RemoteConfigManager.baseUrl ?? '';
-  static const String referer = 'https://animeinweb.com/';
+  /// Referer dari Remote Config (`api_referer`), tanpa fallback hardcode.
+  /// null = belum tersedia, header Referer tidak dikirim.
+  static String? get referer => RemoteConfigManager.apiReferer;
   static const String userAgent =
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
 }

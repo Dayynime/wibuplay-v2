@@ -89,6 +89,9 @@ class RemoteConfigManager {
   // Base URL API donghua (Anichin). Parameter TERPISAH dari api_base_url.
   static const String _keyAnichinBaseUrl = 'anichin_base_url';
 
+  // Header Referer buat API/gambar/download Animein. TANPA fallback hardcode.
+  static const String _keyApiReferer = 'api_referer';
+
   // Pop up pengumuman (parameter sama dengan Zenime).
   static const String _keyPopupEnabled = 'popup_enabled';
   static const String _keyPopupId = 'popup_id';
@@ -162,6 +165,17 @@ class RemoteConfigManager {
     if (v.isEmpty) return null;
     return v.endsWith('/') ? v : '$v/';
   }
+
+  /// Referer API Animein, murni dari Remote Config `api_referer`. Sama seperti
+  /// [baseUrl]: null kalau kosong / belum pernah fetch sukses, TIDAK ada
+  /// fallback hardcode. null = header Referer tidak dikirim.
+  static String? get apiReferer {
+    final rc = _instance;
+    if (rc == null) return null;
+    final v = rc.getString(_keyApiReferer).trim();
+    return v.isEmpty ? null : v;
+  }
+
   /// Status maintenance yang sedang berlaku (null = normal). UI cukup
   /// mendengarkan notifier ini; isinya diperbarui tiap fetch/activate dan
   /// tiap update real-time dari Console.

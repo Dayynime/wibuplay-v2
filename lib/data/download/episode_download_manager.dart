@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../../core/constants.dart';
 import '../../core/premium_access.dart';
 import '../local/entities.dart';
 import '../local/local_store.dart';
@@ -28,11 +29,10 @@ class EpisodeDownloadManager {
 
   static const MethodChannel _ch = MethodChannel('wibuplay/download');
 
-  static const Map<String, String> _headers = {
-    'Referer': 'https://animeinweb.com/',
-    'User-Agent':
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-  };
+  static Map<String, String> get _headers => {
+        if (Constants.referer case final r?) 'Referer': r,
+        'User-Agent': Constants.userAgent,
+      };
 
   // Kode status DownloadManager Android.
   static const int _statusSuccessful = 8;

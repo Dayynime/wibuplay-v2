@@ -17,7 +17,8 @@ const int _maxMessagesInMemory = 200;
 const int _resyncSeconds = 45;
 
 /// State Chat Global. Port ChatUiState di ChatViewModel.kt (versi inti:
-/// kirim teks, balas, hapus pesan sendiri, realtime, badge warna/ID/avatar).
+/// kirim teks, balas, hapus pesan (sendiri / semua kalau admin-developer),
+/// realtime, badge warna/ID/avatar).
 class ChatUiState {
   const ChatUiState({
     this.messages = const [],
@@ -35,6 +36,7 @@ class ChatUiState {
     this.myUid = '',
     this.myUsername = '',
     this.myAvatarUrl,
+    this.canDeleteOthers = false,
   });
 
   final List<ChatMessage> messages;
@@ -57,6 +59,10 @@ class ChatUiState {
   final String myUsername;
   final String? myAvatarUrl;
 
+  /// true kalau akun yang login role-nya admin/developer: boleh hapus pesan
+  /// orang lain (sama seperti Zenime). Cuma gating UI, server cek ulang.
+  final bool canDeleteOthers;
+
   /// Parameter berupa fungsi supaya bisa mengisi null secara eksplisit.
   ChatUiState copyWith({
     List<ChatMessage>? messages,
@@ -73,6 +79,7 @@ class ChatUiState {
     Set<String>? premiumUids,
     String? myUsername,
     String? myAvatarUrl,
+    bool? canDeleteOthers,
   }) {
     return ChatUiState(
       messages: messages ?? this.messages,
@@ -90,6 +97,7 @@ class ChatUiState {
       myUid: myUid,
       myUsername: myUsername ?? this.myUsername,
       myAvatarUrl: myAvatarUrl ?? this.myAvatarUrl,
+      canDeleteOthers: canDeleteOthers ?? this.canDeleteOthers,
     );
   }
 }
@@ -163,6 +171,7 @@ class ChatController extends AutoDisposeNotifier<ChatUiState> {
     // BERSAMAAN. Realtime + resync tidak boleh menunggu request profil/fetch
     // (kalau salah satunya lambat/timeout, chat jadi tidak live sama sekali).
     unawaited(_loadProfile());
+    unawaited(_loadMyRole());
     unawaited(_refresh(initial: true));
     _startRealtime();
     // Jaring pengaman jarang-jarang (bukan polling tiap beberapa detik).
@@ -377,11 +386,30 @@ class ChatController extends AutoDisposeNotifier<ChatUiState> {
 
   void clearError() => _update((s) => s.copyWith(errorMessage: () => null));
 
-  /// Hapus pesan milik sendiri (hanya kalau firebase_uid cocok).
-  Future<void> deleteMessage(ChatMessage message) async {
-    if (message.firebaseUid != state.myUid) return;
+  /// Cek role diri sendiri: nentuin boleh/nggaknya hapus pesan orang lain.
+  /// Gagal = anggap user biasa (tombol hapus pesan orang tidak muncul).
+  Future<void> _loadMyRole() async {
     try {
-      await _repo.deleteMessage(message.id, state.myUid);
+      final r = await ref.read(adminRepositoryProvider).getMyRole();
+      final role = r.role;
+      _update((s) => s.copyWith(
+            canDeleteOthers: role == 'admin' || role == 'developer',
+          ));
+    } catch (_) {}
+  }
+
+  /// Pesan sendiri: hapus lewat Edge Function `chat-global`. Pesan ORANG LAIN:
+  /// cuma kalau [ChatUiState.canDeleteOthers] (admin/developer), lewat Edge
+  /// Function zenime-admin-delete-message -- role dicek ULANG di server.
+  Future<void> deleteMessage(ChatMessage message) async {
+    final isOwn = message.firebaseUid == state.myUid;
+    if (!isOwn && !state.canDeleteOthers) return;
+    try {
+      if (isOwn) {
+        await _repo.deleteMessage(message.id, state.myUid);
+      } else {
+        await ref.read(adminRepositoryProvider).deleteMessage(message.id);
+      }
       _update((s) => s.copyWith(
             messages: s.messages.where((m) => m.id != message.id).toList(),
             replyTarget: s.replyTarget?.id == message.id ? () => null : null,

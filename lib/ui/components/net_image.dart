@@ -7,14 +7,13 @@ import 'shimmer.dart';
 
 /// Header yang sama dengan request API (Referer + User-Agent browser).
 /// Banyak CDN menolak User-Agent bawaan Dart.
-const Map<String, String> _imageHeaders = {
-  'Referer': Constants.referer,
-  'User-Agent': Constants.userAgent,
-  'Accept': 'image/webp,image/png,image/jpeg,image/*;q=0.8,*/*;q=0.5',
-};
-
+/// Getter (bukan const) supaya Referer selalu ikut nilai Remote Config terbaru.
 /// Dipakai juga buat preload gambar (mis. hero banner).
-const Map<String, String> netImageHeaders = _imageHeaders;
+Map<String, String> get netImageHeaders => {
+      if (Constants.referer case final r?) 'Referer': r,
+      'User-Agent': Constants.userAgent,
+      'Accept': 'image/webp,image/png,image/jpeg,image/*;q=0.8,*/*;q=0.5',
+    };
 
 /// Gambar jaringan dengan cache. Pakai di tempat yang ukurannya sudah pasti
 /// (Positioned.fill / SizedBox / AspectRatio). URL kosong -> area kosong.
@@ -37,7 +36,7 @@ class NetImage extends StatelessWidget {
     if (url.isEmpty) return const SizedBox.expand();
     return CachedNetworkImage(
       imageUrl: url,
-      httpHeaders: _imageHeaders,
+      httpHeaders: netImageHeaders,
       fit: fit,
       alignment: alignment,
       fadeInDuration: const Duration(milliseconds: 200),

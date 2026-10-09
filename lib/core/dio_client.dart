@@ -33,7 +33,8 @@ class DynamicBaseUrlInterceptor extends Interceptor {
 class HeaderInterceptor extends Interceptor {
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
-    options.headers['Referer'] = Constants.referer;
+    final referer = Constants.referer;
+    if (referer != null) options.headers['Referer'] = referer;
     options.headers['User-Agent'] = Constants.userAgent;
     handler.next(options);
   }

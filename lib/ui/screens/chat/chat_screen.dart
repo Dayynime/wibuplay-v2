@@ -133,13 +133,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 Clipboard.setData(ClipboardData(text: m.message));
               },
             ),
-            if (m.firebaseUid == s.myUid)
+            if (m.firebaseUid == s.myUid || s.canDeleteOthers)
               ListTile(
                 leading: const Icon(Icons.delete_outline, color: AppColors.errorRed),
                 title: const Text('Hapus', style: TextStyle(color: AppColors.errorRed)),
                 onTap: () {
                   Navigator.pop(ctx);
-                  _controller.deleteMessage(m);
+                  // Pesan orang lain wajib konfirmasi dulu (aksi moderasi).
+                  if (m.firebaseUid == s.myUid) {
+                    _controller.deleteMessage(m);
+                  } else {
+                    _confirmDelete(m);
+                  }
                 },
               ),
           ],
@@ -308,7 +313,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           onOwnAvatarTap: _openProfileDialog,
           onLongPress: () => _showActions(m, s),
           onReply: () => _controller.setReplyTarget(m),
-          onDelete: m.firebaseUid == s.myUid ? () => _confirmDelete(m) : null,
+          onDelete: (m.firebaseUid == s.myUid || s.canDeleteOthers)
+              ? () => _confirmDelete(m)
+              : null,
           onProfileTap: m.firebaseUid == s.myUid
               ? null
               : () => openPublicProfile(context, m.firebaseUid),
@@ -473,7 +480,7 @@ class _MessageBubble extends StatelessWidget {
   final VoidCallback onLongPress;
   final VoidCallback onReply;
 
-  /// null = pesan orang lain (tombol Hapus tidak ditampilkan).
+  /// null = tombol Hapus tidak ditampilkan (bukan pesan sendiri dan bukan admin/developer).
   final VoidCallback? onDelete;
   final Color? nameColor;
   final int? userNumber;

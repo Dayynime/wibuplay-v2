@@ -186,4 +186,12 @@ class AdminRepository {
         {'device_id': deviceId},
         'Gagal cabut ban device',
       );
+
+  /// Hapus pesan Chat Global milik orang lain (admin/developer). Lewat Edge
+  /// Function yang sama dengan Zenime; role dicek ULANG di server.
+  Future<void> deleteMessage(int messageId) => _action(
+        'zenime-admin-delete-message',
+        {'message_id': messageId},
+        'Gagal hapus pesan',
+      );
 }
