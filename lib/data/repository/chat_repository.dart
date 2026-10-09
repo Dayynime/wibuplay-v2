@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
+import '../../core/firebase_config.dart';
 import '../models/chat_models.dart';
 import '../models/clan_models.dart';
 
@@ -88,8 +90,21 @@ class ChatRepository {
     return rows.isEmpty ? null : ChatProfile.fromJson(rows.first);
   }
 
-  /// Upsert profil (firebase_uid = primary key). Upsert menimpa SEMUA kolom
-  /// yang dikirim, jadi nilai yang tidak diubah tetap harus ikut dikirim.
+  /// Header Authorization berisi Firebase ID Token asli (bukan anon key).
+  Future<Options> _authOptions() async {
+    if (!FirebaseConfig.ready) {
+      throw Exception('Login belum tersedia di perangkat ini.');
+    }
+    final token = await FirebaseAuth.instance.currentUser?.getIdToken();
+    if (token == null || token.isEmpty) {
+      throw Exception('Kamu harus login dulu');
+    }
+    return Options(headers: {'Authorization': 'Bearer $token'});
+  }
+
+  /// Simpan profil lewat Edge Function `chat-save-profile`. UID diambil server
+  /// dari token, BUKAN dari body. Parameter [firebaseUid] dipertahankan hanya
+  /// agar pemanggil lama tidak berubah; nilainya tidak dikirim.
   Future<void> saveProfile({
     required String firebaseUid,
     required String username,
@@ -99,26 +114,32 @@ class ChatRepository {
     bool favoritesPublic = false,
     bool historyPublic = false,
   }) async {
-    await _dio.post<dynamic>(
-      'rest/v1/chat_profiles',
-      queryParameters: {'on_conflict': 'firebase_uid'},
-      data: {
-        'firebase_uid': firebaseUid,
-        'username': username,
-        'avatar_url': avatarUrl,
-        'banner_url': bannerUrl,
-        'username_color': usernameColor,
-        'favorites_public': favoritesPublic,
-        'history_public': historyPublic,
-      },
-      options: Options(
-        headers: {'Prefer': 'resolution=merge-duplicates,return=minimal'},
-      ),
-    );
+    try {
+      await _dio.post<dynamic>(
+        'functions/v1/chat-save-profile',
+        data: {
+          'username': username,
+          'avatar_url': avatarUrl,
+          'banner_url': bannerUrl,
+          'username_color': usernameColor,
+          'favorites_public': favoritesPublic,
+          'history_public': historyPublic,
+        },
+        options: await _authOptions(),
+      );
+    } on DioException catch (e) {
+      // Tampilkan pesan dari server (mis. "Username sudah dipakai").
+      final d = e.response?.data;
+      final msg = d is Map ? d['error'] : null;
+      if (msg is String && msg.trim().isNotEmpty) {
+        throw Exception(msg.trim());
+      }
+      rethrow;
+    }
   }
 
   /// Buat baris profil kalau belum ada. Kalau sudah ada (mis. dari Zenime)
-  /// TIDAK disentuh, supaya username/avatar custom user tidak ketimpa.
+  /// TIDAK disentuh. Nama default dipilih server dari akun Firebase.
   Future<void> ensureProfile(
     String firebaseUid,
     String defaultUsername,
@@ -127,10 +148,10 @@ class ChatRepository {
     try {
       final existing = await getProfile(firebaseUid);
       if (existing != null) return;
-      await saveProfile(
-        firebaseUid: firebaseUid,
-        username: defaultUsername,
-        avatarUrl: defaultAvatarUrl,
+      await _dio.post<dynamic>(
+        'functions/v1/chat-save-profile',
+        data: <String, dynamic>{},
+        options: await _authOptions(),
       );
     } catch (_) {
       // Best effort: gagal di sini tidak boleh menghalangi login/chat.
