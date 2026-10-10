@@ -18,9 +18,21 @@ class AccountRepository {
   final Dio _dio;
 
   Future<Map<String, dynamic>?> _post(String function, String firebaseUid) async {
+    // Sertakan Firebase ID Token kalau ada, supaya function yang nanti
+    // mewajibkan token (anti IDOR) tetap jalan. Gagal ambil token = tanpa header.
+    Options? options;
+    if (FirebaseConfig.ready) {
+      try {
+        final token = await FirebaseAuth.instance.currentUser?.getIdToken();
+        if (token != null && token.isNotEmpty) {
+          options = Options(headers: {'Authorization': 'Bearer $token'});
+        }
+      } catch (_) {}
+    }
     final res = await _dio.post<dynamic>(
       'functions/v1/$function',
       data: {'firebase_uid': firebaseUid},
+      options: options,
     );
     final data = res.data;
     return data is Map ? Map<String, dynamic>.from(data) : null;

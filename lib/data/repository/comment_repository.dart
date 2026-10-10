@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../models/comment_models.dart';
+import 'authed_function.dart';
 
 /// Komentar episode lewat PostgREST Supabase (tabel `episode_comments`,
 /// sama persis dengan Zenime). Port CommentRepository.kt.
@@ -60,37 +61,31 @@ class CommentRepository {
     bool isPinned = false,
     CommentMeta meta = const CommentMeta(),
   }) async {
-    final res = await _dio.post<dynamic>(
-      'rest/v1/episode_comments',
-      data: {
-        'episode_id': episodeId,
-        'anime_id': animeId,
-        'firebase_uid': firebaseUid,
-        'username': username,
-        'avatar_url': avatarUrl,
-        'comment': comment,
-        'parent_id': parentId,
-        'reply_to_username': replyToUsername,
-        'is_pinned': isPinned,
-        'anime_title': meta.animeTitle,
-        'anime_poster_url': meta.animePosterUrl,
-        'episode_index': meta.episodeIndex,
-      },
-      options: Options(headers: {'Prefer': 'return=representation'}),
-    );
-    final rows = _rows(res.data);
-    if (rows.isEmpty) {
+    // UID, username, dan avatar diambil server dari token + profil, jadi
+    // [firebaseUid], [username], [avatarUrl] sengaja TIDAK dikirim (anti
+    // impersonasi). Parameter dipertahankan agar pemanggil lama tidak berubah.
+    final data = await callAuthedFunction(_dio, 'comments-write', {
+      'action': 'post',
+      'episode_id': episodeId,
+      'anime_id': animeId,
+      'comment': comment,
+      'parent_id': parentId,
+      'reply_to_username': replyToUsername,
+      'pinned': isPinned,
+      'anime_title': meta.animeTitle,
+      'anime_poster_url': meta.animePosterUrl,
+      'episode_index': meta.episodeIndex,
+    });
+    if (data is! Map) {
       throw Exception('Server tidak mengembalikan komentar yang terkirim');
     }
-    return EpisodeComment.fromJson(rows.first);
+    return EpisodeComment.fromJson(Map<String, dynamic>.from(data));
   }
 
-  /// Hapus komentar/balasan milik sendiri (firebase_uid ikut difilter di query).
+  /// Hapus komentar/balasan milik sendiri. Server hanya menghapus kalau
+  /// komentar itu milik uid di token ([firebaseUid] tidak dikirim).
   Future<void> deleteComment(int id, String firebaseUid) async {
-    await _dio.delete<dynamic>(
-      'rest/v1/episode_comments',
-      queryParameters: {'id': 'eq.$id', 'firebase_uid': 'eq.$firebaseUid'},
-    );
+    await callAuthedFunction(_dio, 'comments-write', {'action': 'delete', 'id': id});
   }
 
   /// Semua komentar/balasan MILIK 1 user lintas episode (tab Komentar di

@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../models/friend_models.dart';
+import 'authed_function.dart';
 import 'chat_repository.dart';
 
 /// Fitur Add Friend lewat PostgREST langsung (tabel `friendships`), sama
@@ -63,35 +64,26 @@ class FriendRepository {
   }
 
   Future<void> sendRequest(String myUid, String otherUid) async {
-    await _dio.post<dynamic>(
-      'rest/v1/friendships',
-      data: {
-        'requester_uid': myUid,
-        'addressee_uid': otherUid,
-        'status': FriendStatus.pending,
-      },
-      options: Options(headers: {'Prefer': 'return=minimal'}),
-    );
+    // Pengirim = uid di token ([myUid] tidak dikirim).
+    await callAuthedFunction(_dio, 'friends-action', {
+      'action': 'send',
+      'other_uid': _safe(otherUid),
+    });
   }
 
   Future<void> accept(String friendshipId) async {
-    await _dio.patch<dynamic>(
-      'rest/v1/friendships',
-      queryParameters: {'id': 'eq.$friendshipId'},
-      data: {
-        'status': FriendStatus.accepted,
-        'responded_at': DateTime.now().toUtc().toIso8601String(),
-      },
-      options: Options(headers: {'Prefer': 'return=minimal'}),
-    );
+    await callAuthedFunction(_dio, 'friends-action', {
+      'action': 'accept',
+      'friendship_id': friendshipId,
+    });
   }
 
   /// Tolak permintaan masuk / batalkan permintaan keluar / hapus teman.
   Future<void> remove(String friendshipId) async {
-    await _dio.delete<dynamic>(
-      'rest/v1/friendships',
-      queryParameters: {'id': 'eq.$friendshipId'},
-    );
+    await callAuthedFunction(_dio, 'friends-action', {
+      'action': 'remove',
+      'friendship_id': friendshipId,
+    });
   }
 
   Future<FriendLists> getLists(String myUid) async {

@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 
 import '../local/entities.dart';
 import '../models/public_profile_models.dart';
+import 'authed_function.dart';
 
 /// Sinkronisasi Favorit & Riwayat Tontonan ke Supabase (`user_favorites`,
 /// `user_watch_history`), sama seperti PublicProfileRepository.kt di Zenime.
@@ -10,39 +11,22 @@ import '../models/public_profile_models.dart';
 /// LocalStore tetap sumber utama buat pemilik data. Semua fungsi di sini
 /// best-effort: dipanggil SETELAH tulis lokal berhasil, dan gagal sync tidak
 /// dilempar balik (supaya nonton/favorit tidak terganggu saat offline).
-/// Status HTTP non-2xx dicek manual (validateStatus) lalu di-log.
+/// Penulisan lewat Edge Function `profile-sync` (uid dari token, bukan body).
 class PublicProfileRepository {
   PublicProfileRepository(this._dio);
 
   final Dio _dio;
 
-  static final Options _anyStatus = Options(validateStatus: (_) => true);
-
-  void _logIfFailed(String action, Response<dynamic> res) {
-    final code = res.statusCode ?? 0;
-    if (code < 200 || code >= 300) {
-      if (kDebugMode) debugPrint('PublicProfileSync: $action GAGAL -- HTTP $code: ${res.data}');
-    }
-  }
-
   Future<void> syncFavoriteAdded(String firebaseUid, FavoriteEntity fav) async {
     try {
-      final res = await _dio.post<dynamic>(
-        'rest/v1/user_favorites',
-        queryParameters: {'on_conflict': 'firebase_uid,anime_id'},
-        data: {
-          'firebase_uid': firebaseUid,
-          'anime_id': fav.id,
-          'title': fav.title,
-          'poster_url': fav.posterUrl,
-          'type': fav.type,
-          'status': fav.status,
-        },
-        options: _anyStatus.copyWith(
-          headers: {'Prefer': 'resolution=merge-duplicates'},
-        ),
-      );
-      _logIfFailed('syncFavoriteAdded', res);
+      await callAuthedFunction(_dio, 'profile-sync', {
+        'action': 'fav_add',
+        'anime_id': fav.id,
+        'title': fav.title,
+        'poster_url': fav.posterUrl,
+        'type': fav.type,
+        'status': fav.status,
+      });
     } catch (e) {
       if (kDebugMode) debugPrint('PublicProfileSync: syncFavoriteAdded EXCEPTION: $e');
     }
@@ -50,15 +34,10 @@ class PublicProfileRepository {
 
   Future<void> syncFavoriteRemoved(String firebaseUid, String animeId) async {
     try {
-      final res = await _dio.delete<dynamic>(
-        'rest/v1/user_favorites',
-        queryParameters: {
-          'firebase_uid': 'eq.$firebaseUid',
-          'anime_id': 'eq.$animeId',
-        },
-        options: _anyStatus,
-      );
-      _logIfFailed('syncFavoriteRemoved', res);
+      await callAuthedFunction(_dio, 'profile-sync', {
+        'action': 'fav_remove',
+        'anime_id': animeId,
+      });
     } catch (e) {
       if (kDebugMode) debugPrint('PublicProfileSync: syncFavoriteRemoved EXCEPTION: $e');
     }
@@ -81,22 +60,17 @@ class PublicProfileRepository {
     if (last != null && now.difference(last) < _progressMinGap) return;
     _lastProgressSync[key] = now;
     try {
-      final res = await _dio.post<dynamic>(
-        'rest/v1/rpc/upsert_watch_history',
-        data: {
-          'firebase_uid': firebaseUid,
-          'anime_id': h.movieId,
-          'anime_title': h.movieTitle,
-          'poster_url': h.moviePoster,
-          'episode_id': h.episodeId,
-          'episode_title': h.episodeTitle,
-          'episode_index': h.episodeIndex,
-          'progress_ms': h.playbackPositionMs,
-          'duration_ms': h.durationMs,
-        },
-        options: _anyStatus,
-      );
-      _logIfFailed('syncWatchProgress', res);
+      await callAuthedFunction(_dio, 'profile-sync', {
+        'action': 'history_upsert',
+        'anime_id': h.movieId,
+        'anime_title': h.movieTitle,
+        'poster_url': h.moviePoster,
+        'episode_id': h.episodeId,
+        'episode_title': h.episodeTitle,
+        'episode_index': h.episodeIndex,
+        'progress_ms': h.playbackPositionMs,
+        'duration_ms': h.durationMs,
+      });
     } catch (e) {
       if (kDebugMode) debugPrint('PublicProfileSync: syncWatchProgress EXCEPTION: $e');
     }
@@ -109,16 +83,11 @@ class PublicProfileRepository {
   ) async {
     _lastProgressSync.remove('$animeId|$episodeId');
     try {
-      final res = await _dio.delete<dynamic>(
-        'rest/v1/user_watch_history',
-        queryParameters: {
-          'firebase_uid': 'eq.$firebaseUid',
-          'anime_id': 'eq.$animeId',
-          'episode_id': 'eq.$episodeId',
-        },
-        options: _anyStatus,
-      );
-      _logIfFailed('syncHistoryRemoved', res);
+      await callAuthedFunction(_dio, 'profile-sync', {
+        'action': 'history_remove',
+        'anime_id': animeId,
+        'episode_id': episodeId,
+      });
     } catch (e) {
       if (kDebugMode) debugPrint('PublicProfileSync: syncHistoryRemoved EXCEPTION: $e');
     }
