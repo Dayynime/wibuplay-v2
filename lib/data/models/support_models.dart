@@ -42,3 +42,45 @@ class TopSupporter {
     );
   }
 }
+
+/// Satu baris Top Giver (total hari Premium yang diberikan, sepanjang masa).
+class TopGiver {
+  const TopGiver({
+    required this.rank,
+    required this.firebaseUid,
+    required this.username,
+    required this.days,
+    this.avatarUrl,
+    this.userNumber,
+    this.usernameColor,
+  });
+
+  final int rank;
+  final String firebaseUid;
+  final String username;
+  final int days;
+  final String? avatarUrl;
+  final int? userNumber;
+  final String? usernameColor;
+
+  factory TopGiver.fromJson(Map<String, dynamic> j, int rank) => TopGiver(
+        rank: rank,
+        firebaseUid: (j['firebase_uid'] as String?) ?? '',
+        username: ((j['username'] as String?) ?? '').trim().isEmpty
+            ? 'Pengguna'
+            : (j['username'] as String).trim(),
+        days: (j['days'] as num?)?.toInt() ?? 0,
+        avatarUrl: j['avatar_url'] as String?,
+        userNumber: (j['user_number'] as num?)?.toInt(),
+        usernameColor: j['username_color'] as String?,
+      );
+}
+
+/// Top Giver + data badge (clan & level) untuk ditampilkan.
+class TopGiversData {
+  const TopGiversData({required this.givers, this.clanTags = const {}, this.levels = const {}});
+
+  final List<TopGiver> givers;
+  final Map<String, String> clanTags;
+  final Map<String, int> levels;
+}

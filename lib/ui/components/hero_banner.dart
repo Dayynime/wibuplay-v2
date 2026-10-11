@@ -38,6 +38,9 @@ class HeroBanner extends StatefulWidget {
     this.onLeaderboardClick,
     this.onClanLeaderboardClick,
     this.onSupportClick,
+    this.topGivers = const [],
+    this.giverClanTags = const {},
+    this.onGiverClick,
   });
 
   final List<AnimeItem> sliderItems;
@@ -52,6 +55,11 @@ class HeroBanner extends StatefulWidget {
 
   /// Tap slide Top Support (buka halaman Top Support).
   final VoidCallback? onSupportClick;
+
+  /// Slide Top Giver (kosong = slide tidak ada).
+  final List<TopGiver> topGivers;
+  final Map<String, String> giverClanTags;
+  final VoidCallback? onGiverClick;
 
   @override
   State<HeroBanner> createState() => _HeroBannerState();
@@ -123,7 +131,13 @@ class _HeroBannerState extends State<HeroBanner> {
     final hasLeaderboard = widget.topXp.isNotEmpty || widget.topClans.isNotEmpty;
     final lbPage = hasLeaderboard ? 1 : -1;
     final supportPage = widget.topSupport.isNotEmpty ? 1 + (hasLeaderboard ? 1 : 0) : -1;
-    final pageCount = 1 + (hasLeaderboard ? 1 : 0) + (widget.topSupport.isNotEmpty ? 1 : 0);
+    final giverPage = widget.topGivers.isNotEmpty
+        ? 1 + (hasLeaderboard ? 1 : 0) + (widget.topSupport.isNotEmpty ? 1 : 0)
+        : -1;
+    final pageCount = 1 +
+        (hasLeaderboard ? 1 : 0) +
+        (widget.topSupport.isNotEmpty ? 1 : 0) +
+        (widget.topGivers.isNotEmpty ? 1 : 0);
 
     return Column(
       children: [
@@ -164,6 +178,19 @@ class _HeroBannerState extends State<HeroBanner> {
                         builder: (context, active, offset) => HeroSupportSlide(
                           supporters: widget.topSupport,
                           onTap: widget.onSupportClick,
+                          active: active,
+                          pageOffset: offset,
+                        ),
+                      );
+                    }
+                    if (page == giverPage) {
+                      return _SlideHost(
+                        controller: _pager,
+                        index: page,
+                        builder: (context, active, offset) => HeroGiverSlide(
+                          givers: widget.topGivers,
+                          clanTags: widget.giverClanTags,
+                          onTap: widget.onGiverClick,
                           active: active,
                           pageOffset: offset,
                         ),

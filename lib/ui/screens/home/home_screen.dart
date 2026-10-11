@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../gift/top_giver_screen.dart';
 import '../../../core/firebase_config.dart';
 import '../../../core/remote_config_manager.dart';
 import '../../../core/theme/app_colors.dart';
@@ -335,6 +336,10 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
                     .push<void>(fadeRoute(const ClanBrowseScreen())),
                 onSupportClick: () => Navigator.of(context)
                     .push<void>(fadeRoute(const TopSupportScreen())),
+                topGivers: ref.watch(topGiversProvider).valueOrNull?.givers ?? const [],
+                giverClanTags: ref.watch(topGiversProvider).valueOrNull?.clanTags ?? const {},
+                onGiverClick: () => Navigator.of(context)
+                    .push<void>(fadeRoute(const TopGiverScreen())),
                 onItemClick: (item) {
                   final id = item.id;
                   if (id != null) widget.onAnimeClick(id);

@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 
+import '../models/support_models.dart';
 import 'authed_function.dart';
 
 /// Status kuota Gift Premium milik user yang login (dari server).
@@ -122,6 +123,21 @@ class GiftRepository {
     }
     final s = e.toString().replaceFirst('Exception: ', '').trim();
     return s.isEmpty || s.length > 200 ? fallback : s;
+  }
+
+  /// Peringkat Top Giver (publik, tanpa login).
+  Future<List<TopGiver>> topGivers({int limit = 50}) async {
+    final res = await _dio.post<dynamic>(
+      'functions/v1/premium-gift',
+      data: {'action': 'top_givers', 'limit': limit},
+    );
+    final d = res.data;
+    if (d is! List) return const [];
+    final rows = d.whereType<Map>().toList();
+    return [
+      for (var i = 0; i < rows.length; i++)
+        TopGiver.fromJson(Map<String, dynamic>.from(rows[i]), i + 1),
+    ];
   }
 
   Future<GiftStatus> status() async {

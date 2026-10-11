@@ -1582,3 +1582,293 @@ class _BarShimmer extends StatelessWidget {
     );
   }
 }
+
+// ================================================================ TOP GIVER
+
+const Color heroTeal = Color(0xFF2DD4BF);
+
+String _giverDays(int d) => '${_compactCount(d)}d';
+
+/// Slide "TOP GIVER" (total hari Premium yang dibagikan, sepanjang masa).
+/// Tata letak mirip referensi (3 avatar + baris peringkat), warna hijau-teal.
+class HeroGiverSlide extends StatelessWidget {
+  const HeroGiverSlide({
+    super.key,
+    required this.givers,
+    this.clanTags = const {},
+    this.onTap,
+    this.active = true,
+    this.pageOffset,
+  });
+
+  final List<TopGiver> givers;
+  final Map<String, String> clanTags;
+  final VoidCallback? onTap;
+  final bool active;
+  final ValueListenable<double>? pageOffset;
+
+  @override
+  Widget build(BuildContext context) {
+    final g = givers;
+    return _SlideMotion(
+      active: active,
+      enterDuration: const Duration(milliseconds: 1500),
+      loopDuration: const Duration(seconds: 8),
+      builder: (context, enter, loop) {
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: DecoratedBox(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF0E4A45), Color(0xFF0B2A2F), Color(0xFF0B0E14)],
+              ),
+            ),
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: _ParallaxLayer(
+                    offset: pageOffset,
+                    depth: 0.45,
+                    child: RepaintBoundary(
+                      child: AnimatedBuilder(
+                        animation: loop,
+                        builder: (context, _) {
+                          final t = loop.value * 2 * math.pi;
+                          return Stack(
+                            children: [
+                              Positioned(
+                                left: 60 + math.sin(t) * 20,
+                                top: -60 + math.cos(t) * 10,
+                                child: const _Glow(color: heroTeal, size: 220, alpha: 0.20),
+                              ),
+                              Positioned(
+                                right: -50 + math.cos(t) * 16,
+                                bottom: -80,
+                                child: const _Glow(color: heroGold, size: 200, alpha: 0.10),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned.fill(
+                  child: _ParallaxLayer(
+                    offset: pageOffset,
+                    depth: 0.18,
+                    fade: true,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                      child: Column(
+                        children: [
+                          _Reveal(
+                            t: enter,
+                            start: 0,
+                            end: 0.25,
+                            dy: -8,
+                            child: Row(
+                              children: [
+                                const Icon(Icons.card_giftcard, size: 16, color: heroGold),
+                                const SizedBox(width: 6),
+                                _ShimmerText(
+                                  'TOP GIVER',
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 0.6,
+                                  ),
+                                  base: heroTeal,
+                                  highlight: const Color(0xFFCCFBF1),
+                                  loop: loop,
+                                ),
+                                const Spacer(),
+                                if (onTap != null) _SeeAll(loop: loop),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          // Tiga avatar teratas (juara 1 di tengah, lebih besar).
+                          SizedBox(
+                            height: 62,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                if (g.length > 1) _giverAvatar(g[1], 38, enter, loop, 0.15),
+                                const SizedBox(width: 14),
+                                if (g.isNotEmpty) _giverAvatar(g[0], 50, enter, loop, 0.05),
+                                const SizedBox(width: 14),
+                                if (g.length > 2) _giverAvatar(g[2], 38, enter, loop, 0.25),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          if (g.isNotEmpty)
+                            _Reveal(t: enter, start: 0.3, end: 0.55, dx: -20, dy: 0,
+                                child: _GiverRow(giver: g[0], clan: clanTags[g[0].firebaseUid])),
+                          if (g.length > 1) ...[
+                            const SizedBox(height: 4),
+                            _Reveal(t: enter, start: 0.38, end: 0.63, dx: -20, dy: 0,
+                                child: _GiverRow(giver: g[1], clan: clanTags[g[1].firebaseUid])),
+                          ],
+                          if (g.length > 2) ...[
+                            const SizedBox(height: 4),
+                            _Reveal(
+                              t: enter,
+                              start: 0.46,
+                              end: 0.72,
+                              dy: 8,
+                              child: Row(
+                                children: [
+                                  for (var i = 2; i < 5 && i < g.length; i++) ...[
+                                    if (i > 2) const SizedBox(width: 4),
+                                    Expanded(child: _GiverChip(giver: g[i])),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _giverAvatar(TopGiver x, double size, Animation<double> enter, Animation<double> loop, double start) {
+    return _Reveal(
+      t: enter,
+      start: start,
+      end: start + 0.3,
+      dy: 10,
+      scaleFrom: 0.7,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          _PodiumAvatar(
+            rank: x.rank,
+            size: size,
+            name: x.username,
+            url: x.avatarUrl,
+            enter: enter,
+            loop: loop,
+            crownStart: 0.3,
+          ),
+          Positioned(
+            right: -2,
+            bottom: -2,
+            child: Container(
+              width: 18,
+              height: 18,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: _rankColor(x.rank),
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFF0B2A2F), width: 1.5),
+              ),
+              child: Text(
+                '${x.rank}',
+                style: const TextStyle(color: Color(0xFF15213B), fontSize: 10, fontWeight: FontWeight.w900),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GiverRow extends StatelessWidget {
+  const _GiverRow({required this.giver, this.clan});
+
+  final TopGiver giver;
+  final String? clan;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 24,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        color: const Color(0x1A2DD4BF),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0x332DD4BF)),
+      ),
+      child: Row(
+        children: [
+          UserAvatar(username: giver.username, url: giver.avatarUrl, size: 16),
+          const SizedBox(width: 6),
+          Text(
+            '#${giver.rank}',
+            style: TextStyle(color: _rankColor(giver.rank), fontSize: 11, fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              giver.username,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w700),
+            ),
+          ),
+          if ((clan ?? '').isNotEmpty) ...[
+            const SizedBox(width: 6),
+            ClanRainbowBadge(text: clan!, height: 15),
+          ],
+          const Spacer(),
+          Text(
+            _giverDays(giver.days),
+            style: const TextStyle(color: heroGold, fontSize: 11.5, fontWeight: FontWeight.w800),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GiverChip extends StatelessWidget {
+  const _GiverChip({required this.giver});
+
+  final TopGiver giver;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 24,
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      decoration: BoxDecoration(
+        color: const Color(0x14FFFFFF),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          UserAvatar(username: giver.username, url: giver.avatarUrl, size: 14),
+          const SizedBox(width: 4),
+          Text('#${giver.rank}',
+              style: const TextStyle(color: heroTeal, fontSize: 10, fontWeight: FontWeight.w900)),
+          const SizedBox(width: 3),
+          Expanded(
+            child: Text(
+              giver.username,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Colors.white, fontSize: 10),
+            ),
+          ),
+          Text(_giverDays(giver.days),
+              style: const TextStyle(color: heroGold, fontSize: 10, fontWeight: FontWeight.w800)),
+        ],
+      ),
+    );
+  }
+}

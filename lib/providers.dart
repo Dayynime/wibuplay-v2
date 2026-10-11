@@ -119,6 +119,18 @@ final giftRepositoryProvider = Provider<GiftRepository>(
   (ref) => GiftRepository(ref.watch(supabaseDioProvider)),
 );
 
+/// Top Giver sepanjang masa + clan & level tiap orang (carousel & halaman).
+final topGiversProvider = FutureProvider<TopGiversData>((ref) async {
+  final givers = await ref.watch(giftRepositoryProvider).topGivers();
+  final uids = givers.map((g) => g.firebaseUid).where((u) => u.isNotEmpty).toList();
+  if (uids.isEmpty) return TopGiversData(givers: givers);
+  final clansF = ref.read(chatRepositoryProvider).getClanTagsForUids(uids)
+      .catchError((_) => <String, String>{});
+  final levelsF = ref.read(xpRepositoryProvider).getLevelsForUids(uids)
+      .catchError((_) => <String, int>{});
+  return TopGiversData(givers: givers, clanTags: await clansF, levels: await levelsF);
+});
+
 /// Wallpaper Komentar (gacha spin, koleksi, panel admin).
 final wallpaperRepositoryProvider = Provider<WallpaperRepository>(
   (ref) => WallpaperRepository(ref.watch(supabaseDioProvider)),
