@@ -6,6 +6,8 @@ import '../../../core/theme/app_colors.dart';
 import '../../../data/models/account_models.dart' show formatZCoin;
 import '../../../providers.dart';
 import '../../app_routes.dart';
+import '../library/library_screens.dart';
+import '../profile/profile_controller.dart';
 import '../store/coin_screen.dart';
 import '../store/premium_screen.dart';
 import '../wallpaper/wallpaper_screen.dart';
@@ -24,6 +26,8 @@ class MenuScreen extends ConsumerWidget {
     final uid = ref.watch(authUserProvider).valueOrNull?.uid;
     final coins = uid == null ? null : ref.watch(coinBalanceProvider(uid)).valueOrNull;
     final premium = uid == null ? null : ref.watch(premiumProvider(uid)).valueOrNull;
+    final historyCount = ref.watch(profileHistoryProvider).length;
+    final favoriteCount = ref.watch(profileFavoritesProvider).length;
 
     return Scaffold(
       backgroundColor: AppColors.backgroundDark,
@@ -71,6 +75,32 @@ class MenuScreen extends ConsumerWidget {
                     leading: const Icon(Icons.verified, color: Color(0xFF3B9BFF), size: 26),
                     onTap: () => Navigator.of(context).push<void>(fadeRoute(const PremiumScreen())),
                     onReturn: uid == null ? null : () => ref.invalidate(premiumStatusProvider(uid)),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: _ShopTile(
+                    title: 'Riwayat',
+                    value: historyCount == 0 ? 'Kosong' : '$historyCount',
+                    caption: historyCount == 0 ? 'Belum ada tontonan' : 'Lanjut nonton',
+                    accent: const Color(0xFFF59E0B),
+                    leading: const Icon(Icons.history, color: Color(0xFFF59E0B), size: 26),
+                    onTap: () => Navigator.of(context).push<void>(fadeRoute(const HistoryScreen())),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _ShopTile(
+                    title: 'Favorit',
+                    value: favoriteCount == 0 ? 'Kosong' : '$favoriteCount',
+                    caption: favoriteCount == 0 ? 'Belum ada favorit' : 'Anime favoritmu',
+                    accent: const Color(0xFFEC4899),
+                    leading: const Icon(Icons.favorite, color: Color(0xFFEC4899), size: 26),
+                    onTap: () => Navigator.of(context).push<void>(fadeRoute(const FavoritesScreen())),
                   ),
                 ),
               ],
