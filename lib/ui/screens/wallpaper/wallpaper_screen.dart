@@ -13,7 +13,7 @@ import '../comments/comments_section.dart' show CommentWallpaperFrame;
 
 /// Wallpaper Komentar: spin (gacha) pakai ZCoin + koleksi untuk dipasang.
 ///
-/// Hasil spin SELALU ditentukan server (RPC wp_spin, CSPRNG). Animasi reel di
+/// Hasil spin SELALU ditentukan server (RPC wp_spin_multi, CSPRNG). Animasi reel di
 /// sini cuma pertunjukan: hasilnya sudah diketahui sebelum reel berputar.
 class WallpaperScreen extends ConsumerStatefulWidget {
   const WallpaperScreen({super.key});
@@ -92,22 +92,24 @@ class _WallpaperScreenState extends ConsumerState<WallpaperScreen> {
 
   // ------------------------------------------------------------ spin
 
-  Future<void> _spin() async {
+  /// [count] 1 atau 10.
+  Future<void> _spin(int count) async {
     final s = _state;
     if (_spinning || s == null) return;
     if (s.pool.isEmpty) {
       _snack('Belum ada wallpaper di pool spin.');
       return;
     }
-    if (s.balance < s.spinCost) {
-      _snack('ZCoin kamu tidak cukup (butuh ${formatZCoin(s.spinCost)}).');
+    final cost = count == 10 ? s.spin10Cost : s.spinCost;
+    if (s.balance < cost) {
+      _snack('ZCoin kamu tidak cukup (butuh ${formatZCoin(cost)}).');
       return;
     }
 
     setState(() => _spinning = true);
     SpinResult r;
     try {
-      r = await _repo.spin();
+      r = await _repo.spin(count: count);
     } catch (e) {
       if (mounted) {
         setState(() => _spinning = false);
@@ -121,7 +123,8 @@ class _WallpaperScreenState extends ConsumerState<WallpaperScreen> {
     setState(() {
       _reelItems = List.generate(
         _resultIndex + 5,
-        (i) => i == _resultIndex ? r.item : pool[_rnd.nextInt(pool.length)],
+        // Reel berhenti di hasil dengan rarity tertinggi.
+        (i) => i == _resultIndex ? r.best.item : pool[_rnd.nextInt(pool.length)],
       );
     });
     await WidgetsBinding.instance.endOfFrame;
@@ -136,18 +139,121 @@ class _WallpaperScreenState extends ConsumerState<WallpaperScreen> {
     );
     if (!mounted) return;
 
+    final ownedIds = s.inventory.map((w) => w.id).toSet();
+    final fresh = <WallpaperItem>[];
+    for (final e in r.entries) {
+      if (!e.duplicate && ownedIds.add(e.item.id)) fresh.add(e.item);
+    }
     setState(() {
       _spinning = false;
       _state = s.copyWith(
         balance: r.balance,
-        inventory: r.duplicate ? s.inventory : [r.item, ...s.inventory],
+        inventory: [...fresh.reversed, ...s.inventory],
       );
     });
     _refreshCoins();
-    await _showResult(r);
+    if (r.entries.length == 1) {
+      await _showResult(r.entries.first, r.refund);
+    } else {
+      await _showMultiResult(r);
+    }
   }
 
-  Future<void> _showResult(SpinResult r) async {
+  Future<void> _showMultiResult(SpinResult r) async {
+    final newCount = r.entries.where((e) => !e.duplicate).length;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surfaceElevated,
+        contentPadding: const EdgeInsets.fromLTRB(14, 16, 14, 0),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Hasil Spin 10x',
+                style: TextStyle(color: AppColors.textWhite, fontSize: 18, fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '$newCount baru'
+                '${r.refund > 0 ? ' • refund ${formatZCoin(r.refund)} ZCoin' : ''}',
+                style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+              ),
+              const SizedBox(height: 12),
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: r.entries.length,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  mainAxisSpacing: 8,
+                  crossAxisSpacing: 8,
+                  childAspectRatio: 16 / 10,
+                ),
+                itemBuilder: (_, i) {
+                  final e = r.entries[i];
+                  return Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: e.item.rarity.color, width: 2),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          CachedNetworkImage(
+                            imageUrl: e.item.previewUrl,
+                            fit: BoxFit.cover,
+                            errorWidget: (_, __, ___) => const ColoredBox(color: AppColors.surfaceDark),
+                          ),
+                          if (e.duplicate) const ColoredBox(color: Color(0x8C000000)),
+                          Positioned(left: 4, top: 4, child: _RarityPill(rarity: e.item.rarity)),
+                          Positioned(
+                            right: 4,
+                            bottom: 4,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: e.duplicate ? const Color(0xCC262D3B) : AppColors.successGreen,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                e.duplicate ? 'Duplikat' : 'BARU',
+                                style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w800),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              setState(() => _tab = 1);
+            },
+            child: const Text('Lihat Koleksi'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.accentViolet),
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Oke'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showResult(SpinEntry r, int refund) async {
     final equipNow = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -179,8 +285,8 @@ class _WallpaperScreenState extends ConsumerState<WallpaperScreen> {
             if (r.duplicate) ...[
               const SizedBox(height: 8),
               Text(
-                r.refund > 0
-                    ? 'Kamu sudah punya ini. Refund ${formatZCoin(r.refund)} ZCoin.'
+                refund > 0
+                    ? 'Kamu sudah punya ini. Refund ${formatZCoin(refund)} ZCoin.'
                     : 'Kamu sudah punya wallpaper ini.',
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
@@ -409,26 +515,12 @@ class _WallpaperScreenState extends ConsumerState<WallpaperScreen> {
       const SizedBox(height: 18),
       Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: SizedBox(
-          height: 52,
-          child: FilledButton.icon(
-            onPressed: _spinning || s.pool.isEmpty ? null : _spin,
-            style: FilledButton.styleFrom(
-              backgroundColor: AppColors.accentViolet,
-              shape: const StadiumBorder(),
-            ),
-            icon: _spinning
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                  )
-                : const Icon(Icons.casino_outlined),
-            label: Text(
-              _spinning ? 'Memutar…' : 'Spin • ${formatZCoin(s.spinCost)} ZCoin',
-              style: const TextStyle(fontWeight: FontWeight.w800),
-            ),
-          ),
+        child: Row(
+          children: [
+            Expanded(child: _spinButton(s, 1, s.spinCost)),
+            const SizedBox(width: 10),
+            Expanded(child: _spinButton(s, 10, s.spin10Cost)),
+          ],
         ),
       ),
       if (s.dupRefundPercent > 0)
@@ -508,6 +600,44 @@ class _WallpaperScreenState extends ConsumerState<WallpaperScreen> {
         ),
       ),
     ];
+  }
+
+  Widget _spinButton(WallpaperState s, int count, int cost) {
+    final ten = count == 10;
+    return SizedBox(
+      height: 56,
+      child: FilledButton(
+        onPressed: _spinning || s.pool.isEmpty ? null : () => _spin(count),
+        style: FilledButton.styleFrom(
+          backgroundColor: ten ? const Color(0xFF8B3DFF) : AppColors.accentViolet,
+          shape: const StadiumBorder(),
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+        ),
+        child: _spinning
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+              )
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Spin ${count}x',
+                    style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+                  ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Image.asset('assets/images/ic_zcoin_badge.png', width: 13, height: 13),
+                      const SizedBox(width: 4),
+                      Text(formatZCoin(cost), style: const TextStyle(fontSize: 12)),
+                    ],
+                  ),
+                ],
+              ),
+      ),
+    );
   }
 
   Widget _collectionTab(WallpaperState s) {

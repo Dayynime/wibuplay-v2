@@ -115,6 +115,7 @@ List<WallpaperItem> _items(Object? v) => v is List
 class WallpaperState {
   const WallpaperState({
     required this.spinCost,
+    required this.spin10Cost,
     required this.dupRefundPercent,
     required this.balance,
     required this.pool,
@@ -123,6 +124,7 @@ class WallpaperState {
   });
 
   final int spinCost;
+  final int spin10Cost;
   final int dupRefundPercent;
   final int balance;
   final List<WallpaperItem> pool;
@@ -131,6 +133,7 @@ class WallpaperState {
 
   factory WallpaperState.fromJson(Map<String, dynamic> j) => WallpaperState(
         spinCost: _int(j['spin_cost']),
+        spin10Cost: _int(j['spin10_cost'], _int(j['spin_cost']) * 10),
         dupRefundPercent: _int(j['dup_refund_percent']),
         balance: _int(j['balance']),
         pool: _items(j['pool']),
@@ -141,6 +144,7 @@ class WallpaperState {
   WallpaperState copyWith({int? balance, String? Function()? equippedId, List<WallpaperItem>? inventory}) =>
       WallpaperState(
         spinCost: spinCost,
+        spin10Cost: spin10Cost,
         dupRefundPercent: dupRefundPercent,
         balance: balance ?? this.balance,
         pool: pool,
@@ -158,29 +162,48 @@ class WallpaperState {
   }
 }
 
-class SpinResult {
-  const SpinResult({
-    required this.item,
-    required this.duplicate,
-    required this.refund,
-    required this.balance,
-  });
+class SpinEntry {
+  const SpinEntry({required this.item, required this.duplicate});
 
   final WallpaperItem item;
   final bool duplicate;
-  final int refund;
-  final int balance;
 
-  static SpinResult? fromJson(Map<String, dynamic> j) {
+  static SpinEntry? fromJson(Map<String, dynamic> j) {
     final w = j['wallpaper'];
     final item = w is Map ? WallpaperItem.fromJson(Map<String, dynamic>.from(w)) : null;
     if (item == null) return null;
-    return SpinResult(
-      item: item,
-      duplicate: j['duplicate'] == true,
-      refund: _int(j['refund']),
-      balance: _int(j['balance']),
-    );
+    return SpinEntry(item: item, duplicate: j['duplicate'] == true);
+  }
+}
+
+/// Hasil spin 1x atau 10x (diacak di server).
+class SpinResult {
+  const SpinResult({required this.entries, required this.refund, required this.balance});
+
+  final List<SpinEntry> entries;
+
+  /// Total ZCoin yang dikembalikan karena duplikat.
+  final int refund;
+  final int balance;
+
+  /// Hasil dengan rarity tertinggi (dipakai untuk animasi reel).
+  SpinEntry get best => entries.reduce((a, b) => b.item.rarity.index > a.item.rarity.index ? b : a);
+
+  static SpinResult? fromJson(Map<String, dynamic> j) {
+    final raw = j['results'];
+    final entries = <SpinEntry>[];
+    if (raw is List) {
+      for (final e in raw.whereType<Map>()) {
+        final s = SpinEntry.fromJson(Map<String, dynamic>.from(e));
+        if (s != null) entries.add(s);
+      }
+    } else {
+      // respons format lama (1x)
+      final s = SpinEntry.fromJson(j);
+      if (s != null) entries.add(s);
+    }
+    if (entries.isEmpty) return null;
+    return SpinResult(entries: entries, refund: _int(j['refund']), balance: _int(j['balance']));
   }
 }
 

@@ -95,8 +95,13 @@ class WallpaperRepository {
         await _call('wibuplay-wallpaper-user', {'action': 'state'}, 'Gagal memuat wallpaper'),
       );
 
-  Future<SpinResult> spin() async {
-    final d = await _call('wibuplay-wallpaper-user', {'action': 'spin'}, 'Spin gagal, coba lagi');
+  /// [count] 1 atau 10. Harga & hasil ditentukan server.
+  Future<SpinResult> spin({int count = 1}) async {
+    final d = await _call(
+      'wibuplay-wallpaper-user',
+      {'action': 'spin', 'count': count},
+      'Spin gagal, coba lagi',
+    );
     final r = SpinResult.fromJson(d);
     if (r == null) throw const WallpaperException('Spin gagal, coba lagi');
     return r;
