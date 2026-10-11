@@ -1,9 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/watch_xp_gate.dart';
+import '../../providers.dart';
 import '../app_routes.dart';
 import 'net_image.dart';
 
@@ -123,14 +126,15 @@ class MiniPlayerManager extends ChangeNotifier {
 /// Kartu video mengambang di atas semua layar. Geser badan kartu = pindah,
 /// tap = buka kembali player penuh, tombol play/pause dan X di kartu.
 /// Dipasang di MaterialApp.builder (lihat main.dart).
-class MiniPlayerOverlay extends StatefulWidget {
+class MiniPlayerOverlay extends ConsumerStatefulWidget {
   const MiniPlayerOverlay({super.key});
 
   @override
-  State<MiniPlayerOverlay> createState() => _MiniPlayerOverlayState();
+  ConsumerState<MiniPlayerOverlay> createState() => _MiniPlayerOverlayState();
 }
 
-class _MiniPlayerOverlayState extends State<MiniPlayerOverlay> {
+class _MiniPlayerOverlayState extends ConsumerState<MiniPlayerOverlay>
+    with WidgetsBindingObserver {
   static const double _cardW = 200;
   static const double _cardH = _cardW * 9 / 16;
 
@@ -138,9 +142,44 @@ class _MiniPlayerOverlayState extends State<MiniPlayerOverlay> {
   String? _forEpisode;
   bool _controlsVisible = true;
   Timer? _hideTimer;
+  Timer? _xpTick;
+  bool _inForeground = true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _xpTick = Timer.periodic(const Duration(seconds: 1), _onXpTick);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _inForeground = state == AppLifecycleState.resumed;
+  }
+
+  /// XP nonton tetap dihitung saat video jalan di mini player. Layar player
+  /// penuh sudah dibuang saat di-minimize (timer XP-nya ikut berhenti), jadi
+  /// penghitungan dilanjutkan di sini. Pakai WatchXpGate yang sama supaya tidak
+  /// dobel dengan layar player: detik hanya dihitung kalau video playing,
+  /// tidak buffering, dan app di depan.
+  void _onXpTick(Timer _) {
+    if (!mounted || !_inForeground) return;
+    final vc = MiniPlayerManager.instance.controller;
+    if (vc == null || !vc.value.isPlaying || vc.value.isBuffering) return;
+    if (!WatchXpGate.onActiveSecond(this)) return;
+    unawaited(
+      ref.read(xpRepositoryProvider).sendHeartbeat(minutes: 1).then((ok) {
+        // Segarkan kartu XP di Profil begitu server menerima heartbeat.
+        if (ok && mounted) ref.invalidate(myXpProvider);
+      }),
+    );
+  }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _xpTick?.cancel();
+    WatchXpGate.release(this);
     _hideTimer?.cancel();
     super.dispose();
   }
