@@ -25,6 +25,7 @@ import '../clan/clan_browse_screen.dart';
 import 'settings_screen.dart';
 import '../comic/comic_profile_section.dart';
 import '../friends/friends_screen.dart';
+import '../wallpaper/wallpaper_screen.dart';
 import '../xp/xp_leaderboard_screen.dart';
 import 'my_xp_card.dart';
 import 'profile_controller.dart';
@@ -313,6 +314,25 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       label: Text(
                         incomingRequests > 0 ? 'Teman ($incomingRequests permintaan)' : 'Teman',
                       ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: OutlinedButton.icon(
+                      onPressed: () => Navigator.of(context)
+                          .push<void>(fadeRoute(const WallpaperScreen())),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFFC084FC),
+                        side: const BorderSide(color: Color(0x80A855F7)),
+                        shape: const StadiumBorder(),
+                      ),
+                      icon: const Icon(Icons.wallpaper, size: 18),
+                      label: const Text('Wallpaper Komentar'),
                     ),
                   ),
                 ),

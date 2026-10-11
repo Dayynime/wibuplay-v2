@@ -11,6 +11,7 @@ import '../../../data/repository/chat_repository.dart' show ChatRepository;
 import '../../../providers.dart';
 import '../../components/game_badges.dart' show UserAvatar;
 import '../../components/role_badges.dart';
+import 'admin_wallpaper_tab.dart';
 
 const Color _banRed = Color(0xFFE53935);
 const Color _banRedSoft = Color(0xFFE57373);
@@ -223,6 +224,7 @@ class _AdminScreenState extends ConsumerState<AdminScreen> {
     final labels = <String>[
       'Semua User',
       if (role == ZenimeRole.developer) 'Pemegang Role',
+      'Wallpaper',
       'Info',
     ];
     final tab = _tab < labels.length ? _tab : 0;
@@ -276,6 +278,12 @@ class _AdminScreenState extends ConsumerState<AdminScreen> {
                   busy: _processing,
                   onAction: _run,
                 ),
+              AdminWallpaperTab(
+                role: role,
+                refresh: _refresh,
+                busy: _processing,
+                onAction: _run,
+              ),
               _InfoTab(role: role),
             ],
           ),

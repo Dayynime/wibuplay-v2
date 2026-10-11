@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/error_message.dart';
 import '../../../data/models/chat_models.dart';
 import '../../../data/models/comment_models.dart';
+import '../../../data/models/wallpaper_models.dart';
 import '../../../providers.dart';
 
 const int kMaxCommentLength = 300;
@@ -29,6 +30,7 @@ class CommentsUiState {
     this.levels = const {},
     this.userNumbers = const {},
     this.avatarUrls = const {},
+    this.wallpapers = const {},
   });
 
   final bool isLoading;
@@ -52,6 +54,9 @@ class CommentsUiState {
   final Map<String, int> levels;
   final Map<String, int> userNumbers;
   final Map<String, String> avatarUrls;
+
+  /// Wallpaper komentar yang dipakai tiap pengirim (uid -> wallpaper).
+  final Map<String, CommentWallpaper> wallpapers;
 
   List<EpisodeComment> get sortedTopLevel {
     if (!sortTop) return topLevel;
@@ -80,6 +85,7 @@ class CommentsUiState {
     Map<String, int>? levels,
     Map<String, int>? userNumbers,
     Map<String, String>? avatarUrls,
+    Map<String, CommentWallpaper>? wallpapers,
   }) {
     return CommentsUiState(
       isLoading: isLoading ?? this.isLoading,
@@ -98,6 +104,7 @@ class CommentsUiState {
       levels: levels ?? this.levels,
       userNumbers: userNumbers ?? this.userNumbers,
       avatarUrls: avatarUrls ?? this.avatarUrls,
+      wallpapers: wallpapers ?? this.wallpapers,
     );
   }
 }
@@ -291,14 +298,19 @@ class CommentsController
     try {
       final xp = ref.read(xpRepositoryProvider);
       final chat = ref.read(chatRepositoryProvider);
-      // Tiga request jalan paralel; gagal salah satu tidak menggagalkan yang lain.
+      // Empat request jalan paralel; gagal salah satu tidak menggagalkan yang lain.
       final levelsF = xp.getLevelsForUids(fresh).catchError((_) => <String, int>{});
       final premiumF = xp.getPremiumUids(fresh).catchError((_) => <String>{});
       final profilesF =
           chat.getProfilesForUids(fresh).catchError((_) => <String, ChatProfile>{});
+      final wallpapersF = ref
+          .read(wallpaperRepositoryProvider)
+          .getEquippedForUids(fresh)
+          .catchError((_) => <String, CommentWallpaper>{});
       final levels = await levelsF;
       final premiums = await premiumF;
       final profiles = await profilesF;
+      final wallpapers = await wallpapersF;
 
       final numbers = <String, int>{};
       final avatars = <String, String>{};
@@ -314,6 +326,7 @@ class CommentsController
             premiumUids: {...s.premiumUids, ...premiums},
             userNumbers: {...s.userNumbers, ...numbers},
             avatarUrls: {...s.avatarUrls, ...avatars},
+            wallpapers: {...s.wallpapers, ...wallpapers},
           ));
     } catch (_) {
       // Badge best effort: komentar tetap tampil tanpa badge.

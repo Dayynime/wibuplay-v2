@@ -1,8 +1,10 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/comment_models.dart';
+import '../../../data/models/wallpaper_models.dart';
 import '../../../providers.dart';
 import '../../components/game_badges.dart';
 import '../../components/role_badges.dart';
@@ -139,6 +141,7 @@ class CommentsSliver extends ConsumerWidget {
                 level: s.levels[c.firebaseUid],
                 userNumber: s.userNumbers[c.firebaseUid],
                 avatarUrl: s.avatarUrls[c.firebaseUid] ?? c.avatarUrl,
+                wallpaper: s.wallpapers[c.firebaseUid],
                 replyCount: s.repliesByParent[c.id]?.length ?? 0,
                 isDeleting: s.deletingCommentId == c.id,
                 onReplyClick: () {
@@ -224,6 +227,7 @@ class _ThreadSheet extends ConsumerWidget {
           level: s.levels[c.firebaseUid],
           userNumber: s.userNumbers[c.firebaseUid],
           avatarUrl: s.avatarUrls[c.firebaseUid] ?? c.avatarUrl,
+          wallpaper: s.wallpapers[c.firebaseUid],
           replyCount: null,
           isDeleting: s.deletingCommentId == c.id,
           onReplyClick: onReply,
@@ -489,6 +493,7 @@ class CommentItem extends StatelessWidget {
     required this.level,
     required this.userNumber,
     required this.avatarUrl,
+    this.wallpaper,
     required this.replyCount,
     required this.isDeleting,
     required this.onReplyClick,
@@ -502,6 +507,9 @@ class CommentItem extends StatelessWidget {
   final int? userNumber;
   final String? avatarUrl;
 
+  /// Wallpaper komentar milik pengirim (null = tampilan biasa).
+  final CommentWallpaper? wallpaper;
+
   /// null = tampilan di dalam thread (tanpa hitungan balasan).
   final int? replyCount;
   final bool isDeleting;
@@ -510,6 +518,13 @@ class CommentItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final wp = wallpaper;
+    final content = _buildContent(context);
+    if (wp == null) return content;
+    return CommentWallpaperFrame(wallpaper: wp, child: content);
+  }
+
+  Widget _buildContent(BuildContext context) {
     final replyTo = comment.replyToUsername;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -727,4 +742,72 @@ String formatCommentRelativeTime(String iso) {
   final l = t.toLocal();
   String two(int n) => n.toString().padLeft(2, '0');
   return '${two(l.day)}/${two(l.month)}/${two(l.year % 100)}';
+}
+
+/// Latar wallpaper animasi di belakang satu komentar + gradient supaya teks
+/// tetap terbaca + chip rarity di pojok kanan bawah. Dipakai juga untuk
+/// pratinjau di layar Wallpaper.
+class CommentWallpaperFrame extends StatelessWidget {
+  const CommentWallpaperFrame({super.key, required this.wallpaper, required this.child});
+
+  final CommentWallpaper wallpaper;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final rarity = wallpaper.rarity;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: ClipRect(
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: CachedNetworkImage(
+                imageUrl: wallpaper.url,
+                fit: BoxFit.cover,
+                filterQuality: FilterQuality.low,
+                fadeInDuration: const Duration(milliseconds: 200),
+                placeholder: (_, __) => const ColoredBox(color: AppColors.surfaceDark),
+                errorWidget: (_, __, ___) => const SizedBox.shrink(),
+              ),
+            ),
+            const Positioned.fill(
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                    colors: [Color(0xE00B0E14), Color(0xA60B0E14), Color(0x590B0E14)],
+                    stops: [0, 0.55, 1],
+                  ),
+                ),
+              ),
+            ),
+            child,
+            Positioned(
+              right: 12,
+              bottom: 10,
+              child: IgnorePointer(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: rarity.color.withValues(alpha: 0.9),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    rarity.label,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
