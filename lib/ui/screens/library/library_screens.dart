@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/firebase_config.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../data/comic/comic_providers.dart';
 import '../../../data/local/entities.dart';
 import '../../../providers.dart';
 import '../../app_routes.dart';
@@ -11,10 +12,62 @@ import '../../components/cards.dart';
 import '../comic/comic_profile_section.dart';
 import '../profile/profile_controller.dart';
 import '../profile/profile_screen.dart'
-    show ProfileEmptyBox, ProfileSectionHeader, ProfileWatchHistoryRow;
+    show ProfileEmptyBox, ProfileWatchHistoryRow;
 
-/// Halaman Riwayat & Favorit (dibuka dari tab Menu). Isinya sama persis dengan
-/// tab Riwayat / Favorit di Profil, memakai widget & data yang sama.
+/// Halaman Riwayat & Favorit (dibuka dari tab Menu). Dipisah per tab:
+/// anime dan komik tidak dicampur. Widget & data sama dengan tab di Profil.
+
+/// Tab pil (gaya sama dengan tab Spin/Koleksiku).
+class _LibraryTabs extends StatelessWidget {
+  const _LibraryTabs({required this.labels, required this.selected, required this.onChanged});
+
+  final List<String> labels;
+  final int selected;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceDark,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0x14FFFFFF)),
+      ),
+      child: Row(
+        children: [
+          for (var i = 0; i < labels.length; i++)
+            Expanded(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => onChanged(i),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 220),
+                  height: 40,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    gradient: i == selected
+                        ? const LinearGradient(colors: [AppColors.accentViolet, Color(0xFFFF6B4A)])
+                        : null,
+                  ),
+                  child: Text(
+                    labels[i],
+                    style: TextStyle(
+                      color: i == selected ? Colors.white : AppColors.textSecondary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13.5,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
 
 AppBar _appBar(String title, {List<Widget>? actions}) => AppBar(
       backgroundColor: AppColors.backgroundDark,
@@ -56,12 +109,20 @@ Future<bool> _confirm(
 
 // ================================================================ riwayat
 
-class HistoryScreen extends ConsumerWidget {
+class HistoryScreen extends ConsumerStatefulWidget {
   const HistoryScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HistoryScreen> createState() => _HistoryScreenState();
+}
+
+class _HistoryScreenState extends ConsumerState<HistoryScreen> {
+  int _tab = 0; // 0 = nonton, 1 = baca komik
+
+  @override
+  Widget build(BuildContext context) {
     final history = ref.watch(profileHistoryProvider);
+    final comicCount = ref.watch(comicStoreProvider).progress.length;
     final authUser = ref.watch(authUserProvider).valueOrNull;
     final User? user = (authUser != null && FirebaseConfig.ready) ? authUser : null;
     final premium = user != null && (ref.watch(premiumProvider(user.uid)).valueOrNull ?? false);
@@ -83,9 +144,9 @@ class HistoryScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: AppColors.backgroundDark,
       appBar: _appBar(
-        'Riwayat Tontonan',
+        'Riwayat',
         actions: [
-          if (history.isNotEmpty)
+          if (_tab == 0 && history.isNotEmpty)
             IconButton(
               tooltip: 'Hapus semua riwayat',
               icon: const Icon(Icons.delete_sweep, color: AppColors.accentViolet),
@@ -100,9 +161,29 @@ class HistoryScreen extends ConsumerWidget {
             ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.only(top: 8, bottom: 40),
+      body: Column(
         children: [
+          _LibraryTabs(
+            labels: [
+              history.isEmpty ? 'Nonton' : 'Nonton (${history.length})',
+              comicCount == 0 ? 'Baca Komik' : 'Baca Komik ($comicCount)',
+            ],
+            selected: _tab,
+            onChanged: (i) => setState(() => _tab = i),
+          ),
+          Expanded(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 220),
+              child: _tab == 1
+                  ? ListView(
+                      key: const ValueKey('komik'),
+                      padding: const EdgeInsets.only(bottom: 40),
+                      children: const [ComicProgressBlock(showHeader: false)],
+                    )
+                  : ListView(
+                      key: const ValueKey('nonton'),
+                      padding: const EdgeInsets.only(top: 4, bottom: 40),
+                      children: [
           if (history.isEmpty)
             const ProfileEmptyBox(text: 'Belum ada riwayat tontonan.')
           else
@@ -126,7 +207,10 @@ class HistoryScreen extends ConsumerWidget {
                 ],
               ),
             ),
-          const ComicProgressBlock(),
+                      ],
+                    ),
+            ),
+          ),
         ],
       ),
     );
@@ -135,12 +219,20 @@ class HistoryScreen extends ConsumerWidget {
 
 // ================================================================ favorit
 
-class FavoritesScreen extends ConsumerWidget {
+class FavoritesScreen extends ConsumerStatefulWidget {
   const FavoritesScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<FavoritesScreen> createState() => _FavoritesScreenState();
+}
+
+class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
+  int _tab = 0; // 0 = anime, 1 = komik
+
+  @override
+  Widget build(BuildContext context) {
     final favorites = ref.watch(profileFavoritesProvider);
+    final comicCount = ref.watch(comicStoreProvider).favorites.length;
     final controller = ref.read(profileControllerProvider);
 
     Future<void> remove(FavoriteEntity fav) async {
@@ -155,14 +247,29 @@ class FavoritesScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: AppColors.backgroundDark,
       appBar: _appBar('Favorit'),
-      body: ListView(
-        padding: const EdgeInsets.only(top: 4, bottom: 40),
+      body: Column(
         children: [
-          ProfileSectionHeader(
-            icon: Icons.favorite,
-            title: 'Favorite Shows',
-            trailing: favorites.isEmpty ? null : '${favorites.length} Anime',
+          _LibraryTabs(
+            labels: [
+              favorites.isEmpty ? 'Anime' : 'Anime (${favorites.length})',
+              comicCount == 0 ? 'Komik' : 'Komik ($comicCount)',
+            ],
+            selected: _tab,
+            onChanged: (i) => setState(() => _tab = i),
           ),
+          Expanded(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 220),
+              child: _tab == 1
+                  ? ListView(
+                      key: const ValueKey('komik'),
+                      padding: const EdgeInsets.only(bottom: 40),
+                      children: const [ComicFavoritesBlock(showHeader: false, grid: true)],
+                    )
+                  : ListView(
+                      key: const ValueKey('anime'),
+                      padding: const EdgeInsets.only(top: 4, bottom: 40),
+                      children: [
           if (favorites.isEmpty)
             const ProfileEmptyBox(text: 'Belum ada anime favorit.')
           else
@@ -216,8 +323,10 @@ class FavoritesScreen extends ConsumerWidget {
                 },
               ),
             ),
-          const SizedBox(height: 8),
-          const ComicFavoritesBlock(),
+                      ],
+                    ),
+            ),
+          ),
         ],
       ),
     );

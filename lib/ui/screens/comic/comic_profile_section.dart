@@ -65,7 +65,13 @@ Future<bool> _confirm(BuildContext context, String title, String body) async {
 
 /// Komik favorit (tab Favorit di Profil). Tahan kartu untuk menghapus.
 class ComicFavoritesBlock extends ConsumerWidget {
-  const ComicFavoritesBlock({super.key});
+  const ComicFavoritesBlock({super.key, this.showHeader = true, this.grid = false});
+
+  /// false = tanpa judul (dipakai di tab halaman Favorit).
+  final bool showHeader;
+
+  /// true = grid 3 kolom (halaman Favorit), false = baris geser (Profil).
+  final bool grid;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -76,10 +82,45 @@ class ComicFavoritesBlock extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _header(Icons.menu_book_rounded, 'Komik Favorit',
-            favs.isEmpty ? null : '${favs.length} Komik'),
+        if (showHeader)
+          _header(Icons.menu_book_rounded, 'Komik Favorit',
+              favs.isEmpty ? null : '${favs.length} Komik'),
         if (favs.isEmpty)
           _emptyBox('Belum ada komik favorit.')
+        else if (grid)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: LayoutBuilder(
+              builder: (context, c) {
+                const gap = 12.0;
+                final w = (c.maxWidth - gap * 2) / 3;
+                return Wrap(
+                  spacing: gap,
+                  runSpacing: 14,
+                  children: [
+                    for (final f in favs)
+                      SizedBox(
+                        key: ValueKey(f.slug),
+                        width: w,
+                        child: ComicPosterCard(
+                          comic: ComicListItem(title: f.title, slug: f.slug, cover: f.cover),
+                          onTap: () => openComicDetail(context, f.slug),
+                          onLongPress: () async {
+                            if (await _confirm(
+                              context,
+                              'Hapus dari Favorit?',
+                              '"${f.title}" akan dihapus dari komik favorit.',
+                            )) {
+                              await store.removeFavorite(f.slug);
+                            }
+                          },
+                        ),
+                      ),
+                  ],
+                );
+              },
+            ),
+          )
         else
           SizedBox(
             height: cardW * 1.5 + 8 + 38,
@@ -116,7 +157,10 @@ class ComicFavoritesBlock extends ConsumerWidget {
 
 /// Riwayat baca komik (tab Riwayat di Profil): chapter terakhir per komik.
 class ComicProgressBlock extends ConsumerWidget {
-  const ComicProgressBlock({super.key});
+  const ComicProgressBlock({super.key, this.showHeader = true});
+
+  /// false = tanpa judul (dipakai di tab halaman Riwayat).
+  final bool showHeader;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -126,7 +170,7 @@ class ComicProgressBlock extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _header(Icons.auto_stories_rounded, 'Riwayat Baca Komik', null),
+        if (showHeader) _header(Icons.auto_stories_rounded, 'Riwayat Baca Komik', null),
         if (list.isEmpty)
           _emptyBox('Belum ada riwayat baca komik.')
         else

@@ -183,6 +183,17 @@ class _WallpaperScreenState extends ConsumerState<WallpaperScreen> {
     }
   }
 
+  Future<void> _openCatalog(WallpaperState s) async {
+    final equipId = await Navigator.of(context).push<String>(
+      fadeRoute(_CatalogPage(
+        pool: s.pool,
+        ownedIds: s.inventory.map((w) => w.id).toSet(),
+        equippedId: s.equippedId,
+      )),
+    );
+    if (equipId != null && mounted) await _equip(equipId);
+  }
+
   // ------------------------------------------------------------ equip
 
   Future<void> _equip(String? id) async {
@@ -357,7 +368,7 @@ class _WallpaperScreenState extends ConsumerState<WallpaperScreen> {
           index: showcase.isEmpty ? 0 : _hero % showcase.length,
           total: showcase.length,
           poolSize: s.pool.length,
-          onTap: hero == null ? null : () => _openItem(hero),
+          onTap: s.pool.isEmpty ? null : () => _openCatalog(s),
         ),
       ),
       const SizedBox(height: 18),
@@ -629,14 +640,21 @@ class _HeroStage extends StatelessWidget {
                         top: 12,
                         left: 12,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          padding: const EdgeInsets.fromLTRB(10, 5, 6, 5),
                           decoration: BoxDecoration(
                             color: const Color(0x99000000),
                             borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: const Color(0x33FFFFFF)),
                           ),
-                          child: Text(
-                            '$poolSize wallpaper bisa didapat',
-                            style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w600),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Lihat semua $poolSize wallpaper',
+                                style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w600),
+                              ),
+                              const Icon(Icons.chevron_right, color: Colors.white, size: 16),
+                            ],
                           ),
                         ),
                       ),
@@ -650,6 +668,10 @@ class _HeroStage extends StatelessWidget {
                             Expanded(
                               child: AnimatedSwitcher(
                                 duration: const Duration(milliseconds: 400),
+                                layoutBuilder: (current, previous) => Stack(
+                                  alignment: Alignment.bottomLeft,
+                                  children: [...previous, if (current != null) current],
+                                ),
                                 child: Column(
                                   key: ValueKey('t-${w.id}'),
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -829,6 +851,7 @@ class _OddsCardState extends State<_OddsCard> {
               child: SizedBox(
                 height: 10,
                 child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     for (final r in rarities.reversed)
                       Expanded(
@@ -1413,6 +1436,527 @@ class _RingPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_RingPainter old) => old.progress != progress || old.color != color;
+}
+
+// ================================================================ katalog
+
+/// Daftar semua wallpaper yang bisa didapat dari spin, dengan filter rarity.
+/// Pop dengan id wallpaper = user ingin memasangnya.
+class _CatalogPage extends StatefulWidget {
+  const _CatalogPage({required this.pool, required this.ownedIds, required this.equippedId});
+
+  final List<WallpaperItem> pool;
+  final Set<String> ownedIds;
+  final String? equippedId;
+
+  @override
+  State<_CatalogPage> createState() => _CatalogPageState();
+}
+
+class _CatalogPageState extends State<_CatalogPage> {
+  WallpaperRarity? _rarity; // null = semua
+  bool _missingOnly = false;
+
+  List<WallpaperItem> get _sorted {
+    final list = [...widget.pool];
+    list.sort((a, b) {
+      final r = b.rarity.index.compareTo(a.rarity.index);
+      return r != 0 ? r : a.name.toLowerCase().compareTo(b.name.toLowerCase());
+    });
+    return list;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final all = _sorted;
+    final counts = <WallpaperRarity, int>{};
+    for (final w in all) {
+      counts[w.rarity] = (counts[w.rarity] ?? 0) + 1;
+    }
+    final owned = all.where((w) => widget.ownedIds.contains(w.id)).length;
+    final shown = all
+        .where((w) => _rarity == null || w.rarity == _rarity)
+        .where((w) => !_missingOnly || !widget.ownedIds.contains(w.id))
+        .toList();
+    final progress = all.isEmpty ? 0.0 : owned / all.length;
+
+    return Scaffold(
+      backgroundColor: AppColors.backgroundDark,
+      appBar: AppBar(
+        backgroundColor: AppColors.backgroundDark,
+        foregroundColor: AppColors.textWhite,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        titleSpacing: 0,
+        title: const Text('Daftar Wallpaper', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 19)),
+      ),
+      body: CustomScrollView(
+        slivers: [
+          // ---- progres koleksi
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceDark,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: const Color(0x14FFFFFF)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          '$owned',
+                          style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w800, height: 1),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(left: 4, bottom: 2),
+                          child: Text(
+                            '/ ${all.length} dimiliki',
+                            style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          '${(progress * 100).round()}%',
+                          style: const TextStyle(color: AppColors.textWhite, fontWeight: FontWeight.w800),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: Stack(
+                        children: [
+                          Container(height: 8, color: AppColors.surfaceVariantDark),
+                          TweenAnimationBuilder<double>(
+                            tween: Tween(begin: 0, end: progress),
+                            duration: const Duration(milliseconds: 900),
+                            curve: Curves.easeOutCubic,
+                            builder: (_, v, __) => FractionallySizedBox(
+                              widthFactor: v,
+                              child: Container(
+                                height: 8,
+                                decoration: const BoxDecoration(
+                                  gradient: LinearGradient(colors: [Color(0xFF8B3DFF), Color(0xFFE4344A)]),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // ---- filter rarity
+          SliverToBoxAdapter(
+            child: SizedBox(
+              height: 40,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                children: [
+                  _FilterChip(
+                    label: 'Semua',
+                    count: all.length,
+                    selected: _rarity == null,
+                    onTap: () => setState(() => _rarity = null),
+                  ),
+                  for (final r in WallpaperRarity.values.reversed)
+                    if ((counts[r] ?? 0) > 0) ...[
+                      const SizedBox(width: 8),
+                      _FilterChip(
+                        label: r.label,
+                        count: counts[r]!,
+                        rarity: r,
+                        selected: _rarity == r,
+                        onTap: () => setState(() => _rarity = _rarity == r ? null : r),
+                      ),
+                    ],
+                ],
+              ),
+            ),
+          ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 10, 8, 4),
+              child: Row(
+                children: [
+                  Text(
+                    '${shown.length} wallpaper',
+                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                  ),
+                  const Spacer(),
+                  const Text('Belum dimiliki saja', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                  Switch(
+                    value: _missingOnly,
+                    activeThumbColor: Colors.white,
+                    activeTrackColor: AppColors.accentViolet,
+                    onChanged: (v) => setState(() => _missingOnly = v),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // ---- grid
+          if (shown.isEmpty)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(32, 48, 32, 0),
+                child: Column(
+                  children: [
+                    const Icon(Icons.check_circle_outline, color: AppColors.textMuted, size: 40),
+                    const SizedBox(height: 10),
+                    Text(
+                      _missingOnly
+                          ? 'Semua wallpaper di filter ini sudah kamu miliki.'
+                          : 'Tidak ada wallpaper di filter ini.',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(color: AppColors.textSecondary),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
+              sliver: SliverGrid(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                  childAspectRatio: 0.92,
+                ),
+                delegate: SliverChildBuilderDelegate(
+                  (_, i) {
+                    final w = shown[i];
+                    return TweenAnimationBuilder<double>(
+                      key: ValueKey('${_rarity?.name}-$_missingOnly-${w.id}'),
+                      tween: Tween(begin: 0, end: 1),
+                      duration: Duration(milliseconds: 260 + math.min(i, 8) * 40),
+                      curve: Curves.easeOutCubic,
+                      builder: (_, v, child) => Opacity(
+                        opacity: v,
+                        child: Transform.translate(offset: Offset(0, 12 * (1 - v)), child: child),
+                      ),
+                      child: _CatalogCard(
+                        item: w,
+                        owned: widget.ownedIds.contains(w.id),
+                        equipped: widget.equippedId == w.id,
+                        onTap: () => _openDetail(w),
+                      ),
+                    );
+                  },
+                  childCount: shown.length,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  void _openDetail(WallpaperItem w) {
+    final owned = widget.ownedIds.contains(w.id);
+    final equipped = widget.equippedId == w.id;
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.backgroundDarkSecondary,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: AspectRatio(
+                    aspectRatio: 16 / 9,
+                    child: CachedNetworkImage(
+                      imageUrl: w.url,
+                      fit: BoxFit.cover,
+                      placeholder: (_, __) => CachedNetworkImage(imageUrl: w.previewUrl, fit: BoxFit.cover),
+                      errorWidget: (_, __, ___) => const ColoredBox(color: AppColors.surfaceDark),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            w.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800),
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              _RarityPill(rarity: w.rarity),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Peluang ${(w.chancePercent ?? 0).toStringAsFixed(2)}%',
+                                style: const TextStyle(color: AppColors.textSecondary, fontSize: 12.5),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              // pratinjau di kolom komentar
+              CommentWallpaperFrame(
+                wallpaper: CommentWallpaper(id: w.id, rarity: w.rarity, url: w.url),
+                child: const Padding(
+                  padding: EdgeInsets.fromLTRB(16, 14, 16, 30),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      CircleAvatar(radius: 17, backgroundColor: AppColors.surfaceElevated),
+                      SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Kamu', style: TextStyle(color: AppColors.textWhite, fontWeight: FontWeight.w700, fontSize: 13)),
+                            SizedBox(height: 4),
+                            Text('Contoh tampilan di kolom komentar', style: TextStyle(color: Color(0xE6FFFFFF), fontSize: 13)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: owned
+                      ? FilledButton(
+                          onPressed: equipped
+                              ? null
+                              : () {
+                                  Navigator.pop(ctx);
+                                  Navigator.pop(context, w.id);
+                                },
+                          style: FilledButton.styleFrom(
+                            backgroundColor: AppColors.accentViolet,
+                            disabledBackgroundColor: AppColors.surfaceElevated,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          ),
+                          child: Text(
+                            equipped ? 'Sedang dipakai' : 'Pakai wallpaper ini',
+                            style: const TextStyle(fontWeight: FontWeight.w800),
+                          ),
+                        )
+                      : OutlinedButton.icon(
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            Navigator.pop(context);
+                          },
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            side: const BorderSide(color: Color(0x59FFFFFF)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          ),
+                          icon: const Icon(Icons.casino_outlined, size: 18),
+                          label: const Text('Dapatkan lewat spin', style: TextStyle(fontWeight: FontWeight.w700)),
+                        ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FilterChip extends StatelessWidget {
+  const _FilterChip({
+    required this.label,
+    required this.count,
+    required this.selected,
+    required this.onTap,
+    this.rarity,
+  });
+
+  final String label;
+  final int count;
+  final bool selected;
+  final VoidCallback onTap;
+  final WallpaperRarity? rarity;
+
+  @override
+  Widget build(BuildContext context) {
+    final r = rarity;
+    final color = r?.color ?? AppColors.accentViolet;
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        decoration: BoxDecoration(
+          color: selected ? (r?.gradient == null ? color : null) : AppColors.surfaceDark,
+          gradient: selected ? r?.gradient : null,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: selected ? Colors.transparent : color.withValues(alpha: 0.45)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (r != null) ...[
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: selected ? Colors.white : (r.gradient == null ? color : null),
+                  gradient: selected ? null : r.gradient,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 7),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                color: selected ? Colors.white : AppColors.textWhite,
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              '$count',
+              style: TextStyle(
+                color: selected ? const Color(0xCCFFFFFF) : AppColors.textMuted,
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CatalogCard extends StatelessWidget {
+  const _CatalogCard({
+    required this.item,
+    required this.owned,
+    required this.equipped,
+    required this.onTap,
+  });
+
+  final WallpaperItem item;
+  final bool owned;
+  final bool equipped;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final r = item.rarity;
+    final high = r.index >= WallpaperRarity.epic.index;
+    return Material(
+      color: AppColors.surfaceDark,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: r.color.withValues(alpha: equipped ? 1 : 0.5), width: equipped ? 2 : 1.2),
+            boxShadow: high ? [BoxShadow(color: r.color.withValues(alpha: 0.22), blurRadius: 16)] : null,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      CachedNetworkImage(
+                        imageUrl: item.previewUrl,
+                        fit: BoxFit.cover,
+                        errorWidget: (_, __, ___) => const ColoredBox(color: AppColors.surfaceVariantDark),
+                      ),
+                      Positioned(top: 6, left: 6, child: _RarityPill(rarity: r)),
+                      if (owned)
+                        Positioned(
+                          top: 6,
+                          right: 6,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: equipped ? AppColors.accentViolet : AppColors.successGreen,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              equipped ? 'Dipakai' : 'Dimiliki',
+                              style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: AppColors.textWhite, fontWeight: FontWeight.w700, fontSize: 13),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      'Peluang ${(item.chancePercent ?? 0).toStringAsFixed(2)}%',
+                      style: TextStyle(color: r.color, fontSize: 11.5, fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _RarityPill extends StatelessWidget {
