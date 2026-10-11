@@ -5,6 +5,7 @@ import '../../../core/error_message.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/local/entities.dart';
 import '../../../data/models/chat_models.dart';
+import '../../../data/models/comment_models.dart';
 import '../../../data/models/friend_models.dart';
 import '../../../providers.dart';
 import '../../app_routes.dart';
@@ -14,7 +15,6 @@ import '../../components/net_image.dart';
 import '../../components/role_badges.dart';
 import '../clan/clan_browse_screen.dart';
 import '../xp/xp_leaderboard_screen.dart';
-import 'my_xp_card.dart';
 import 'profile_controller.dart';
 import 'profile_screen.dart';
 
@@ -577,7 +577,7 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
   }) {
     switch (_selectedTab) {
       case 0:
-        return _buildAll();
+        return _buildAll(history, loading, name, avatarUrl, premium);
       case 1:
         return _buildFavorites(favorites, loading, failed);
       case 2:
@@ -587,17 +587,71 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
     }
   }
 
-  Widget _buildAll() {
-    return Column(
-      children: [
-        MyXpCard(firebaseUid: widget.uid),
-        const SizedBox(height: 8),
-        ProfileInfoCard(
-          text: 'Gabung atau bikin Clan bareng sesama penonton',
-          action: 'Lihat',
-          onTap: () =>
-              Navigator.of(context).push<void>(fadeRoute(const ClanBrowseScreen())),
+  /// Tab Semua: gabungan komentar + riwayat tontonan (kalau riwayatnya
+  /// publik), urut dari yang terbaru. Sama seperti tab Semua di profil sendiri.
+  Widget _buildAll(
+    List<WatchHistoryEntity>? history,
+    bool loading,
+    String name,
+    String? avatarUrl,
+    bool premium,
+  ) {
+    final commentsAsync = ref.watch(myCommentsProvider(widget.uid));
+    final comments = commentsAsync.valueOrNull ?? const <EpisodeComment>[];
+
+    final entries = <(DateTime, Widget)>[];
+    for (final h in history ?? const <WatchHistoryEntity>[]) {
+      entries.add((
+        DateTime.fromMillisecondsSinceEpoch(h.lastWatchedTime),
+        ProfileWatchHistoryRow(
+          key: ValueKey('h-${h.id}'),
+          history: h,
+          firebaseUid: widget.uid,
+          username: name,
+          avatarUrl: avatarUrl,
+          isPremium: premium,
+          onPlay: () => openPlayer(context, h.movieId, h.episodeId),
         ),
+      ));
+    }
+    for (final c in comments) {
+      entries.add((
+        c.time ?? DateTime.fromMillisecondsSinceEpoch(0),
+        ProfileCommentFeedRow(
+          key: ValueKey('c-${c.id}'),
+          item: c,
+          firebaseUid: widget.uid,
+          username: name,
+          avatarUrl: avatarUrl,
+          isPremium: premium,
+          onTap: () => openDetail(context, c.animeId),
+        ),
+      ));
+    }
+    entries.sort((x, y) => y.$1.compareTo(x.$1));
+    final shown = entries.take(40).toList();
+    final stillLoading = (loading || commentsAsync.isLoading) && shown.isEmpty;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const ProfileSectionHeader(icon: Icons.dynamic_feed, title: 'Aktivitas Terbaru'),
+        if (stillLoading)
+          _loadingBox()
+        else if (shown.isEmpty)
+          const ProfileEmptyBox(text: 'Belum ada aktivitas.')
+        else
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Column(
+              children: [
+                for (var i = 0; i < shown.length; i++) ...[
+                  shown[i].$2,
+                  if (i != shown.length - 1) const SizedBox(height: 22),
+                ],
+              ],
+            ),
+          ),
       ],
     );
   }

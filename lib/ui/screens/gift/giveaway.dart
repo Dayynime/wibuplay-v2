@@ -19,7 +19,13 @@ class GiveawayStore extends Notifier<Map<int, GiveawayState>> {
   final Set<int> _inflight = {};
 
   @override
-  Map<int, GiveawayState> build() => const {};
+  Map<int, GiveawayState> build() {
+    // "Diklaim"/"Punyamu" tergantung akun: reset cache tiap ganti akun.
+    ref.watch(authUserProvider.select((a) => a.valueOrNull?.uid));
+    _fetchedAt.clear();
+    _inflight.clear();
+    return const {};
+  }
 
   /// Ambil status untuk [ids] yang belum ada / masih open dan sudah > 20 detik.
   Future<void> ensure(Iterable<int> ids) async {
@@ -83,8 +89,8 @@ String _countdown(DateTime? t) {
   if (t == null) return '';
   final d = t.difference(DateTime.now());
   if (d.isNegative) return 'berakhir';
-  if (d.inHours >= 1) return 'sisa ${d.inHours} jam';
-  return 'sisa ${d.inMinutes < 1 ? 1 : d.inMinutes} menit';
+  if (d.inHours >= 1) return '${d.inHours}j lagi';
+  return '${d.inMinutes < 1 ? 1 : d.inMinutes}m lagi';
 }
 
 // =============================================================== kartu
@@ -151,7 +157,7 @@ class _GiveawayCardState extends ConsumerState<GiveawayCard> {
       subtitle = 'Slot sudah habis';
       button = 'Habis';
     } else {
-      subtitle = '${g.claimed}/${g.slots} terklaim · ${_countdown(g.expiresAt)}';
+      subtitle = '${g.claimed}/${g.slots} diklaim · ${_countdown(g.expiresAt)}';
       button = mine ? 'Punyamu' : 'Klaim';
       onTap = mine || _claiming ? null : _claim;
     }
@@ -162,23 +168,28 @@ class _GiveawayCardState extends ConsumerState<GiveawayCard> {
 
     return Container(
       margin: const EdgeInsets.only(top: 6),
-      padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+      padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(18),
         gradient: gradient,
       ),
       child: Row(
         children: [
-          const Icon(Icons.workspace_premium, color: Colors.white, size: 30),
-          const SizedBox(width: 12),
+          const Icon(Icons.workspace_premium, color: Colors.white, size: 28),
+          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  '$days Hari Premium',
-                  style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    '$days Hari Premium',
+                    maxLines: 1,
+                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w800),
+                  ),
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -198,7 +209,7 @@ class _GiveawayCardState extends ConsumerState<GiveawayCard> {
               customBorder: const StadiumBorder(),
               onTap: onTap,
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
                 child: _claiming
                     ? const SizedBox(
                         width: 16,
