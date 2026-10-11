@@ -139,6 +139,7 @@ class CommentsSliver extends ConsumerWidget {
                 isOwn: myUid.isNotEmpty && c.firebaseUid == myUid,
                 isPremiumSender: s.premiumUids.contains(c.firebaseUid),
                 level: s.levels[c.firebaseUid],
+                clanTag: s.clanTags[c.firebaseUid],
                 userNumber: s.userNumbers[c.firebaseUid],
                 avatarUrl: s.avatarUrls[c.firebaseUid] ?? c.avatarUrl,
                 wallpaper: s.wallpapers[c.firebaseUid],
@@ -225,6 +226,7 @@ class _ThreadSheet extends ConsumerWidget {
           isOwn: myUid.isNotEmpty && c.firebaseUid == myUid,
           isPremiumSender: s.premiumUids.contains(c.firebaseUid),
           level: s.levels[c.firebaseUid],
+          clanTag: s.clanTags[c.firebaseUid],
           userNumber: s.userNumbers[c.firebaseUid],
           avatarUrl: s.avatarUrls[c.firebaseUid] ?? c.avatarUrl,
           wallpaper: s.wallpapers[c.firebaseUid],
@@ -494,6 +496,7 @@ class CommentItem extends StatelessWidget {
     required this.userNumber,
     required this.avatarUrl,
     this.wallpaper,
+    this.clanTag,
     required this.replyCount,
     required this.isDeleting,
     required this.onReplyClick,
@@ -509,6 +512,9 @@ class CommentItem extends StatelessWidget {
 
   /// Wallpaper komentar milik pengirim (null = tampilan biasa).
   final CommentWallpaper? wallpaper;
+
+  /// Tag clan pengirim (null = tidak gabung clan).
+  final String? clanTag;
 
   /// null = tampilan di dalam thread (tanpa hitungan balasan).
   final int? replyCount;
@@ -608,9 +614,15 @@ class CommentItem extends StatelessWidget {
                       ),
                   ],
                 ),
-                if (level != null) ...[
-                  const SizedBox(height: 3),
-                  LevelBadge(level: level!),
+                if (level != null || (clanTag?.isNotEmpty ?? false)) ...[
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      if (clanTag?.isNotEmpty ?? false) ClanRainbowBadge(text: clanTag!),
+                      if ((clanTag?.isNotEmpty ?? false) && level != null) const SizedBox(width: 5),
+                      if (level != null) LevelBadge(level: level!),
+                    ],
+                  ),
                 ],
                 const SizedBox(height: 4),
                 if (replyTo != null && replyTo.isNotEmpty)
@@ -747,6 +759,8 @@ String formatCommentRelativeTime(String iso) {
 /// Latar wallpaper animasi di belakang satu komentar + gradient supaya teks
 /// tetap terbaca + chip rarity di pojok kanan bawah. Dipakai juga untuk
 /// pratinjau di layar Wallpaper.
+const double _kWallpaperCardMinHeight = 124;
+
 class CommentWallpaperFrame extends StatelessWidget {
   const CommentWallpaperFrame({super.key, required this.wallpaper, required this.child});
 
@@ -783,7 +797,18 @@ class CommentWallpaperFrame extends StatelessWidget {
                 ),
               ),
             ),
-            child,
+            // Kartu ber-wallpaper dibuat lebih tinggi supaya latarnya
+            // terlihat (seperti referensi), konten di tengah vertikal.
+            ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: _kWallpaperCardMinHeight),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  child: child,
+                ),
+              ),
+            ),
             Positioned(
               right: 12,
               bottom: 10,

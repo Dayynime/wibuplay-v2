@@ -31,6 +31,7 @@ class CommentsUiState {
     this.userNumbers = const {},
     this.avatarUrls = const {},
     this.wallpapers = const {},
+    this.clanTags = const {},
   });
 
   final bool isLoading;
@@ -57,6 +58,9 @@ class CommentsUiState {
 
   /// Wallpaper komentar yang dipakai tiap pengirim (uid -> wallpaper).
   final Map<String, CommentWallpaper> wallpapers;
+
+  /// Tag clan (3 huruf) tiap pengirim yang sedang gabung clan.
+  final Map<String, String> clanTags;
 
   List<EpisodeComment> get sortedTopLevel {
     if (!sortTop) return topLevel;
@@ -86,6 +90,7 @@ class CommentsUiState {
     Map<String, int>? userNumbers,
     Map<String, String>? avatarUrls,
     Map<String, CommentWallpaper>? wallpapers,
+    Map<String, String>? clanTags,
   }) {
     return CommentsUiState(
       isLoading: isLoading ?? this.isLoading,
@@ -105,6 +110,7 @@ class CommentsUiState {
       userNumbers: userNumbers ?? this.userNumbers,
       avatarUrls: avatarUrls ?? this.avatarUrls,
       wallpapers: wallpapers ?? this.wallpapers,
+      clanTags: clanTags ?? this.clanTags,
     );
   }
 }
@@ -298,7 +304,7 @@ class CommentsController
     try {
       final xp = ref.read(xpRepositoryProvider);
       final chat = ref.read(chatRepositoryProvider);
-      // Empat request jalan paralel; gagal salah satu tidak menggagalkan yang lain.
+      // Lima request jalan paralel; gagal salah satu tidak menggagalkan yang lain.
       final levelsF = xp.getLevelsForUids(fresh).catchError((_) => <String, int>{});
       final premiumF = xp.getPremiumUids(fresh).catchError((_) => <String>{});
       final profilesF =
@@ -307,10 +313,12 @@ class CommentsController
           .read(wallpaperRepositoryProvider)
           .getEquippedForUids(fresh)
           .catchError((_) => <String, CommentWallpaper>{});
+      final clansF = chat.getClanTagsForUids(fresh).catchError((_) => <String, String>{});
       final levels = await levelsF;
       final premiums = await premiumF;
       final profiles = await profilesF;
       final wallpapers = await wallpapersF;
+      final clans = await clansF;
 
       final numbers = <String, int>{};
       final avatars = <String, String>{};
@@ -327,6 +335,7 @@ class CommentsController
             userNumbers: {...s.userNumbers, ...numbers},
             avatarUrls: {...s.avatarUrls, ...avatars},
             wallpapers: {...s.wallpapers, ...wallpapers},
+            clanTags: {...s.clanTags, ...clans},
           ));
     } catch (_) {
       // Badge best effort: komentar tetap tampil tanpa badge.
