@@ -25,6 +25,7 @@ class PremiumPackage {
     required this.price,
     this.badge,
     this.bonusCoin = 0,
+    this.bonusXp = 0,
   });
 
   final String id;
@@ -32,6 +33,10 @@ class PremiumPackage {
   final String durationText;
   final int price;
   final String? badge;
+
+  /// Bonus XP (masuk level & leaderboard bulanan) setelah pembayaran
+  /// terverifikasi. 0 = tanpa bonus / server belum kirim field-nya.
+  final int bonusXp;
 
   /// Bonus ZCoin yang dikasih server setelah pembayaran premium terverifikasi
   /// (0 = tanpa bonus / server belum kirim field-nya).
@@ -44,6 +49,7 @@ class PremiumPackage {
         price: _int(j['price']),
         badge: _strOrNull(j['badge']),
         bonusCoin: _int(j['bonus_coin']),
+        bonusXp: _int(j['bonus_xp']),
       );
 
   /// "12 bulan" -> 12, "1 tahun" -> 12. null kalau teks durasi tidak berangka.

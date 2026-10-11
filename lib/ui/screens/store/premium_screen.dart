@@ -188,9 +188,11 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen>
           ),
           if (selected != null)
             StoreCtaBar(
-              summary: selected.bonusCoin > 0
-                  ? 'Paket ${selected.label} + ${formatRupiah(selected.bonusCoin)} ZCoin'
-                  : 'Paket ${selected.label}',
+              summary: [
+                'Paket ${selected.label}',
+                if (selected.bonusCoin > 0) '${formatRupiah(selected.bonusCoin)} ZCoin',
+                if (selected.bonusXp > 0) '${formatRupiah(selected.bonusXp)} XP',
+              ].join(' + '),
               priceText: 'Rp ${formatRupiah(selected.price)}',
               buttonText: user == null
                   ? 'Masuk'
@@ -472,6 +474,17 @@ class _PlanCard extends StatelessWidget {
                       'Bonus ZCoin: ${formatRupiah(pkg.bonusCoin)}',
                       style: const TextStyle(
                         color: AppColors.successGreen,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                  if (pkg.bonusXp > 0) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      'Bonus XP: ${formatRupiah(pkg.bonusXp)}',
+                      style: const TextStyle(
+                        color: Color(0xFFF5B73B),
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
