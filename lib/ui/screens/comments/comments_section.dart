@@ -791,7 +791,8 @@ class CommentWallpaperFrame extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: rarity.color.withValues(alpha: 0.9),
+                    color: rarity.gradient == null ? rarity.color.withValues(alpha: 0.9) : null,
+                    gradient: rarity.gradient,
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(

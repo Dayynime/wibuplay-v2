@@ -609,7 +609,11 @@ class _RarityPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-        decoration: BoxDecoration(color: rarity.color, borderRadius: BorderRadius.circular(20)),
+        decoration: BoxDecoration(
+          color: rarity.gradient == null ? rarity.color : null,
+          gradient: rarity.gradient,
+          borderRadius: BorderRadius.circular(20),
+        ),
         child: Text(
           rarity.label,
           style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800),

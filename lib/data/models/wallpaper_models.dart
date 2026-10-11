@@ -10,7 +10,8 @@ enum WallpaperRarity {
   common,
   rare,
   epic,
-  legendary;
+  legendary,
+  mythic;
 
   static WallpaperRarity from(Object? v) =>
       WallpaperRarity.values.firstWhere((e) => e.name == v, orElse: () => WallpaperRarity.common);
@@ -20,6 +21,7 @@ enum WallpaperRarity {
         WallpaperRarity.rare => 'Rare',
         WallpaperRarity.epic => 'Epic',
         WallpaperRarity.legendary => 'Legendary',
+        WallpaperRarity.mythic => 'Mythic',
       };
 
   Color get color => switch (this) {
@@ -27,7 +29,13 @@ enum WallpaperRarity {
         WallpaperRarity.rare => const Color(0xFF3B82F6),
         WallpaperRarity.epic => const Color(0xFFA855F7),
         WallpaperRarity.legendary => const Color(0xFFF59E0B),
+        WallpaperRarity.mythic => const Color(0xFFFF2E63),
       };
+
+  /// Gradient khusus Mythic (rarity tertinggi); rarity lain warna polos.
+  Gradient? get gradient => this == WallpaperRarity.mythic
+      ? const LinearGradient(colors: [Color(0xFFFF2E63), Color(0xFFB026FF)])
+      : null;
 }
 
 // Nama file selalu uuid buatan server. URL HANYA dirakit dari nama yang lolos

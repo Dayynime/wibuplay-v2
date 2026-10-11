@@ -26,6 +26,7 @@ const Map<WallpaperRarity, int> _defaultWeight = {
   WallpaperRarity.rare: 300,
   WallpaperRarity.epic: 80,
   WallpaperRarity.legendary: 20,
+  WallpaperRarity.mythic: 5,
 };
 
 const List<(String, String)> _filters = [
