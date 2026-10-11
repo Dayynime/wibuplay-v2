@@ -50,14 +50,17 @@ class PublicProfileRepository {
   static const Duration _progressMinGap = Duration(seconds: 20);
   final Map<String, DateTime> _lastProgressSync = {};
 
+  /// [force] = abaikan jeda 20 detik (dipakai saat menghapus episode supaya
+  /// server langsung menunjuk episode tersisa).
   Future<void> syncWatchProgress(
     String firebaseUid,
-    WatchHistoryEntity h,
-  ) async {
+    WatchHistoryEntity h, {
+    bool force = false,
+  }) async {
     final key = '${h.movieId}|${h.episodeId}';
     final now = DateTime.now();
     final last = _lastProgressSync[key];
-    if (last != null && now.difference(last) < _progressMinGap) return;
+    if (!force && last != null && now.difference(last) < _progressMinGap) return;
     _lastProgressSync[key] = now;
     try {
       await callAuthedFunction(_dio, 'profile-sync', {
@@ -76,12 +79,20 @@ class PublicProfileRepository {
     }
   }
 
+  /// Server menyimpan 1 baris per anime. Kalau di HP masih ada episode lain
+  /// dari anime yang sama ([remaining]), server diarahkan ke episode itu;
+  /// kalau tidak ada lagi, baris anime di server dihapus.
   Future<void> syncHistoryRemoved(
     String firebaseUid,
     String animeId,
-    String episodeId,
-  ) async {
+    String episodeId, {
+    WatchHistoryEntity? remaining,
+  }) async {
     _lastProgressSync.remove('$animeId|$episodeId');
+    if (remaining != null) {
+      await syncWatchProgress(firebaseUid, remaining, force: true);
+      return;
+    }
     try {
       await callAuthedFunction(_dio, 'profile-sync', {
         'action': 'history_remove',
@@ -90,6 +101,16 @@ class PublicProfileRepository {
       });
     } catch (e) {
       if (kDebugMode) debugPrint('PublicProfileSync: syncHistoryRemoved EXCEPTION: $e');
+    }
+  }
+
+  /// "Hapus Semua Riwayat": kosongkan juga riwayat publik di server.
+  Future<void> syncHistoryCleared(String firebaseUid) async {
+    _lastProgressSync.clear();
+    try {
+      await callAuthedFunction(_dio, 'profile-sync', {'action': 'history_clear'});
+    } catch (e) {
+      if (kDebugMode) debugPrint('PublicProfileSync: syncHistoryCleared EXCEPTION: $e');
     }
   }
 

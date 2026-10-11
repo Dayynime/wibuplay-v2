@@ -446,12 +446,18 @@ class AnimeRepository {
     await _store.deleteHistory(id);
     if (target != null) {
       final t = target;
-      _sync((repo, uid) => repo.syncHistoryRemoved(uid, t.movieId, t.episodeId));
+      // Episode lain dari anime yang sama yang masih ada di HP (terbaru).
+      final remaining = _store.latestHistoryForMovie(t.movieId);
+      _sync((repo, uid) =>
+          repo.syncHistoryRemoved(uid, t.movieId, t.episodeId, remaining: remaining));
     }
   }
 
   // CATATAN: sama seperti Zenime, "hapus semua riwayat" hanya mereset data
   // lokal. Salinan server baru tertimpa saat ada progress nonton baru dan
   // tetap dijaga toggle privasi (history_public).
-  Future<void> clearAllHistory() => _store.clearAllHistory();
+  Future<void> clearAllHistory() async {
+    await _store.clearAllHistory();
+    _sync((repo, uid) => repo.syncHistoryCleared(uid));
+  }
 }

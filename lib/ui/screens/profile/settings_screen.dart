@@ -15,7 +15,9 @@ import '../admin/admin_screen.dart';
 import '../auth/login_screen.dart';
 import '../chat/chat_screen.dart';
 import '../download/downloads_screen.dart';
-import 'profile_screen.dart' show ProfileAvatar;
+import '../friends/friends_screen.dart';
+import '../wallpaper/wallpaper_screen.dart';
+import 'profile_screen.dart' show ProfileAvatar, showEditProfileSheet;
 
 /// Halaman Pengaturan sendiri (dibuka dari ikon gear di pojok kanan atas
 /// Profil). Isinya dulu tab "Pengaturan" di Profil, ditambah menu Download.
@@ -129,6 +131,8 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
     final isStaff =
         user != null && ref.watch(roleInfoProvider(user.uid)).valueOrNull != null;
     final downloadCount = ref.watch(localStoreProvider.select((s) => s.downloads.length));
+    final incomingRequests =
+        user == null ? 0 : (ref.watch(incomingFriendRequestsProvider).valueOrNull ?? 0);
     final store = ref.watch(localStoreProvider);
 
     return Scaffold(
@@ -267,6 +271,58 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
                         ),
                       ],
                     ),
+                  ),
+                  const _RowDivider(),
+                  _SettingsRow(
+                    leading: const _IconChip(icon: Icons.edit_outlined),
+                    title: 'Edit Profil',
+                    subtitle: 'Foto, banner, dan username',
+                    trailing: const Icon(Icons.chevron_right, color: AppColors.textMuted),
+                    onTap: () => showEditProfileSheet(
+                      context,
+                      user: user,
+                      profile: profile,
+                      fallbackName: _resolvedName(user, profile, profileLoading),
+                      fallbackAvatar: (profile?.avatarUrl ?? '').isNotEmpty
+                          ? profile!.avatarUrl
+                          : user.photoURL,
+                      premium: premium?.isPremium == true,
+                    ),
+                  ),
+                  const _RowDivider(),
+                  _SettingsRow(
+                    leading: const _IconChip(icon: Icons.people_alt_outlined),
+                    title: 'Teman',
+                    titleBadge: incomingRequests > 0
+                        ? Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: AppColors.accentViolet,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              '$incomingRequests',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          )
+                        : null,
+                    subtitle: incomingRequests > 0
+                        ? '$incomingRequests permintaan pertemanan baru'
+                        : 'Daftar teman & permintaan pertemanan',
+                    trailing: const Icon(Icons.chevron_right, color: AppColors.textMuted),
+                    onTap: () => Navigator.of(context).push<void>(fadeRoute(const FriendsScreen())),
+                  ),
+                  const _RowDivider(),
+                  _SettingsRow(
+                    leading: const _IconChip(icon: Icons.wallpaper),
+                    title: 'Wallpaper Komentar',
+                    subtitle: 'Gacha & pasang wallpaper di komentarmu',
+                    trailing: const Icon(Icons.chevron_right, color: AppColors.textMuted),
+                    onTap: () => Navigator.of(context).push<void>(fadeRoute(const WallpaperScreen())),
                   ),
                   const _RowDivider(),
                   _SettingsRow(

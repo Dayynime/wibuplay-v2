@@ -24,10 +24,7 @@ import '../auth/login_screen.dart';
 import '../clan/clan_browse_screen.dart';
 import 'settings_screen.dart';
 import '../comic/comic_profile_section.dart';
-import '../friends/friends_screen.dart';
-import '../wallpaper/wallpaper_screen.dart';
 import '../xp/xp_leaderboard_screen.dart';
-import 'my_xp_card.dart';
 import 'profile_controller.dart';
 
 /// Profil Saya ala Zenime: banner full-bleed menyatu dengan avatar, identitas
@@ -134,8 +131,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         uid.isEmpty ? 0 : (ref.watch(myCommentCountProvider(uid)).valueOrNull ?? 0);
     final uniqueAnime = history.map((h) => h.movieId).toSet().length;
     final topPad = MediaQuery.paddingOf(context).top;
-    final incomingRequests =
-        uid.isEmpty ? 0 : (ref.watch(incomingFriendRequestsProvider).valueOrNull ?? 0);
 
     return Stack(
       children: [
@@ -267,72 +262,23 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ],
                 ),
               ),
-              const SizedBox(height: 14),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: FilledButton.icon(
-                    onPressed: user == null
-                        ? _openLogin
-                        : () => _openEditSheet(
-                              user: user,
-                              profile: profile,
-                              fallbackName: name,
-                              fallbackAvatar: avatarUrl,
-                              premium: premium,
-                            ),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.accentViolet,
-                      shape: const StadiumBorder(),
-                    ),
-                    icon: Icon(user == null ? Icons.login : Icons.edit, size: 18),
-                    label: Text(
-                      user == null ? 'Masuk' : 'Edit Profil',
-                      style: const TextStyle(fontWeight: FontWeight.w700),
-                    ),
-                  ),
-                ),
-              ),
-              if (user != null) ...[
-                const SizedBox(height: 10),
+              // Edit Profil, Teman, dan Wallpaper Komentar dipindah ke Pengaturan
+              // (ikon gear kanan atas). Di sini cuma tombol Masuk saat belum login.
+              if (user == null) ...[
+                const SizedBox(height: 14),
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: SizedBox(
                     width: double.infinity,
-                    height: 48,
-                    child: OutlinedButton.icon(
-                      onPressed: () => Navigator.of(context)
-                          .push<void>(fadeRoute(const FriendsScreen())),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.white,
-                        side: const BorderSide(color: Color(0x59FFFFFF)),
+                    height: 52,
+                    child: FilledButton.icon(
+                      onPressed: _openLogin,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.accentViolet,
                         shape: const StadiumBorder(),
                       ),
-                      icon: const Icon(Icons.people_alt_outlined, size: 18),
-                      label: Text(
-                        incomingRequests > 0 ? 'Teman ($incomingRequests permintaan)' : 'Teman',
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: OutlinedButton.icon(
-                      onPressed: () => Navigator.of(context)
-                          .push<void>(fadeRoute(const WallpaperScreen())),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFFC084FC),
-                        side: const BorderSide(color: Color(0x80A855F7)),
-                        shape: const StadiumBorder(),
-                      ),
-                      icon: const Icon(Icons.wallpaper, size: 18),
-                      label: const Text('Wallpaper Komentar'),
+                      icon: const Icon(Icons.login, size: 18),
+                      label: const Text('Masuk', style: TextStyle(fontWeight: FontWeight.w700)),
                     ),
                   ),
                 ),
@@ -388,33 +334,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Widget _statDivider() => Container(width: 1, height: 26, color: const Color(0x40FFFFFF));
-
-  Future<void> _openEditSheet({
-    required User user,
-    required ChatProfile? profile,
-    required String fallbackName,
-    required String? fallbackAvatar,
-    required bool premium,
-  }) {
-    return showModalBottomSheet<void>(
-      context: context,
-      // Root navigator: sheet menutupi bottom-nav floating milik shell.
-      useRootNavigator: true,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: AppColors.surfaceDark,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (_) => _EditProfileSheet(
-        uid: user.uid,
-        premium: premium,
-        fallbackName: fallbackName,
-        fallbackAvatar: fallbackAvatar,
-        initialProfile: profile,
-      ),
-    );
-  }
 
   // -------------------------------------------------------------------- tab
 
@@ -482,7 +401,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   ) {
     switch (_selectedTab) {
       case 0:
-        return _buildAll(user, premium);
+        return _buildAll(user, premium, name, avatarUrl, history);
       case 1:
         return _buildFavorites(favorites);
       case 2:
@@ -494,13 +413,58 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
   // ------------------------------------------------------------------ semua
 
-  Widget _buildAll(User? user, bool premium) {
+  /// Tab Semua: gabungan komentar + riwayat tontonan, urut dari yang terbaru.
+  Widget _buildAll(
+    User? user,
+    bool premium,
+    String name,
+    String? avatarUrl,
+    List<WatchHistoryEntity> history,
+  ) {
+    final commentsAsync = user == null ? null : ref.watch(myCommentsProvider(user.uid));
+    final comments = commentsAsync?.valueOrNull ?? const <EpisodeComment>[];
+    final loadingComments = commentsAsync?.isLoading == true && comments.isEmpty;
+
+    // (waktu, widget) lalu diurutkan terbaru dulu.
+    final entries = <(DateTime, Widget)>[];
+    for (final h in history) {
+      entries.add((
+        DateTime.fromMillisecondsSinceEpoch(h.lastWatchedTime),
+        ProfileWatchHistoryRow(
+          key: ValueKey('h-${h.id}'),
+          history: h,
+          firebaseUid: user?.uid ?? '',
+          username: name,
+          avatarUrl: avatarUrl,
+          isPremium: premium,
+          onPlay: () => widget.onWatchEpisode(h.movieId, h.episodeId),
+          onDelete: () => _controller.deleteHistory(h.id),
+        ),
+      ));
+    }
+    if (user != null) {
+      for (final c in comments) {
+        entries.add((
+          c.time ?? DateTime.fromMillisecondsSinceEpoch(0),
+          ProfileCommentFeedRow(
+            key: ValueKey('c-${c.id}'),
+            item: c,
+            firebaseUid: user.uid,
+            username: name,
+            avatarUrl: avatarUrl,
+            isPremium: premium,
+            onTap: () => widget.onAnimeClick(c.animeId),
+          ),
+        ));
+      }
+    }
+    entries.sort((x, y) => y.$1.compareTo(x.$1));
+    final shown = entries.take(40).toList();
+
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (user != null) ...[
-          MyXpCard(firebaseUid: user.uid),
-          const SizedBox(height: 8),
-        ] else ...[
+        if (user == null) ...[
           ProfileInfoCard(
             text: 'Masuk pakai akun Zenime buat dapat Level, Clan, dan Chat Global',
             action: 'Masuk',
@@ -508,57 +472,32 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ),
           const SizedBox(height: 8),
         ],
-        ProfileInfoCard(
-          text: 'Gabung atau bikin Clan bareng sesama penonton',
-          action: 'Lihat',
-          onTap: () =>
-              Navigator.of(context).push<void>(fadeRoute(const ClanBrowseScreen())),
-        ),
-        const SizedBox(height: 8),
-        if (user != null && !premium) ...[
-          ProfileInfoCard(
-            text: 'Upgrade Premium buat upload banner profil sendiri',
-            action: 'Lihat',
-            outlined: true,
-            onTap: () => openPremium(context),
-          ),
-          const SizedBox(height: 8),
-        ],
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceDark,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0x14FFFFFF)),
+        const ProfileSectionHeader(icon: Icons.dynamic_feed, title: 'Aktivitas Terbaru'),
+        if (shown.isEmpty && loadingComments)
+          const SizedBox(
+            height: 130,
+            child: Center(
+              child: SizedBox(
+                width: 28,
+                height: 28,
+                child: CircularProgressIndicator(strokeWidth: 3, color: AppColors.accentViolet),
+              ),
             ),
-            child: const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          )
+        else if (shown.isEmpty)
+          const ProfileEmptyBox(text: 'Belum ada aktivitas. Mulai nonton atau komentar, yuk!')
+        else
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Column(
               children: [
-                Row(
-                  children: [
-                    Icon(Icons.info, color: AppColors.accentViolet),
-                    SizedBox(width: 8),
-                    Text(
-                      'Tentang Zenime',
-                      style: TextStyle(
-                        color: AppColors.textWhite,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 8),
-                Text(
-                  'Zenime adalah aplikasi streaming anime buat nonton ribuan judul favoritmu langsung dari HP, lengkap dengan Chat Global & Clan.',
-                  style: TextStyle(color: Color(0xB3FFFFFF), fontSize: 14, height: 1.45),
-                ),
+                for (var i = 0; i < shown.length; i++) ...[
+                  shown[i].$2,
+                  if (i != shown.length - 1) const SizedBox(height: 22),
+                ],
               ],
             ),
           ),
-        ),
       ],
     );
   }
@@ -1043,6 +982,7 @@ class ProfileInfoCard extends StatelessWidget {
 /// + judul + episode, isi komentar, jumlah balasan.
 class ProfileCommentFeedRow extends StatelessWidget {
   const ProfileCommentFeedRow({
+    super.key,
     required this.item,
     required this.firebaseUid,
     required this.username,
@@ -1172,6 +1112,34 @@ class ProfileCommentFeedRow extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Buka sheet Edit Profil (dipanggil dari halaman Pengaturan).
+Future<void> showEditProfileSheet(
+  BuildContext context, {
+  required User user,
+  required ChatProfile? profile,
+  required String fallbackName,
+  required String? fallbackAvatar,
+  required bool premium,
+}) {
+  return showModalBottomSheet<void>(
+    context: context,
+    useRootNavigator: true,
+    isScrollControlled: true,
+    useSafeArea: true,
+    backgroundColor: AppColors.surfaceDark,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    builder: (_) => _EditProfileSheet(
+      uid: user.uid,
+      premium: premium,
+      fallbackName: fallbackName,
+      fallbackAvatar: fallbackAvatar,
+      initialProfile: profile,
+    ),
+  );
 }
 
 /// Bottom sheet Edit Profil: foto profil (semua user), banner (khusus
