@@ -5,14 +5,14 @@ import '../../core/theme/app_colors.dart';
 import '../../providers.dart';
 import '../app_routes.dart';
 import '../components/floating_bottom_bar.dart';
-import '../screens/comic/comic_screen.dart';
+import '../screens/menu/menu_screen.dart';
 import '../screens/explore/explore_screen.dart';
 import '../screens/home/home_screen.dart';
 import '../screens/profile/profile_screen.dart';
 import '../screens/schedule/schedule_screen.dart';
 
 /// Port AppNavigation.kt: 5 tab + bottom bar melayang.
-/// Beranda, Jelajah, Jadwal, Cuplix, Profil; Detail dan Player dibuka lewat
+/// Beranda, Jelajah, Jadwal, Menu (Donghua/Komik/Gacha), Profil; Detail dan Player dibuka lewat
 /// openDetail/openPlayer (app_routes.dart).
 class AppShell extends ConsumerStatefulWidget {
   const AppShell({super.key});
@@ -74,16 +74,11 @@ class _AppShellState extends ConsumerState<AppShell> {
                 onSeeAllClick: (_) => _goTab(1),
                 onProfileClick: () => _goTab(4),
                 onCuplixClick: () => openCuplix(context),
-                onComicSeeAllClick: () => _goTab(3),
+                onComicSeeAllClick: () => openComic(context),
               )),
               _tab(1, () => ExploreScreen(onAnimeClick: _openDetail)),
               _tab(2, () => ScheduleScreen(onAnimeClick: _openDetail)),
-              _tab(
-                3,
-                () => ComicScreen(
-                  onComicClick: (key) => openComicDetail(context, key),
-                ),
-              ),
+              _tab(3, () => const MenuScreen()),
               _tab(
                 4,
                 () => ProfileScreen(

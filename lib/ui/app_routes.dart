@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'screens/comic/comic_detail_screen.dart';
 import 'screens/comic/comic_reader_controller.dart' show ComicReaderArgs;
 import 'screens/comic/comic_reader_screen.dart';
+import 'screens/comic/comic_screen.dart';
 import 'screens/cuplix/cuplix_screen.dart';
 import 'screens/detail/detail_screen.dart';
 import 'screens/donghua/donghua_detail_screen.dart';
@@ -162,6 +163,19 @@ void openCoin(BuildContext context) {
   Navigator.of(context).push(fadeRoute(const CoinScreen()));
 }
 
+
+/// Halaman daftar Komik (dari tab Menu / "Lihat semua" di Beranda).
+void openComic(BuildContext context) {
+  final nav = Navigator.of(context);
+  nav.push(
+    fadeRoute(
+      ComicScreen(
+        onBackClick: () => nav.maybePop(),
+        onComicClick: (key) => _pushComicDetail(nav, key),
+      ),
+    ),
+  );
+}
 
 /// Detail komik. [comicKey] = kunci komik (ComicKey); dari Beranda/tab Komik
 /// /Profil cukup oper slug apa adanya dari ComicRepository.

@@ -13,7 +13,10 @@ import 'comic_widgets.dart';
 /// (Dayynime-v1 / v2), tab per sumber, cari, filter genre, grid dengan
 /// auto load-more, dan carousel unggulan di tab pertama.
 class ComicScreen extends ConsumerStatefulWidget {
-  const ComicScreen({super.key, required this.onComicClick});
+  const ComicScreen({super.key, required this.onComicClick, this.onBackClick});
+
+  /// Diisi saat dibuka sebagai halaman (dari tab Menu): tampilkan tombol kembali.
+  final VoidCallback? onBackClick;
 
   /// Argumen = kunci komik (ComicKey).
   final ValueChanged<String> onComicClick;
@@ -130,9 +133,14 @@ class _ComicScreenState extends ConsumerState<ComicScreen> {
               )
             : Row(
                 children: [
-                  const Padding(
-                    padding: EdgeInsets.only(left: 12),
-                    child: Text(
+                  if (widget.onBackClick != null)
+                    IconButton(
+                      onPressed: widget.onBackClick,
+                      icon: const Icon(Icons.arrow_back, color: Colors.white),
+                    ),
+                  Padding(
+                    padding: EdgeInsets.only(left: widget.onBackClick != null ? 0 : 12),
+                    child: const Text(
                       'Komik',
                       style: TextStyle(
                         color: Colors.white,
