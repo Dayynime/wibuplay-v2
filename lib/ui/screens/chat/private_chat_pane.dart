@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../gift/gift_premium_sheet.dart';
 import '../../../data/models/friend_models.dart';
 import '../../components/friend_avatar.dart';
 import '../../components/swipe_to_reply.dart';
@@ -208,6 +209,21 @@ class _PrivateChatPaneState extends ConsumerState<PrivateChatPane> {
                     ],
                   ),
                 ),
+              ),
+              IconButton(
+                tooltip: 'Gift Premium',
+                onPressed: () async {
+                  final row = await showGiftPremiumSheet(
+                    context,
+                    recipientUid: friend.firebaseUid,
+                    recipientName: friend.username,
+                    channel: 'private',
+                  );
+                  if (row != null && mounted) {
+                    _controller.addOwnMessage(PrivateMessage.fromJson(row));
+                  }
+                },
+                icon: const Icon(Icons.card_giftcard, color: Color(0xFFF5B73B)),
               ),
             ],
           ),
@@ -460,10 +476,16 @@ class _DmBubble extends StatelessWidget {
               ),
               const SizedBox(height: 6),
             ],
-            Text(
-              m.message,
-              style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.3),
-            ),
+            if (m.isGift)
+              GiftBubbleCard(
+                days: m.giftDays!,
+                title: isOwn ? 'Kamu memberi Premium' : 'Kamu menerima Premium!',
+              )
+            else
+              Text(
+                m.message,
+                style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.3),
+              ),
             Align(
               alignment: Alignment.centerRight,
               child: Text(

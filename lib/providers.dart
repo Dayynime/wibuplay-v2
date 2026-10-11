@@ -33,6 +33,7 @@ import 'data/repository/store_repository.dart';
 import 'data/models/store_models.dart';
 import 'data/repository/xp_repository.dart';
 import 'data/repository/wallpaper_repository.dart';
+import 'data/repository/gift_repository.dart';
 import 'data/supabase/supabase_client.dart';
 
 /// Di-override di main() setelah LocalStore.open() selesai.
@@ -111,6 +112,11 @@ final chatRepositoryProvider = Provider<ChatRepository>(
 
 final commentRepositoryProvider = Provider<CommentRepository>(
   (ref) => CommentRepository(ref.watch(supabaseDioProvider)),
+);
+
+/// Gift Premium (kirim hari premium ke user lain).
+final giftRepositoryProvider = Provider<GiftRepository>(
+  (ref) => GiftRepository(ref.watch(supabaseDioProvider)),
 );
 
 /// Wallpaper Komentar (gacha spin, koleksi, panel admin).

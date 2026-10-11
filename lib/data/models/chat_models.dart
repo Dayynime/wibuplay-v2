@@ -13,6 +13,10 @@ class ChatMessage {
     this.messageType = 'text',
     this.audioUrl,
     this.durationSeconds,
+    this.giftDays,
+    this.giftRecipientUid,
+    this.giftRecipientUsername,
+    this.giveawayId,
   });
 
   final int id;
@@ -31,7 +35,17 @@ class ChatMessage {
   final String? audioUrl;
   final int? durationSeconds;
 
+  /// Gift Premium (bubble khusus).
+  final int? giftDays;
+  final String? giftRecipientUid;
+  final String? giftRecipientUsername;
+
+  /// Giveaway Premium (kartu dengan tombol Klaim).
+  final int? giveawayId;
+  bool get isGiveaway => messageType == 'giveaway' && giveawayId != null;
+
   bool get isVoice => messageType == 'voice';
+  bool get isGift => messageType == 'gift' && (giftDays ?? 0) > 0;
 
   DateTime? get time => DateTime.tryParse(createdAt)?.toLocal();
 
@@ -49,6 +63,10 @@ class ChatMessage {
       messageType: (j['message_type'] as String?) ?? 'text',
       audioUrl: j['audio_url'] as String?,
       durationSeconds: (j['duration_seconds'] as num?)?.toInt(),
+      giftDays: (j['gift_days'] as num?)?.toInt(),
+      giftRecipientUid: j['gift_recipient_uid'] as String?,
+      giftRecipientUsername: j['gift_recipient_username'] as String?,
+      giveawayId: (j['giveaway_id'] as num?)?.toInt(),
     );
   }
 }

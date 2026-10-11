@@ -14,7 +14,8 @@ class ChatRepository {
 
   static const String _messageColumns =
       'id,firebase_uid,username,avatar_url,message,created_at,reply_to_id,'
-      'reply_to_username,reply_to_message,message_type,audio_url,duration_seconds';
+      'reply_to_username,reply_to_message,message_type,audio_url,duration_seconds,'
+      'gift_days,gift_recipient_uid,gift_recipient_username,giveaway_id';
 
   static const String _profileColumns =
       'firebase_uid,username,avatar_url,banner_url,username_color,user_number,'

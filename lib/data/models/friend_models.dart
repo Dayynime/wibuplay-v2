@@ -94,6 +94,8 @@ class PrivateMessage {
     this.replyToId,
     this.replyToSenderUid,
     this.replyToMessage,
+    this.messageType = 'text',
+    this.giftDays,
   });
 
   final int id;
@@ -105,6 +107,12 @@ class PrivateMessage {
   final int? replyToId;
   final String? replyToSenderUid;
   final String? replyToMessage;
+
+  /// 'text' atau 'gift' (Gift Premium).
+  final String messageType;
+  final int? giftDays;
+
+  bool get isGift => messageType == 'gift' && (giftDays ?? 0) > 0;
 
   DateTime? get time => DateTime.tryParse(createdAt)?.toLocal();
 
@@ -118,6 +126,8 @@ class PrivateMessage {
         replyToId: (j['reply_to_id'] as num?)?.toInt(),
         replyToSenderUid: j['reply_to_sender_uid'] as String?,
         replyToMessage: j['reply_to_message'] as String?,
+        messageType: (j['message_type'] as String?) ?? 'text',
+        giftDays: (j['gift_days'] as num?)?.toInt(),
       );
 
   PrivateMessage withReadAt(String readAt) => PrivateMessage(
@@ -130,6 +140,8 @@ class PrivateMessage {
         replyToId: replyToId,
         replyToSenderUid: replyToSenderUid,
         replyToMessage: replyToMessage,
+        messageType: messageType,
+        giftDays: giftDays,
       );
 
   bool involves(String myUid, String otherUid) =>

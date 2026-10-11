@@ -11,6 +11,8 @@ import '../../../data/models/chat_models.dart';
 import '../../../data/repository/profile_image_uploader.dart';
 import '../../../providers.dart';
 import '../../app_routes.dart';
+import '../gift/gift_premium_sheet.dart';
+import '../gift/giveaway.dart';
 import '../../components/game_badges.dart';
 import '../../components/role_badges.dart';
 import '../../components/swipe_to_reply.dart';
@@ -133,6 +135,24 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 Clipboard.setData(ClipboardData(text: m.message));
               },
             ),
+            if (m.firebaseUid != s.myUid && s.myUid.isNotEmpty)
+              ListTile(
+                leading: const Icon(Icons.card_giftcard, color: Color(0xFFF5B73B)),
+                title: Text(
+                  'Gift Premium ke ${m.username}',
+                  style: const TextStyle(color: AppColors.textWhite),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  // Bubble gift masuk lewat realtime chat global.
+                  showGiftPremiumSheet(
+                    context,
+                    recipientUid: m.firebaseUid,
+                    recipientName: m.username,
+                    channel: 'global',
+                  );
+                },
+              ),
             if (m.firebaseUid == s.myUid || s.canDeleteOthers)
               ListTile(
                 leading: const Icon(Icons.delete_outline, color: AppColors.errorRed),
@@ -403,6 +423,18 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               ),
             ),
             const SizedBox(width: 6),
+            // Giveaway Premium (mahkota)
+            SizedBox(
+              width: 46,
+              height: 46,
+              child: IconButton.filled(
+                tooltip: 'Buat Giveaway',
+                onPressed: s.myUid.isEmpty ? null : () => showCreateGiveawaySheet(context),
+                style: IconButton.styleFrom(backgroundColor: const Color(0xFFE6A817)),
+                icon: const Icon(Icons.workspace_premium, size: 22, color: Colors.black),
+              ),
+            ),
+            const SizedBox(width: 6),
             SizedBox(
               width: 46,
               height: 46,
@@ -590,10 +622,23 @@ class _MessageBubble extends StatelessWidget {
               ),
             ],
             const SizedBox(height: 4),
-            Text(
-              m.message,
-              style: const TextStyle(color: AppColors.textWhite, fontSize: 14, height: 1.3),
-            ),
+            if (m.isGiveaway) ...[
+              if (m.message.trim().isNotEmpty && !m.message.startsWith('🎁 Giveaway Premium'))
+                Text(
+                  m.message,
+                  style: const TextStyle(color: AppColors.textWhite, fontSize: 14, height: 1.3),
+                ),
+              GiveawayCard(giveawayId: m.giveawayId!, days: m.giftDays ?? 1),
+            ] else if (m.isGift)
+              GiftBubbleCard(
+                days: m.giftDays!,
+                title: 'memberi Premium ke ${m.giftRecipientUsername ?? 'pengguna'}',
+              )
+            else
+              Text(
+                m.message,
+                style: const TextStyle(color: AppColors.textWhite, fontSize: 14, height: 1.3),
+              ),
             if (m.isVoice)
               const Padding(
                 padding: EdgeInsets.only(top: 2),

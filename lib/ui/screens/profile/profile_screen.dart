@@ -22,6 +22,7 @@ import '../../components/net_image.dart';
 import '../../components/role_badges.dart';
 import '../auth/login_screen.dart';
 import '../clan/clan_browse_screen.dart';
+import 'image_crop_screen.dart';
 import 'settings_screen.dart';
 import '../comic/comic_profile_section.dart';
 import '../xp/xp_leaderboard_screen.dart';
@@ -1270,13 +1271,22 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
       if (mounted) setState(() => _error = block);
       return;
     }
+    final isGif = await ImagePrep.isGif(x.path);
+    if (!mounted) return;
+    // Pratinjau + atur posisi dulu (GIF: pratinjau saja).
+    final cropped = await ImageCropScreen.open(
+      context,
+      path: x.path,
+      shape: CropShape.avatar,
+      isGif: isGif,
+    );
+    if (cropped == null || !mounted) return;
     setState(() {
       _uploadingAvatar = true;
       _error = null;
     });
     try {
-      final isGif = await ImagePrep.isGif(x.path);
-      final path = await ImagePrep.prepare(x.path, maxSide: 512);
+      final path = isGif ? await ImagePrep.prepare(cropped, maxSide: 512) : cropped;
       final url = await ProfileImageUploader.uploadAvatar(path, widget.uid);
       await _persist(avatar: url);
       if (isGif) await GifQuota.consume(widget.uid);
@@ -1306,13 +1316,21 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
       if (mounted) setState(() => _error = block);
       return;
     }
+    final isGif = await ImagePrep.isGif(x.path);
+    if (!mounted) return;
+    final cropped = await ImageCropScreen.open(
+      context,
+      path: x.path,
+      shape: CropShape.banner,
+      isGif: isGif,
+    );
+    if (cropped == null || !mounted) return;
     setState(() {
       _uploadingBanner = true;
       _error = null;
     });
     try {
-      final isGif = await ImagePrep.isGif(x.path);
-      final path = await ImagePrep.prepare(x.path, maxSide: 1280);
+      final path = isGif ? await ImagePrep.prepare(cropped, maxSide: 1280) : cropped;
       final url = await ProfileImageUploader.uploadBanner(path, widget.uid);
       await _persist(banner: url);
       if (isGif) await GifQuota.consume(widget.uid);

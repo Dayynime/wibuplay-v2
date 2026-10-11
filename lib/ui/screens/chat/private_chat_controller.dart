@@ -295,6 +295,18 @@ class PrivateChatController extends AutoDisposeNotifier<PrivateChatState> {
     }
   }
 
+  /// Pesan milik sendiri yang dibuat di luar [sendMessage] (mis. bubble Gift
+  /// Premium) langsung ditampilkan tanpa menunggu polling.
+  void addOwnMessage(PrivateMessage msg) {
+    if (_recent.any((m) => m.id == msg.id)) return;
+    _recent = [..._recent, msg];
+    final open = state.selected?.firebaseUid == msg.recipientUid;
+    if (open && state.messages.every((m) => m.id != msg.id)) {
+      _update((s) => s.copyWith(messages: [...s.messages, msg]));
+    }
+    _rebuildConversations();
+  }
+
   void _applyIncoming(PrivateMessage msg) {
     final uid = _myUid;
     if (msg.recipientUid != uid) return;
