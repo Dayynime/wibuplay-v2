@@ -1813,19 +1813,26 @@ class _GiverRow extends StatelessWidget {
             style: TextStyle(color: _rankColor(giver.rank), fontSize: 11, fontWeight: FontWeight.w900),
           ),
           const SizedBox(width: 6),
-          Flexible(
-            child: Text(
-              giver.username,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w700),
+          // Nama + clan rapat ke kiri, total hari menempel di kanan.
+          Expanded(
+            child: Row(
+              children: [
+                Flexible(
+                  child: Text(
+                    giver.username,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w700),
+                  ),
+                ),
+                if ((clan ?? '').isNotEmpty) ...[
+                  const SizedBox(width: 6),
+                  ClanRainbowBadge(text: clan!, height: 15),
+                ],
+              ],
             ),
           ),
-          if ((clan ?? '').isNotEmpty) ...[
-            const SizedBox(width: 6),
-            ClanRainbowBadge(text: clan!, height: 15),
-          ],
-          const Spacer(),
+          const SizedBox(width: 6),
           Text(
             _giverDays(giver.days),
             style: const TextStyle(color: heroGold, fontSize: 11.5, fontWeight: FontWeight.w800),

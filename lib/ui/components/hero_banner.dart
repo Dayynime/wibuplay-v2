@@ -129,15 +129,12 @@ class _HeroBannerState extends State<HeroBanner> {
     final index = _animeIndex < items.length ? _animeIndex : 0;
 
     final hasLeaderboard = widget.topXp.isNotEmpty || widget.topClans.isNotEmpty;
-    final lbPage = hasLeaderboard ? 1 : -1;
-    final supportPage = widget.topSupport.isNotEmpty ? 1 + (hasLeaderboard ? 1 : 0) : -1;
-    final giverPage = widget.topGivers.isNotEmpty
-        ? 1 + (hasLeaderboard ? 1 : 0) + (widget.topSupport.isNotEmpty ? 1 : 0)
-        : -1;
-    final pageCount = 1 +
-        (hasLeaderboard ? 1 : 0) +
-        (widget.topSupport.isNotEmpty ? 1 : 0) +
-        (widget.topGivers.isNotEmpty ? 1 : 0);
+    // Urutan slide: poster anime -> Top Giver -> Top Leaderboard -> Top Support.
+    var next = 1;
+    final giverPage = widget.topGivers.isNotEmpty ? next++ : -1;
+    final lbPage = hasLeaderboard ? next++ : -1;
+    final supportPage = widget.topSupport.isNotEmpty ? next++ : -1;
+    final pageCount = next;
 
     return Column(
       children: [
@@ -233,7 +230,9 @@ class _HeroBannerState extends State<HeroBanner> {
                                 ? heroGold
                                 : i == supportPage
                                     ? heroPink
-                                    : AppColors.accentViolet)
+                                    : i == giverPage
+                                        ? heroTeal
+                                        : AppColors.accentViolet)
                             : (i == supportPage
                                 ? heroPink.withValues(alpha: 0.4)
                                 : AppColors.surfaceDark),
