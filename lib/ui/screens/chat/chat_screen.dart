@@ -187,7 +187,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   );
                 },
               ),
-            if (m.firebaseUid == s.myUid || s.canDeleteOthers)
+            // Pesan gift/giveaway permanen (tidak bisa dihapus siapa pun).
+            if ((m.firebaseUid == s.myUid || s.canDeleteOthers) && !m.isGift && !m.isGiveaway)
               ListTile(
                 leading: const Icon(Icons.delete_outline, color: AppColors.errorRed),
                 title: const Text('Hapus', style: TextStyle(color: AppColors.errorRed)),
@@ -370,7 +371,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           onReply: () => _controller.setReplyTarget(m),
           onReplyTap: m.replyToId == null ? null : () => _jumpToMessage(s, m.replyToId),
           highlighted: _highlightId == m.id,
-          onDelete: (m.firebaseUid == s.myUid || s.canDeleteOthers)
+          onDelete: (m.firebaseUid == s.myUid || s.canDeleteOthers) && !m.isGift && !m.isGiveaway
               ? () => _confirmDelete(m)
               : null,
           onProfileTap: m.firebaseUid == s.myUid
