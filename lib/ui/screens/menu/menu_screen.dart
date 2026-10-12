@@ -10,6 +10,7 @@ import '../library/library_screens.dart';
 import '../profile/profile_controller.dart';
 import '../store/coin_screen.dart';
 import '../store/premium_screen.dart';
+import '../tree/tree_screen.dart';
 import '../wallpaper/wallpaper_screen.dart';
 
 // Poster sama dengan slide onboarding (CDN publik MyAnimeList, tidak di-bundle).
@@ -135,6 +136,19 @@ class MenuScreen extends ConsumerWidget {
                 colors: [Color(0xFF3B1A6B), Color(0xFF8B3DFF), Color(0xFFFF2E63)],
               ),
               onTap: () => Navigator.of(context).push<void>(fadeRoute(const WallpaperScreen())),
+            ),
+            const SizedBox(height: 14),
+            _MenuCard(
+              title: 'Pohon ZCoin',
+              subtitle: 'Panen buahnya, dapat ZCoin tiap hari',
+              icon: Icons.park_outlined,
+              accent: const Color(0xFF22C55E),
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF0F3D2A), Color(0xFF1F8A4C), Color(0xFFF59E0B)],
+              ),
+              onTap: () => Navigator.of(context).push<void>(fadeRoute(const TreeScreen())),
             ),
           ],
         ),

@@ -34,6 +34,7 @@ import 'data/models/store_models.dart';
 import 'data/repository/xp_repository.dart';
 import 'data/repository/wallpaper_repository.dart';
 import 'data/repository/gift_repository.dart';
+import 'data/repository/tree_repository.dart';
 import 'data/supabase/supabase_client.dart';
 
 /// Di-override di main() setelah LocalStore.open() selesai.
@@ -130,6 +131,11 @@ final topGiversProvider = FutureProvider<TopGiversData>((ref) async {
       .catchError((_) => <String, int>{});
   return TopGiversData(givers: givers, clanTags: await clansF, levels: await levelsF);
 });
+
+/// Pohon ZCoin (mini game idle, Edge Function `tree-game`).
+final treeRepositoryProvider = Provider<TreeRepository>(
+  (ref) => TreeRepository(ref.watch(supabaseDioProvider)),
+);
 
 /// Wallpaper Komentar (gacha spin, koleksi, panel admin).
 final wallpaperRepositoryProvider = Provider<WallpaperRepository>(
