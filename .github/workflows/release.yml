@@ -130,8 +130,17 @@ jobs:
           # <queries> supaya IntegrityGuard bisa melihat app lain di Android 11+.
           if 'networkSecurityConfig' not in s:
               s = s.replace('<application', '<application android:networkSecurityConfig="@xml/network_security_config" android:allowBackup="false"', 1)
-          if '<queries>' not in s:
-              s = s.replace('<application', '<queries>\n        <intent>\n            <action android:name="android.intent.action.MAIN"/>\n            <category android:name="android.intent.category.LAUNCHER"/>\n        </intent>\n    </queries>\n    <application', 1)
+          # PENTING: template flutter create SUDAH punya <queries> (PROCESS_TEXT),
+          # jadi jangan cuma cek '<queries>' -- sisipkan intent LAUNCHER ke dalamnya.
+          # Tanpa ini, di Android 11+ app lain (Reqable, PCAPdroid, dll) tidak
+          # terlihat dan IntegrityGuard tidak pernah mendeteksi apa pun.
+          launcher_q = ('<intent>\n            <action android:name="android.intent.action.MAIN"/>\n'
+                        '            <category android:name="android.intent.category.LAUNCHER"/>\n        </intent>')
+          if 'integrity-guard-queries' not in s:
+              if '</queries>' in s:
+                  s = s.replace('</queries>', '    <!-- integrity-guard-queries -->\n        ' + launcher_q + '\n    </queries>', 1)
+              else:
+                  s = s.replace('<application', '<queries>\n        <!-- integrity-guard-queries -->\n        ' + launcher_q + '\n    </queries>\n    <application', 1)
           s = re.sub(r'android:label="[^"]*"', 'android:label="Zenime"', s, count=1)
           open(p, 'w', encoding='utf-8').write(s)
           PY
