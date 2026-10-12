@@ -3,6 +3,10 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
+import '../../../data/models/tree_models.dart';
+
+part 'tree_decor.dart';
+
 /// Jumlah slot buah maksimal yang bisa digambar di pohon (kapasitas Lv.10 = 10).
 const int kTreeSlots = 12;
 
@@ -87,6 +91,18 @@ class TreeSceneController extends ChangeNotifier {
 
   /// Titik tujuan koin terbang (posisi ikon ZCoin di HUD, koordinat scene).
   Offset? coinTarget;
+
+  /// Dekorasi yang dipasang (atau sedang di-preview di toko).
+  TreeLook look = const TreeLook();
+
+  /// Tag clan (bendera clan) & username (papan nama).
+  String? clanTag;
+  String? username;
+
+  void setLook(TreeLook value) {
+    look = value;
+    notifyListeners();
+  }
 
   final List<bool> occupied = List<bool>.filled(kTreeSlots, false);
   final List<double> spawnAt = List<double>.filled(kTreeSlots, -10);
@@ -275,8 +291,11 @@ class _TreePainter extends CustomPainter {
     final t = c.t;
     final g = _TreeGeo(size, c.level);
     final phase = skyPhaseNow();
+    final look = c.look;
+    final skin = _skinFor(look.tree, phase);
 
     _sky(canvas, size, g, t, phase);
+    _fxBack(canvas, size, g, t, phase, look.effect);
     _ground(canvas, size, g, phase);
 
     // Buah yang sudah "dipetik" tapi belum mulai jatuh (panen semua berurutan)
@@ -291,8 +310,12 @@ class _TreePainter extends CustomPainter {
     canvas.rotate(g.angle(t));
     canvas.translate(-g.base.dx, -g.base.dy);
     if (c.full) _fullHalo(canvas, g, t);
+    if (look.treeDeco == 'deco_swing') _decoSwing(canvas, g, t);
     _trunk(canvas, g);
-    _canopy(canvas, g, t, phase);
+    _canopy(canvas, g, t, skin);
+    _skinExtras(canvas, g, t, look.tree);
+    if (look.treeDeco != 'deco_swing') _treeDeco(canvas, g, t, phase, look.treeDeco, c.clanTag);
+    _treePet(canvas, g, t, phase, look.pet);
     for (var i = 0; i < kTreeSlots; i++) {
       if (!c.occupied[i] && !waiting.contains(i)) continue;
       final x = ((t - c.spawnAt[i]) / 0.45).clamp(0.0, 1.0);
@@ -304,13 +327,23 @@ class _TreePainter extends CustomPainter {
     }
     canvas.restore();
 
+    final u = g.r / 100;
+    for (var i = 0; i < look.ground.length && i < 2; i++) {
+      final x = size.width * (i == 0 ? 0.17 : 0.83);
+      _groundDeco(canvas, Offset(x, g.groundY + size.height * 0.012), u, t, phase, look.ground[i], c.username);
+    }
+    _groundPet(canvas, g, t, phase, look.pet);
+
     _drops(canvas, size, g, t);
     _burst(canvas, g, t);
-    _leaves(canvas, g, t);
-    if (phase == 2) {
-      _butterflies(canvas, g, t);
-    } else {
-      _fireflies(canvas, size, g, t, phase == 0 ? 7 : 3);
+    _leaves(canvas, g, t, skin.leaf);
+    final replaced = _fxFront(canvas, size, g, t, phase, look.effect, look.tree);
+    if (!replaced) {
+      if (phase == 2) {
+        _butterflies(canvas, g, t);
+      } else {
+        _fireflies(canvas, size, g, t, phase == 0 ? 7 : 3);
+      }
     }
   }
 
@@ -558,8 +591,8 @@ class _TreePainter extends CustomPainter {
     );
   }
 
-  void _canopy(Canvas canvas, _TreeGeo g, double t, int phase) {
-    final shadow = Paint()..color = const Color(0xFF1A5530);
+  void _canopy(Canvas canvas, _TreeGeo g, double t, _Skin skin) {
+    final shadow = Paint()..color = skin.shadow;
     for (var i = 0; i < _blobs.length; i++) {
       final (dx, dy, rr) = _blobs[i];
       final breathe = 1 + math.sin(t * 1.6 + i) * 0.012;
@@ -569,9 +602,7 @@ class _TreePainter extends CustomPainter {
         shadow,
       );
     }
-    final light = phase == 2
-        ? const [Color(0xFF6BE38A), Color(0xFF34A853), Color(0xFF237A3D)]
-        : const [Color(0xFF4CC870), Color(0xFF2A8A47), Color(0xFF1F6B39)];
+    final light = skin.light;
     for (var i = 0; i < _blobs.length; i++) {
       final (dx, dy, rr) = _blobs[i];
       final breathe = 1 + math.sin(t * 1.6 + i) * 0.012;
@@ -620,6 +651,7 @@ class _TreePainter extends CustomPainter {
   }
 
   void _fruit(Canvas canvas, double rad) {
+    if (_fruitSkin(canvas, rad, c.look.fruit, c.t)) return;
     canvas.drawCircle(
       Offset.zero,
       rad * 1.7,
@@ -843,7 +875,7 @@ class _TreePainter extends CustomPainter {
     }
   }
 
-  void _leaves(Canvas canvas, _TreeGeo g, double t) {
+  void _leaves(Canvas canvas, _TreeGeo g, double t, Color leaf) {
     for (var i = 0; i < 8; i++) {
       final speed = 0.06 + _rand(i + 200) * 0.05;
       final prog = (t * speed + _rand(i + 300)) % 1.0;
@@ -855,7 +887,7 @@ class _TreePainter extends CustomPainter {
       canvas.rotate(math.sin(t * 2 + i) * 0.9);
       canvas.drawOval(
         Rect.fromCenter(center: Offset.zero, width: g.fruitR * 0.9, height: g.fruitR * 0.45),
-        Paint()..color = Color.fromRGBO(110, 220, 130, 0.75 * a),
+        Paint()..color = leaf.withValues(alpha: 0.8 * a),
       );
       canvas.restore();
     }

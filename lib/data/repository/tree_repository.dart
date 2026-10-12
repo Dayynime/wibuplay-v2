@@ -78,4 +78,28 @@ class TreeRepository {
     final d = await _call({'action': 'water_status'}, 'Gagal memuat jatah siram');
     return TreeWaterStatus.fromJson(d);
   }
+
+  // ---------------------------------------------------------------- toko
+
+  Future<ShopData> shop() async {
+    final d = await _call({'action': 'shop'}, 'Gagal memuat toko');
+    return ShopData.fromJson(d);
+  }
+
+  /// Beli item. Return saldo ZCoin terbaru.
+  Future<int> buy(String itemId) async {
+    final d = await _call({'action': 'buy', 'item_id': itemId}, 'Gagal membeli item');
+    return (d['balance'] as num?)?.toInt() ?? 0;
+  }
+
+  /// Pasang ([on] = true) / lepas item. Return dekorasi terbaru.
+  Future<TreeLook> equip(String itemId, {required bool on}) async {
+    final d = await _call({'action': 'equip', 'item_id': itemId, 'on': on}, 'Gagal memasang item');
+    return TreeLook.fromJson(d);
+  }
+
+  Future<TreeVisit> visit(String friendUid) async {
+    final d = await _call({'action': 'visit', 'friend_uid': friendUid}, 'Gagal membuka pohon teman');
+    return TreeVisit.fromJson(d);
+  }
 }

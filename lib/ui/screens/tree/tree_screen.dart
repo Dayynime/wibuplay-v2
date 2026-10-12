@@ -63,6 +63,15 @@ class _TreeScreenState extends ConsumerState<TreeScreen> with SingleTickerProvid
   int _toastId = 0;
   Timer? _toastTimer;
 
+  // ---------- dekorasi & toko
+  TreeLook _look = const TreeLook();
+  bool _identityLoaded = false;
+  ShopData? _shop;
+  bool _shopOpen = false;
+  bool _shopBusy = false;
+  String _shopTab = TreeSlot.tree;
+  String? _selectedId;
+
   String? get _uid => ref.read(authUserProvider).valueOrNull?.uid;
 
   @override
@@ -118,6 +127,8 @@ class _TreeScreenState extends ConsumerState<TreeScreen> with SingleTickerProvid
   }
 
   void _apply(TreeState tree) {
+    final look = tree.look;
+    if (look != null) _look = look;
     setState(() {
       _tree = tree;
       _loading = false;
@@ -126,6 +137,155 @@ class _TreeScreenState extends ConsumerState<TreeScreen> with SingleTickerProvid
     });
     final visible = tree.fruits - _pending - _inFlight;
     _scene.sync(visible < 0 ? 0 : visible, tree.capacity, tree.level);
+    _scene.setLook(_sceneLook());
+    if (!_identityLoaded) {
+      _identityLoaded = true;
+      _loadIdentity();
+    }
+  }
+
+  /// Tag clan (bendera) & username (papan nama) buat dekorasi.
+  Future<void> _loadIdentity() async {
+    final uid = _uid;
+    if (uid == null) return;
+    final chat = ref.read(chatRepositoryProvider);
+    try {
+      final tags = await chat.getClanTagsForUids([uid]);
+      _scene.clanTag = tags[uid];
+    } catch (_) {}
+    try {
+      final prof = await chat.getProfile(uid);
+      _scene.username = prof?.username;
+    } catch (_) {}
+  }
+
+  // ================================================================ toko
+
+  ShopItem? _itemById(String? id) {
+    final shop = _shop;
+    if (id == null || shop == null) return null;
+    for (final it in shop.items) {
+      if (it.id == id) return it;
+    }
+    return null;
+  }
+
+  /// Look yang digambar: dekorasi terpasang + item yang sedang di-preview.
+  TreeLook _sceneLook() {
+    final item = _shopOpen ? _itemById(_selectedId) : null;
+    if (item == null) return _look;
+    return _look.withItem(item.id, item.slot);
+  }
+
+  Future<void> _openShop() async {
+    HapticFeedback.selectionClick();
+    setState(() {
+      _shopOpen = true;
+      _selectedId = null;
+    });
+    try {
+      final data = await _repo.shop();
+      if (!mounted) return;
+      setState(() {
+        _shop = data;
+        _look = data.look;
+      });
+      _scene.setLook(_sceneLook());
+    } on TreeException catch (e) {
+      _toast(e.message, warn: true);
+    }
+  }
+
+  void _closeShop() {
+    setState(() {
+      _shopOpen = false;
+      _selectedId = null;
+    });
+    _scene.setLook(_sceneLook());
+  }
+
+  void _selectItem(ShopItem item) {
+    HapticFeedback.selectionClick();
+    setState(() => _selectedId = _selectedId == item.id ? null : item.id);
+    _scene.setLook(_sceneLook());
+  }
+
+  Future<void> _buy(ShopItem item) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: _kSheet,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+        title: Text('Beli ${item.name}?', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+        content: Row(
+          children: [
+            Image.asset('assets/images/ic_zcoin_badge.png', width: 20, height: 20),
+            const SizedBox(width: 6),
+            Text(
+              '${formatZCoin(item.price)} ZCoin',
+              style: const TextStyle(color: _kGold, fontWeight: FontWeight.w800, fontSize: 16),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Batal', style: TextStyle(color: Color(0xFFB5BCC9))),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: const Color(0xFFF59E0B)),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Beli', style: TextStyle(color: Color(0xFF3A2600), fontWeight: FontWeight.w800)),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _shopBusy = true);
+    try {
+      final bal = await _repo.buy(item.id);
+      final look = await _repo.equip(item.id, on: true);
+      if (!mounted) return;
+      final shop = _shop;
+      setState(() {
+        _balance = bal;
+        _look = look;
+        if (shop != null) {
+          _shop = ShopData(items: shop.items, owned: {...shop.owned, item.id}, look: look);
+        }
+      });
+      _scene.setLook(_sceneLook());
+      _scene.celebrate();
+      HapticFeedback.heavyImpact();
+      final uid = _uid;
+      if (uid != null) ref.invalidate(coinBalanceProvider(uid));
+      _toast('${item.name} dibeli dan langsung dipasang!');
+    } on TreeException catch (e) {
+      _toast(e.message, warn: true);
+    } finally {
+      if (mounted) setState(() => _shopBusy = false);
+    }
+  }
+
+  Future<void> _equip(ShopItem item, {required bool on}) async {
+    setState(() => _shopBusy = true);
+    try {
+      final look = await _repo.equip(item.id, on: on);
+      if (!mounted) return;
+      final shop = _shop;
+      setState(() {
+        _look = look;
+        if (shop != null) _shop = ShopData(items: shop.items, owned: shop.owned, look: look);
+        if (!on) _selectedId = null;
+      });
+      _scene.setLook(_sceneLook());
+      HapticFeedback.lightImpact();
+      _toast(on ? '${item.name} dipasang' : '${item.name} dilepas');
+    } on TreeException catch (e) {
+      _toast(e.message, warn: true);
+    } finally {
+      if (mounted) setState(() => _shopBusy = false);
+    }
   }
 
   void _onClock() {
@@ -370,14 +530,26 @@ class _TreeScreenState extends ConsumerState<TreeScreen> with SingleTickerProvid
                 children: [
                   _topBar(balance, tree),
                   const SizedBox(height: 12),
-                  if (tree != null) _statusCard(tree, fruitsShown),
-                  const SizedBox(height: 10),
+                  if (tree != null && !_shopOpen) ...[
+                    _statusCard(tree, fruitsShown),
+                    const SizedBox(height: 8),
+                    _hint(tree, fruitsShown),
+                    const SizedBox(height: 8),
+                  ],
                   _toastArea(),
                   const Spacer(),
-                  if (tree != null) _hint(tree, fruitsShown),
-                  const SizedBox(height: 14),
-                  if (tree != null) _bottomBar(tree, fruitsShown),
-                  const SizedBox(height: 14),
+                  if (tree != null && !_shopOpen) ...[
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 16),
+                        child: _ShopButton(onTap: _openShop),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    _bottomBar(tree, fruitsShown),
+                    const SizedBox(height: 14),
+                  ],
                 ],
               ),
             ),
@@ -391,6 +563,8 @@ class _TreeScreenState extends ConsumerState<TreeScreen> with SingleTickerProvid
                 text: _error ?? 'Gagal memuat pohon',
                 action: TextButton(onPressed: _load, child: const Text('Coba lagi')),
               ),
+            if (_shopOpen && tree != null)
+              Positioned(left: 0, right: 0, bottom: 0, child: _shopPanel(tree)),
             Positioned.fill(child: _levelUpOverlay()),
           ],
         ),
@@ -645,6 +819,193 @@ class _TreeScreenState extends ConsumerState<TreeScreen> with SingleTickerProvid
         ],
       ),
     );
+  }
+
+  Widget _shopPanel(TreeState tree) {
+    final shop = _shop;
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    final items = shop == null ? const <ShopItem>[] : shop.items.where((e) => e.slot == _shopTab).toList();
+    final selected = _itemById(_selectedId);
+
+    return Container(
+      padding: EdgeInsets.fromLTRB(0, 6, 0, 12 + bottomInset),
+      decoration: const BoxDecoration(
+        color: Color(0xF2101622),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+        border: Border(top: BorderSide(color: Color(0x33FFC53D))),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 4, 6, 0),
+            child: Row(
+              children: [
+                const Icon(Icons.storefront_rounded, color: _kGold),
+                const SizedBox(width: 8),
+                const Text(
+                  'Toko Dekorasi',
+                  style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w800),
+                ),
+                const Spacer(),
+                IconButton(
+                  onPressed: _closeShop,
+                  icon: const Icon(Icons.close_rounded, color: Colors.white70),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(
+            height: 36,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              children: [
+                for (final (slot, label) in _kShopTabs)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: _TabChip(
+                      label: label,
+                      active: _shopTab == slot,
+                      onTap: () {
+                        HapticFeedback.selectionClick();
+                        setState(() {
+                          _shopTab = slot;
+                          _selectedId = null;
+                        });
+                        _scene.setLook(_sceneLook());
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 156,
+            child: shop == null
+                ? const Center(child: CircularProgressIndicator(color: _kGold))
+                : items.isEmpty
+                    ? const Center(
+                        child: Text('Belum ada item di sini', style: TextStyle(color: Colors.white54)),
+                      )
+                    : ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        itemCount: items.length,
+                        separatorBuilder: (_, __) => const SizedBox(width: 10),
+                        itemBuilder: (context, i) {
+                          final it = items[i];
+                          return _ShopCard(
+                            item: it,
+                            owned: shop.owned.contains(it.id),
+                            equipped: _look.isEquipped(it.id, it.slot),
+                            selected: _selectedId == it.id,
+                            onTap: () => _selectItem(it),
+                          );
+                        },
+                      ),
+          ),
+          const SizedBox(height: 12),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: _shopAction(tree, shop, selected),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _shopAction(TreeState tree, ShopData? shop, ShopItem? item) {
+    if (shop == null) return const SizedBox(height: 54);
+    if (item == null) {
+      return const SizedBox(
+        height: 54,
+        child: Center(
+          child: Text(
+            'Tap item buat lihat preview di pohonmu',
+            style: TextStyle(color: Color(0xFFB5BCC9), fontSize: 13),
+          ),
+        ),
+      );
+    }
+    final owned = shop.owned.contains(item.id);
+    final equipped = _look.isEquipped(item.id, item.slot);
+    final until = item.availableUntil;
+    final sub = <String>[
+      if (item.description.isNotEmpty) item.description,
+      if (until != null) 'Terbatas s/d ${_fmtDate(until)}',
+    ].join(' • ');
+
+    Widget button;
+    if (owned) {
+      button = _BigButton(
+        colors: equipped
+            ? const [Color(0xFF4B5563), Color(0xFF374151)]
+            : const [Color(0xFF4ADE80), Color(0xFF16A34A)],
+        onTap: _shopBusy ? null : () => _equip(item, on: !equipped),
+        child: Text(
+          equipped ? 'LEPAS' : 'PAKAI',
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, letterSpacing: 1),
+        ),
+      );
+    } else if (item.premiumOnly && !tree.premium) {
+      button = _BigButton(
+        colors: const [Color(0xFFFFD54F), Color(0xFFF59E0B)],
+        onTap: () => Navigator.of(context).push<void>(fadeRoute(const PremiumScreen())),
+        child: const Text(
+          'KHUSUS PREMIUM',
+          style: TextStyle(color: Color(0xFF3A2600), fontWeight: FontWeight.w900, letterSpacing: 1),
+        ),
+      );
+    } else {
+      button = _BigButton(
+        colors: const [Color(0xFFFFD54F), Color(0xFFF59E0B)],
+        onTap: _shopBusy ? null : () => _buy(item),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text(
+              'BELI',
+              style: TextStyle(color: Color(0xFF3A2600), fontWeight: FontWeight.w900, letterSpacing: 1),
+            ),
+            const SizedBox(width: 10),
+            Image.asset('assets/images/ic_zcoin_badge.png', width: 18, height: 18),
+            const SizedBox(width: 4),
+            Text(
+              formatZCoin(item.price),
+              style: const TextStyle(color: Color(0xFF3A2600), fontWeight: FontWeight.w900),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (sub.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              sub,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Color(0xFFB5BCC9), fontSize: 12),
+            ),
+          ),
+        button,
+      ],
+    );
+  }
+
+  static String _fmtDate(DateTime d) {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+    final w = d.toUtc().add(const Duration(hours: 7)).subtract(const Duration(minutes: 1));
+    return '${w.day} ${months[w.month - 1]}';
   }
 
   Widget _levelUpOverlay() {
@@ -1646,6 +2007,13 @@ class _WaterSheetState extends ConsumerState<_WaterSheet> {
     }
   }
 
+  Future<void> _visit(FriendDisplay f) async {
+    await Navigator.of(context).push<void>(
+      fadeRoute(TreeVisitScreen(friendUid: f.firebaseUid, username: f.username, avatarUrl: f.avatarUrl)),
+    );
+    if (mounted) await _load();
+  }
+
   void _snack(String msg) {
     if (!mounted) return;
     ScaffoldMessenger.of(context)
@@ -1696,22 +2064,33 @@ class _WaterSheetState extends ConsumerState<_WaterSheet> {
           final done = status.watered.contains(f.firebaseUid);
           final busy = _busy.contains(f.firebaseUid);
           final canWater = !done && status.left > 0;
-          return Container(
+          return Material(
+            color: const Color(0xFF1A2232),
+            borderRadius: BorderRadius.circular(16),
+            child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: () => _visit(f),
+            child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1A2232),
-              borderRadius: BorderRadius.circular(16),
-            ),
             child: Row(
               children: [
                 FriendAvatar(url: f.avatarUrl, seed: f.firebaseUid, label: f.username, size: 40),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: Text(
-                    f.username,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        f.username,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                      ),
+                      const Text(
+                        'Tap buat lihat pohonnya',
+                        style: TextStyle(color: Color(0xFF8A93A3), fontSize: 11),
+                      ),
+                    ],
                   ),
                 ),
                 if (done)
@@ -1741,6 +2120,8 @@ class _WaterSheetState extends ConsumerState<_WaterSheet> {
                     label: const Text('Siram'),
                   ),
               ],
+            ),
+            ),
             ),
           );
         },
@@ -1774,6 +2155,508 @@ class _WaterSheetState extends ConsumerState<_WaterSheet> {
               ),
             ),
             Flexible(child: body),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+
+// ==================================================================== toko: widgets
+
+const List<(String, String)> _kShopTabs = [
+  (TreeSlot.tree, 'Pohon'),
+  (TreeSlot.fruit, 'Buah'),
+  (TreeSlot.treeDeco, 'Hiasan'),
+  (TreeSlot.ground, 'Tanah'),
+  (TreeSlot.pet, 'Pet'),
+  (TreeSlot.effect, 'Efek'),
+];
+
+Color _rarityColor(String r) => switch (r) {
+      'rare' => const Color(0xFF3B82F6),
+      'epic' => const Color(0xFFA855F7),
+      'legendary' => const Color(0xFFF59E0B),
+      _ => const Color(0xFF9CA3AF),
+    };
+
+String _rarityLabel(String r) => switch (r) {
+      'rare' => 'Langka',
+      'epic' => 'Epik',
+      'legendary' => 'Legendaris',
+      _ => 'Biasa',
+    };
+
+(IconData, Color) _itemIcon(String id) => switch (id) {
+      'tree_sakura' => (Icons.local_florist_rounded, const Color(0xFFF9A8D4)),
+      'tree_autumn' => (Icons.eco_rounded, const Color(0xFFFB923C)),
+      'tree_snow' => (Icons.ac_unit_rounded, const Color(0xFFBAE6FD)),
+      'tree_neon' => (Icons.bolt_rounded, const Color(0xFF67E8F9)),
+      'tree_gold' => (Icons.workspace_premium_rounded, const Color(0xFFFFD54F)),
+      'fruit_apple' => (Icons.circle, const Color(0xFFEF4444)),
+      'fruit_peach' => (Icons.circle, const Color(0xFFFDA4AF)),
+      'fruit_star' => (Icons.star_rounded, const Color(0xFFFFD54F)),
+      'fruit_candy' => (Icons.bubble_chart_rounded, const Color(0xFFF472B6)),
+      'fruit_lantern' => (Icons.emoji_objects_rounded, const Color(0xFFF87171)),
+      'fruit_crystal' => (Icons.diamond_rounded, const Color(0xFF67E8F9)),
+      'fruit_pumpkin' => (Icons.circle, const Color(0xFFF97316)),
+      'deco_lights' => (Icons.lightbulb_rounded, const Color(0xFFFDE68A)),
+      'deco_nest' => (Icons.egg_rounded, const Color(0xFFBFE3F2)),
+      'deco_lanterns' => (Icons.emoji_objects_rounded, const Color(0xFFEF4444)),
+      'deco_swing' => (Icons.chair_rounded, const Color(0xFFD6B37A)),
+      'deco_clanflag' => (Icons.flag_rounded, const Color(0xFFE4344A)),
+      'deco_treehouse' => (Icons.cottage_rounded, const Color(0xFFD97706)),
+      'ground_fence' => (Icons.fence_rounded, const Color(0xFFD6A06A)),
+      'ground_bench' => (Icons.chair_rounded, const Color(0xFFB07A44)),
+      'ground_sign' => (Icons.signpost_rounded, const Color(0xFFD6A06A)),
+      'ground_stonelantern' => (Icons.wb_incandescent_rounded, const Color(0xFFD1D5DB)),
+      'ground_mushroom' => (Icons.grass_rounded, const Color(0xFFC084FC)),
+      'ground_torii' => (Icons.temple_buddhist_rounded, const Color(0xFFEF4444)),
+      'ground_pond' => (Icons.water_rounded, const Color(0xFF38BDF8)),
+      'ground_pumpkin' => (Icons.sentiment_very_satisfied_rounded, const Color(0xFFF97316)),
+      'pet_bird' => (Icons.flutter_dash_rounded, const Color(0xFF60A5FA)),
+      'pet_slime' => (Icons.bubble_chart_rounded, const Color(0xFF34D399)),
+      'pet_cat' => (Icons.pets_rounded, const Color(0xFFF4A261)),
+      'pet_kitsune' => (Icons.whatshot_rounded, const Color(0xFFF97316)),
+      'fx_goldflies' => (Icons.auto_awesome_rounded, const Color(0xFFFFC53D)),
+      'fx_petals' => (Icons.filter_vintage_rounded, const Color(0xFFF9A8D4)),
+      'fx_fuji' => (Icons.landscape_rounded, const Color(0xFF93C5FD)),
+      'fx_aurora' => (Icons.waves_rounded, const Color(0xFF34D399)),
+      'fx_fireworks' => (Icons.celebration_rounded, const Color(0xFFF472B6)),
+      'fx_bats' => (Icons.nights_stay_rounded, const Color(0xFFA78BFA)),
+      _ => (Icons.auto_awesome_rounded, const Color(0xFFFFFFFF)),
+    };
+
+class _ShopButton extends StatelessWidget {
+  const _ShopButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return _Pressable(
+      onTap: onTap,
+      child: _Glass(
+        radius: 18,
+        borderColor: const Color(0x66FFC53D),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.storefront_rounded, color: _kGold, size: 20),
+            SizedBox(width: 6),
+            Text(
+              'Toko',
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TabChip extends StatelessWidget {
+  const _TabChip({required this.label, required this.active, required this.onTap});
+
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: active ? _kGold : const Color(0xFF1A2232),
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: active ? const Color(0xFF3A2600) : Colors.white70,
+            fontWeight: FontWeight.w800,
+            fontSize: 13,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ShopCard extends StatelessWidget {
+  const _ShopCard({
+    required this.item,
+    required this.owned,
+    required this.equipped,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final ShopItem item;
+  final bool owned;
+  final bool equipped;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final rc = _rarityColor(item.rarity);
+    final (icon, ic) = _itemIcon(item.id);
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        width: 112,
+        padding: const EdgeInsets.fromLTRB(8, 10, 8, 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1A2232),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: selected ? rc : const Color(0x1AFFFFFF), width: selected ? 2 : 1),
+          boxShadow: selected ? [BoxShadow(color: rc.withValues(alpha: 0.35), blurRadius: 14)] : null,
+        ),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Column(
+              children: [
+                Container(
+                  width: 54,
+                  height: 54,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: RadialGradient(colors: [rc.withValues(alpha: 0.45), rc.withValues(alpha: 0.08)]),
+                    border: Border.all(color: rc.withValues(alpha: 0.6)),
+                  ),
+                  child: Icon(icon, color: ic, size: 28),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  item.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12),
+                ),
+                Text(
+                  _rarityLabel(item.rarity),
+                  style: TextStyle(color: rc, fontSize: 10, fontWeight: FontWeight.w700),
+                ),
+                const Spacer(),
+                if (equipped)
+                  const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.check_circle_rounded, size: 14, color: _kLeaf),
+                      SizedBox(width: 3),
+                      Text('Dipakai', style: TextStyle(color: _kLeaf, fontSize: 11, fontWeight: FontWeight.w800)),
+                    ],
+                  )
+                else if (owned)
+                  const Text('Dimiliki', style: TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w700))
+                else
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Image.asset('assets/images/ic_zcoin_badge.png', width: 13, height: 13),
+                      const SizedBox(width: 3),
+                      Text(
+                        formatZCoin(item.price),
+                        style: const TextStyle(color: _kGold, fontSize: 12, fontWeight: FontWeight.w800),
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+            if (item.premiumOnly)
+              const Positioned(
+                top: -4,
+                left: -2,
+                child: Icon(Icons.workspace_premium_rounded, size: 18, color: _kGold),
+              ),
+            if (item.limited)
+              Positioned(
+                top: -4,
+                right: -2,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEA580C),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Text(
+                    'Terbatas',
+                    style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ==================================================================== kunjungi pohon teman
+
+/// Lihat pohon teman (lengkap dengan dekorasinya) dan siram dari sini.
+class TreeVisitScreen extends ConsumerStatefulWidget {
+  const TreeVisitScreen({super.key, required this.friendUid, required this.username, this.avatarUrl});
+
+  final String friendUid;
+  final String username;
+  final String? avatarUrl;
+
+  @override
+  ConsumerState<TreeVisitScreen> createState() => _TreeVisitScreenState();
+}
+
+class _TreeVisitScreenState extends ConsumerState<TreeVisitScreen> {
+  final TreeSceneController _scene = TreeSceneController();
+  late final TreeRepository _repo;
+  TreeVisit? _v;
+  String? _error;
+  bool _watering = false;
+  String? _toastMsg;
+  Timer? _toastTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _repo = ref.read(treeRepositoryProvider);
+    _scene.username = widget.username;
+    _load();
+    ref.read(chatRepositoryProvider).getClanTagsForUids([widget.friendUid]).then(
+      (tags) => _scene.clanTag = tags[widget.friendUid],
+      onError: (_) {},
+    );
+  }
+
+  @override
+  void dispose() {
+    _toastTimer?.cancel();
+    _scene.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    try {
+      final v = await _repo.visit(widget.friendUid);
+      if (!mounted) return;
+      setState(() {
+        _v = v;
+        _error = null;
+      });
+      _scene.sync(v.fruits, v.capacity, v.level);
+      _scene.setLook(v.look);
+    } on TreeException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    }
+  }
+
+  void _toast(String msg) {
+    _toastTimer?.cancel();
+    setState(() => _toastMsg = msg);
+    _toastTimer = Timer(const Duration(milliseconds: 2800), () {
+      if (mounted) setState(() => _toastMsg = null);
+    });
+  }
+
+  Future<void> _water() async {
+    if (_watering) return;
+    setState(() => _watering = true);
+    try {
+      final bonus = await _repo.water(widget.friendUid);
+      if (!mounted) return;
+      HapticFeedback.mediumImpact();
+      _scene.celebrate();
+      _toast('Pohon ${widget.username} disiram! Buahnya tumbuh $bonus menit lebih cepat');
+      await _load();
+    } on TreeException catch (e) {
+      _toast(e.message);
+    } finally {
+      if (mounted) setState(() => _watering = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final v = _v;
+    final canWater = v != null && !v.wateredByMe && v.waterReceivedToday < v.waterReceiveLimit && !_watering;
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+        systemNavigationBarColor: Color(0xFF173D22),
+        systemNavigationBarIconBrightness: Brightness.light,
+      ),
+      child: Scaffold(
+        backgroundColor: const Color(0xFF0E1424),
+        body: Stack(
+          children: [
+            Positioned.fill(
+              child: TreeScene(
+                controller: _scene,
+                onFruitTap: (_) => _toast('Ini pohon ${widget.username}, buahnya cuma bisa dipanen pemiliknya'),
+              ),
+            ),
+            const Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: 180,
+              child: IgnorePointer(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Color(0x80000000), Color(0x00000000)],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            SafeArea(
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                    child: Row(
+                      children: [
+                        _GlassIconButton(
+                          icon: Icons.arrow_back_rounded,
+                          onTap: () => Navigator.of(context).maybePop(),
+                        ),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: _Glass(
+                            radius: 22,
+                            padding: const EdgeInsets.fromLTRB(4, 4, 14, 4),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                FriendAvatar(
+                                  url: widget.avatarUrl,
+                                  seed: widget.friendUid,
+                                  label: widget.username,
+                                  size: 34,
+                                ),
+                                const SizedBox(width: 8),
+                                Flexible(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        'Pohon ${widget.username}',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13),
+                                      ),
+                                      Text(
+                                        v == null ? '...' : 'Lv.${v.level} • ${v.fruits}/${v.capacity} buah',
+                                        style: const TextStyle(color: Color(0xB3FFFFFF), fontSize: 11),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 250),
+                    child: _toastMsg == null
+                        ? const SizedBox.shrink()
+                        : Padding(
+                            key: ValueKey(_toastMsg),
+                            padding: const EdgeInsets.symmetric(horizontal: 24),
+                            child: _Glass(
+                              radius: 16,
+                              color: const Color(0xCC0F2A1B),
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                              child: Text(_toastMsg!, style: const TextStyle(color: Colors.white, fontSize: 13)),
+                            ),
+                          ),
+                  ),
+                  const Spacer(),
+                  if (v != null) ...[
+                    _Glass(
+                      radius: 18,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                      child: Text(
+                        'Disiram hari ini ${v.waterReceivedToday}/${v.waterReceiveLimit}',
+                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Opacity(
+                      opacity: canWater || _watering ? 1.0 : 0.55,
+                      child: _Pressable(
+                        onTap: canWater ? _water : null,
+                        child: Container(
+                          width: 96,
+                          height: 96,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: const RadialGradient(
+                              center: Alignment(-0.3, -0.4),
+                              colors: [Color(0xFFBAE6FD), Color(0xFF38BDF8), Color(0xFF0369A1)],
+                              stops: [0, 0.55, 1],
+                            ),
+                            border: Border.all(color: const Color(0x99FFFFFF), width: 3),
+                            boxShadow: const [BoxShadow(color: Color(0x8838BDF8), blurRadius: 22, offset: Offset(0, 6))],
+                          ),
+                          child: _watering
+                              ? const Padding(
+                                  padding: EdgeInsets.all(30),
+                                  child: CircularProgressIndicator(strokeWidth: 3, color: Colors.white),
+                                )
+                              : Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      v.wateredByMe ? Icons.check_rounded : Icons.water_drop_rounded,
+                                      color: Colors.white,
+                                      size: 34,
+                                    ),
+                                    Text(
+                                      v.wateredByMe ? 'DISIRAM' : 'SIRAM',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w900,
+                                        fontSize: 12,
+                                        letterSpacing: 1,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                  ],
+                ],
+              ),
+            ),
+            if (v == null)
+              _error == null
+                  ? const Center(child: CircularProgressIndicator(color: _kLeaf))
+                  : _CenterCard(
+                      icon: Icons.cloud_off_outlined,
+                      text: _error!,
+                      action: TextButton(onPressed: _load, child: const Text('Coba lagi')),
+                    ),
           ],
         ),
       ),
