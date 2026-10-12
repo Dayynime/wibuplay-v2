@@ -349,35 +349,74 @@ class _TreePainter extends CustomPainter {
   TextPainter? _zTp;
   double _zRad = -1;
 
-  // Pohon (batang, dahan, ribuan daun) dirender sekali jadi gambar, lalu
-  // dipakai ulang tiap frame. Dibuat ulang kalau ukuran/level/skin/waktu berubah.
+  // Pohon (batang, dahan, ribuan daun) direkam sekali jadi Picture, lalu
+  // dirasterisasi di belakang layar jadi gambar. Selama gambarnya belum siap,
+  // Picture-nya langsung digambar. Kalau gagal, error ditampilkan kecil di
+  // layar (bukan bikin seluruh pemandangan hilang).
+  ui.Picture? _treePic;
   ui.Image? _treeImg;
   Rect _treeRect = Rect.zero;
   String? _treeKey;
+  String? _treeError;
+  int _treeGen = 0;
+  bool _disposed = false;
 
   void _drawTree(Canvas canvas, _TreeGeo g, _Skin skin, String? skinId, int phase) {
+    final dpr = c.dpr;
     final key = '${g.size.width.toStringAsFixed(1)}x${g.size.height.toStringAsFixed(1)}'
-        '|${c.level}|$skinId|$phase|${c.dpr}';
-    if (_treeImg == null || key != _treeKey) {
-      _treeImg?.dispose();
-      final (img, rect) = _buildTreeImage(g, skin, skinId, phase, c.dpr);
-      _treeImg = img;
-      _treeRect = rect;
+        '|${c.level}|$skinId|$phase|$dpr';
+    if (key != _treeKey) {
       _treeKey = key;
+      final gen = ++_treeGen;
+      _treeImg?.dispose();
+      _treeImg = null;
+      _treePic?.dispose();
+      _treePic = null;
+      _treeError = null;
+      try {
+        final (pic, rect) = _recordTree(g, skin, skinId, phase, dpr);
+        _treePic = pic;
+        _treeRect = rect;
+        pic
+            .toImage((rect.width * dpr).ceil(), (rect.height * dpr).ceil())
+            .then((img) {
+          if (_disposed || gen != _treeGen) {
+            img.dispose();
+          } else {
+            _treeImg = img;
+          }
+        }).catchError((Object _) {});
+      } catch (e) {
+        _treeError = e.toString();
+      }
     }
-    final img = _treeImg!;
-    canvas.drawImageRect(
-      img,
-      Rect.fromLTWH(0, 0, img.width.toDouble(), img.height.toDouble()),
-      _treeRect,
-      Paint()..filterQuality = FilterQuality.medium,
-    );
+
+    final img = _treeImg;
+    final pic = _treePic;
+    if (img != null) {
+      canvas.drawImageRect(
+        img,
+        Rect.fromLTWH(0, 0, img.width.toDouble(), img.height.toDouble()),
+        _treeRect,
+        Paint()..filterQuality = FilterQuality.medium,
+      );
+    } else if (pic != null) {
+      canvas.save();
+      canvas.translate(_treeRect.left, _treeRect.top);
+      canvas.scale(1 / dpr);
+      canvas.drawPicture(pic);
+      canvas.restore();
+    } else if (_treeError != null) {
+      _text(canvas, 'Pohon gagal digambar: ${_treeError!}', g.canopy, 10, Colors.white, w: FontWeight.w500);
+    }
   }
 
   void disposeCache() {
+    _disposed = true;
     _treeImg?.dispose();
     _treeImg = null;
-    _treeKey = null;
+    _treePic?.dispose();
+    _treePic = null;
   }
 
   @override

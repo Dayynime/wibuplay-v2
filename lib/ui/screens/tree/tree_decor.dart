@@ -168,8 +168,8 @@ void _limb(Canvas canvas, Offset a, Offset b, double wa, double wb, Paint paint,
   canvas.drawCircle(b, wb, paint);
 }
 
-/// Render pohon realistis jadi gambar. Return (gambar, kotak tujuan di layar).
-(ui.Image, Rect) _buildTreeImage(_TreeGeo g, _Skin skin, String? skinId, int phase, double dpr) {
+/// Rekam pohon realistis jadi Picture (skala [dpr]). Return (picture, kotak di layar).
+(ui.Picture, Rect) _recordTree(_TreeGeo g, _Skin skin, String? skinId, int phase, double dpr) {
   final r = g.r;
   final base = g.base;
   final bounds = Rect.fromLTRB(g.canopy.dx - r * 1.45, g.canopy.dy - r * 1.25, g.canopy.dx + r * 1.45, base.dy + r * 0.16);
@@ -408,10 +408,7 @@ void _limb(Canvas canvas, Offset a, Offset b, double wa, double wb, Paint paint,
   }
   canvas.restore();
 
-  final pic = rec.endRecording();
-  final img = pic.toImageSync((bounds.width * dpr).ceil(), (bounds.height * dpr).ceil());
-  pic.dispose();
-  return (img, bounds);
+  return (rec.endRecording(), bounds);
 }
 
 // ==================================================================== skin buah
