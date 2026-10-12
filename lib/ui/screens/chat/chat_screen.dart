@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
 import '../../../core/error_message.dart';
 import '../../../core/theme/app_colors.dart';
@@ -58,6 +59,39 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   /// Id yang animasinya sudah diputar, supaya tidak mengulang saat item
   /// di-scroll keluar lalu masuk lagi.
   final Set<int> _played = {};
+
+  /// Untuk lompat ke pesan yang dibalas (tap kutipan reply).
+  final ItemScrollController _itemScroll = ItemScrollController();
+
+  /// Pesan yang sedang disorot sesudah lompat dari kutipan reply.
+  int? _highlightId;
+
+  Future<void> _jumpToMessage(ChatUiState s, int? id) async {
+    if (id == null) return;
+    final msgs = s.messages;
+    final j = msgs.indexWhere((m) => m.id == id);
+    if (j < 0) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(content: Text('Pesan yang dibalas sudah tidak dimuat')));
+      return;
+    }
+    // List dibalik (reverse): index 0 = pesan terbaru.
+    final index = msgs.length - 1 - j;
+    if (_itemScroll.isAttached) {
+      await _itemScroll.scrollTo(
+        index: index,
+        duration: const Duration(milliseconds: 450),
+        curve: Curves.easeOutCubic,
+        alignment: 0.35,
+      );
+    }
+    if (!mounted) return;
+    setState(() => _highlightId = id);
+    Future<void>.delayed(const Duration(milliseconds: 1600), () {
+      if (mounted && _highlightId == id) setState(() => _highlightId = null);
+    });
+  }
 
   @override
   void dispose() {
@@ -312,7 +346,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     }
     final msgs = s.messages;
     // reverse: true -> pesan terbaru menempel di bawah dan list tetap di sana.
-    return ListView.builder(
+    return ScrollablePositionedList.builder(
+      itemScrollController: _itemScroll,
       reverse: true,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       itemCount: msgs.length,
@@ -333,6 +368,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           onOwnAvatarTap: _openProfileDialog,
           onLongPress: () => _showActions(m, s),
           onReply: () => _controller.setReplyTarget(m),
+          onReplyTap: m.replyToId == null ? null : () => _jumpToMessage(s, m.replyToId),
+          highlighted: _highlightId == m.id,
           onDelete: (m.firebaseUid == s.myUid || s.canDeleteOthers)
               ? () => _confirmDelete(m)
               : null,
@@ -490,6 +527,8 @@ class _MessageBubble extends StatelessWidget {
     required this.mine,
     required this.onLongPress,
     required this.onReply,
+    this.onReplyTap,
+    this.highlighted = false,
     this.onDelete,
     this.nameColor,
     this.userNumber,
@@ -512,6 +551,12 @@ class _MessageBubble extends StatelessWidget {
   final VoidCallback onLongPress;
   final VoidCallback onReply;
 
+  /// Tap kutipan reply = lompat ke pesan aslinya.
+  final VoidCallback? onReplyTap;
+
+  /// Disorot sebentar setelah dilompati dari kutipan reply.
+  final bool highlighted;
+
   /// null = tombol Hapus tidak ditampilkan (bukan pesan sendiri dan bukan admin/developer).
   final VoidCallback? onDelete;
   final Color? nameColor;
@@ -531,10 +576,18 @@ class _MessageBubble extends StatelessWidget {
 
     final bubble = GestureDetector(
       onLongPress: onLongPress,
-      child: Container(
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
         width: _bubbleWidth(context),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(color: bubbleColor, borderRadius: AppShapes.card),
+        decoration: BoxDecoration(
+          color: highlighted ? const Color(0xFF3A2430) : bubbleColor,
+          borderRadius: AppShapes.card,
+          border: Border.all(
+            color: highlighted ? AppColors.accentViolet : Colors.transparent,
+            width: 1.5,
+          ),
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -590,7 +643,10 @@ class _MessageBubble extends StatelessWidget {
             ],
             if (hasReply) ...[
               const SizedBox(height: 4),
-              Container(
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: onReplyTap,
+                child: Container(
                 width: double.infinity,
                 padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
                 decoration: BoxDecoration(
@@ -618,6 +674,7 @@ class _MessageBubble extends StatelessWidget {
                       style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
                     ),
                   ],
+                ),
                 ),
               ),
             ],
