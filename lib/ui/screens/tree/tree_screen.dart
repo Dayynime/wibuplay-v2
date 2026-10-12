@@ -537,19 +537,18 @@ class _TreeScreenState extends ConsumerState<TreeScreen> with SingleTickerProvid
                     _statusCard(tree, fruitsShown),
                     const SizedBox(height: 8),
                     _hint(tree, fruitsShown),
-                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 14, top: 4),
+                        child: _ShopButton(onTap: _openShop),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
                   ],
                   _toastArea(),
                   const Spacer(),
                   if (tree != null && !_shopOpen) ...[
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: Padding(
-                        padding: const EdgeInsets.only(right: 16),
-                        child: _ShopButton(onTap: _openShop),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
                     _bottomBar(tree, fruitsShown),
                     const SizedBox(height: 14),
                   ],
