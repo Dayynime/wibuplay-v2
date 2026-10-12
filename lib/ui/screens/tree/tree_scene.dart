@@ -29,17 +29,6 @@ const List<Offset> _slotRel = [
   Offset(0.84, -0.12),
 ];
 
-/// Lingkaran penyusun kanopi: (dx, dy, radius) dalam satuan radius kanopi.
-const List<(double, double, double)> _blobs = [
-  (0.0, 0.0, 0.78),
-  (-0.55, 0.15, 0.58),
-  (0.55, 0.14, 0.58),
-  (-0.32, -0.42, 0.55),
-  (0.34, -0.44, 0.52),
-  (0.0, 0.34, 0.60),
-  (-0.78, -0.05, 0.40),
-  (0.80, -0.08, 0.38),
-];
 
 // Palet per fase langit: 0 = malam, 1 = senja/fajar, 2 = siang.
 const List<List<Color>> _skyColors = [
@@ -93,6 +82,9 @@ class TreeSceneController extends ChangeNotifier {
 
   /// Titik tujuan koin terbang (posisi ikon ZCoin di HUD, koordinat scene).
   Offset? coinTarget;
+
+  /// Kepadatan piksel layar (dipakai saat merender pohon jadi gambar).
+  double dpr = 2;
 
   /// Dekorasi yang dipasang (atau sedang di-preview di toko).
   TreeLook look = const TreeLook();
@@ -206,11 +198,13 @@ class _TreeSceneState extends State<TreeScene> with SingleTickerProviderStateMix
   @override
   void dispose() {
     _ticker.dispose();
+    _painter.disposeCache();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    widget.controller.dpr = MediaQuery.devicePixelRatioOf(context).clamp(1.0, 3.0);
     return LayoutBuilder(
       builder: (context, constraints) {
         final size = Size(constraints.maxWidth, constraints.maxHeight);
@@ -272,6 +266,7 @@ class _LottiePet extends StatelessWidget {
             anchor = g.base + Offset(g.r * 0.6, 4);
             sway = false;
         }
+        anchor += Offset(box * asset.dx, box * asset.dy);
         final angle = sway ? g.angle(controller.t) : 0.0;
         if (sway) anchor = g.rotate(anchor, angle);
         return Positioned(
@@ -354,6 +349,37 @@ class _TreePainter extends CustomPainter {
   TextPainter? _zTp;
   double _zRad = -1;
 
+  // Pohon (batang, dahan, ribuan daun) dirender sekali jadi gambar, lalu
+  // dipakai ulang tiap frame. Dibuat ulang kalau ukuran/level/skin/waktu berubah.
+  ui.Image? _treeImg;
+  Rect _treeRect = Rect.zero;
+  String? _treeKey;
+
+  void _drawTree(Canvas canvas, _TreeGeo g, _Skin skin, String? skinId, int phase) {
+    final key = '${g.size.width.toStringAsFixed(1)}x${g.size.height.toStringAsFixed(1)}'
+        '|${c.level}|$skinId|$phase|${c.dpr}';
+    if (_treeImg == null || key != _treeKey) {
+      _treeImg?.dispose();
+      final (img, rect) = _buildTreeImage(g, skin, skinId, phase, c.dpr);
+      _treeImg = img;
+      _treeRect = rect;
+      _treeKey = key;
+    }
+    final img = _treeImg!;
+    canvas.drawImageRect(
+      img,
+      Rect.fromLTWH(0, 0, img.width.toDouble(), img.height.toDouble()),
+      _treeRect,
+      Paint()..filterQuality = FilterQuality.medium,
+    );
+  }
+
+  void disposeCache() {
+    _treeImg?.dispose();
+    _treeImg = null;
+    _treeKey = null;
+  }
+
   @override
   void paint(Canvas canvas, Size size) {
     if (size.isEmpty) return;
@@ -380,8 +406,7 @@ class _TreePainter extends CustomPainter {
     canvas.translate(-g.base.dx, -g.base.dy);
     if (c.full) _fullHalo(canvas, g, t);
     if (look.treeDeco == 'deco_swing') _decoSwing(canvas, g, t);
-    _trunk(canvas, g);
-    _canopy(canvas, g, t, skin);
+    _drawTree(canvas, g, skin, look.tree, phase);
     _skinExtras(canvas, g, t, look.tree);
     if (look.treeDeco != 'deco_swing') _treeDeco(canvas, g, t, phase, look.treeDeco, c.clanTag);
     if (look.petAsset == null) _treePet(canvas, g, t, phase, look.pet);
@@ -609,95 +634,6 @@ class _TreePainter extends CustomPainter {
         ..color = Color.fromRGBO(255, 197, 61, a)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 36),
     );
-  }
-
-  void _trunk(Canvas canvas, _TreeGeo g) {
-    final b = g.base;
-    final topY = g.canopy.dy + g.r * 0.25;
-    final tw = g.r * 0.17;
-    final trunk = Path()
-      ..moveTo(b.dx - tw * 1.3, b.dy + 4)
-      ..quadraticBezierTo(b.dx - tw * 0.7, (b.dy + topY) / 2, b.dx - tw * 0.55, topY)
-      ..lineTo(b.dx + tw * 0.55, topY)
-      ..quadraticBezierTo(b.dx + tw * 0.7, (b.dy + topY) / 2, b.dx + tw * 1.3, b.dy + 4)
-      ..close();
-    canvas.drawPath(
-      trunk,
-      Paint()
-        ..shader = const LinearGradient(
-          colors: [Color(0xFF4A2E17), Color(0xFF7A4E2A), Color(0xFF4A2E17)],
-        ).createShader(Rect.fromLTRB(b.dx - tw * 1.3, topY, b.dx + tw * 1.3, b.dy)),
-    );
-    // serat kayu
-    final grain = Paint()
-      ..color = const Color(0x33000000)
-      ..strokeWidth = 1.4
-      ..style = PaintingStyle.stroke;
-    canvas.drawLine(Offset(b.dx - tw * 0.2, b.dy - 6), Offset(b.dx - tw * 0.1, topY + 20), grain);
-    canvas.drawLine(Offset(b.dx + tw * 0.35, b.dy - 12), Offset(b.dx + tw * 0.2, topY + 40), grain);
-    // akar
-    final root = Paint()
-      ..color = const Color(0xFF4A2E17)
-      ..strokeWidth = tw * 0.35
-      ..strokeCap = StrokeCap.round;
-    canvas.drawLine(Offset(b.dx - tw * 0.9, b.dy - 2), Offset(b.dx - tw * 1.9, b.dy + 6), root);
-    canvas.drawLine(Offset(b.dx + tw * 0.9, b.dy - 2), Offset(b.dx + tw * 2.0, b.dy + 5), root);
-
-    final branch = Paint()
-      ..color = const Color(0xFF5C3A1E)
-      ..strokeWidth = tw * 0.45
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke;
-    canvas.drawLine(
-      Offset(b.dx, topY + g.r * 0.35),
-      Offset(b.dx - g.r * 0.45, g.canopy.dy + g.r * 0.05),
-      branch,
-    );
-    canvas.drawLine(
-      Offset(b.dx, topY + g.r * 0.25),
-      Offset(b.dx + g.r * 0.42, g.canopy.dy),
-      branch,
-    );
-  }
-
-  void _canopy(Canvas canvas, _TreeGeo g, double t, _Skin skin) {
-    final shadow = Paint()..color = skin.shadow;
-    for (var i = 0; i < _blobs.length; i++) {
-      final (dx, dy, rr) = _blobs[i];
-      final breathe = 1 + math.sin(t * 1.6 + i) * 0.012;
-      canvas.drawCircle(
-        g.canopy + Offset(dx * g.r, dy * g.r + g.r * 0.06),
-        rr * g.r * breathe,
-        shadow,
-      );
-    }
-    final light = skin.light;
-    for (var i = 0; i < _blobs.length; i++) {
-      final (dx, dy, rr) = _blobs[i];
-      final breathe = 1 + math.sin(t * 1.6 + i) * 0.012;
-      final center = g.canopy + Offset(dx * g.r - g.r * 0.03, dy * g.r - g.r * 0.04);
-      final radius = rr * g.r * 0.92 * breathe;
-      canvas.drawCircle(
-        center,
-        radius,
-        Paint()
-          ..shader = RadialGradient(
-            center: const Alignment(-0.3, -0.45),
-            radius: 0.95,
-            colors: light,
-            stops: const [0, 0.6, 1],
-          ).createShader(Rect.fromCircle(center: center, radius: radius)),
-      );
-    }
-    final hl = Paint()..color = const Color(0x2E9BF5B0);
-    for (var i = 0; i < 5; i++) {
-      final (dx, dy, rr) = _blobs[i];
-      canvas.drawCircle(
-        g.canopy + Offset((dx - rr * 0.35) * g.r, (dy - rr * 0.4) * g.r),
-        rr * g.r * 0.22,
-        hl,
-      );
-    }
   }
 
   // ================================================================ buah & koin

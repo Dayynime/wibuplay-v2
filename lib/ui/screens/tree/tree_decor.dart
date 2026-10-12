@@ -86,53 +86,332 @@ _Skin _skinFor(String? id, int phase) {
       : const _Skin(Color(0xFF1A5530), [Color(0xFF4CC870), Color(0xFF2A8A47), Color(0xFF1F6B39)], Color(0xFF6EDC82));
 }
 
-Offset _blobCenter(_TreeGeo g, int i) {
-  final (dx, dy, _) = _blobs[i];
-  return g.canopy + Offset(dx * g.r - g.r * 0.03, dy * g.r - g.r * 0.04);
-}
-
-double _blobRadius(_TreeGeo g, int i, double t) {
-  final (_, _, rr) = _blobs[i];
-  return rr * g.r * 0.92 * (1 + math.sin(t * 1.6 + i) * 0.012);
-}
-
-/// Hiasan tambahan di atas kanopi sesuai skin (salju, neon, kilau emas).
+/// Kilau animasi di atas kanopi (Pohon Emas).
 void _skinExtras(Canvas canvas, _TreeGeo g, double t, String? skin) {
-  switch (skin) {
-    case 'tree_snow': {
-      final p = Paint()..color = const Color(0xF2FFFFFF);
-      for (var i = 0; i < _blobs.length; i++) {
-        final (_, dy, _) = _blobs[i];
-        if (dy > 0.2) continue;
-        final rect = Rect.fromCircle(center: _blobCenter(g, i), radius: _blobRadius(g, i, t));
-        canvas.drawPath(Path()..addArc(rect, math.pi * 1.1, math.pi * 0.8)..close(), p);
+  if (skin != 'tree_gold') return;
+  for (var i = 0; i < 11; i++) {
+    final ph = (t * 0.6 + i * 0.29) % 1.0;
+    if (ph > 0.3) continue;
+    final k = math.sin(ph / 0.3 * math.pi);
+    final p = g.canopy + Offset((_rand(i + 1300) * 2 - 1) * g.r * 0.85, (_rand(i + 1400) * 2 - 1) * g.r * 0.65);
+    _sparkle(canvas, p, g.r * 0.07 * k, Color.fromRGBO(255, 255, 255, k));
+  }
+}
+
+// ==================================================================== pohon realistis
+
+class _Cluster {
+  _Cluster(this.c, this.r);
+  final Offset c;
+  final double r;
+}
+
+/// Bentuk satu helai daun (lonjong runcing), ukuran -1..1.
+final Path _kLeaf = Path()
+  ..moveTo(0, -1)
+  ..quadraticBezierTo(0.62, -0.3, 0, 1)
+  ..quadraticBezierTo(-0.62, -0.3, 0, -1)
+  ..close();
+
+Color _jitter(Color c, math.Random rnd, double hue, double light) {
+  final h = HSLColor.fromColor(c);
+  return h
+      .withHue((h.hue + (rnd.nextDouble() * 2 - 1) * hue) % 360)
+      .withLightness((h.lightness + (rnd.nextDouble() * 2 - 1) * light).clamp(0.0, 1.0))
+      .toColor();
+}
+
+void _drawLeaves(
+  Canvas canvas,
+  _Cluster cl,
+  math.Random rnd,
+  int count,
+  double r,
+  Color top,
+  Color bottom,
+  double hueJ, {
+  double size = 1,
+}) {
+  final p = Paint();
+  for (var i = 0; i < count; i++) {
+    final a = rnd.nextDouble() * math.pi * 2;
+    final d = math.sqrt(rnd.nextDouble()) * cl.r;
+    final pos = cl.c + Offset(math.cos(a) * d, math.sin(a) * d);
+    final ty = ((pos.dy - (cl.c.dy - cl.r)) / (cl.r * 2)).clamp(0.0, 1.0);
+    final tx = ((pos.dx - (cl.c.dx - cl.r)) / (cl.r * 2)).clamp(0.0, 1.0);
+    p.color = _jitter(Color.lerp(top, bottom, ty * 0.75 + tx * 0.25)!, rnd, hueJ, 0.05);
+    final s = r * 0.05 * size * (0.7 + rnd.nextDouble() * 0.6);
+    canvas.save();
+    canvas.translate(pos.dx, pos.dy);
+    canvas.rotate(rnd.nextDouble() * math.pi * 2);
+    canvas.scale(s * 0.55, s);
+    canvas.drawPath(_kLeaf, p);
+    canvas.restore();
+  }
+}
+
+/// Dahan meruncing dengan sedikit lengkung. [wa]/[wb] = setengah lebar.
+void _limb(Canvas canvas, Offset a, Offset b, double wa, double wb, Paint paint, double bend) {
+  final dir = b - a;
+  final len = dir.distance;
+  if (len <= 0) return;
+  final n = Offset(-dir.dy / len, dir.dx / len);
+  final mid = Offset.lerp(a, b, 0.5)! + n * bend;
+  final wm = (wa + wb) / 2;
+  final path = Path()
+    ..moveTo(a.dx + n.dx * wa, a.dy + n.dy * wa)
+    ..quadraticBezierTo(mid.dx + n.dx * wm, mid.dy + n.dy * wm, b.dx + n.dx * wb, b.dy + n.dy * wb)
+    ..lineTo(b.dx - n.dx * wb, b.dy - n.dy * wb)
+    ..quadraticBezierTo(mid.dx - n.dx * wm, mid.dy - n.dy * wm, a.dx - n.dx * wa, a.dy - n.dy * wa)
+    ..close();
+  canvas.drawPath(path, paint);
+  canvas.drawCircle(b, wb, paint);
+}
+
+/// Render pohon realistis jadi gambar. Return (gambar, kotak tujuan di layar).
+(ui.Image, Rect) _buildTreeImage(_TreeGeo g, _Skin skin, String? skinId, int phase, double dpr) {
+  final r = g.r;
+  final base = g.base;
+  final bounds = Rect.fromLTRB(g.canopy.dx - r * 1.45, g.canopy.dy - r * 1.25, g.canopy.dx + r * 1.45, base.dy + r * 0.16);
+  final rec = ui.PictureRecorder();
+  final canvas = Canvas(rec);
+  canvas.scale(dpr);
+  canvas.translate(-bounds.left, -bounds.top);
+  canvas.saveLayer(bounds, Paint());
+
+  final rnd = math.Random(20261013);
+  final autumn = skinId == 'tree_autumn';
+  final hueJ = autumn ? 24.0 : 7.0;
+  final back = skin.shadow;
+  final dark = skin.light[2];
+  final mid = skin.light[1];
+  final hi = skin.light[0];
+
+  // ---------- susunan gerombol daun
+  final clusters = <_Cluster>[];
+  for (var i = 0; i < 22; i++) {
+    final a = i / 22 * math.pi * 2 + (rnd.nextDouble() - 0.5) * 0.25;
+    final ry = math.sin(a) > 0 ? 0.6 : 0.8;
+    clusters.add(_Cluster(
+      g.canopy + Offset(math.cos(a) * r * 0.9, math.sin(a) * r * ry - r * 0.03),
+      r * (0.16 + rnd.nextDouble() * 0.1),
+    ));
+  }
+  for (var i = 0; i < 24; i++) {
+    final a = rnd.nextDouble() * math.pi * 2;
+    final d = math.sqrt(rnd.nextDouble()) * 0.74;
+    clusters.add(_Cluster(
+      g.canopy + Offset(math.cos(a) * r * d, math.sin(a) * r * d * 0.75 - r * 0.05),
+      r * (0.18 + rnd.nextDouble() * 0.12),
+    ));
+  }
+
+  // ---------- 1) daun lapisan belakang (gelap = kedalaman)
+  final backPaint = Paint()..color = back;
+  final shift = Offset(r * 0.02, r * 0.05);
+  for (final cl in clusters) {
+    canvas.drawCircle(cl.c + shift, cl.r * 1.08, backPaint);
+  }
+  final backLeaf = Color.lerp(back, Colors.black, 0.2)!;
+  for (final cl in clusters) {
+    _drawLeaves(canvas, _Cluster(cl.c + shift, cl.r * 1.05), rnd, 10, r, back, backLeaf, hueJ);
+  }
+
+  // ---------- 2) akar, batang, dahan
+  final tw = r * 0.17;
+  final top = Offset(base.dx + r * 0.02, g.canopy.dy + r * 0.32);
+  final bark = Paint()
+    ..shader = ui.Gradient.linear(
+      Offset(g.canopy.dx - r, 0),
+      Offset(g.canopy.dx + r, 0),
+      [const Color(0xFF7A5232), const Color(0xFF543620), const Color(0xFF34200F)],
+    );
+
+  for (final (side, len, drop, w) in const [
+    (-1.0, 2.5, 0.05, 0.38),
+    (1.0, 2.6, 0.04, 0.36),
+    (-1.0, 1.7, 0.1, 0.3),
+    (1.0, 1.6, 0.09, 0.3),
+  ]) {
+    _limb(
+      canvas,
+      Offset(base.dx + side * tw * 0.7, base.dy - 3),
+      Offset(base.dx + side * tw * len, base.dy + r * drop),
+      tw * w,
+      tw * 0.06,
+      bark,
+      side * r * 0.02,
+    );
+  }
+
+  final trunk = Path()
+    ..moveTo(base.dx - tw * 2.0, base.dy + 6)
+    ..quadraticBezierTo(base.dx - tw * 1.05, base.dy - r * 0.04, base.dx - tw * 0.95, base.dy - r * 0.3)
+    ..cubicTo(base.dx - tw * 0.85, base.dy - r * 0.75, top.dx - tw * 0.75, top.dy + r * 0.25, top.dx - tw * 0.6, top.dy)
+    ..lineTo(top.dx + tw * 0.6, top.dy)
+    ..cubicTo(top.dx + tw * 0.75, top.dy + r * 0.25, base.dx + tw * 0.9, base.dy - r * 0.75, base.dx + tw * 1.0, base.dy - r * 0.3)
+    ..quadraticBezierTo(base.dx + tw * 1.1, base.dy - r * 0.04, base.dx + tw * 2.1, base.dy + 6)
+    ..close();
+  canvas.drawPath(
+    trunk,
+    Paint()
+      ..shader = ui.Gradient.linear(
+        Offset(base.dx - tw * 1.2, 0),
+        Offset(base.dx + tw * 1.2, 0),
+        [const Color(0xFF8A603A), const Color(0xFF6B4628), const Color(0xFF4A2E18), const Color(0xFF2B190C)],
+        const [0.0, 0.35, 0.7, 1.0],
+      ),
+  );
+
+  // tekstur kulit kayu
+  canvas.save();
+  canvas.clipPath(trunk);
+  final h0 = base.dy + 6;
+  final h1 = top.dy;
+  for (var i = 0; i < 30; i++) {
+    final off = (rnd.nextDouble() * 2 - 1) * tw * 1.15;
+    final path = Path();
+    var first = true;
+    for (var y = h0; y >= h1; y -= 8) {
+      final f = ((h0 - y) / (h0 - h1)).clamp(0.0, 1.0);
+      final ws = 1 - 0.4 * f;
+      final x = base.dx + off * ws + math.sin(y * 0.07 + i) * 1.6 + (top.dx - base.dx) * f;
+      if (first) {
+        path.moveTo(x, y);
+        first = false;
+      } else {
+        path.lineTo(x, y);
       }
     }
-    case 'tree_neon': {
-      final pulse = 0.55 + 0.45 * math.sin(t * 2.5);
-      for (var i = 0; i < _blobs.length; i++) {
-        final col = i.isEven ? Color.fromRGBO(124, 248, 255, 0.6 * pulse) : Color.fromRGBO(244, 114, 182, 0.6 * pulse);
-        canvas.drawCircle(
-          _blobCenter(g, i),
-          _blobRadius(g, i, t),
-          Paint()
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 2.4
-            ..color = col
-            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
-        );
+    canvas.drawPath(
+      path,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 0.8 + rnd.nextDouble() * 1.4
+        ..color = (i % 4 == 0 ? const Color(0xFFB08458) : const Color(0xFF1E1208))
+            .withValues(alpha: i % 4 == 0 ? 0.18 : 0.3 + rnd.nextDouble() * 0.2),
+    );
+  }
+  final knot = Offset(base.dx - tw * 0.3, base.dy - r * 0.55);
+  canvas.drawOval(Rect.fromCenter(center: knot, width: tw * 0.4, height: tw * 0.6), Paint()..color = const Color(0xFF2B190C));
+  canvas.drawOval(
+    Rect.fromCenter(center: knot, width: tw * 0.6, height: tw * 0.85),
+    Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2
+      ..color = const Color(0x55B08458),
+  );
+  canvas.restore();
+
+  // dahan bercabang
+  void grow(Offset start, double ang, double len, double w, int depth) {
+    final end = start + Offset(math.sin(ang), -math.cos(ang)) * len;
+    _limb(canvas, start, end, w, w * 0.66, bark, (rnd.nextDouble() - 0.5) * len * 0.3);
+    if (depth == 0) {
+      final twig = Paint()
+        ..color = const Color(0xFF4A2E18)
+        ..strokeWidth = math.max(0.8, w * 0.6)
+        ..strokeCap = StrokeCap.round;
+      for (var k = 0; k < 2; k++) {
+        final a2 = ang + (k == 0 ? -0.6 : 0.6);
+        canvas.drawLine(end, end + Offset(math.sin(a2), -math.cos(a2)) * len * 0.45, twig);
       }
+      return;
     }
-    case 'tree_gold': {
-      for (var i = 0; i < 9; i++) {
-        final ph = (t * 0.6 + i * 0.29) % 1.0;
-        if (ph > 0.3) continue;
-        final k = math.sin(ph / 0.3 * math.pi);
-        final p = g.canopy + Offset((_rand(i + 1300) * 2 - 1) * g.r * 0.85, (_rand(i + 1400) * 2 - 1) * g.r * 0.7);
-        _sparkle(canvas, p, g.r * 0.07 * k, Color.fromRGBO(255, 255, 255, k));
-      }
+    final kids = depth >= 2 ? 2 : 3;
+    for (var k = 0; k < kids; k++) {
+      final spread = (k - (kids - 1) / 2) * (0.5 + rnd.nextDouble() * 0.25) + (rnd.nextDouble() - 0.5) * 0.2;
+      grow(end, ang + spread, len * (0.66 + rnd.nextDouble() * 0.14), w * 0.66, depth - 1);
     }
   }
+
+  for (final (ang, len, w, depth) in const [
+    (-1.0, 0.42, 0.52, 3),
+    (-0.42, 0.5, 0.56, 3),
+    (0.12, 0.48, 0.52, 3),
+    (0.68, 0.45, 0.5, 3),
+    (1.2, 0.4, 0.42, 2),
+  ]) {
+    grow(top, ang, r * len, tw * w, depth);
+  }
+
+  // ---------- 3) daun lapisan depan (bawah dulu, atas terakhir)
+  clusters.sort((a, b) => b.c.dy.compareTo(a.c.dy));
+  final hiLight = Color.lerp(hi, Colors.white, 0.18)!;
+  for (final cl in clusters) {
+    // celah: sebagian gerombol bagian dalam dilewati supaya dahan kelihatan
+    final inner = (cl.c - g.canopy).distance < r * 0.45;
+    if (inner && rnd.nextDouble() < 0.3) continue;
+    final rect = Rect.fromCircle(center: cl.c, radius: cl.r * 0.92);
+    canvas.drawCircle(
+      cl.c,
+      cl.r * 0.92,
+      Paint()
+        ..shader = ui.Gradient.radial(
+          cl.c + Offset(-cl.r * 0.35, -cl.r * 0.45),
+          cl.r * 1.3,
+          [mid, dark],
+        ),
+    );
+    _drawLeaves(canvas, cl, rnd, (cl.r / r * 220).round().clamp(18, 70), r, hi, dark, hueJ);
+    _drawLeaves(
+      canvas,
+      _Cluster(cl.c + Offset(-cl.r * 0.25, -cl.r * 0.35), cl.r * 0.5),
+      rnd,
+      9,
+      r,
+      hiLight,
+      hi,
+      hueJ,
+      size: 0.9,
+    );
+    if (skinId == 'tree_snow' && cl.c.dy < g.canopy.dy + r * 0.15) {
+      canvas.drawPath(
+        Path()..addArc(rect, math.pi * 1.1, math.pi * 0.8)..close(),
+        Paint()..color = const Color(0xF2F4F8FF),
+      );
+      _drawLeaves(
+        canvas,
+        _Cluster(cl.c - Offset(0, cl.r * 0.6), cl.r * 0.45),
+        rnd,
+        8,
+        r,
+        Colors.white,
+        const Color(0xFFDCE8F5),
+        0,
+        size: 0.8,
+      );
+    }
+    if (skinId == 'tree_neon') {
+      canvas.drawCircle(
+        cl.c,
+        cl.r * 0.95,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.6
+          ..color = (cl.c.dx < g.canopy.dx ? const Color(0xFF7CF8FF) : const Color(0xFFF472B6)).withValues(alpha: 0.55)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
+      );
+    }
+  }
+
+  // ---------- 4) warna cahaya sesuai waktu (bulan / senja)
+  final tint = switch (phase) {
+    0 => const Color(0x380A1440),
+    1 => const Color(0x22FF6A3D),
+    _ => null,
+  };
+  if (tint != null) {
+    canvas.drawRect(bounds, Paint()
+      ..color = tint
+      ..blendMode = BlendMode.srcATop);
+  }
+  canvas.restore();
+
+  final pic = rec.endRecording();
+  final img = pic.toImageSync((bounds.width * dpr).ceil(), (bounds.height * dpr).ceil());
+  pic.dispose();
+  return (img, bounds);
 }
 
 // ==================================================================== skin buah
