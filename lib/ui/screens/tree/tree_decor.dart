@@ -225,6 +225,7 @@ void _limb(Canvas canvas, Offset a, Offset b, double wa, double wb, Paint paint,
       Offset(g.canopy.dx - r, 0),
       Offset(g.canopy.dx + r, 0),
       [const Color(0xFF7A5232), const Color(0xFF543620), const Color(0xFF34200F)],
+      const [0.0, 0.5, 1.0],
     );
 
   for (final (side, len, drop, w) in const [
