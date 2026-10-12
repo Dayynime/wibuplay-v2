@@ -109,8 +109,8 @@ class _Cluster {
 /// Bentuk satu helai daun (lonjong runcing), ukuran -1..1.
 final Path _kLeaf = Path()
   ..moveTo(0, -1)
-  ..quadraticBezierTo(0.62, -0.3, 0, 1)
-  ..quadraticBezierTo(-0.62, -0.3, 0, -1)
+  ..quadraticBezierTo(0.95, -0.2, 0, 1)
+  ..quadraticBezierTo(-0.95, -0.2, 0, -1)
   ..close();
 
 Color _jitter(Color c, math.Random rnd, double hue, double light) {
@@ -135,16 +135,16 @@ void _drawLeaves(
   final p = Paint();
   for (var i = 0; i < count; i++) {
     final a = rnd.nextDouble() * math.pi * 2;
-    final d = math.sqrt(rnd.nextDouble()) * cl.r;
+    final d = math.sqrt(rnd.nextDouble()) * cl.r * 1.12;
     final pos = cl.c + Offset(math.cos(a) * d, math.sin(a) * d);
     final ty = ((pos.dy - (cl.c.dy - cl.r)) / (cl.r * 2)).clamp(0.0, 1.0);
     final tx = ((pos.dx - (cl.c.dx - cl.r)) / (cl.r * 2)).clamp(0.0, 1.0);
     p.color = _jitter(Color.lerp(top, bottom, ty * 0.75 + tx * 0.25)!, rnd, hueJ, 0.05);
-    final s = r * 0.05 * size * (0.7 + rnd.nextDouble() * 0.6);
+    final s = r * 0.04 * size * (0.7 + rnd.nextDouble() * 0.6);
     canvas.save();
     canvas.translate(pos.dx, pos.dy);
     canvas.rotate(rnd.nextDouble() * math.pi * 2);
-    canvas.scale(s * 0.55, s);
+    canvas.scale(s * 0.9, s);
     canvas.drawPath(_kLeaf, p);
     canvas.restore();
   }
@@ -210,11 +210,11 @@ void _limb(Canvas canvas, Offset a, Offset b, double wa, double wb, Paint paint,
   final backPaint = Paint()..color = back;
   final shift = Offset(r * 0.02, r * 0.05);
   for (final cl in clusters) {
-    canvas.drawCircle(cl.c + shift, cl.r * 1.08, backPaint);
+    canvas.drawCircle(cl.c + shift, cl.r * 0.95, backPaint);
   }
   final backLeaf = Color.lerp(back, Colors.black, 0.2)!;
   for (final cl in clusters) {
-    _drawLeaves(canvas, _Cluster(cl.c + shift, cl.r * 1.05), rnd, 10, r, back, backLeaf, hueJ);
+    _drawLeaves(canvas, _Cluster(cl.c + shift, cl.r * 1.0), rnd, 16, r, back, backLeaf, hueJ);
   }
 
   // ---------- 2) akar, batang, dahan
@@ -310,12 +310,12 @@ void _limb(Canvas canvas, Offset a, Offset b, double wa, double wb, Paint paint,
     _limb(canvas, start, end, w, w * 0.66, bark, (rnd.nextDouble() - 0.5) * len * 0.3);
     if (depth == 0) {
       final twig = Paint()
-        ..color = const Color(0xFF4A2E18)
-        ..strokeWidth = math.max(0.8, w * 0.6)
+        ..color = const Color(0xFF5C3B22)
+        ..strokeWidth = math.max(0.6, w * 0.45)
         ..strokeCap = StrokeCap.round;
       for (var k = 0; k < 2; k++) {
         final a2 = ang + (k == 0 ? -0.6 : 0.6);
-        canvas.drawLine(end, end + Offset(math.sin(a2), -math.cos(a2)) * len * 0.45, twig);
+        canvas.drawLine(end, end + Offset(math.sin(a2), -math.cos(a2)) * len * 0.28, twig);
       }
       return;
     }
@@ -333,7 +333,7 @@ void _limb(Canvas canvas, Offset a, Offset b, double wa, double wb, Paint paint,
     (0.68, 0.45, 0.5, 3),
     (1.2, 0.4, 0.42, 2),
   ]) {
-    grow(top, ang, r * len, tw * w, depth);
+    grow(top, ang, r * len * 0.86, tw * w, depth);
   }
 
   // ---------- 3) daun lapisan depan (bawah dulu, atas terakhir)
@@ -346,7 +346,7 @@ void _limb(Canvas canvas, Offset a, Offset b, double wa, double wb, Paint paint,
     final rect = Rect.fromCircle(center: cl.c, radius: cl.r * 0.92);
     canvas.drawCircle(
       cl.c,
-      cl.r * 0.92,
+      cl.r * 0.78,
       Paint()
         ..shader = ui.Gradient.radial(
           cl.c + Offset(-cl.r * 0.35, -cl.r * 0.45),
@@ -354,7 +354,7 @@ void _limb(Canvas canvas, Offset a, Offset b, double wa, double wb, Paint paint,
           [mid, dark],
         ),
     );
-    _drawLeaves(canvas, cl, rnd, (cl.r / r * 220).round().clamp(18, 70), r, hi, dark, hueJ);
+    _drawLeaves(canvas, cl, rnd, (cl.r / r * 300).round().clamp(26, 95), r, hi, dark, hueJ);
     _drawLeaves(
       canvas,
       _Cluster(cl.c + Offset(-cl.r * 0.25, -cl.r * 0.35), cl.r * 0.5),
