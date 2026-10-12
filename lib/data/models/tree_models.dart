@@ -216,7 +216,7 @@ class TreeLook {
     final g = j['ground'];
     final pa = j['pet_asset'];
     return TreeLook(
-      petAsset: pa is Map ? PetAsset.tryParse(pa['file'], pa['place'], pa['scale']) : null,
+      petAsset: pa is Map ? PetAsset.tryParse(pa['file'], pa['place'], pa['scale'], pa['dx'], pa['dy']) : null,
       tree: _s(j['tree']),
       fruit: _s(j['fruit']),
       treeDeco: _s(j['tree_deco']),
@@ -338,7 +338,7 @@ class ShopItem {
         price: _i(j['price']),
         premiumOnly: j['premium_only'] == true,
         availableUntil: _d(j['available_until']),
-        asset: PetAsset.tryParse(j['asset'], j['asset_place'], j['asset_scale']),
+        asset: PetAsset.tryParse(j['asset'], j['asset_place'], j['asset_scale'], j['asset_dx'], j['asset_dy']),
       );
 }
 
@@ -402,7 +402,13 @@ class TreeVisit {
 
 /// Animasi Lottie pet yang disimpan di bucket publik `tree-assets`.
 class PetAsset {
-  const PetAsset({required this.file, required this.place, required this.scale});
+  const PetAsset({
+    required this.file,
+    required this.place,
+    required this.scale,
+    this.dx = 0,
+    this.dy = 0,
+  });
 
   final String file;
 
@@ -410,17 +416,25 @@ class PetAsset {
   final String place;
   final double scale;
 
+  /// Geser posisi (satuan = ukuran kotak animasi). dx + ke kanan, dy + ke bawah.
+  final double dx;
+  final double dy;
+
   static final RegExp _fileRe = RegExp(r'^[A-Za-z0-9._-]{1,80}\.json$');
 
   String get url => '${SupabaseConfig.url}/storage/v1/object/public/tree-assets/$file';
 
-  static PetAsset? tryParse(dynamic file, dynamic place, dynamic scale) {
+  static PetAsset? tryParse(dynamic file, dynamic place, dynamic scale, [dynamic dx, dynamic dy]) {
     if (file is! String || !_fileRe.hasMatch(file)) return null;
     final s = (scale as num?)?.toDouble() ?? 1.0;
+    final x = (dx as num?)?.toDouble() ?? 0.0;
+    final y = (dy as num?)?.toDouble() ?? 0.0;
     return PetAsset(
       file: file,
       place: place is String ? place : 'ground_right',
       scale: s.clamp(0.3, 3.0),
+      dx: x.clamp(-1.0, 1.0),
+      dy: y.clamp(-1.0, 1.0),
     );
   }
 }
