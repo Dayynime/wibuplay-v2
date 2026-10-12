@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 
+import '../models/chat_models.dart';
 import '../models/friend_models.dart';
 import 'authed_function.dart';
 import 'chat_repository.dart';
@@ -86,6 +87,26 @@ class FriendRepository {
     });
   }
 
+  /// Level XP banyak uid sekaligus (tabel `user_xp`, public SELECT).
+  Future<Map<String, int>> _getLevels(List<String> uids) async {
+    final distinct = uids.where(_safeUid.hasMatch).toSet().toList();
+    if (distinct.isEmpty) return <String, int>{};
+    final res = await _dio.get<dynamic>(
+      'rest/v1/user_xp',
+      queryParameters: {
+        'firebase_uid': 'in.(${distinct.join(',')})',
+        'select': 'firebase_uid,level',
+      },
+    );
+    final out = <String, int>{};
+    for (final row in _rows(res.data)) {
+      final uid = (row['firebase_uid'] as String?) ?? '';
+      final lv = (row['level'] as num?)?.toInt();
+      if (uid.isNotEmpty && lv != null) out[uid] = lv;
+    }
+    return out;
+  }
+
   Future<FriendLists> getLists(String myUid) async {
     final me = _safe(myUid);
     final res = await _dio.get<dynamic>(
@@ -98,7 +119,14 @@ class FriendRepository {
       },
     );
     final rows = _rows(res.data).map(Friendship.fromJson).toList();
-    final profiles = await _chat.getProfilesForUids(rows.map((f) => f.otherUid(myUid)).toList());
+    final uids = rows.map((f) => f.otherUid(myUid)).toList();
+    // Profil wajib, level best-effort (gagal = badge level tidak tampil).
+    final results = await Future.wait<Object>([
+      _chat.getProfilesForUids(uids),
+      _getLevels(uids).catchError((_) => <String, int>{}),
+    ]);
+    final profiles = results[0] as Map<String, ChatProfile>;
+    final levels = results[1] as Map<String, int>;
 
     FriendDisplay display(Friendship f) {
       final uid = f.otherUid(myUid);
@@ -110,6 +138,9 @@ class FriendRepository {
         firebaseUid: uid,
         username: name.isEmpty ? 'Pengguna Zenime' : name,
         avatarUrl: (avatar == null || avatar.isEmpty) ? null : avatar,
+        userNumber: p?.userNumber,
+        level: levels[uid],
+        usernameColor: p?.usernameColor,
       );
     }
 

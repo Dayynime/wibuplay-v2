@@ -62,12 +62,24 @@ class FriendDisplay {
     required this.firebaseUid,
     required this.username,
     this.avatarUrl,
+    this.userNumber,
+    this.level,
+    this.usernameColor,
   });
 
   final String friendshipId;
   final String firebaseUid;
   final String username;
   final String? avatarUrl;
+
+  /// ID urut publik (`chat_profiles.user_number`), ditampilkan "ID #123".
+  final int? userNumber;
+
+  /// Level XP (`user_xp.level`). null = belum punya XP, badge tidak tampil.
+  final int? level;
+
+  /// Warna username custom (hex), sama seperti di chat.
+  final String? usernameColor;
 }
 
 class FriendLists {
