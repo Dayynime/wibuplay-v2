@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lottie/lottie.dart';
 
 import '../../../data/models/account_models.dart' show formatZCoin;
 import '../../../data/models/friend_models.dart';
@@ -69,6 +70,7 @@ class _TreeScreenState extends ConsumerState<TreeScreen> with SingleTickerProvid
   ShopData? _shop;
   bool _shopOpen = false;
   bool _shopBusy = false;
+  String? _shopError;
   String _shopTab = TreeSlot.tree;
   String? _selectedId;
 
@@ -174,7 +176,7 @@ class _TreeScreenState extends ConsumerState<TreeScreen> with SingleTickerProvid
   TreeLook _sceneLook() {
     final item = _shopOpen ? _itemById(_selectedId) : null;
     if (item == null) return _look;
-    return _look.withItem(item.id, item.slot);
+    return _look.withItem(item.id, item.slot, asset: item.asset);
   }
 
   Future<void> _openShop() async {
@@ -182,6 +184,7 @@ class _TreeScreenState extends ConsumerState<TreeScreen> with SingleTickerProvid
     setState(() {
       _shopOpen = true;
       _selectedId = null;
+      _shopError = null;
     });
     try {
       final data = await _repo.shop();
@@ -192,7 +195,7 @@ class _TreeScreenState extends ConsumerState<TreeScreen> with SingleTickerProvid
       });
       _scene.setLook(_sceneLook());
     } on TreeException catch (e) {
-      _toast(e.message, warn: true);
+      if (mounted) setState(() => _shopError = e.message);
     }
   }
 
@@ -885,7 +888,24 @@ class _TreeScreenState extends ConsumerState<TreeScreen> with SingleTickerProvid
           SizedBox(
             height: 156,
             child: shop == null
-                ? const Center(child: CircularProgressIndicator(color: _kGold))
+                ? (_shopError != null
+                    ? Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 24),
+                              child: Text(
+                                _shopError!,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(color: Colors.white70, fontSize: 13),
+                              ),
+                            ),
+                            TextButton(onPressed: _openShop, child: const Text('Coba lagi')),
+                          ],
+                        ),
+                      )
+                    : const Center(child: CircularProgressIndicator(color: _kGold)))
                 : items.isEmpty
                     ? const Center(
                         child: Text('Belum ada item di sini', style: TextStyle(color: Colors.white54)),
@@ -2333,7 +2353,15 @@ class _ShopCard extends StatelessWidget {
                     gradient: RadialGradient(colors: [rc.withValues(alpha: 0.45), rc.withValues(alpha: 0.08)]),
                     border: Border.all(color: rc.withValues(alpha: 0.6)),
                   ),
-                  child: Icon(icon, color: ic, size: 28),
+                  child: item.asset == null
+                      ? Icon(icon, color: ic, size: 28)
+                      : ClipOval(
+                          child: Lottie.network(
+                            item.asset!.url,
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stack) => Icon(icon, color: ic, size: 28),
+                          ),
+                        ),
                 ),
                 const SizedBox(height: 6),
                 Text(

@@ -1,4 +1,6 @@
-/// Model Pohon ZCoin (Edge Function `tree-game`). Semua angka dihitung server.
+import '../../core/supabase_config.dart';
+
+// Model Pohon ZCoin (Edge Function `tree-game`). Semua angka dihitung server.
 
 int _i(dynamic v, [int fallback = 0]) => (v as num?)?.toInt() ?? fallback;
 
@@ -197,6 +199,7 @@ class TreeLook {
     this.ground = const [],
     this.pet,
     this.effect,
+    this.petAsset,
   });
 
   final String? tree;
@@ -206,9 +209,14 @@ class TreeLook {
   final String? pet;
   final String? effect;
 
+  /// Animasi Lottie pet yang dipasang. null = pet digambar pakai kode.
+  final PetAsset? petAsset;
+
   factory TreeLook.fromJson(Map<String, dynamic> j) {
     final g = j['ground'];
+    final pa = j['pet_asset'];
     return TreeLook(
+      petAsset: pa is Map ? PetAsset.tryParse(pa['file'], pa['place'], pa['scale']) : null,
       tree: _s(j['tree']),
       fruit: _s(j['fruit']),
       treeDeco: _s(j['tree_deco']),
@@ -237,7 +245,18 @@ class TreeLook {
   }
 
   /// Versi dengan [id] terpasang (dipakai buat preview di toko).
-  TreeLook withItem(String id, String slot) {
+  TreeLook withItem(String id, String slot, {PetAsset? asset}) {
+    if (slot == TreeSlot.pet) {
+      return TreeLook(
+        tree: tree,
+        fruit: fruit,
+        treeDeco: treeDeco,
+        ground: ground,
+        pet: id,
+        effect: effect,
+        petAsset: asset,
+      );
+    }
     switch (slot) {
       case TreeSlot.tree:
         return _copy(tree: id);
@@ -275,6 +294,7 @@ class TreeLook {
         ground: ground ?? this.ground,
         pet: pet ?? this.pet,
         effect: effect ?? this.effect,
+        petAsset: petAsset,
       );
 }
 
@@ -288,6 +308,7 @@ class ShopItem {
     required this.price,
     required this.premiumOnly,
     required this.availableUntil,
+    this.asset,
   });
 
   final String id;
@@ -305,6 +326,9 @@ class ShopItem {
 
   bool get limited => availableUntil != null;
 
+  /// Animasi Lottie (khusus pet). null = pakai gambar kode.
+  final PetAsset? asset;
+
   factory ShopItem.fromJson(Map<String, dynamic> j) => ShopItem(
         id: (j['id'] as String?) ?? '',
         slot: (j['slot'] as String?) ?? '',
@@ -314,6 +338,7 @@ class ShopItem {
         price: _i(j['price']),
         premiumOnly: j['premium_only'] == true,
         availableUntil: _d(j['available_until']),
+        asset: PetAsset.tryParse(j['asset'], j['asset_place'], j['asset_scale']),
       );
 }
 
@@ -371,6 +396,31 @@ class TreeVisit {
       waterReceiveLimit: _i(j['water_receive_limit'], 5),
       wateredByMe: j['watered_by_me'] == true,
       look: eq is Map ? TreeLook.fromJson(Map<String, dynamic>.from(eq)) : const TreeLook(),
+    );
+  }
+}
+
+/// Animasi Lottie pet yang disimpan di bucket publik `tree-assets`.
+class PetAsset {
+  const PetAsset({required this.file, required this.place, required this.scale});
+
+  final String file;
+
+  /// ground_left | ground_right | canopy_top | branch_left | branch_right
+  final String place;
+  final double scale;
+
+  static final RegExp _fileRe = RegExp(r'^[A-Za-z0-9._-]{1,80}\.json$');
+
+  String get url => '${SupabaseConfig.url}/storage/v1/object/public/tree-assets/$file';
+
+  static PetAsset? tryParse(dynamic file, dynamic place, dynamic scale) {
+    if (file is! String || !_fileRe.hasMatch(file)) return null;
+    final s = (scale as num?)?.toDouble() ?? 1.0;
+    return PetAsset(
+      file: file,
+      place: place is String ? place : 'ground_right',
+      scale: s.clamp(0.3, 3.0),
     );
   }
 }

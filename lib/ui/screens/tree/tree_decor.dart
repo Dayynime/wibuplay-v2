@@ -331,7 +331,7 @@ bool _fruitSkin(Canvas canvas, double rad, String? skin, double t) {
 /// Ayunan: digambar SEBELUM kanopi supaya talinya keluar dari bawah daun.
 void _decoSwing(Canvas canvas, _TreeGeo g, double t) {
   final anchor = g.canopy + Offset(g.r * 0.5, g.r * 0.62);
-  final len = g.r * 0.62;
+  final len = g.r * 0.4;
   canvas.save();
   canvas.translate(anchor.dx, anchor.dy);
   canvas.rotate(math.sin(t * 1.6) * 0.22);
@@ -594,12 +594,17 @@ void _groundPet(Canvas canvas, _TreeGeo g, double t, int phase, String? id) {
       // ekor
       final sway = math.sin(t * 1.8) * 6 * u;
       final tail = Path()
-        ..moveTo(c.dx + 6 * u, c.dy - 6 * u)
-        ..quadraticBezierTo(c.dx + 30 * u + sway, c.dy - 6 * u, c.dx + 22 * u + sway, c.dy - 30 * u)
-        ..quadraticBezierTo(c.dx + 14 * u + sway, c.dy - 16 * u, c.dx + 2 * u, c.dy - 12 * u)
+        ..moveTo(c.dx + 4 * u, c.dy - 2 * u)
+        ..quadraticBezierTo(c.dx + 36 * u + sway, c.dy, c.dx + 26 * u + sway, c.dy - 32 * u)
+        ..quadraticBezierTo(c.dx + 14 * u + sway, c.dy - 20 * u, c.dx + 4 * u, c.dy - 16 * u)
         ..close();
       canvas.drawPath(tail, p);
-      canvas.drawCircle(Offset(c.dx + 22 * u + sway, c.dy - 29 * u), 5 * u, Paint()..color = Colors.white);
+      final tip = Path()
+        ..moveTo(c.dx + 20 * u + sway, c.dy - 22 * u)
+        ..quadraticBezierTo(c.dx + 32 * u + sway, c.dy - 20 * u, c.dx + 26 * u + sway, c.dy - 32 * u)
+        ..quadraticBezierTo(c.dx + 20 * u + sway, c.dy - 30 * u, c.dx + 20 * u + sway, c.dy - 22 * u)
+        ..close();
+      canvas.drawPath(tip, Paint()..color = const Color(0xFFFFF7ED));
       // badan duduk
       canvas.drawPath(
         Path()
@@ -890,82 +895,14 @@ void _fxBack(Canvas canvas, Size size, _TreeGeo g, double t, int phase, String? 
   final h = size.height;
   switch (id) {
     case 'fx_fuji': {
-      final mountain = switch (phase) {
-        0 => const Color(0xFF2A3157),
-        1 => const Color(0xFF6B4A7A),
-        _ => const Color(0xFF7FA6D9),
-      };
-      final peak = Offset(w * 0.32, g.groundY - h * 0.34);
-      canvas.drawPath(
-        Path()
-          ..moveTo(-w * 0.1, g.groundY - h * 0.02)
-          ..lineTo(peak.dx - w * 0.06, peak.dy + h * 0.02)
-          ..quadraticBezierTo(peak.dx, peak.dy - h * 0.008, peak.dx + w * 0.06, peak.dy + h * 0.02)
-          ..lineTo(w * 0.8, g.groundY - h * 0.02)
-          ..close(),
-        Paint()..color = mountain,
-      );
-      canvas.drawPath(
-        Path()
-          ..moveTo(peak.dx - w * 0.06, peak.dy + h * 0.02)
-          ..quadraticBezierTo(peak.dx, peak.dy - h * 0.008, peak.dx + w * 0.06, peak.dy + h * 0.02)
-          ..lineTo(peak.dx + w * 0.12, peak.dy + h * 0.07)
-          ..lineTo(peak.dx + w * 0.07, peak.dy + h * 0.06)
-          ..lineTo(peak.dx + w * 0.03, peak.dy + h * 0.085)
-          ..lineTo(peak.dx - w * 0.01, peak.dy + h * 0.06)
-          ..lineTo(peak.dx - w * 0.05, peak.dy + h * 0.08)
-          ..lineTo(peak.dx - w * 0.12, peak.dy + h * 0.07)
-          ..close(),
-        Paint()..color = const Color(0xF2FFFFFF),
-      );
+      _fuji(canvas, size, g, t, phase);
     }
     case 'fx_aurora': {
       if (phase != 0) return;
-      const cols = [Color(0xFF34D399), Color(0xFF22D3EE), Color(0xFFA78BFA)];
-      for (var k = 0; k < 3; k++) {
-        final path = Path();
-        for (var i = 0; i <= 24; i++) {
-          final x = w * i / 24;
-          final y = h * (0.14 + 0.05 * k) + math.sin(i / 24 * math.pi * 3 + t * 0.4 + k) * h * 0.03;
-          if (i == 0) {
-            path.moveTo(x, y);
-          } else {
-            path.lineTo(x, y);
-          }
-        }
-        canvas.drawPath(
-          path,
-          Paint()
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = h * 0.05
-            ..color = cols[k].withValues(alpha: 0.16 + 0.06 * math.sin(t + k))
-            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 14),
-        );
-      }
+      _aurora(canvas, size, g, t);
     }
     case 'fx_fireworks': {
-      const cols = [Color(0xFFFF5A5A), Color(0xFFFFD54F), Color(0xFF60A5FA), Color(0xFFF472B6), Color(0xFF4ADE80)];
-      for (var k = 0; k < 3; k++) {
-        final tt = t + k * 0.9;
-        final cycle = (tt / 2.7).floor();
-        final p = (tt / 2.7) - cycle;
-        final seed = cycle * 3 + k;
-        final center = Offset(w * (0.15 + 0.7 * _rand(seed + 2000)), h * (0.12 + 0.18 * _rand(seed + 3000)));
-        final col = cols[seed % cols.length];
-        if (p < 0.25) {
-          final q = p / 0.25;
-          final y = g.groundY - (g.groundY - center.dy) * q;
-          canvas.drawCircle(Offset(center.dx, y), 2, Paint()..color = col);
-        } else {
-          final q = (p - 0.25) / 0.75;
-          final pa = Paint()..color = col.withValues(alpha: (1 - q).clamp(0.0, 1.0));
-          for (var i = 0; i < 18; i++) {
-            final a = i * math.pi * 2 / 18;
-            final pos = center + Offset(math.cos(a), math.sin(a)) * (q * w * 0.16) + Offset(0, q * q * 30);
-            canvas.drawCircle(pos, 2.4 * (1 - q) + 0.6, pa);
-          }
-        }
-      }
+      _fireworks(canvas, size, g, t);
     }
     case 'fx_bats': {
       final bat = Paint()..color = phase == 2 ? const Color(0xFF374151) : const Color(0xFF111111);
@@ -1035,4 +972,252 @@ bool _fxFront(Canvas canvas, Size size, _TreeGeo g, double t, int phase, String?
     }
   }
   return false;
+}
+
+
+// ==================================================================== Gunung Fuji
+
+void _fuji(Canvas canvas, Size size, _TreeGeo g, double t, int phase) {
+  final w = size.width;
+  final h = size.height;
+  // Puncak di kiri-atas supaya kelihatan di samping & di atas kanopi,
+  // tidak ketutup kartu HUD di tengah.
+  final cx = w * 0.27;
+  final peakY = math.max(g.canopy.dy - g.r * 1.35, h * 0.25);
+  final baseY = g.groundY - h * 0.03;
+  final top = w * 0.045;
+
+  final (Color hi, Color lo, Color snow, Color snowShade, Color mist) = switch (phase) {
+    0 => (const Color(0xFF4A5A8C), const Color(0xFF1B2347), const Color(0xFFDDE6FF), const Color(0xFF8E9CC8), const Color(0xFF6B7BB0)),
+    1 => (const Color(0xFF9A6E9E), const Color(0xFF4A3560), const Color(0xFFFFE3D6), const Color(0xFFC79AB6), const Color(0xFFF3B6A8)),
+    _ => (const Color(0xFF5E86C2), const Color(0xFFB4CDEB), const Color(0xFFFFFFFF), const Color(0xFFC9D8EE), const Color(0xFFE6F1FF)),
+  };
+
+  final mountain = Path()
+    ..moveTo(-w * 0.45, baseY)
+    ..cubicTo(-w * 0.05, baseY - h * 0.015, cx - w * 0.2, peakY + h * 0.11, cx - top, peakY)
+    ..lineTo(cx - top * 0.35, peakY - h * 0.004)
+    ..lineTo(cx + top * 0.25, peakY + h * 0.002)
+    ..lineTo(cx + top, peakY)
+    ..cubicTo(cx + w * 0.2, peakY + h * 0.11, w * 0.85, baseY - h * 0.015, w * 1.25, baseY)
+    ..close();
+
+  final bounds = Rect.fromLTRB(-w * 0.5, peakY - 10, w * 1.3, baseY + 2);
+  canvas.save();
+  canvas.clipPath(mountain);
+
+  // badan gunung
+  canvas.drawRect(
+    bounds,
+    Paint()
+      ..shader = ui.Gradient.linear(Offset(0, peakY), Offset(0, baseY), [hi, lo]),
+  );
+
+  // tudung salju bergerigi (dipotong rapi oleh bentuk gunung)
+  final capH = (baseY - peakY) * 0.30;
+  final snowPath = Path()
+    ..moveTo(cx - w * 0.6, peakY - 20)
+    ..lineTo(cx + w * 0.6, peakY - 20);
+  const n = 34;
+  for (var i = n; i >= 0; i--) {
+    final x = cx + (i / n * 2 - 1) * w * 0.42;
+    final long = i % 3 == 0;
+    final d = capH * (long ? 0.85 + 0.45 * _rand(i + 3100) : 0.45 + 0.25 * _rand(i + 3200));
+    snowPath.lineTo(x, peakY + d);
+  }
+  snowPath.close();
+  canvas.drawPath(
+    snowPath,
+    Paint()
+      ..shader = ui.Gradient.linear(Offset(0, peakY), Offset(0, peakY + capH * 1.3), [snow, snowShade]),
+  );
+
+  // alur lembah (garis halus dari puncak ke bawah)
+  final ridge = Paint()
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = 1.2
+    ..color = const Color(0x22000000);
+  for (var i = 0; i < 9; i++) {
+    final k = (i / 8) * 2 - 1;
+    final x0 = cx + k * top * 0.9;
+    canvas.drawLine(Offset(x0, peakY + 4), Offset(cx + k * w * 0.32, baseY), ridge);
+  }
+
+  // sisi kanan lebih gelap (cahaya dari kiri / bulan)
+  canvas.drawRect(
+    Rect.fromLTRB(cx, peakY - 10, w * 1.3, baseY + 2),
+    Paint()
+      ..shader = ui.Gradient.linear(
+        Offset(cx, 0),
+        Offset(cx + w * 0.5, 0),
+        [const Color(0x38000814), const Color(0x14000814)],
+      ),
+  );
+  canvas.restore();
+
+  // garis tepi tipis yang terkena cahaya
+  canvas.drawPath(
+    mountain,
+    Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1
+      ..color = snow.withValues(alpha: 0.18),
+  );
+
+  // kabut di kaki gunung, pelan bergeser
+  for (var k = 0; k < 3; k++) {
+    final y = baseY - h * (0.015 + 0.035 * k);
+    final dx = math.sin(t * 0.07 + k * 2) * w * 0.06;
+    canvas.drawOval(
+      Rect.fromCenter(center: Offset(w * 0.4 + dx, y), width: w * 1.5, height: h * 0.05),
+      Paint()
+        ..color = mist.withValues(alpha: phase == 2 ? 0.35 : 0.22)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 16),
+    );
+  }
+}
+
+// ==================================================================== Aurora
+
+void _aurora(Canvas canvas, Size size, _TreeGeo g, double t) {
+  final w = size.width;
+  final h = size.height;
+
+  // cahaya hijau samar yang memantul ke langit
+  canvas.drawOval(
+    Rect.fromCenter(center: Offset(w * 0.5, h * 0.3), width: w * 1.4, height: h * 0.3),
+    Paint()
+      ..color = const Color(0x1A34D399)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 40),
+  );
+
+  // Tirai cahaya: banyak "sinar" vertikal, tiap sinar gradasi hijau terang di
+  // bawah -> toska -> ungu memudar di atas. Digambar di layer blur + plus
+  // supaya menyala seperti aurora asli.
+  canvas.saveLayer(
+    Rect.fromLTWH(0, 0, w, g.groundY),
+    Paint()
+      ..imageFilter = ui.ImageFilter.blur(sigmaX: 4, sigmaY: 10)
+      ..blendMode = BlendMode.plus,
+  );
+  for (var curtain = 0; curtain < 3; curtain++) {
+    final strips = 80;
+    final sw = w / strips;
+    final baseH = h * (0.33 - curtain * 0.06);
+    final tall = h * (0.2 - curtain * 0.035);
+    final power = curtain == 0 ? 1.0 : (curtain == 1 ? 0.65 : 0.4);
+    for (var i = 0; i <= strips; i++) {
+      final k = i / strips;
+      final x = i * sw;
+      final base = baseH +
+          math.sin(k * math.pi * 2.0 + t * 0.22 + curtain * 1.9) * h * 0.055 +
+          math.sin(k * math.pi * 7 + t * 0.5 + curtain) * h * 0.01;
+      final ray = 0.5 + 0.5 * math.sin(k * 41 + t * 1.3 + curtain * 3);
+      final height = tall * (0.45 + 0.55 * ray);
+      final wave = 0.5 + 0.5 * math.sin(k * math.pi * 3.5 - t * 0.7 + curtain * 2);
+      final bright = (0.25 + 0.75 * wave * wave) * power;
+      final top = base - height;
+      canvas.drawRect(
+        Rect.fromLTRB(x, top, x + sw + 1, base + h * 0.012),
+        Paint()
+          ..shader = ui.Gradient.linear(
+            Offset(x, base + h * 0.012),
+            Offset(x, top),
+            [
+              const Color(0x0078FFAA),
+              Color.fromRGBO(110, 255, 170, 0.8 * bright),
+              Color.fromRGBO(45, 220, 200, 0.45 * bright),
+              Color.fromRGBO(170, 100, 255, 0.18 * bright),
+              const Color(0x00AA64FF),
+            ],
+            const [0.0, 0.06, 0.4, 0.75, 1.0],
+          ),
+      );
+    }
+  }
+  canvas.restore();
+}
+
+// ==================================================================== Kembang api
+
+void _fireworks(Canvas canvas, Size size, _TreeGeo g, double t) {
+  final w = size.width;
+  final h = size.height;
+  const palettes = [
+    [Color(0xFFFFE08A), Color(0xFFFF6B3D)],
+    [Color(0xFFB4F0FF), Color(0xFF3B82F6)],
+    [Color(0xFFFFC2E2), Color(0xFFEC4899)],
+    [Color(0xFFD9FFB3), Color(0xFF22C55E)],
+    [Color(0xFFFFF4C2), Color(0xFFF59E0B)],
+  ];
+  for (var k = 0; k < 3; k++) {
+    const period = 3.1;
+    final tt = t + k * 1.05;
+    final cycle = (tt / period).floor();
+    final p = tt / period - cycle;
+    final seed = cycle * 3 + k;
+    final center = Offset(w * (0.12 + 0.76 * _rand(seed + 2000)), h * (0.13 + 0.17 * _rand(seed + 3000)));
+    final pal = palettes[seed % palettes.length];
+    final start = Offset(center.dx + (_rand(seed + 4000) - 0.5) * w * 0.1, g.groundY);
+
+    if (p < 0.22) {
+      // roket naik + percikan ekor
+      final q = p / 0.22;
+      final e = 1 - (1 - q) * (1 - q);
+      final pos = Offset.lerp(start, center, e)!;
+      for (var j = 0; j < 6; j++) {
+        final back = Offset.lerp(start, center, math.max(0.0, e - j * 0.025))!;
+        canvas.drawCircle(
+          back + Offset((_rand(j + seed) - 0.5) * 3, 0),
+          1.6 - j * 0.2,
+          Paint()
+            ..color = pal[0].withValues(alpha: 0.7 - j * 0.1)
+            ..blendMode = BlendMode.plus,
+        );
+      }
+      canvas.drawCircle(pos, 2.4, Paint()..color = Colors.white);
+      continue;
+    }
+
+    final q = (p - 0.22) / 0.78;
+    // kilatan saat meledak
+    if (q < 0.12) {
+      canvas.drawCircle(
+        center,
+        w * 0.09 * (1 - q / 0.12),
+        Paint()
+          ..color = pal[0].withValues(alpha: 0.5 * (1 - q / 0.12))
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 18),
+      );
+    }
+    final ease = 1 - math.pow(1 - q, 3).toDouble();
+    final fade = (1 - q).clamp(0.0, 1.0);
+    final glowPaint = Paint()..blendMode = BlendMode.plus;
+    for (var ring = 0; ring < 2; ring++) {
+      final count = ring == 0 ? 28 : 18;
+      final radius = w * (ring == 0 ? 0.17 : 0.1);
+      for (var i = 0; i < count; i++) {
+        final a = i * math.pi * 2 / count + ring * 0.3 + seed;
+        final dir = Offset(math.cos(a), math.sin(a));
+        final drop = Offset(0, q * q * h * 0.06);
+        final pos = center + dir * (radius * ease) + drop;
+        final prevE = 1 - math.pow(1 - math.max(0.0, q - 0.07), 3).toDouble();
+        final prev = center + dir * (radius * prevE) + Offset(0, math.max(0.0, q - 0.07) * math.max(0.0, q - 0.07) * h * 0.06);
+        final col = Color.lerp(pal[0], pal[1], q)!;
+        // jejak
+        canvas.drawLine(
+          prev,
+          pos,
+          Paint()
+            ..strokeWidth = 1.6
+            ..strokeCap = StrokeCap.round
+            ..color = col.withValues(alpha: 0.55 * fade)
+            ..blendMode = BlendMode.plus,
+        );
+        // kerlip di akhir
+        final twinkle = q > 0.6 ? (0.5 + 0.5 * math.sin(t * 30 + i * 7)) : 1.0;
+        canvas.drawCircle(pos, 2.0 * fade + 0.4, glowPaint..color = col.withValues(alpha: fade * twinkle));
+      }
+    }
+  }
 }

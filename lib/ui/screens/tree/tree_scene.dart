@@ -1,7 +1,9 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:lottie/lottie.dart';
 
 import '../../../data/models/tree_models.dart';
 
@@ -219,8 +221,75 @@ class _TreeSceneState extends State<TreeScene> with SingleTickerProviderStateMix
             final slot = _TreeGeo(size, c.level).hitTest(d.localPosition, c);
             if (slot != null) widget.onFruitTap(slot);
           },
-          child: RepaintBoundary(
-            child: CustomPaint(size: size, painter: _painter),
+          child: Stack(
+            fit: StackFit.expand,
+            clipBehavior: Clip.none,
+            children: [
+              Positioned.fill(
+                child: RepaintBoundary(
+                  child: CustomPaint(size: size, painter: _painter),
+                ),
+              ),
+              _LottiePet(controller: widget.controller, size: size),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// Pet animasi Lottie (file dari bucket `tree-assets`). Ditaruh di atas
+/// pemandangan; pet di dahan/puncak ikut goyang bareng pohon.
+class _LottiePet extends StatelessWidget {
+  const _LottiePet({required this.controller, required this.size});
+
+  final TreeSceneController controller;
+  final Size size;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, _) {
+        final asset = controller.look.petAsset;
+        if (asset == null || size.isEmpty) return const SizedBox.shrink();
+        final g = _TreeGeo(size, controller.level);
+        final box = g.r * 0.8 * asset.scale;
+        Offset anchor; // titik bawah-tengah si pet
+        var sway = true;
+        switch (asset.place) {
+          case 'ground_left':
+            anchor = g.base + Offset(-g.r * 0.6, 4);
+            sway = false;
+          case 'canopy_top':
+            anchor = g.canopy + Offset(g.r * 0.25, -g.r * 0.82);
+          case 'branch_left':
+            anchor = g.canopy + Offset(-g.r * 0.5, g.r * 0.92);
+          case 'branch_right':
+            anchor = g.canopy + Offset(g.r * 0.5, g.r * 0.88);
+          default:
+            anchor = g.base + Offset(g.r * 0.6, 4);
+            sway = false;
+        }
+        final angle = sway ? g.angle(controller.t) : 0.0;
+        if (sway) anchor = g.rotate(anchor, angle);
+        return Positioned(
+          left: anchor.dx - box / 2,
+          top: anchor.dy - box,
+          width: box,
+          height: box,
+          child: IgnorePointer(
+            child: Transform.rotate(
+              angle: angle,
+              alignment: Alignment.bottomCenter,
+              child: Lottie.network(
+                asset.url,
+                key: ValueKey(asset.url),
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stack) => const SizedBox.shrink(),
+              ),
+            ),
           ),
         );
       },
@@ -315,7 +384,7 @@ class _TreePainter extends CustomPainter {
     _canopy(canvas, g, t, skin);
     _skinExtras(canvas, g, t, look.tree);
     if (look.treeDeco != 'deco_swing') _treeDeco(canvas, g, t, phase, look.treeDeco, c.clanTag);
-    _treePet(canvas, g, t, phase, look.pet);
+    if (look.petAsset == null) _treePet(canvas, g, t, phase, look.pet);
     for (var i = 0; i < kTreeSlots; i++) {
       if (!c.occupied[i] && !waiting.contains(i)) continue;
       final x = ((t - c.spawnAt[i]) / 0.45).clamp(0.0, 1.0);
@@ -332,7 +401,7 @@ class _TreePainter extends CustomPainter {
       final x = size.width * (i == 0 ? 0.17 : 0.83);
       _groundDeco(canvas, Offset(x, g.groundY + size.height * 0.012), u, t, phase, look.ground[i], c.username);
     }
-    _groundPet(canvas, g, t, phase, look.pet);
+    if (look.petAsset == null) _groundPet(canvas, g, t, phase, look.pet);
 
     _drops(canvas, size, g, t);
     _burst(canvas, g, t);
