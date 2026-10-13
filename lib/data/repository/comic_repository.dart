@@ -1,3 +1,4 @@
+import '../../core/content_filter.dart';
 import '../comic/comic_source.dart';
 import '../local/comic_store.dart';
 import '../models/comic_models.dart';
@@ -42,12 +43,24 @@ class ComicRepository {
   final Map<ComicSourceId, _CacheEntry<List<ComicGenreItem>>> _genresCache = {};
 
   // Tambahkan awalan sumber ke slug tiap komik di hasil list.
+  // Judul dewasa disaring kalau ContentFilter aktif (build Play).
   ComicListResponse _withKeys(ComicListResponse r, ComicSourceId source) =>
       r.copyWith(
         komikList: r.komikList
-            ?.map((e) => e.copyWith(slug: ComicKey.encode(source, e.slug)))
+            ?.where((e) => !ContentFilter.isBlockedTitle(e.title))
+            .map((e) => e.copyWith(slug: ComicKey.encode(source, e.slug)))
             .toList(),
       );
+
+  static void _guardDetail(ComicDetail d) {
+    if (!ContentFilter.enabled) return;
+    final genres = <String>[
+      for (final g in d.genres ?? const <ComicGenreRef>[]) ...[g.title, g.slug],
+    ];
+    if (ContentFilter.hasBlockedGenre(genres)) {
+      throw Exception('Komik ini tidak tersedia.');
+    }
+  }
 
   // ---- List per tab ----
 
@@ -98,6 +111,7 @@ class ComicRepository {
     }
     try {
       final detail = await _sourceOf(sourceId).detail(slug);
+      _guardDetail(detail);
       _detailCache[comicKey] = _CacheEntry(detail);
       return detail;
     } catch (_) {
@@ -123,7 +137,10 @@ class ComicRepository {
       return cached.data;
     }
     try {
-      final list = await _sourceOf(sourceId).genres();
+      final list = (await _sourceOf(sourceId).genres())
+          .where((g) => !ContentFilter.isBlockedGenre(g.title) &&
+              !ContentFilter.isBlockedGenre(g.slug))
+          .toList();
       _genresCache[sourceId] = _CacheEntry(list);
       return list;
     } catch (_) {

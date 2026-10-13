@@ -2,6 +2,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../data/repository/safety_repository.dart' show ReportChannel;
+import '../safety/safety_actions.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/comment_models.dart';
 import '../../../data/models/wallpaper_models.dart';
@@ -38,7 +40,10 @@ class CommentsSliver extends ConsumerWidget {
     final s = ref.watch(commentsControllerProvider(args));
     final ctrl = ref.read(commentsControllerProvider(args).notifier);
     final myUid = ref.watch(authUserProvider.select((a) => a.valueOrNull?.uid)) ?? '';
-    final top = s.sortedTopLevel;
+    final blocked = ref.watch(blockedUsersProvider);
+    final top = blocked.isEmpty
+        ? s.sortedTopLevel
+        : s.sortedTopLevel.where((c) => !blocked.contains(c.firebaseUid)).toList();
 
     return SliverMainAxisGroup(
       slivers: [
@@ -150,6 +155,20 @@ class CommentsSliver extends ConsumerWidget {
                   showCommentThreadSheet(context, args: args, meta: meta);
                 },
                 onDeleteClick: () => ctrl.deleteComment(c),
+                onReportClick: myUid.isEmpty
+                    ? null
+                    : () => showReportSheet(
+                          context,
+                          ref,
+                          targetUid: c.firebaseUid,
+                          targetName: c.username,
+                          channel: ReportChannel.comment,
+                          messageId: c.id,
+                          messageText: c.comment,
+                        ),
+                onBlockClick: myUid.isEmpty
+                    ? null
+                    : () => confirmBlockUser(context, ref, uid: c.firebaseUid, name: c.username),
               );
             },
           ),
@@ -216,7 +235,10 @@ class _ThreadSheet extends ConsumerWidget {
         break;
       }
     }
-    final replies = s.repliesByParent[threadId] ?? const <EpisodeComment>[];
+    final blocked = ref.watch(blockedUsersProvider);
+    final replies = (s.repliesByParent[threadId] ?? const <EpisodeComment>[])
+        .where((c) => !blocked.contains(c.firebaseUid))
+        .toList();
     final keyboard = MediaQuery.viewInsetsOf(context).bottom;
     final maxH = MediaQuery.sizeOf(context).height * 0.9;
 
@@ -234,6 +256,20 @@ class _ThreadSheet extends ConsumerWidget {
           isDeleting: s.deletingCommentId == c.id,
           onReplyClick: onReply,
           onDeleteClick: () => ctrl.deleteComment(c),
+          onReportClick: myUid.isEmpty
+              ? null
+              : () => showReportSheet(
+                    context,
+                    ref,
+                    targetUid: c.firebaseUid,
+                    targetName: c.username,
+                    channel: ReportChannel.comment,
+                    messageId: c.id,
+                    messageText: c.comment,
+                  ),
+          onBlockClick: myUid.isEmpty
+              ? null
+              : () => confirmBlockUser(context, ref, uid: c.firebaseUid, name: c.username),
         );
 
     return Padding(
@@ -501,6 +537,8 @@ class CommentItem extends StatelessWidget {
     required this.isDeleting,
     required this.onReplyClick,
     required this.onDeleteClick,
+    this.onReportClick,
+    this.onBlockClick,
   });
 
   final EpisodeComment comment;
@@ -521,6 +559,10 @@ class CommentItem extends StatelessWidget {
   final bool isDeleting;
   final VoidCallback onReplyClick;
   final VoidCallback onDeleteClick;
+
+  /// Laporkan / blokir pengirim (komentar orang lain). null = tidak tampil.
+  final VoidCallback? onReportClick;
+  final VoidCallback? onBlockClick;
 
   @override
   Widget build(BuildContext context) {
@@ -609,6 +651,44 @@ class CommentItem extends StatelessWidget {
                                 ],
                               ),
                             ),
+                          ],
+                        ),
+                      ),
+                    if (!isOwn && (onReportClick != null || onBlockClick != null))
+                      SizedBox(
+                        width: 26,
+                        height: 22,
+                        child: PopupMenuButton<String>(
+                          padding: EdgeInsets.zero,
+                          color: AppColors.surfaceElevated,
+                          icon: const Icon(Icons.more_vert, size: 16, color: Color(0x80FFFFFF)),
+                          onSelected: (v) {
+                            if (v == 'report') onReportClick?.call();
+                            if (v == 'block') onBlockClick?.call();
+                          },
+                          itemBuilder: (_) => [
+                            if (onReportClick != null)
+                              const PopupMenuItem<String>(
+                                value: 'report',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.flag_outlined, size: 18, color: AppColors.textWhite),
+                                    SizedBox(width: 8),
+                                    Text('Laporkan', style: TextStyle(color: AppColors.textWhite)),
+                                  ],
+                                ),
+                              ),
+                            if (onBlockClick != null)
+                              const PopupMenuItem<String>(
+                                value: 'block',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.block, size: 18, color: AppColors.errorRed),
+                                    SizedBox(width: 8),
+                                    Text('Blokir', style: TextStyle(color: AppColors.errorRed)),
+                                  ],
+                                ),
+                              ),
                           ],
                         ),
                       ),

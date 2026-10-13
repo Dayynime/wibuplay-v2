@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../../core/apk_downloader.dart';
+import '../../../core/build_flags.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/update_checker.dart';
 import 'force_update_screen.dart';
@@ -56,6 +57,13 @@ class _UpdateGateState extends State<UpdateGate> {
 
   Future<void> _check() async {
     if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
+      if (mounted) setState(() => _phase = _Phase.ok);
+      return;
+    }
+    // Build Google Play: update ditangani Play Store. Aplikasi dari Play
+    // dilarang mengunduh/memasang APK sendiri, jadi cek GitHub dilewati.
+    if (BuildFlags.isPlay) {
+      if (widget.minSplash > Duration.zero) await Future<void>.delayed(widget.minSplash);
       if (mounted) setState(() => _phase = _Phase.ok);
       return;
     }

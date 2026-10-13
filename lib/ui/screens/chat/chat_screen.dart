@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
+import '../../../data/repository/safety_repository.dart' show ReportChannel;
+import '../safety/safety_actions.dart';
 import '../../../core/error_message.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
@@ -187,6 +189,35 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   );
                 },
               ),
+            if (m.firebaseUid != s.myUid && s.myUid.isNotEmpty) ...[
+              ListTile(
+                leading: const Icon(Icons.flag_outlined, color: AppColors.errorRed),
+                title: const Text('Laporkan pesan', style: TextStyle(color: AppColors.textWhite)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  showReportSheet(
+                    context,
+                    ref,
+                    targetUid: m.firebaseUid,
+                    targetName: m.username,
+                    channel: ReportChannel.global,
+                    messageId: m.id,
+                    messageText: m.message,
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.block, color: AppColors.errorRed),
+                title: Text(
+                  'Blokir ${m.username}',
+                  style: const TextStyle(color: AppColors.textWhite),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  confirmBlockUser(context, ref, uid: m.firebaseUid, name: m.username);
+                },
+              ),
+            ],
             // Pesan gift/giveaway permanen (tidak bisa dihapus siapa pun).
             if ((m.firebaseUid == s.myUid || s.canDeleteOthers) && !m.isGift && !m.isGiveaway)
               ListTile(
@@ -337,7 +368,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         child: CircularProgressIndicator(color: AppColors.accentViolet, strokeWidth: 3),
       );
     }
-    if (s.messages.isEmpty) {
+    // Pesan dari pengguna yang diblokir disembunyikan.
+    final blocked = ref.watch(blockedUsersProvider);
+    final msgs = blocked.isEmpty
+        ? s.messages
+        : s.messages.where((m) => !blocked.contains(m.firebaseUid)).toList();
+    if (msgs.isEmpty) {
       return const Center(
         child: Text(
           'Belum ada pesan. Jadi yang pertama!',
@@ -345,7 +381,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         ),
       );
     }
-    final msgs = s.messages;
     // reverse: true -> pesan terbaru menempel di bawah dan list tetap di sana.
     return ScrollablePositionedList.builder(
       itemScrollController: _itemScroll,

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
 
+import '../../core/content_filter.dart';
 import '../../core/firebase_config.dart';
 import '../../core/json_helper.dart';
 import '../api/api_service.dart';
@@ -171,7 +172,9 @@ class AnimeRepository {
     final cached = _cachedGenres;
     if (cached != null && cached.isNotEmpty) return cached;
     final resp = await _api.getGenreList();
-    final list = JsonHelper.parseGenreList(resp.data);
+    final list = JsonHelper.parseGenreList(resp.data)
+        .where((g) => !ContentFilter.isBlockedGenre(g.name ?? ''))
+        .toList();
     _cachedGenres = list;
     return list;
   }

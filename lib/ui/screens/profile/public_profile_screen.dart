@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../data/repository/safety_repository.dart' show ReportChannel;
+import '../safety/safety_actions.dart';
 import '../../../core/error_message.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/local/entities.dart';
@@ -165,6 +167,44 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
               ),
             ),
           ),
+          // Laporkan / blokir profil orang lain.
+          if (!_isMe && _myUid.isNotEmpty)
+            Positioned(
+              top: MediaQuery.paddingOf(context).top + 8,
+              right: 8,
+              child: Material(
+                color: const Color(0x59000000),
+                shape: const CircleBorder(),
+                child: PopupMenuButton<String>(
+                  tooltip: 'Lainnya',
+                  color: AppColors.surfaceDark,
+                  icon: const Icon(Icons.more_vert, color: Colors.white),
+                  onSelected: (v) {
+                    if (v == 'report') {
+                      showReportSheet(
+                        context,
+                        ref,
+                        targetUid: uid,
+                        targetName: name,
+                        channel: ReportChannel.profile,
+                      );
+                    } else if (v == 'block') {
+                      confirmBlockUser(context, ref, uid: uid, name: name);
+                    }
+                  },
+                  itemBuilder: (_) => const [
+                    PopupMenuItem(
+                      value: 'report',
+                      child: Text('Laporkan profil', style: TextStyle(color: AppColors.textWhite)),
+                    ),
+                    PopupMenuItem(
+                      value: 'block',
+                      child: Text('Blokir pengguna', style: TextStyle(color: AppColors.errorRed)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
     );

@@ -30,13 +30,20 @@ class IntegrityGuard {
     }
   }
 
+  /// Boleh lebih dari satu SHA-256, dipisah koma. Build Play memakai SHA-256
+  /// kunci Play App Signing (Play Console > Integritas aplikasi), karena Google
+  /// menandatangani ulang aplikasi; kunci upload TIDAK cocok di perangkat user.
   static Future<bool> _isSignatureTampered() async {
-    final expected = _expectedSig.replaceAll(':', '').trim().toLowerCase();
+    final expected = _expectedSig
+        .split(',')
+        .map((e) => e.replaceAll(':', '').trim().toLowerCase())
+        .where((e) => e.isNotEmpty)
+        .toSet();
     if (expected.isEmpty) return false;
     try {
       final hashes = await _ch.invokeListMethod<String>('signatureHashes');
       if (hashes == null || hashes.isEmpty) return false;
-      return !hashes.contains(expected);
+      return !hashes.any((h) => expected.contains(h.toLowerCase()));
     } catch (_) {
       return false;
     }

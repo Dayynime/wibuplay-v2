@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../data/repository/safety_repository.dart' show ReportChannel;
+import '../../../providers.dart';
+import '../safety/safety_actions.dart';
 import '../../../core/theme/app_colors.dart';
 import '../gift/gift_premium_sheet.dart';
 import '../../../data/models/friend_models.dart';
@@ -87,6 +90,24 @@ class _PrivateChatPaneState extends ConsumerState<PrivateChatPane> {
                 Clipboard.setData(ClipboardData(text: m.message));
               },
             ),
+            if (m.senderUid != widget.myUid)
+              ListTile(
+                leading: const Icon(Icons.flag_outlined, color: AppColors.errorRed),
+                title: const Text('Laporkan pesan', style: TextStyle(color: AppColors.textWhite)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  final friend = ref.read(privateChatControllerProvider).selected;
+                  showReportSheet(
+                    context,
+                    ref,
+                    targetUid: m.senderUid,
+                    targetName: friend?.username ?? 'Pengguna',
+                    channel: ReportChannel.private,
+                    messageId: m.id,
+                    messageText: m.message,
+                  );
+                },
+              ),
           ],
         ),
       ),
@@ -116,7 +137,8 @@ class _PrivateChatPaneState extends ConsumerState<PrivateChatPane> {
           ),
         _DmInputBar(
           controller: _input,
-          enabled: s.selected != null,
+          enabled: s.selected != null &&
+              !ref.watch(blockedUsersProvider).contains(s.selected!.firebaseUid),
           isSending: s.isSending,
           onSend: _send,
         ),
@@ -125,8 +147,11 @@ class _PrivateChatPaneState extends ConsumerState<PrivateChatPane> {
   }
 
   Widget _buildContent(PrivateChatState s) {
+    final blocked = ref.watch(blockedUsersProvider);
     final selected = s.selected;
-    if (selected != null) return _buildConversation(s, selected);
+    if (selected != null && !blocked.contains(selected.firebaseUid)) {
+      return _buildConversation(s, selected);
+    }
     if (s.isLoading) {
       return const Center(
         child: CircularProgressIndicator(color: AppColors.accentViolet, strokeWidth: 3),
@@ -153,13 +178,16 @@ class _PrivateChatPaneState extends ConsumerState<PrivateChatPane> {
         ),
       );
     }
-    if (s.conversations.isEmpty) return const _EmptyConversations();
+    final conversations = blocked.isEmpty
+        ? s.conversations
+        : s.conversations.where((c) => !blocked.contains(c.friend.firebaseUid)).toList();
+    if (conversations.isEmpty) return const _EmptyConversations();
     return ListView.separated(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      itemCount: s.conversations.length,
+      itemCount: conversations.length,
       separatorBuilder: (_, __) => const SizedBox(height: 8),
       itemBuilder: (context, i) {
-        final item = s.conversations[i];
+        final item = conversations[i];
         return _ConversationRow(
           key: ValueKey(item.friend.friendshipId),
           item: item,
@@ -224,6 +252,40 @@ class _PrivateChatPaneState extends ConsumerState<PrivateChatPane> {
                   }
                 },
                 icon: const Icon(Icons.card_giftcard, color: Color(0xFFF5B73B)),
+              ),
+              PopupMenuButton<String>(
+                tooltip: 'Lainnya',
+                color: AppColors.surfaceDark,
+                icon: const Icon(Icons.more_vert, color: Colors.white),
+                onSelected: (v) async {
+                  if (v == 'report') {
+                    showReportSheet(
+                      context,
+                      ref,
+                      targetUid: friend.firebaseUid,
+                      targetName: friend.username,
+                      channel: ReportChannel.private,
+                    );
+                  } else if (v == 'block') {
+                    final done = await confirmBlockUser(
+                      context,
+                      ref,
+                      uid: friend.firebaseUid,
+                      name: friend.username,
+                    );
+                    if (done && mounted) _controller.closeChat();
+                  }
+                },
+                itemBuilder: (_) => const [
+                  PopupMenuItem(
+                    value: 'report',
+                    child: Text('Laporkan', style: TextStyle(color: AppColors.textWhite)),
+                  ),
+                  PopupMenuItem(
+                    value: 'block',
+                    child: Text('Blokir', style: TextStyle(color: AppColors.errorRed)),
+                  ),
+                ],
               ),
             ],
           ),

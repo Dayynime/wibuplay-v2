@@ -2,7 +2,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/build_flags.dart';
 import '../../../core/firebase_config.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
@@ -15,6 +17,7 @@ import '../admin/admin_screen.dart';
 import '../auth/login_screen.dart';
 import '../chat/chat_screen.dart';
 import '../download/downloads_screen.dart';
+import '../safety/safety_actions.dart';
 import '../friends/friends_screen.dart';
 import '../wallpaper/wallpaper_screen.dart';
 import 'profile_screen.dart' show ProfileAvatar, showEditProfileSheet;
@@ -464,6 +467,56 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
               title: 'Bersihkan Cache Memori',
               subtitle: 'Mengosongkan cache cover dan metadata',
               onTap: _clearCache,
+            ),
+
+            // ------------------------------------------------- Privasi & Keamanan
+            const SizedBox(height: 22),
+            const _GroupLabel('Privasi & Keamanan'),
+            _GroupCard(
+              children: [
+                if (FirebaseConfig.ready && FirebaseAuth.instance.currentUser != null) ...[
+                  _SettingsRow(
+                    leading: const _IconChip(icon: Icons.block),
+                    title: 'Pengguna Diblokir',
+                    subtitle: 'Lihat dan buka blokir pengguna',
+                    trailing: const Icon(Icons.chevron_right, color: AppColors.textMuted),
+                    onTap: () => Navigator.of(context)
+                        .push<void>(fadeRoute(const BlockedUsersScreen())),
+                  ),
+                  const _RowDivider(),
+                ],
+                _SettingsRow(
+                  leading: const _IconChip(icon: Icons.privacy_tip_outlined),
+                  title: 'Kebijakan Privasi',
+                  subtitle: 'Data apa yang kami kumpulkan dan untuk apa',
+                  trailing: const Icon(Icons.open_in_new, color: AppColors.textMuted, size: 18),
+                  onTap: () => launchUrl(
+                    Uri.parse(BuildFlags.privacyUrl),
+                    mode: LaunchMode.externalApplication,
+                  ),
+                ),
+                const _RowDivider(),
+                _SettingsRow(
+                  leading: const _IconChip(icon: Icons.gavel_outlined),
+                  title: 'Ketentuan Layanan',
+                  subtitle: 'Aturan komunitas dan penggunaan',
+                  trailing: const Icon(Icons.open_in_new, color: AppColors.textMuted, size: 18),
+                  onTap: () => launchUrl(
+                    Uri.parse(BuildFlags.termsUrl),
+                    mode: LaunchMode.externalApplication,
+                  ),
+                ),
+                if (FirebaseConfig.ready && FirebaseAuth.instance.currentUser != null) ...[
+                  const _RowDivider(),
+                  _SettingsRow(
+                    leading: const _IconChip(icon: Icons.person_remove_outlined),
+                    title: 'Hapus Akun',
+                    subtitle: 'Hapus akun dan semua datamu secara permanen',
+                    trailing: const Icon(Icons.chevron_right, color: AppColors.textMuted),
+                    onTap: () => startDeleteAccount(context, ref),
+                  ),
+                ],
+              ],
             ),
 
             // ----------------------------------------------------------- Tentang

@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/dio_client.dart';
+import 'core/firebase_config.dart';
 import 'data/api/anichin_network.dart';
 import 'data/api/premium_token_manager.dart';
 import 'data/models/anichin_models.dart';
@@ -17,6 +18,7 @@ import 'data/repository/auth_repository.dart';
 import 'data/repository/chat_repository.dart';
 import 'data/repository/clan_repository.dart';
 import 'data/repository/public_profile_repository.dart';
+import 'data/repository/safety_repository.dart';
 import 'data/repository/comment_repository.dart';
 import 'data/repository/friend_repository.dart';
 import 'data/repository/private_chat_repository.dart';
@@ -440,3 +442,56 @@ final incomingFriendRequestsProvider = FutureProvider.autoDispose<int>((ref) asy
     return 0;
   }
 });
+
+// ---------------------------------------------------------------------------
+// Keamanan: laporkan, blokir, hapus akun (Edge Function `zenime-safety`).
+
+final safetyRepositoryProvider = Provider<SafetyRepository>(
+  (ref) => SafetyRepository(ref.watch(supabaseDioProvider)),
+);
+
+/// Set uid yang diblokir user yang sedang login. Pesan dari uid ini
+/// disembunyikan di Chat Global dan percakapan DM-nya ditutup.
+final blockedUsersProvider =
+    NotifierProvider<BlockedUsersNotifier, Set<String>>(BlockedUsersNotifier.new);
+
+class BlockedUsersNotifier extends Notifier<Set<String>> {
+  bool _loaded = false;
+
+  @override
+  Set<String> build() {
+    // Ganti akun / logout -> daftar blokir dimuat ulang.
+    ref.watch(authUserProvider.select((a) => a.valueOrNull?.uid));
+    _loaded = false;
+    Future.microtask(refresh);
+    return const {};
+  }
+
+  bool get _loggedIn =>
+      FirebaseConfig.ready && FirebaseAuth.instance.currentUser != null;
+
+  Future<void> refresh() async {
+    if (!_loggedIn) return;
+    try {
+      final list = await ref.read(safetyRepositoryProvider).listBlocks();
+      state = list.map((e) => e.uid).toSet();
+      _loaded = true;
+    } catch (_) {
+      // Gagal ambil daftar: biarkan state lama, coba lagi nanti.
+    }
+  }
+
+  Future<void> ensureLoaded() async {
+    if (!_loaded) await refresh();
+  }
+
+  Future<void> block(String uid) async {
+    await ref.read(safetyRepositoryProvider).block(uid);
+    state = {...state, uid};
+  }
+
+  Future<void> unblock(String uid) async {
+    await ref.read(safetyRepositoryProvider).unblock(uid);
+    state = {...state}..remove(uid);
+  }
+}
