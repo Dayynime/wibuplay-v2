@@ -344,16 +344,9 @@ void _limb(Canvas canvas, Offset a, Offset b, double wa, double wb, Paint paint,
     final inner = (cl.c - g.canopy).distance < r * 0.45;
     if (inner && rnd.nextDouble() < 0.3) continue;
     final rect = Rect.fromCircle(center: cl.c, radius: cl.r * 0.92);
-    canvas.drawCircle(
-      cl.c,
-      cl.r * 0.78,
-      Paint()
-        ..shader = ui.Gradient.radial(
-          cl.c + Offset(-cl.r * 0.35, -cl.r * 0.45),
-          cl.r * 1.3,
-          [mid, dark],
-        ),
-    );
+    // isi gerombol pakai daun gelap (bukan bulatan polos) supaya tidak kelihatan seperti bola
+    canvas.drawCircle(cl.c, cl.r * 0.55, Paint()..color = dark);
+    _drawLeaves(canvas, _Cluster(cl.c, cl.r * 0.85), rnd, (cl.r / r * 160).round().clamp(14, 50), r, mid, dark, hueJ, size: 1.3);
     _drawLeaves(canvas, cl, rnd, (cl.r / r * 300).round().clamp(26, 95), r, hi, dark, hueJ);
     _drawLeaves(
       canvas,
