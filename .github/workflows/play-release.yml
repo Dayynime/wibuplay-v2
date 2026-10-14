@@ -118,6 +118,14 @@ jobs:
               s = s.replace('<application', '<uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>\n    <application', 1)
           s = re.sub(r'\s*<uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"\s*/>', '', s)
           s = s.replace('<application', '<uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" tools:node="remove"/>\n    <application', 1)
+          # Izin media dibuang: plugin open_filex menambahkan READ_MEDIA_* dan
+          # Google Play mewajibkan deklarasi khusus untuk izin foto/video.
+          # Pilih foto profil/clan memakai Photo Picker (image_picker), tanpa izin.
+          for perm in ['READ_MEDIA_IMAGES', 'READ_MEDIA_VIDEO', 'READ_MEDIA_AUDIO',
+                       'READ_MEDIA_VISUAL_USER_SELECTED', 'READ_EXTERNAL_STORAGE',
+                       'WRITE_EXTERNAL_STORAGE', 'MANAGE_EXTERNAL_STORAGE']:
+              s = re.sub(r'\s*<uses-permission android:name="android.permission.%s"[^>]*/>' % perm, '', s)
+              s = s.replace('<application', '<uses-permission android:name="android.permission.%s" tools:node="remove"/>\n    <application' % perm, 1)
           if 'supportsPictureInPicture' not in s:
               s = s.replace('<activity', '<activity android:supportsPictureInPicture="true"', 1)
           if 'networkSecurityConfig' not in s:
