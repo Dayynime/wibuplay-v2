@@ -100,7 +100,8 @@ class FramedAvatar extends ConsumerWidget {
       id = ref.watch(avatarFrameCacheProvider.select((m) => m[uid]));
     }
     final asset = avatarFrameAsset(id);
-    final ext = size * (kAvatarFrameScale - 1) / 2;
+    final scale = avatarFrameScale(id);
+    final ext = size * (scale - 1) / 2;
     return SizedBox(
       width: size,
       height: size,
@@ -112,8 +113,8 @@ class FramedAvatar extends ConsumerWidget {
             Positioned(
               left: -ext,
               top: -ext,
-              width: size * kAvatarFrameScale,
-              height: size * kAvatarFrameScale,
+              width: size * scale,
+              height: size * scale,
               child: IgnorePointer(
                 child: Image.asset(
                   asset,

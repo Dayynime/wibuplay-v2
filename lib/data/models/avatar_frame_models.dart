@@ -11,12 +11,19 @@ const Map<String, String> kAvatarFrameAssets = {
   'petir': 'assets/frames/petir.webp',
   'sakura': 'assets/frames/sakura.webp',
   'galaksi': 'assets/frames/galaksi.webp',
+  'malaikat': 'assets/frames/malaikat.webp',
 };
 
 String? avatarFrameAsset(String? id) => id == null ? null : kAvatarFrameAssets[id];
 
-/// Avatar mengisi 80% kanvas border, jadi border = 1.25x ukuran avatar.
+/// Ukuran kanvas border dibanding avatar. Default 1.25 (avatar mengisi 80%
+/// kanvas). Border dengan hiasan besar (sayap, halo) pakai kanvas lebih lebar.
 const double kAvatarFrameScale = 1.25;
+const Map<String, double> _kFrameScaleById = {
+  'malaikat': 1.8,
+};
+
+double avatarFrameScale(String? id) => _kFrameScaleById[id] ?? kAvatarFrameScale;
 
 int _int(Object? v) => (v as num?)?.toInt() ?? 0;
 

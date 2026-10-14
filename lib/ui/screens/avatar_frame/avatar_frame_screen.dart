@@ -207,13 +207,13 @@ class _AvatarFrameScreenState extends ConsumerState<AvatarFrameScreen> {
     final item = _item;
     return Column(
       children: [
-        const SizedBox(height: 28),
+        const SizedBox(height: 52),
         FramedAvatar.preview(
           frameId: _selected,
           size: 120,
           child: UserAvatar(username: name, url: avatarUrl, size: 120),
         ),
-        const SizedBox(height: 22),
+        SizedBox(height: 22 + 120 * (avatarFrameScale(_selected) - 1.25) / 2),
         Text(
           item?.name ?? '',
           style: const TextStyle(
@@ -368,7 +368,8 @@ class _FrameTile extends StatelessWidget {
                 child: Center(
                   child: FramedAvatar.preview(
                     frameId: item.id,
-                    size: 56,
+                    // Border selalu muat di kotak, apa pun ukuran kanvasnya.
+                    size: 72 / avatarFrameScale(item.id),
                     child: Container(
                       decoration: const BoxDecoration(
                         color: AppColors.surfaceVariantDark,
