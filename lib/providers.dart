@@ -35,6 +35,7 @@ import 'data/repository/store_repository.dart';
 import 'data/models/store_models.dart';
 import 'data/repository/xp_repository.dart';
 import 'data/repository/wallpaper_repository.dart';
+import 'data/repository/avatar_frame_repository.dart';
 import 'data/repository/gift_repository.dart';
 import 'data/repository/tree_repository.dart';
 import 'data/supabase/supabase_client.dart';
@@ -142,6 +143,10 @@ final treeRepositoryProvider = Provider<TreeRepository>(
 /// Wallpaper Komentar (gacha spin, koleksi, panel admin).
 final wallpaperRepositoryProvider = Provider<WallpaperRepository>(
   (ref) => WallpaperRepository(ref.watch(supabaseDioProvider)),
+);
+
+final avatarFrameRepositoryProvider = Provider<AvatarFrameRepository>(
+  (ref) => AvatarFrameRepository(ref.watch(supabaseDioProvider)),
 );
 
 final xpRepositoryProvider = Provider<XpRepository>(

@@ -12,6 +12,7 @@ import '../../components/game_badges.dart';
 import '../../components/role_badges.dart';
 import 'comments_controller.dart';
 import '../profile/public_profile_screen.dart';
+import '../../components/avatar_frame.dart';
 
 const Color _kPinnedGold = Color(0xFFE8A317);
 const Color _kSheetColor = AppColors.backgroundDarkSecondary;
@@ -415,10 +416,14 @@ class _CommentInputRowState extends ConsumerState<CommentInputRow> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: Row(
         children: [
-          UserAvatar(
-            username: profile?.username ?? '',
-            url: profile?.avatarUrl,
+          FramedAvatar(
+            uid: uid,
             size: 32,
+            child: UserAvatar(
+              username: profile?.username ?? '',
+              url: profile?.avatarUrl,
+              size: 32,
+            ),
           ),
           const SizedBox(width: 8),
           Expanded(
@@ -582,7 +587,11 @@ class CommentItem extends StatelessWidget {
           GestureDetector(
             behavior: HitTestBehavior.opaque,
             onTap: () => openPublicProfile(context, comment.firebaseUid),
-            child: UserAvatar(username: comment.username, url: avatarUrl, size: 34),
+            child: FramedAvatar(
+              uid: comment.firebaseUid,
+              size: 34,
+              child: UserAvatar(username: comment.username, url: avatarUrl, size: 34),
+            ),
           ),
           const SizedBox(width: 10),
           Expanded(

@@ -24,6 +24,7 @@ import '../profile/public_profile_screen.dart';
 import 'private_chat_controller.dart';
 import 'private_chat_pane.dart';
 import 'chat_controller.dart';
+import '../../components/avatar_frame.dart';
 
 Color? _parseHex(String? hex) {
   if (hex == null) return null;
@@ -761,18 +762,22 @@ class _MessageBubble extends StatelessWidget {
       ),
     );
 
-    final avatar = CircleAvatar(
-      radius: 16,
-      backgroundColor: AppColors.surfaceVariantDark,
-      backgroundImage: (avatarUrl != null && avatarUrl!.isNotEmpty)
-          ? CachedNetworkImageProvider(avatarUrl!)
-          : null,
-      child: (avatarUrl == null || avatarUrl!.isEmpty)
-          ? Text(
-              m.username.isEmpty ? '?' : m.username.characters.first.toUpperCase(),
-              style: const TextStyle(color: AppColors.textWhite, fontSize: 13),
-            )
-          : null,
+    final avatar = FramedAvatar(
+      uid: m.firebaseUid,
+      size: 32,
+      child: CircleAvatar(
+        radius: 16,
+        backgroundColor: AppColors.surfaceVariantDark,
+        backgroundImage: (avatarUrl != null && avatarUrl!.isNotEmpty)
+            ? CachedNetworkImageProvider(avatarUrl!)
+            : null,
+        child: (avatarUrl == null || avatarUrl!.isEmpty)
+            ? Text(
+                m.username.isEmpty ? '?' : m.username.characters.first.toUpperCase(),
+                style: const TextStyle(color: AppColors.textWhite, fontSize: 13),
+              )
+            : null,
+      ),
     );
 
     return Padding(

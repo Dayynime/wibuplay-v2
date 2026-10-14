@@ -27,6 +27,7 @@ import 'settings_screen.dart';
 import '../comic/comic_profile_section.dart';
 import '../xp/xp_leaderboard_screen.dart';
 import 'profile_controller.dart';
+import '../../components/avatar_frame.dart';
 
 /// Profil Saya ala Zenime: banner full-bleed menyatu dengan avatar, identitas
 /// + badge (level, clan, role) di bawah avatar, stat row 4 kolom, tombol pill
@@ -160,7 +161,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           child: Column(
             children: [
               // Avatar polos, tanpa border/ring.
-              ProfileAvatar(url: avatarUrl, seed: uid.isEmpty ? name : uid, label: name, size: 120),
+              FramedAvatar(
+                uid: uid,
+                size: 120,
+                child: ProfileAvatar(url: avatarUrl, seed: uid.isEmpty ? name : uid, label: name, size: 120),
+              ),
               const SizedBox(height: 14),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),

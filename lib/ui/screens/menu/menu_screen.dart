@@ -12,6 +12,7 @@ import '../store/coin_screen.dart';
 import '../store/premium_screen.dart';
 import '../tree/tree_screen.dart';
 import '../wallpaper/wallpaper_screen.dart';
+import '../avatar_frame/avatar_frame_screen.dart';
 
 // Poster sama dengan slide onboarding (CDN publik MyAnimeList, tidak di-bundle).
 const String _kDonghuaPoster = 'https://cdn.myanimelist.net/images/anime/1438/101531l.jpg';
@@ -149,6 +150,19 @@ class MenuScreen extends ConsumerWidget {
                 colors: [Color(0xFF0F3D2A), Color(0xFF1F8A4C), Color(0xFFF59E0B)],
               ),
               onTap: () => Navigator.of(context).push<void>(fadeRoute(const TreeScreen())),
+            ),
+            const SizedBox(height: 14),
+            _MenuCard(
+              title: 'Border Avatar',
+              subtitle: 'Hias avatarmu dengan border animasi',
+              icon: Icons.blur_circular,
+              accent: const Color(0xFF22D3EE),
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF0B2A4A), Color(0xFF7C3AED), Color(0xFF22D3EE)],
+              ),
+              onTap: () => Navigator.of(context).push<void>(fadeRoute(const AvatarFrameScreen())),
             ),
           ],
         ),
