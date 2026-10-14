@@ -13,6 +13,10 @@ on:
         description: 'Buat GitHub Release + upload APK?'
         type: boolean
         default: false
+      adi_snippet:
+        description: 'Opsional: snippet verifikasi developer Android (isi adi-registration.properties). Kosongkan untuk rilis biasa.'
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -165,6 +169,18 @@ jobs:
           rm -f "$RES"/mipmap-*/ic_launcher.png "$RES"/mipmap-*/ic_launcher_round.png
           cp -r android_res/. "$RES/"
           ls "$RES/mipmap-xxxhdpi" "$RES/drawable"
+
+      # Hanya untuk pendaftaran nama paket (Verifikasi developer Android):
+      # snippet dari Play Console ditaruh di assets APK.
+      - name: Sisipkan adi-registration.properties (opsional)
+        if: ${{ inputs.adi_snippet != '' }}
+        env:
+          ADI_SNIPPET: ${{ inputs.adi_snippet }}
+        run: |
+          mkdir -p android/app/src/main/assets
+          printf '%s\n' "$ADI_SNIPPET" > android/app/src/main/assets/adi-registration.properties
+          echo "Isi adi-registration.properties:"
+          cat android/app/src/main/assets/adi-registration.properties
 
       - name: Ambil dependency
         run: flutter pub get
