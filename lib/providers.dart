@@ -214,6 +214,16 @@ final chatProfileProvider = FutureProvider.family<ChatProfile?, String>((ref, ui
   }
 });
 
+/// Tanggal gabung Zenime per uid (Stat "Join Zenime" di profil). Gagal = null.
+final joinDateProvider = FutureProvider.family<DateTime?, String>((ref, uid) async {
+  if (uid.isEmpty) return null;
+  try {
+    return await ref.watch(chatRepositoryProvider).getJoinDate(uid);
+  } catch (_) {
+    return null;
+  }
+});
+
 /// Status Premium user yang sedang login.
 /// loading = belum tahu (auth / cek server belum selesai); belum login = false.
 final myPremiumProvider = Provider<AsyncValue<bool>>((ref) {

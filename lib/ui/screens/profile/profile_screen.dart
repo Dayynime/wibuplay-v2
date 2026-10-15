@@ -28,6 +28,7 @@ import '../comic/comic_profile_section.dart';
 import '../xp/xp_leaderboard_screen.dart';
 import 'profile_controller.dart';
 import '../../components/avatar_frame.dart';
+import '../../components/join_date_stat.dart';
 import '../../../data/models/avatar_frame_models.dart';
 
 /// Profil Saya ala Zenime: banner full-bleed menyatu dengan avatar, identitas
@@ -225,7 +226,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Row(
                   children: [
-                    _stat(favorites.length, 'Favorit'),
+                    JoinDateStat(firebaseUid: uid, fallback: user?.metadata.creationTime?.toLocal()),
                     _statDivider(),
                     _stat(uniqueAnime, 'Anime Ditonton'),
                     _statDivider(),

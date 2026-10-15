@@ -106,6 +106,23 @@ class ChatRepository {
     return rows.isEmpty ? null : ChatProfile.fromJson(rows.first);
   }
 
+  /// Tanggal pertama gabung Zenime = `chat_profiles.created_at` (baris dibuat
+  /// otomatis saat login pertama). Query terpisah supaya kalau kolom ini
+  /// bermasalah, profil utama tetap kebaca. null = tidak ada / gagal.
+  Future<DateTime?> getJoinDate(String firebaseUid) async {
+    final res = await _dio.get<dynamic>(
+      'rest/v1/chat_profiles',
+      queryParameters: {
+        'firebase_uid': 'eq.$firebaseUid',
+        'select': 'created_at',
+        'limit': 1,
+      },
+    );
+    final rows = _rows(res.data);
+    if (rows.isEmpty) return null;
+    return DateTime.tryParse((rows.first['created_at'] as String?) ?? '')?.toLocal();
+  }
+
   /// Header Authorization berisi Firebase ID Token asli (bukan anon key).
   Future<Options> _authOptions() async {
     if (!FirebaseConfig.ready) {

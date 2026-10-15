@@ -15,6 +15,7 @@ import '../../components/cards.dart';
 import '../../components/game_badges.dart';
 import '../../components/net_image.dart';
 import '../../components/role_badges.dart';
+import '../../components/join_date_stat.dart';
 import '../clan/clan_browse_screen.dart';
 import '../xp/xp_leaderboard_screen.dart';
 import 'profile_controller.dart';
@@ -322,7 +323,7 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Row(
                   children: [
-                    _stat(favorites.length, 'Favorit'),
+                    JoinDateStat(firebaseUid: uid),
                     _statDivider(),
                     _stat(uniqueAnime, 'Anime Ditonton'),
                     _statDivider(),
