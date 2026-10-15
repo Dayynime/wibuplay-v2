@@ -1,7 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Sama dengan Zenime: cleartext (HTTP) HANYA untuk server API ini, sisanya wajib HTTPS. -->
+<!-- Semua trafik wajib HTTPS. Tidak ada pengecualian cleartext (HTTP). -->
 <network-security-config>
-    <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="true">203.175.11.166</domain>
-    </domain-config>
+    <base-config cleartextTrafficPermitted="false" />
 </network-security-config>
