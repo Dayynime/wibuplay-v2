@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../data/models/account_models.dart';
+import '../../data/models/avatar_frame_models.dart';
 import '../../providers.dart';
 import 'game_badges.dart';
 import 'avatar_frame.dart';
@@ -373,7 +374,16 @@ class _RingAvatar extends ConsumerWidget {
       ref.read(avatarFrameCacheProvider.notifier).request(uid);
       final frame = ref.watch(avatarFrameCacheProvider.select((m) => m[uid]));
       if (frame != null) {
-        return UserAvatar(username: username, url: url, size: 56, frameUid: uid);
+        // Border (kanvas) dimuatkan ke kotak 56dp yang sama dengan versi
+        // cincin, jadi foto mengecil dan border tidak meluber ke luar kartu.
+        final size = 56 / avatarFrameScale(frame);
+        return SizedBox(
+          width: 56,
+          height: 56,
+          child: Center(
+            child: UserAvatar(username: username, url: url, size: size, frameUid: uid),
+          ),
+        );
       }
     }
     return Container(

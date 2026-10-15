@@ -394,45 +394,6 @@ class _Sheen extends StatelessWidget {
   }
 }
 
-/// Ring emas dengan highlight putih yang berputar (buat juara 1).
-class _SweepRingPainter extends CustomPainter {
-  _SweepRingPainter({
-    required this.loop,
-    required this.color,
-    required this.width,
-    this.turns = 2,
-  }) : super(repaint: loop);
-
-  final Animation<double> loop;
-  final Color color;
-  final double width;
-  final int turns;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final rect = Offset.zero & size;
-    final paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = width
-      ..shader = SweepGradient(
-        colors: [
-          color.withValues(alpha: 0.25),
-          color,
-          Colors.white,
-          color,
-          color.withValues(alpha: 0.25),
-        ],
-        stops: const [0.0, 0.35, 0.5, 0.65, 1.0],
-        transform: GradientRotation(loop.value * turns * 2 * math.pi),
-      ).createShader(rect);
-    canvas.drawCircle(rect.center, (size.width - width) / 2, paint);
-  }
-
-  @override
-  bool shouldRepaint(_SweepRingPainter old) =>
-      old.color != color || old.width != width || old.turns != turns;
-}
-
 class _Crown extends StatelessWidget {
   const _Crown({required this.width, required this.height});
 
@@ -979,8 +940,9 @@ class _BoardRow extends StatelessWidget {
   }
 }
 
-/// Ring avatar 28px: juara 1 = ring emas berputar, 2/3 = perak/perunggu,
-/// sisanya tipis.
+/// Slot avatar 28px. Ring peringkat sudah dihapus; border avatar milik user
+/// (kalau ada) ikut tampil dari [avatar]. Tanpa ClipOval supaya border tidak
+/// terpotong.
 class _AvatarRing extends StatelessWidget {
   const _AvatarRing({required this.rank, required this.loop, required this.avatar});
 
@@ -990,35 +952,7 @@ class _AvatarRing extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (rank == 1) {
-      return SizedBox(
-        width: 28,
-        height: 28,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            RepaintBoundary(
-              child: CustomPaint(
-                size: const Size.square(28),
-                painter: _SweepRingPainter(loop: loop, color: heroGold, width: 1.8),
-              ),
-            ),
-            ClipOval(child: avatar),
-          ],
-        ),
-      );
-    }
-    final ring = rank <= 3 ? _rankColor(rank) : const Color(0x26FFFFFF);
-    return Container(
-      width: 28,
-      height: 28,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        border: Border.all(color: ring, width: 1.5),
-      ),
-      child: ClipOval(child: avatar),
-    );
+    return SizedBox(width: 28, height: 28, child: Center(child: avatar));
   }
 }
 
@@ -1331,6 +1265,7 @@ class _Podium extends StatelessWidget {
               child: _PodiumAvatar(
                 rank: rank,
                 size: avatarSize,
+                uid: s.firebaseUid,
                 name: s.name,
                 url: s.avatarUrl,
                 enter: enter,
@@ -1386,6 +1321,7 @@ class _PodiumAvatar extends StatelessWidget {
   const _PodiumAvatar({
     required this.rank,
     required this.size,
+    required this.uid,
     required this.name,
     required this.url,
     required this.enter,
@@ -1395,6 +1331,7 @@ class _PodiumAvatar extends StatelessWidget {
 
   final int rank;
   final double size;
+  final String? uid;
   final String name;
   final String? url;
   final Animation<double> enter;
@@ -1403,20 +1340,8 @@ class _PodiumAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = _rankColor(rank);
-    final avatar = UserAvatar(username: name, url: url, size: size);
-
-    if (rank != 1) {
-      return Container(
-        padding: const EdgeInsets.all(2),
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(color: color, width: 2),
-        ),
-        child: avatar,
-      );
-    }
-
+    // Tanpa ring: border avatar yang dibeli user (kalau ada) yang tampil.
+    final avatar = UserAvatar(username: name, url: url, size: size, frameUid: uid);
     final box = size + 8;
     return SizedBox(
       width: box,
@@ -1425,62 +1350,35 @@ class _PodiumAvatar extends StatelessWidget {
         clipBehavior: Clip.none,
         alignment: Alignment.center,
         children: [
-          // Halo emas berdenyut.
-          RepaintBoundary(
-            child: AnimatedBuilder(
-              animation: loop,
-              builder: (context, _) {
-                final pulse = 0.5 + 0.5 * math.sin(loop.value * 4 * math.pi);
-                return DecoratedBox(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: color.withValues(alpha: 0.16 + 0.16 * pulse),
-                        blurRadius: 12 + 8 * pulse,
-                        spreadRadius: 1,
-                      ),
-                    ],
-                  ),
-                  child: SizedBox.square(dimension: box - 4),
-                );
-              },
-            ),
-          ),
-          RepaintBoundary(
-            child: CustomPaint(
-              size: Size.square(box),
-              painter: _SweepRingPainter(loop: loop, color: color, width: 2.2),
-            ),
-          ),
           avatar,
-          // Mahkota jatuh masuk lalu melayang naik-turun pelan.
-          Positioned(
-            top: -12,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: _Reveal(
-                t: enter,
-                start: crownStart,
-                end: math.min(1.0, crownStart + 0.3),
-                dy: -14,
-                scaleFrom: 0.5,
-                curve: Curves.easeOutBack,
-                child: AnimatedBuilder(
-                  animation: loop,
-                  builder: (context, child) => Transform.translate(
-                    offset: Offset(0, -1.6 * math.sin(loop.value * 4 * math.pi)),
-                    child: child,
-                  ),
-                  child: Transform.rotate(
-                    angle: -0.12,
-                    child: const _Crown(width: 18, height: 13),
+          if (rank == 1)
+            // Mahkota jatuh masuk lalu melayang naik-turun pelan.
+            Positioned(
+              top: -12,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: _Reveal(
+                  t: enter,
+                  start: crownStart,
+                  end: math.min(1.0, crownStart + 0.3),
+                  dy: -14,
+                  scaleFrom: 0.5,
+                  curve: Curves.easeOutBack,
+                  child: AnimatedBuilder(
+                    animation: loop,
+                    builder: (context, child) => Transform.translate(
+                      offset: Offset(0, -1.6 * math.sin(loop.value * 4 * math.pi)),
+                      child: child,
+                    ),
+                    child: Transform.rotate(
+                      angle: -0.12,
+                      child: const _Crown(width: 18, height: 13),
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
         ],
       ),
     );
@@ -1759,6 +1657,7 @@ class HeroGiverSlide extends StatelessWidget {
           _PodiumAvatar(
             rank: x.rank,
             size: size,
+            uid: x.firebaseUid,
             name: x.username,
             url: x.avatarUrl,
             enter: enter,

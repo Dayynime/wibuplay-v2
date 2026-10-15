@@ -357,47 +357,8 @@ class _PodiumSlot extends StatelessWidget {
         alignment: Alignment.center,
         clipBehavior: Clip.none,
         children: [
-          // Halo berdenyut.
-          Container(
-            width: outer,
-            height: outer,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: color.withValues(alpha: 0.22 + 0.30 * pulse),
-                  blurRadius: 16 + 12 * pulse,
-                  spreadRadius: 1,
-                ),
-              ],
-            ),
-          ),
-          // Ring gradient yang berputar.
-          Container(
-            padding: const EdgeInsets.all(ring),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: SweepGradient(
-                transform: GradientRotation(l),
-                colors: [
-                  color,
-                  color.withValues(alpha: 0.10),
-                  Colors.white,
-                  color.withValues(alpha: 0.10),
-                  color,
-                ],
-              ),
-            ),
-            child: Container(
-              padding: const EdgeInsets.all(2),
-              decoration: const BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.backgroundDarkSecondary,
-              ),
-              child: UserAvatar(username: entry.username, url: entry.avatarUrl, size: avatarSize, frameUid: entry.firebaseUid),
-            ),
-          ),
-          // Chip nomor peringkat.
+          // Ring diganti border avatar yang dibeli user (kalau ada).
+          UserAvatar(username: entry.username, url: entry.avatarUrl, size: avatarSize, frameUid: entry.firebaseUid),
           Positioned(
             bottom: 2,
             right: 4,

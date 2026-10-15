@@ -165,16 +165,15 @@ class _PodiumEntry extends StatelessWidget {
           Stack(
             clipBehavior: Clip.none,
             children: [
-              Container(
-                padding: const EdgeInsets.all(3),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: color, width: 2.5),
-                  boxShadow: giver.rank == 1
-                      ? [BoxShadow(color: _gold.withValues(alpha: 0.45), blurRadius: 18)]
-                      : null,
+              // Ring diganti border avatar yang dibeli user (kalau ada).
+              Padding(
+                padding: const EdgeInsets.all(5.5),
+                child: UserAvatar(
+                  username: giver.username,
+                  url: giver.avatarUrl,
+                  size: size,
+                  frameUid: giver.firebaseUid,
                 ),
-                child: UserAvatar(username: giver.username, url: giver.avatarUrl, size: size, frameUid: giver.firebaseUid),
               ),
               if (giver.rank == 1)
                 const Positioned(
