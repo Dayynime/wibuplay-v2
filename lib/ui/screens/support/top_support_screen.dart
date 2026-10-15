@@ -434,7 +434,7 @@ class _SupportSlot extends StatelessWidget {
                 shape: BoxShape.circle,
                 color: Color(0xFF10121A),
               ),
-              child: UserAvatar(username: s.name, url: s.avatarUrl, size: avatarSize),
+              child: UserAvatar(username: s.name, url: s.avatarUrl, size: avatarSize, frameUid: s.firebaseUid),
             ),
           ),
           Positioned(
@@ -1128,7 +1128,7 @@ class _SupporterRow extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 10),
-              UserAvatar(username: s.name, url: s.avatarUrl, size: 42),
+              UserAvatar(username: s.name, url: s.avatarUrl, size: 42, frameUid: s.firebaseUid),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(

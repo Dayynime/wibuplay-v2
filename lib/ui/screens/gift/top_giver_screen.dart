@@ -174,7 +174,7 @@ class _PodiumEntry extends StatelessWidget {
                       ? [BoxShadow(color: _gold.withValues(alpha: 0.45), blurRadius: 18)]
                       : null,
                 ),
-                child: UserAvatar(username: giver.username, url: giver.avatarUrl, size: size),
+                child: UserAvatar(username: giver.username, url: giver.avatarUrl, size: size, frameUid: giver.firebaseUid),
               ),
               if (giver.rank == 1)
                 const Positioned(
@@ -240,7 +240,7 @@ class _GiverTile extends StatelessWidget {
               width: 58,
               child: Column(
                 children: [
-                  UserAvatar(username: giver.username, url: giver.avatarUrl, size: 50),
+                  UserAvatar(username: giver.username, url: giver.avatarUrl, size: 50, frameUid: giver.firebaseUid),
                   const SizedBox(height: 2),
                   Text(
                     '#${giver.rank}',

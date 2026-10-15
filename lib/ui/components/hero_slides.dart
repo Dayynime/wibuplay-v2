@@ -668,6 +668,7 @@ class HeroLeaderboardSlide extends StatelessWidget {
                                             username: entries[i].username,
                                             url: entries[i].avatarUrl,
                                             size: 24,
+                                            frameUid: entries[i].firebaseUid,
                                           ),
                                           title: entries[i].username,
                                           valueAt: (p) =>

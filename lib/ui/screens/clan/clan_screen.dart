@@ -888,7 +888,7 @@ class _MemberRow extends StatelessWidget {
               clipBehavior: Clip.none,
               alignment: Alignment.topCenter,
               children: [
-                UserAvatar(username: member.username, url: member.avatarUrl, size: 48),
+                UserAvatar(username: member.username, url: member.avatarUrl, size: 48, frameUid: member.firebaseUid),
                 Positioned(
                   bottom: 0,
                   left: -12,
@@ -1015,7 +1015,7 @@ class _DonationRow extends StatelessWidget {
             ),
             const SizedBox(width: 8),
           ],
-          UserAvatar(username: entry.username, url: entry.avatarUrl, size: 44),
+          UserAvatar(username: entry.username, url: entry.avatarUrl, size: 44, frameUid: entry.firebaseUid),
           const SizedBox(width: 12),
           Expanded(
             child: Column(

@@ -232,6 +232,7 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
                           seed: user.uid,
                           label: _resolvedName(user, profile, profileLoading),
                           size: 52,
+                          frameUid: user.uid,
                         ),
                         const SizedBox(width: 14),
                         Expanded(

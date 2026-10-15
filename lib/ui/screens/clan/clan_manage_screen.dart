@@ -248,7 +248,7 @@ class _RequestsTab extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  UserAvatar(username: r.username, url: r.avatarUrl, size: 44),
+                  UserAvatar(username: r.username, url: r.avatarUrl, size: 44, frameUid: r.firebaseUid),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(

@@ -19,7 +19,6 @@ import '../clan/clan_browse_screen.dart';
 import '../xp/xp_leaderboard_screen.dart';
 import 'profile_controller.dart';
 import 'profile_screen.dart';
-import '../../components/avatar_frame.dart';
 
 /// Buka profil publik user lain (dari Chat Global, Chat Teman, layar Teman).
 /// Port rute `profile/{targetUid}` di Zenime.
@@ -266,12 +265,8 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
           padding: EdgeInsets.only(top: topPad + 28, bottom: 20),
           child: Column(
             children: [
-              FramedAvatar(
-                uid: uid,
-                size: 120,
-                child: ProfileAvatar(url: avatarUrl, seed: uid, label: name, size: 120),
-              ),
-              const SizedBox(height: 14),
+              ProfileHeroAvatar(uid: uid, url: avatarUrl, seed: uid, label: name),
+              const SizedBox(height: 10),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Row(

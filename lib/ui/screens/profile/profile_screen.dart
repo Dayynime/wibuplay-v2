@@ -28,6 +28,7 @@ import '../comic/comic_profile_section.dart';
 import '../xp/xp_leaderboard_screen.dart';
 import 'profile_controller.dart';
 import '../../components/avatar_frame.dart';
+import '../../../data/models/avatar_frame_models.dart';
 
 /// Profil Saya ala Zenime: banner full-bleed menyatu dengan avatar, identitas
 /// + badge (level, clan, role) di bawah avatar, stat row 4 kolom, tombol pill
@@ -160,13 +161,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           padding: EdgeInsets.only(top: topPad + 28, bottom: 20),
           child: Column(
             children: [
-              // Avatar polos, tanpa border/ring.
-              FramedAvatar(
-                uid: uid,
-                size: 120,
-                child: ProfileAvatar(url: avatarUrl, seed: uid.isEmpty ? name : uid, label: name, size: 120),
-              ),
-              const SizedBox(height: 14),
+              ProfileHeroAvatar(uid: uid, url: avatarUrl, seed: uid.isEmpty ? name : uid, label: name),
+              const SizedBox(height: 10),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Row(
@@ -806,6 +802,44 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
 
 // ====================================================== widget pendukung
 
+/// Avatar besar di header profil (milik sendiri & publik).
+/// Ruang di atas/bawah ikut menyesuaikan kanvas border yang dipasang,
+/// supaya hiasan besar (sayap, halo) tidak menabrak nama di bawahnya.
+class ProfileHeroAvatar extends ConsumerWidget {
+  const ProfileHeroAvatar({
+    super.key,
+    required this.uid,
+    required this.url,
+    required this.seed,
+    required this.label,
+  });
+
+  static const double size = 96;
+
+  final String uid;
+  final String? url;
+  final String seed;
+  final String label;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    String? frame;
+    if (uid.isNotEmpty) {
+      ref.read(avatarFrameCacheProvider.notifier).request(uid);
+      frame = ref.watch(avatarFrameCacheProvider.select((m) => m[uid]));
+    }
+    final ext = frame == null ? 0.0 : size * (avatarFrameScale(frame) - 1) / 2;
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: ext),
+      child: FramedAvatar(
+        uid: uid,
+        size: size,
+        child: ProfileAvatar(url: url, seed: seed, label: label, size: size),
+      ),
+    );
+  }
+}
+
 /// Avatar bulat: foto kalau ada, kalau tidak avatar otomatis (warna + inisial).
 class ProfileAvatar extends StatelessWidget {
   const ProfileAvatar({
@@ -813,6 +847,7 @@ class ProfileAvatar extends StatelessWidget {
     required this.seed,
     required this.label,
     required this.size,
+    this.frameUid,
   });
 
   final String? url;
@@ -820,8 +855,19 @@ class ProfileAvatar extends StatelessWidget {
   final String label;
   final double size;
 
+  /// Kalau diisi, border avatar milik uid ini ikut tampil.
+  final String? frameUid;
+
   @override
   Widget build(BuildContext context) {
+    final fu = frameUid;
+    if (fu != null && fu.isNotEmpty) {
+      return FramedAvatar(
+        uid: fu,
+        size: size,
+        child: ProfileAvatar(url: url, seed: seed, label: label, size: size),
+      );
+    }
     final has = url != null && url!.isNotEmpty;
     return Container(
       width: size,
@@ -1016,7 +1062,7 @@ class ProfileCommentFeedRow extends StatelessWidget {
         children: [
           Row(
             children: [
-              ProfileAvatar(url: avatarUrl, seed: firebaseUid, label: username, size: 28),
+              ProfileAvatar(url: avatarUrl, seed: firebaseUid, label: username, size: 28, frameUid: firebaseUid),
               const SizedBox(width: 8),
               Flexible(
                 child: Text(
@@ -1670,7 +1716,7 @@ class ProfileWatchHistoryRow extends StatelessWidget {
           // Baris atas: avatar mini + nama + badge premium, waktu di kanan.
           Row(
             children: [
-              ProfileAvatar(url: avatarUrl, seed: firebaseUid, label: username, size: 28),
+              ProfileAvatar(url: avatarUrl, seed: firebaseUid, label: username, size: 28, frameUid: firebaseUid),
               const SizedBox(width: 8),
               Flexible(
                 child: Text(

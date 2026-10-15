@@ -6,6 +6,7 @@ import '../../core/theme/app_colors.dart';
 import '../../data/models/account_models.dart';
 import '../../providers.dart';
 import 'game_badges.dart';
+import 'avatar_frame.dart';
 
 /// Warna tombol pill Premium, sama dengan ZenimeInfoBlue di Zenime.
 const Color _kPremiumBlue = Color(0xFF3B82F6);
@@ -64,6 +65,7 @@ class HomeProfileHeader extends ConsumerWidget {
       child: Column(
         children: [
           _ProfileCard(
+            uid: uid,
             username: username,
             avatarUrl: avatarUrl,
             level: level,
@@ -92,6 +94,7 @@ class HomeProfileHeader extends ConsumerWidget {
 
 class _ProfileCard extends StatelessWidget {
   const _ProfileCard({
+    required this.uid,
     required this.username,
     required this.avatarUrl,
     required this.level,
@@ -107,6 +110,7 @@ class _ProfileCard extends StatelessWidget {
     required this.onCoinClick,
   });
 
+  final String uid;
   final String username;
   final String? avatarUrl;
   final int level;
@@ -162,7 +166,7 @@ class _ProfileCard extends StatelessWidget {
                   onTap: onProfileClick,
                   child: Row(
                     children: [
-                      _RingAvatar(username: username, url: avatarUrl),
+                      _RingAvatar(uid: uid, username: username, url: avatarUrl),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(
@@ -355,14 +359,23 @@ class _PremiumBanner extends StatelessWidget {
 }
 
 /// Avatar 56dp dengan cincin gradien (Zenime: sweepGradient merah-kuning).
-class _RingAvatar extends StatelessWidget {
-  const _RingAvatar({required this.username, required this.url});
+/// Kalau user memasang border avatar, cincin diganti border itu.
+class _RingAvatar extends ConsumerWidget {
+  const _RingAvatar({required this.uid, required this.username, required this.url});
 
+  final String uid;
   final String username;
   final String? url;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (uid.isNotEmpty) {
+      ref.read(avatarFrameCacheProvider.notifier).request(uid);
+      final frame = ref.watch(avatarFrameCacheProvider.select((m) => m[uid]));
+      if (frame != null) {
+        return UserAvatar(username: username, url: url, size: 56, frameUid: uid);
+      }
+    }
     return Container(
       width: 56,
       height: 56,

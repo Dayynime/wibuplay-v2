@@ -78,15 +78,6 @@ class _AvatarFrameScreenState extends ConsumerState<AvatarFrameScreen> {
       ..showSnackBar(SnackBar(content: Text(msg)));
   }
 
-  AvatarFrameItem? get _item {
-    final s = _state;
-    if (s == null || _selected == null) return null;
-    for (final f in s.frames) {
-      if (f.id == _selected) return f;
-    }
-    return null;
-  }
-
   Future<void> _buy(AvatarFrameItem f) async {
     final s = _state!;
     if (s.balance < f.price) {
@@ -299,16 +290,8 @@ class _AvatarFrameScreenState extends ConsumerState<AvatarFrameScreen> {
                       affordable: s.balance >= f.price,
                       busy: _busyId == f.id,
                       disabled: _busy,
-                      onTap: () => setState(() => _selected = f.id),
-                      onAction: () {
-                        if (f.id == s.equippedId) {
-                          _equip(null, busyId: f.id);
-                        } else if (f.owned) {
-                          _equip(f.id);
-                        } else {
-                          _buy(f);
-                        }
-                      },
+                      onTap: () => _openPreview(f, name, avatarUrl),
+                      onAction: () => _act(f),
                     );
                   },
                 ),
@@ -319,10 +302,41 @@ class _AvatarFrameScreenState extends ConsumerState<AvatarFrameScreen> {
     );
   }
 
+  void _act(AvatarFrameItem f) {
+    final s = _state;
+    if (s == null || _busy) return;
+    if (f.id == s.equippedId) {
+      _equip(null, busyId: f.id);
+    } else if (f.owned) {
+      _equip(f.id);
+    } else {
+      _buy(f);
+    }
+  }
+
+  /// Bottom sheet pratinjau border di avatar sendiri. Tombol aksi di sheet
+  /// menutup sheet lalu menjalankan aksi yang sama dengan tombol di kartu.
+  Future<void> _openPreview(AvatarFrameItem f, String name, String? avatarUrl) async {
+    final s = _state;
+    if (s == null) return;
+    setState(() => _selected = f.id);
+    final go = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _FramePreviewSheet(
+        item: f,
+        username: name,
+        avatarUrl: avatarUrl,
+        equipped: f.id == s.equippedId,
+        affordable: s.balance >= f.price,
+      ),
+    );
+    if (go == true && mounted) _act(f);
+  }
+
   Widget _header(AvatarFrameState s, String name, String? avatarUrl) {
-    final item = _item;
     final equipped = s.equippedId;
-    final previewing = item != null && item.id != equipped;
     String? equippedName;
     for (final f in s.frames) {
       if (f.id == equipped) equippedName = f.name;
@@ -342,12 +356,12 @@ class _AvatarFrameScreenState extends ConsumerState<AvatarFrameScreen> {
             height: 92,
             child: Center(
               child: FramedAvatar.preview(
-                frameId: _selected ?? equipped,
-                size: 92 / avatarFrameScale(_selected ?? equipped),
+                frameId: equipped,
+                size: 92 / avatarFrameScale(equipped),
                 child: UserAvatar(
                   username: name,
                   url: avatarUrl,
-                  size: 92 / avatarFrameScale(_selected ?? equipped),
+                  size: 92 / avatarFrameScale(equipped),
                 ),
               ),
             ),
@@ -358,12 +372,12 @@ class _AvatarFrameScreenState extends ConsumerState<AvatarFrameScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  previewing ? 'Pratinjau' : 'Border avatar',
+                  'Border avatar',
                   style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  previewing ? item!.name : (equippedName ?? 'Belum dipakai'),
+                  equippedName ?? 'Belum dipakai',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
@@ -393,12 +407,6 @@ class _AvatarFrameScreenState extends ConsumerState<AvatarFrameScreen> {
               ],
             ),
           ),
-          if (previewing)
-            IconButton(
-              tooltip: 'Batal pratinjau',
-              onPressed: () => setState(() => _selected = equipped),
-              icon: const Icon(Icons.close_rounded, color: AppColors.textSecondary),
-            ),
         ],
       ),
     );
@@ -721,6 +729,170 @@ class _FrameCard extends StatelessWidget {
       onPressed: onPressed,
       style: FilledButton.styleFrom(shape: shape, padding: EdgeInsets.zero),
       child: busy ? spinner : price,
+    );
+  }
+}
+
+class _FramePreviewSheet extends StatelessWidget {
+  const _FramePreviewSheet({
+    required this.item,
+    required this.username,
+    required this.avatarUrl,
+    required this.equipped,
+    required this.affordable,
+  });
+
+  final AvatarFrameItem item;
+  final String username;
+  final String? avatarUrl;
+  final bool equipped;
+  final bool affordable;
+
+  @override
+  Widget build(BuildContext context) {
+    final tierColor = _tierColor(item.tier);
+    final scale = avatarFrameScale(item.id);
+    const canvas = 176.0;
+    final avatarSize = canvas / scale;
+    final bottom = MediaQuery.paddingOf(context).bottom;
+
+    final String label;
+    final Color fg;
+    if (equipped) {
+      label = 'Lepas border';
+      fg = AppColors.successGreen;
+    } else if (item.owned) {
+      label = 'Pasang border';
+      fg = Colors.white;
+    } else if (!affordable) {
+      label = 'ZCoin kurang · Top up';
+      fg = AppColors.warningAmber;
+    } else {
+      label = 'Beli border';
+      fg = Colors.white;
+    }
+
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppColors.surfaceDark,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      padding: EdgeInsets.fromLTRB(24, 12, 24, 20 + bottom),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 44,
+            height: 5,
+            decoration: BoxDecoration(
+              color: AppColors.textMuted,
+              borderRadius: BorderRadius.circular(3),
+            ),
+          ),
+          const SizedBox(height: 18),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: tierColor.withValues(alpha: 0.8)),
+            ),
+            child: Text(
+              item.tier.label,
+              style: TextStyle(color: tierColor, fontSize: 11, fontWeight: FontWeight.w700),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            item.name,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: AppColors.textWhite,
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Preview di profil kamu',
+            style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+          ),
+          const SizedBox(height: 20),
+          Container(
+            width: 210,
+            height: 210,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(28),
+              gradient: const RadialGradient(
+                colors: [AppColors.surfaceVariantDark, AppColors.backgroundDarkSecondary],
+                radius: 0.9,
+              ),
+            ),
+            alignment: Alignment.center,
+            child: FramedAvatar.preview(
+              frameId: item.id,
+              size: avatarSize,
+              child: UserAvatar(username: username, url: avatarUrl, size: avatarSize),
+            ),
+          ),
+          const SizedBox(height: 20),
+          if (!item.owned)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(24),
+                color: AppColors.surfaceVariantDark,
+                border: Border.all(color: AppColors.surfaceElevated),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Image.asset('assets/images/ic_zcoin_badge.png', width: 18, height: 18),
+                  const SizedBox(width: 8),
+                  Text(
+                    formatZCoin(item.price),
+                    style: const TextStyle(
+                      color: AppColors.textWhite,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  const Text('ZCoin', style: TextStyle(color: AppColors.textSecondary)),
+                ],
+              ),
+            )
+          else
+            Text(
+              equipped ? 'Sedang kamu pakai' : 'Sudah ada di koleksi kamu',
+              style: TextStyle(
+                color: equipped ? AppColors.successGreen : AppColors.textSecondary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          const SizedBox(height: 18),
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: equipped || !affordable
+                ? OutlinedButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: fg,
+                      side: BorderSide(color: fg.withValues(alpha: 0.8)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    child: Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
+                  )
+                : FilledButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    style: FilledButton.styleFrom(
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    ),
+                    child: Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
+                  ),
+          ),
+        ],
+      ),
     );
   }
 }

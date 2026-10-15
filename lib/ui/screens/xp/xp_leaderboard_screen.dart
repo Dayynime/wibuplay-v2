@@ -394,7 +394,7 @@ class _PodiumSlot extends StatelessWidget {
                 shape: BoxShape.circle,
                 color: AppColors.backgroundDarkSecondary,
               ),
-              child: UserAvatar(username: entry.username, url: entry.avatarUrl, size: avatarSize),
+              child: UserAvatar(username: entry.username, url: entry.avatarUrl, size: avatarSize, frameUid: entry.firebaseUid),
             ),
           ),
           // Chip nomor peringkat.
@@ -771,7 +771,7 @@ class _RankRow extends StatelessWidget {
               ),
             ),
           ),
-          UserAvatar(username: entry.username, url: entry.avatarUrl, size: 44),
+          UserAvatar(username: entry.username, url: entry.avatarUrl, size: 44, frameUid: entry.firebaseUid),
           const SizedBox(width: 12),
           Expanded(
             child: Column(

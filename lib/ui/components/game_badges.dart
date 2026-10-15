@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
+import 'avatar_frame.dart';
 
 /// Badge "gamer rank" yang dipakai bersama di Chat Global, profil, dan
 /// Leaderboard XP supaya tampilannya konsisten (port GameBadges.kt).
@@ -254,14 +255,32 @@ class PremiumCheckBadge extends StatelessWidget {
 
 /// Avatar bulat dengan fallback huruf pertama username.
 class UserAvatar extends StatelessWidget {
-  const UserAvatar({super.key, required this.username, this.url, this.size = 44});
+  const UserAvatar({
+    super.key,
+    required this.username,
+    this.url,
+    this.size = 44,
+    this.frameUid,
+  });
 
   final String username;
   final String? url;
   final double size;
 
+  /// Kalau diisi, border avatar milik uid ini ikut tampil (meluber keluar,
+  /// ukuran layout tetap [size]).
+  final String? frameUid;
+
   @override
   Widget build(BuildContext context) {
+    final fu = frameUid;
+    if (fu != null && fu.isNotEmpty) {
+      return FramedAvatar(
+        uid: fu,
+        size: size,
+        child: UserAvatar(username: username, url: url, size: size),
+      );
+    }
     final has = url != null && url!.isNotEmpty;
     return Container(
       width: size,
