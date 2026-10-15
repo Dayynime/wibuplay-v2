@@ -58,6 +58,22 @@ double avatarFrameScale(String? id) {
   return kAvatarFrameAssets.containsKey(id) ? kAvatarFrameScale : kRemoteAvatarFrameScale;
 }
 
+/// Tingkat border, ditentukan server (kolom avatar_frames.tier).
+enum AvatarFrameTier {
+  basic('Basic'),
+  standard('Standard'),
+  premium('Premium');
+
+  const AvatarFrameTier(this.label);
+  final String label;
+
+  static AvatarFrameTier parse(Object? v) => switch (v) {
+        'standard' => AvatarFrameTier.standard,
+        'premium' => AvatarFrameTier.premium,
+        _ => AvatarFrameTier.basic,
+      };
+}
+
 int _int(Object? v) => (v as num?)?.toInt() ?? 0;
 
 class AvatarFrameItem {
@@ -66,12 +82,14 @@ class AvatarFrameItem {
     required this.name,
     required this.price,
     required this.owned,
+    this.tier = AvatarFrameTier.basic,
   });
 
   final String id;
   final String name;
   final int price;
   final bool owned;
+  final AvatarFrameTier tier;
 
   static AvatarFrameItem? fromJson(Map<String, dynamic> j) {
     final id = j['id'];
@@ -81,11 +99,12 @@ class AvatarFrameItem {
       name: (j['name'] as String?) ?? id,
       price: _int(j['price']),
       owned: j['owned'] == true,
+      tier: AvatarFrameTier.parse(j['tier']),
     );
   }
 
   AvatarFrameItem copyWith({bool? owned}) =>
-      AvatarFrameItem(id: id, name: name, price: price, owned: owned ?? this.owned);
+      AvatarFrameItem(id: id, name: name, price: price, owned: owned ?? this.owned, tier: tier);
 }
 
 class AvatarFrameState {
