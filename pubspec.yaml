@@ -25,6 +25,7 @@ dependencies:
   screen_brightness: ^2.1.0
   volume_controller: ^3.0.0
   firebase_core: ^4.0.0
+  firebase_app_check: ^0.4.0
   firebase_auth: ^6.0.0
   firebase_remote_config: ^6.0.0
   google_sign_in: ^6.3.0

@@ -1,3 +1,4 @@
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -30,6 +31,15 @@ Future<void> _initBackend() async {
   if (!FirebaseConfig.isConfigured) return;
   try {
     await Firebase.initializeApp(options: FirebaseConfig.options);
+    // App Check: pastikan request ke Firebase/Edge Function datang dari APK
+    // Zenime asli (Play Integrity). Best-effort: kalau aktivasi gagal (mis.
+    // device tanpa Google Play), app tetap jalan — enforcement baru dinyalakan
+    // di server setelah mayoritas pengguna update.
+    try {
+      await FirebaseAppCheck.instance.activate(
+        androidProvider: AndroidProvider.playIntegrity,
+      );
+    } catch (_) {}
     FirebaseConfig.ready = true;
     // Base URL API dari Remote Config harus siap sebelum request pertama.
     // forceRefresh (bukan refresh) SENGAJA: app yang baru di-update mewarisi
