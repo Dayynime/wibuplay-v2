@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -62,6 +63,16 @@ final avatarFrameCacheProvider =
   (ref) => AvatarFrameCache(ref.watch(avatarFrameRepositoryProvider)),
 );
 
+/// Gambar border: asset bawaan app, atau file Storage yang di-cache di disk
+/// (sekali unduh per border, animasi WebP tetap jalan).
+ImageProvider? avatarFrameImage(String? id) {
+  final asset = avatarFrameAsset(id);
+  if (asset != null) return AssetImage(asset);
+  final url = avatarFrameUrl(id);
+  if (url != null) return CachedNetworkImageProvider(url);
+  return null;
+}
+
 /// Bungkus avatar bulat berukuran [size] dengan border milik [uid].
 /// Border digambar 1.25x lebih besar dan meluber keluar, jadi ukuran
 /// layout avatar TIDAK berubah.
@@ -99,7 +110,7 @@ class FramedAvatar extends ConsumerWidget {
       ref.read(avatarFrameCacheProvider.notifier).request(uid);
       id = ref.watch(avatarFrameCacheProvider.select((m) => m[uid]));
     }
-    final asset = avatarFrameAsset(id);
+    final image = avatarFrameImage(id);
     final scale = avatarFrameScale(id);
     final ext = size * (scale - 1) / 2;
     return SizedBox(
@@ -109,17 +120,19 @@ class FramedAvatar extends ConsumerWidget {
         clipBehavior: Clip.none,
         children: [
           Positioned.fill(child: child),
-          if (asset != null)
+          if (image != null)
             Positioned(
               left: -ext,
               top: -ext,
               width: size * scale,
               height: size * scale,
               child: IgnorePointer(
-                child: Image.asset(
-                  asset,
+                child: Image(
+                  image: image,
                   gaplessPlayback: true,
                   filterQuality: FilterQuality.medium,
+                  // Gagal unduh = avatar tampil tanpa border.
+                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                 ),
               ),
             ),

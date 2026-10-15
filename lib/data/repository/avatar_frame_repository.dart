@@ -65,7 +65,7 @@ class AvatarFrameRepository {
       for (final row in data.whereType<Map>()) {
         final uid = row['firebase_uid'];
         final id = row['frame_id'];
-        if (uid is String && id is String && kAvatarFrameAssets.containsKey(id)) out[uid] = id;
+        if (uid is String && id is String && isValidFrameId(id)) out[uid] = id;
       }
     }
     return out;

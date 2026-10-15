@@ -1,9 +1,15 @@
-/// Border Avatar animasi. File border di-bundle di app
-/// (assets/frames/<id>.webp); server cuma menyimpan kepemilikan, harga,
-/// dan border yang sedang dipakai.
+import '../../core/supabase_config.dart';
 
-/// id border yang punya file di app. id dari server yang tidak ada di sini
-/// diabaikan (misal border baru yang butuh update app).
+/// Border Avatar animasi. Server menyimpan katalog (id, nama, harga),
+/// kepemilikan, dan border yang sedang dipakai.
+///
+/// File border ada di dua tempat:
+/// - Bawaan app (assets/frames/<id>.webp) untuk border generasi pertama.
+/// - Supabase Storage, bucket publik [kAvatarFrameBucket] (<id>.webp), untuk
+///   semua border lain. Border baru cukup diupload + ditambah ke katalog,
+///   tanpa update app.
+
+/// Border yang file-nya di-bundle di app.
 const Map<String, String> kAvatarFrameAssets = {
   'neon': 'assets/frames/neon.webp',
   'api': 'assets/frames/api.webp',
@@ -14,16 +20,43 @@ const Map<String, String> kAvatarFrameAssets = {
   'malaikat': 'assets/frames/malaikat.webp',
 };
 
+/// Bucket Storage (publik, read-only untuk app) berisi border remote.
+const String kAvatarFrameBucket = 'avatar-frames';
+
+/// id border remote juga dipakai sebagai nama file, jadi dibatasi ketat
+/// supaya tidak bisa menyusun path/URL aneh.
+final RegExp _kFrameIdRe = RegExp(r'^[a-z0-9_]{1,64}$');
+
+bool isValidFrameId(String? id) =>
+    id != null && (kAvatarFrameAssets.containsKey(id) || _kFrameIdRe.hasMatch(id));
+
+/// Path asset kalau border ini bawaan app, selain itu null.
 String? avatarFrameAsset(String? id) => id == null ? null : kAvatarFrameAssets[id];
 
-/// Ukuran kanvas border dibanding avatar. Default 1.25 (avatar mengisi 80%
-/// kanvas). Border dengan hiasan besar (sayap, halo) pakai kanvas lebih lebar.
+/// URL Storage kalau border ini remote, selain itu null.
+String? avatarFrameUrl(String? id) {
+  if (id == null || kAvatarFrameAssets.containsKey(id) || !_kFrameIdRe.hasMatch(id)) {
+    return null;
+  }
+  return '${SupabaseConfig.url}/storage/v1/object/public/$kAvatarFrameBucket/$id.webp';
+}
+
+/// Ukuran kanvas border dibanding avatar.
+/// - Border bawaan: default 1.25 (avatar mengisi 80% kanvas); yang hiasannya
+///   besar (sayap, halo) pakai kanvas lebih lebar.
+/// - Border remote: 1.2 (avatar mengisi ~83% kanvas).
 const double kAvatarFrameScale = 1.25;
+const double kRemoteAvatarFrameScale = 1.2;
 const Map<String, double> _kFrameScaleById = {
   'malaikat': 1.8,
 };
 
-double avatarFrameScale(String? id) => _kFrameScaleById[id] ?? kAvatarFrameScale;
+double avatarFrameScale(String? id) {
+  if (id == null) return kAvatarFrameScale;
+  final custom = _kFrameScaleById[id];
+  if (custom != null) return custom;
+  return kAvatarFrameAssets.containsKey(id) ? kAvatarFrameScale : kRemoteAvatarFrameScale;
+}
 
 int _int(Object? v) => (v as num?)?.toInt() ?? 0;
 
@@ -40,11 +73,9 @@ class AvatarFrameItem {
   final int price;
   final bool owned;
 
-  String get asset => kAvatarFrameAssets[id]!;
-
   static AvatarFrameItem? fromJson(Map<String, dynamic> j) {
     final id = j['id'];
-    if (id is! String || !kAvatarFrameAssets.containsKey(id)) return null;
+    if (id is! String || !isValidFrameId(id)) return null;
     return AvatarFrameItem(
       id: id,
       name: (j['name'] as String?) ?? id,
@@ -77,7 +108,7 @@ class AvatarFrameState {
     return AvatarFrameState(
       balance: _int(j['balance']),
       frames: frames,
-      equippedId: eq is String && kAvatarFrameAssets.containsKey(eq) ? eq : null,
+      equippedId: eq is String && isValidFrameId(eq) ? eq : null,
     );
   }
 

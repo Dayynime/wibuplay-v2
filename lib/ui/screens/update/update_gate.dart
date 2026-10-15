@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:in_app_update/in_app_update.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../../core/apk_downloader.dart';
@@ -62,8 +63,21 @@ class _UpdateGateState extends State<UpdateGate> {
     }
     // Build Google Play: update ditangani Play Store. Aplikasi dari Play
     // dilarang mengunduh/memasang APK sendiri, jadi cek GitHub dilewati.
+    // Sebagai gantinya pakai Play In-App Updates: kalau ada versi baru di
+    // Play (termasuk track pengujian), tampil layar update resmi dari Play.
     if (BuildFlags.isPlay) {
-      if (widget.minSplash > Duration.zero) await Future<void>.delayed(widget.minSplash);
+      final started = DateTime.now();
+      try {
+        final info = await InAppUpdate.checkForUpdate().timeout(_maxWait);
+        if (info.updateAvailability == UpdateAvailability.updateAvailable &&
+            info.immediateUpdateAllowed) {
+          await InAppUpdate.performImmediateUpdate();
+        }
+      } catch (_) {
+        // Bukan diinstall dari Play, offline, atau timeout -> lanjut normal.
+      }
+      final remaining = widget.minSplash - DateTime.now().difference(started);
+      if (remaining > Duration.zero) await Future<void>.delayed(remaining);
       if (mounted) setState(() => _phase = _Phase.ok);
       return;
     }
