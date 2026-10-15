@@ -220,8 +220,16 @@ class AuthRepository {
     }
   }
 
+  /// Dipanggil sebelum logout selagi token login masih ada (mis. hapus token
+  /// push HP ini dari server supaya notif akun lama tidak nyasar). Dipasang
+  /// oleh PushHost. Gagal/timeout diabaikan; logout tetap jalan.
+  static Future<void> Function()? beforeSignOut;
+
   Future<void> signOut() async {
     if (!FirebaseConfig.ready) return;
+    try {
+      await beforeSignOut?.call().timeout(const Duration(seconds: 6));
+    } catch (_) {}
     try {
       await GoogleSignIn().signOut();
     } catch (_) {}

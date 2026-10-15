@@ -1,6 +1,8 @@
 package com.dayynime.wibuplay
 
 import android.app.DownloadManager
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.app.PictureInPictureParams
 import android.content.Intent
 import java.security.MessageDigest
@@ -9,6 +11,7 @@ import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.net.Uri
 import android.os.Build
+import android.os.Bundle
 import android.util.Rational
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -36,6 +39,33 @@ class MainActivity : FlutterActivity() {
     private var channel: MethodChannel? = null
     private var canEnter = false
     private var ratio = Rational(16, 9)
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        createNotificationChannels()
+    }
+
+    /**
+     * Channel push "Teman & Clan" (id dipakai Edge Function zenime-notify:
+     * android.notification.channel_id = "zenime_social"). IMPORTANCE_HIGH
+     * supaya muncul pop-up (heads-up), bukan cuma ikon di status bar.
+     */
+    private fun createNotificationChannels() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        try {
+            val nm = getSystemService(NotificationManager::class.java) ?: return
+            if (nm.getNotificationChannel("zenime_social") != null) return
+            val ch = NotificationChannel(
+                "zenime_social",
+                "Teman & Clan",
+                NotificationManager.IMPORTANCE_HIGH,
+            )
+            ch.description = "Permintaan pertemanan dan request join clan"
+            nm.createNotificationChannel(ch)
+        } catch (e: Exception) {
+            // Gagal bikin channel tidak boleh bikin app crash.
+        }
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)

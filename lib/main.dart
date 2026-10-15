@@ -17,6 +17,7 @@ import 'ui/route_observer.dart';
 import 'ui/components/announcement_popup.dart';
 import 'ui/screens/auth/auth_gate.dart';
 import 'ui/screens/maintenance/maintenance_screen.dart';
+import 'ui/screens/notifications/push_host.dart';
 import 'ui/screens/security/ban_overlay.dart';
 import 'ui/screens/onboarding/onboarding_gate.dart';
 import 'ui/screens/security/integrity_gate.dart';
@@ -30,7 +31,15 @@ import 'ui/shell/app_shell.dart';
 Future<void> _initBackend() async {
   if (!FirebaseConfig.isConfigured) return;
   try {
-    await Firebase.initializeApp(options: FirebaseConfig.options);
+    // Sejak push notif, nilai Firebase juga ditulis ke resource Android (CI)
+    // supaya notif bisa diterima saat app ditutup; FirebaseApp default bisa
+    // sudah dibuat native. Kalau begitu, pakai yang sudah ada.
+    try {
+      await Firebase.initializeApp(options: FirebaseConfig.options);
+    } on FirebaseException catch (e) {
+      if (e.code != 'duplicate-app') rethrow;
+      Firebase.app();
+    }
     // App Check: pastikan request ke Firebase/Edge Function datang dari APK
     // Zenime asli (Play Integrity). Best-effort: kalau aktivasi gagal (mis.
     // device tanpa Google Play), app tetap jalan — enforcement baru dinyalakan
@@ -112,7 +121,9 @@ class ZenimeApp extends ConsumerWidget {
         child: UpdateGate(
           minSplash: introSeen ? Duration.zero : const Duration(milliseconds: 1800),
           child: const OnboardingGate(
-            child: AuthGate(child: AnnouncementHost(child: AppShell())),
+            child: AuthGate(
+              child: AnnouncementHost(child: PushHost(child: AppShell())),
+            ),
           ),
         ),
       ),

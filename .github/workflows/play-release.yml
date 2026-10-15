@@ -148,6 +148,51 @@ jobs:
           rm -f "$RES"/mipmap-*/ic_launcher.png "$RES"/mipmap-*/ic_launcher_round.png
           cp -r android_res/. "$RES/"
 
+      # Push notif (FCM). Nilai Firebase native ditulis ke res/values supaya
+      # FirebaseApp default sudah ada di proses Android sebelum Flutter jalan
+      # (wajib agar notif tetap diterima saat app ditutup), plus izin
+      # POST_NOTIFICATIONS (Android 13+), ikon kecil, warna, dan channel default.
+      - name: Pasang Firebase Messaging (push notif)
+        env:
+          FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+          FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+        run: |
+          python3 - <<'PY'
+          import os
+          from xml.sax.saxutils import escape
+          api = os.environ.get('FIREBASE_API_KEY', '').strip()
+          app = os.environ.get('FIREBASE_APP_ID', '').strip()
+          if not api or not app:
+              print('::warning::FIREBASE_API_KEY/FIREBASE_APP_ID kosong: push notif saat app ditutup tidak akan jalan')
+          else:
+              vals = {
+                  'google_app_id': app,
+                  'google_api_key': api,
+                  'gcm_defaultSenderId': '936105562787',
+                  'project_id': 'zenime-609d0',
+                  'google_storage_bucket': 'zenime-609d0.firebasestorage.app',
+              }
+              xml = '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n'
+              for k, v in vals.items():
+                  xml += '    <string name="%s" translatable="false">%s</string>\n' % (k, escape(v))
+              xml += '</resources>\n'
+              open('android/app/src/main/res/values/zenime_firebase.xml', 'w', encoding='utf-8').write(xml)
+          p = 'android/app/src/main/AndroidManifest.xml'
+          s = open(p, encoding='utf-8').read()
+          if 'android.permission.POST_NOTIFICATIONS' not in s:
+              s = s.replace('<application', '<uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>\n    <application', 1)
+          if 'default_notification_icon' not in s:
+              i = s.index('<application')
+              j = s.index('>', i) + 1
+              meta = ('\n        <meta-data android:name="com.google.firebase.messaging.default_notification_icon" android:resource="@drawable/ic_stat_zenime"/>'
+                      '\n        <meta-data android:name="com.google.firebase.messaging.default_notification_color" android:resource="@color/zenime_notification"/>'
+                      '\n        <meta-data android:name="com.google.firebase.messaging.default_notification_channel_id" android:value="zenime_social"/>')
+              s = s[:j] + meta + s[j:]
+          open(p, 'w', encoding='utf-8').write(s)
+          PY
+          grep -n "POST_NOTIFICATIONS\|default_notification" android/app/src/main/AndroidManifest.xml
+          ls android/app/src/main/res/values/
+
       - name: Ambil dependency
         run: flutter pub get
 

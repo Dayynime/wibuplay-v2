@@ -37,6 +37,7 @@ import 'data/repository/xp_repository.dart';
 import 'data/repository/wallpaper_repository.dart';
 import 'data/repository/avatar_frame_repository.dart';
 import 'data/repository/gift_repository.dart';
+import 'data/repository/notification_repository.dart';
 import 'data/repository/tree_repository.dart';
 import 'data/supabase/supabase_client.dart';
 
@@ -453,6 +454,24 @@ final incomingFriendRequestsProvider = FutureProvider.autoDispose<int>((ref) asy
   if (uid == null || uid.isEmpty) return 0;
   try {
     return await ref.watch(friendRepositoryProvider).countIncomingRequests(uid);
+  } catch (_) {
+    return 0;
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Notifikasi (lonceng + push), Edge Function `zenime-notify`.
+
+final notificationRepositoryProvider = Provider<NotificationRepository>(
+  (ref) => NotificationRepository(ref.watch(supabaseDioProvider)),
+);
+
+/// Jumlah notif belum dibaca (badge lonceng Beranda). Gagal = 0.
+final unreadNotificationsProvider = FutureProvider.autoDispose<int>((ref) async {
+  final uid = ref.watch(authUserProvider).valueOrNull?.uid;
+  if (uid == null || uid.isEmpty) return 0;
+  try {
+    return await ref.watch(notificationRepositoryProvider).unreadCount();
   } catch (_) {
     return 0;
   }

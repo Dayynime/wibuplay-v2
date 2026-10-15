@@ -31,7 +31,7 @@ class HomeProfileHeader extends ConsumerWidget {
   final User user;
   final VoidCallback onSearchClick;
 
-  /// Ikon lonceng (permintaan pertemanan masuk), membuka layar Teman.
+  /// Ikon lonceng, membuka layar Notifikasi (pertemanan & clan).
   final VoidCallback onNotificationClick;
   final VoidCallback onProfileClick;
   final VoidCallback onPremiumClick;
@@ -48,7 +48,11 @@ class HomeProfileHeader extends ConsumerWidget {
     final premium = ref.watch(premiumStatusProvider(uid)).valueOrNull ?? const PremiumStatus();
     final coins = ref.watch(coinBalanceProvider(uid)).valueOrNull ?? 0;
     final level = ref.watch(myXpProvider(uid)).valueOrNull?.level ?? 1;
-    final friendRequests = ref.watch(incomingFriendRequestsProvider).valueOrNull ?? 0;
+    // Badge lonceng: notif belum dibaca, atau minimal jumlah request teman yang
+    // masih menunggu (request lama sebelum ada fitur notif tetap kelihatan).
+    final unreadNotifs = ref.watch(unreadNotificationsProvider).valueOrNull ?? 0;
+    final pendingFriends = ref.watch(incomingFriendRequestsProvider).valueOrNull ?? 0;
+    final friendRequests = unreadNotifs > pendingFriends ? unreadNotifs : pendingFriends;
 
     final chatName = chat?.username ?? '';
     final authName = user.displayName ?? '';
@@ -219,7 +223,7 @@ class _ProfileCard extends StatelessWidget {
               const SizedBox(width: 8),
               _CircleIconButton(
                 icon: Icons.notifications,
-                tooltip: 'Permintaan Pertemanan',
+                tooltip: 'Notifikasi',
                 onTap: onNotificationClick,
                 badgeCount: friendRequests,
               ),
