@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -107,7 +105,7 @@ class HomeScreen extends ConsumerWidget {
     return ColoredBox(
       color: AppColors.backgroundDark,
       child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 350),
+        duration: const Duration(milliseconds: 250),
         child: body,
       ),
     );
@@ -149,17 +147,12 @@ class _HomeContent extends ConsumerStatefulWidget {
 
 class _HomeContentState extends ConsumerState<_HomeContent> {
   final ScrollController _scroll = ScrollController();
-  bool _animateSections = false;
   bool _isScrolled = false;
-  Timer? _enterTimer;
 
   @override
   void initState() {
     super.initState();
     _scroll.addListener(_onScroll);
-    _enterTimer = Timer(const Duration(milliseconds: 50), () {
-      if (mounted) setState(() => _animateSections = true);
-    });
   }
 
   void _onScroll() {
@@ -169,7 +162,6 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
 
   @override
   void dispose() {
-    _enterTimer?.cancel();
     _scroll.dispose();
     super.dispose();
   }
@@ -233,22 +225,19 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
       VoidCallback? onAction,
       bool gapAfterHeader = true,
     }) {
-      return StaggeredSection(
-        visible: _animateSections,
-        delayMs: delayMs,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 16),
-            SectionHeader(title: title, actionText: actionText, onActionClick: onAction),
-            if (gapAfterHeader) const SizedBox(height: 8),
-            child,
-          ],
-        ),
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 16),
+          SectionHeader(title: title, actionText: actionText, onActionClick: onAction),
+          if (gapAfterHeader) const SizedBox(height: 8),
+          child,
+        ],
       );
     }
 
-    return ListView(
+    return PageEntrance(
+      child: ListView(
       controller: _scroll,
       padding: const EdgeInsets.only(bottom: 135),
       children: [
@@ -332,10 +321,7 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
 
         // 1. Hero carousel
         if (sections.slider.isNotEmpty)
-          StaggeredSection(
-            visible: _animateSections,
-            delayMs: 60,
-            child: Padding(
+          Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               child: HeroBanner(
                 sliderItems: sections.slider,
@@ -358,17 +344,12 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
                 },
               ),
             ),
-          ),
 
         // Chat global terbaru (bergeser otomatis), di bawah hero
-        StaggeredSection(
-          visible: _animateSections,
-          delayMs: 120,
-          child: const Padding(
+        const Padding(
             padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
             child: ChatTicker(),
           ),
-        ),
 
         // Urutan section mengikuti Beranda Zenime.
 
@@ -421,25 +402,17 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
 
         // Donghua (API Anichin): bento top 3, gagal/kosong = section tidak tampil.
         if (donghuaHot.isNotEmpty)
-          StaggeredSection(
-            visible: _animateSections,
-            delayMs: 320,
-            child: DonghuaHotSection(
+          DonghuaHotSection(
               cards: donghuaHot,
               onCardClick: (slug) => openDonghuaDetail(context, slug),
               onSeeAllClick: () => openDonghua(context),
             ),
-          ),
 
         // Komik terbaru (API Sanka / Bacakomik): gagal/kosong = section tidak tampil.
-        StaggeredSection(
-          visible: _animateSections,
-          delayMs: 330,
-          child: ComicHomeSection(
+        ComicHomeSection(
             onComicClick: (key) => openComicDetail(context, key),
             onSeeAllClick: widget.onComicSeeAllClick,
           ),
-        ),
 
         // 7. Terpopuler - kartu berperingkat
         if (sections.popular.isNotEmpty)
@@ -471,6 +444,7 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
             child: _posterRow(sections.waiting),
           ),
       ],
+    ),
     );
   }
 }

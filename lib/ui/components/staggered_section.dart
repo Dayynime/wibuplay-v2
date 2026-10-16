@@ -71,3 +71,79 @@ class _StaggeredSectionState extends State<StaggeredSection>
     );
   }
 }
+
+
+/// Animasi masuk halaman: seluruh konten muncul SEKALIGUS (bukan satu-satu),
+/// dengan kombinasi fade + geser halus ke atas + scale ringan.
+/// Pakai kurva easeOutCubic supaya terasa mulus dan modern.
+class PageEntrance extends StatefulWidget {
+  const PageEntrance({
+    super.key,
+    required this.child,
+    this.duration = const Duration(milliseconds: 700),
+    this.offsetY = 32,
+    this.startScale = 0.965,
+  });
+
+  final Widget child;
+  final Duration duration;
+  final double offsetY;
+  final double startScale;
+
+  @override
+  State<PageEntrance> createState() => _PageEntranceState();
+}
+
+class _PageEntranceState extends State<PageEntrance>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c =
+      AnimationController(vsync: this, duration: widget.duration);
+
+  late final Animation<double> _fade = CurvedAnimation(
+    parent: _c,
+    curve: const Interval(0.0, 0.7, curve: Curves.easeOut),
+  );
+  late final Animation<double> _move = CurvedAnimation(
+    parent: _c,
+    curve: Curves.easeOutCubic,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    // Mulai di frame berikutnya supaya frame pertama tidak patah.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _c.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _c,
+      child: widget.child,
+      builder: (context, child) {
+        final m = _move.value;
+        // Setelah selesai, lepas semua layer transform/opacity.
+        if (_c.isCompleted) return child!;
+        return Opacity(
+          opacity: _fade.value.clamp(0.0, 1.0),
+          child: Transform.translate(
+            offset: Offset(0, (1 - m) * widget.offsetY),
+            child: Transform.scale(
+              scale: widget.startScale + (1 - widget.startScale) * m,
+              alignment: Alignment.topCenter,
+              child: child,
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
