@@ -339,10 +339,138 @@ class ClanDetailData {
   int get totalDonatedToday => donations.fold(0, (a, d) => a + d.amountToday);
 }
 
+/// Bangun [ClanDetailData] dari satu respons `screen-data` (aksi clan) dengan
+/// aturan yang SAMA persis dengan jalur lama di bawah. null = data kurang
+/// lengkap, pakai jalur lama.
+Future<ClanDetailData?> _clanDetailFromScreenData(
+  Map<String, dynamic> d,
+  String clanId,
+  String uid,
+  ClanRepository repo,
+) async {
+  final clanRaw = d['clan'];
+  if (clanRaw == null) throw const ClanException('Clan tidak ditemukan');
+  if (clanRaw is! Map) return null;
+  final clan = Clan.fromJson(Map<String, dynamic>.from(clanRaw));
+
+  final membersRaw = d['members'];
+  final profilesRaw = d['profiles'];
+  if (membersRaw is! List || profilesRaw is! Map) return null;
+  final profiles = Map<String, dynamic>.from(profilesRaw);
+  Map<String, dynamic>? prof(String u) => profiles[u] is Map ? Map<String, dynamic>.from(profiles[u] as Map) : null;
+  String nameOf(String u) {
+    final n = (prof(u)?['username'] as String?) ?? '';
+    return n.isEmpty ? 'Pengguna' : n;
+  }
+
+  final raw = membersRaw.whereType<Map>().map((e) => ClanMember.fromJson(Map<String, dynamic>.from(e))).toList();
+  final list = [
+    for (final m in raw)
+      ClanMemberDisplay(
+        firebaseUid: m.firebaseUid,
+        role: m.role,
+        totalContribution: m.totalContribution,
+        joinedAt: m.joinedAt,
+        username: nameOf(m.firebaseUid),
+        avatarUrl: prof(m.firebaseUid)?['avatar_url'] as String?,
+        userNumber: (prof(m.firebaseUid)?['user_number'] as num?)?.toInt(),
+      ),
+  ];
+  final indexed = list.asMap().entries.toList()
+    ..sort((a, b) {
+      final byRole = ClanRoles.rank(b.value.role).compareTo(ClanRoles.rank(a.value.role));
+      return byRole != 0 ? byRole : a.key.compareTo(b.key);
+    });
+  final members = indexed.map((e) => e.value).toList();
+
+  // Keanggotaan sendiri (null = gagal dibaca server -> anggap belum gabung,
+  // sama dengan catchError jalur lama).
+  ClanMember? myMem;
+  final memRaw = d['my_membership'];
+  if (memRaw is Map && memRaw['row'] is Map) {
+    myMem = ClanMember.fromJson(Map<String, dynamic>.from(memRaw['row'] as Map));
+  }
+
+  ClanCta cta;
+  String? myRole;
+  if (myMem == null) {
+    final pending = d['pending'];
+    cta = (pending is bool ? pending : await repo.getMyJoinRequestPending(clanId))
+        ? ClanCta.pending
+        : ClanCta.join;
+  } else if (myMem.clanId != clanId) {
+    cta = ClanCta.blockedOtherClan;
+  } else {
+    cta = ClanCta.member;
+    myRole = myMem.role;
+  }
+
+  final levels = <String, int>{};
+  final levelsRaw = d['levels'];
+  if (levelsRaw is Map) {
+    levelsRaw.forEach((k, v) {
+      if (k is String && v is num) levels[k] = v.toInt();
+    });
+  }
+  final premiumRaw = d['premium_uids'];
+  final premiumUids = premiumRaw is List ? premiumRaw.whereType<String>().toSet() : <String>{};
+
+  final roleByUid = {for (final m in members) m.firebaseUid: m.role};
+  final sums = <String, int>{};
+  final counts = <String, int>{};
+  final donationsRaw = d['donations'];
+  if (donationsRaw is List) {
+    for (final row in donationsRaw.whereType<Map>()) {
+      final u = (row['firebase_uid'] as String?) ?? '';
+      if (u.isEmpty) continue;
+      sums[u] = (sums[u] ?? 0) + ((row['amount'] as num?)?.toInt() ?? 0);
+      counts[u] = (counts[u] ?? 0) + 1;
+    }
+  }
+  final donations = [
+    for (final e in sums.entries)
+      ClanDonationEntry(
+        firebaseUid: e.key,
+        username: nameOf(e.key),
+        avatarUrl: prof(e.key)?['avatar_url'] as String?,
+        role: roleByUid[e.key] ?? ClanRoles.member,
+        amountToday: e.value,
+        donationCountToday: counts[e.key] ?? 0,
+      ),
+  ]..sort((a, b) => b.amountToday.compareTo(a.amountToday));
+
+  return ClanDetailData(
+    clan: clan,
+    members: members,
+    levels: levels,
+    premiumUids: premiumUids,
+    donations: donations,
+    cta: cta,
+    myUid: uid,
+    myRole: myRole,
+  );
+}
+
 final clanDetailProvider =
     FutureProvider.autoDispose.family<ClanDetailData, String>((ref, clanId) async {
   final repo = ref.watch(clanRepositoryProvider);
   final uid = ref.watch(authUserProvider).valueOrNull?.uid ?? '';
+  final screenRepo = ref.watch(screenDataRepositoryProvider);
+  final xpRepo = ref.watch(xpRepositoryProvider);
+
+  // Jalur cepat: semua data halaman lewat SATU request (screen-data). Gagal
+  // apa pun (kecuali clan memang tidak ada) -> jalur lama di bawah.
+  if (uid.isNotEmpty) {
+    try {
+      final now = DateTime.now();
+      final since = DateTime(now.year, now.month, now.day).toUtc().toIso8601String();
+      final d = await screenRepo.clan(clanId, since);
+      final built = await _clanDetailFromScreenData(d, clanId, uid, repo);
+      if (built != null) return built;
+    } on ClanException {
+      rethrow;
+    } catch (_) {}
+  }
 
   final clan = await repo.getClan(clanId);
   // Daftar member wajib duluan (donasi, level, premium butuh uid-nya);
@@ -368,7 +496,6 @@ final clanDetailProvider =
   }
 
   final uids = members.map((m) => m.firebaseUid).toList();
-  final xpRepo = ref.watch(xpRepositoryProvider);
   final donationsF = repo
       .getTodayDonations(clanId, roleByUid: {for (final m in members) m.firebaseUid: m.role})
       .catchError((_) => <ClanDonationEntry>[]);

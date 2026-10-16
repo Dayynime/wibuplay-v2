@@ -14,4 +14,13 @@ class ScreenDataRepository {
     if (d is! Map) throw Exception('Respons screen-data tidak valid');
     return Map<String, dynamic>.from(d);
   }
+
+  /// Data Halaman Clan [clanId]. [since] = awal "hari ini" menurut jam HP
+  /// (buat ranking Donasi Hari Ini).
+  Future<Map<String, dynamic>> clan(String clanId, String since) async {
+    final d = await callAuthedFunction(
+        _dio, 'screen-data', {'screen': 'clan', 'clan_id': clanId, 'since': since});
+    if (d is! Map) throw Exception('Respons screen-data tidak valid');
+    return Map<String, dynamic>.from(d);
+  }
 }
