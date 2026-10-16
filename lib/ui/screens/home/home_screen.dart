@@ -179,19 +179,22 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
     Map<String, String> episodeLabels = const {},
     bool showNewBadge = false,
   }) {
+    final cell = _posterCellWidth(context);
     return SizedBox(
-      height: _rowHeight,
+      // tinggi sama seperti sel grid Jelajah: poster 2:3 + judul + subteks
+      height: cell * 1.5 + 62,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 20),
         itemCount: list.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 14),
+        separatorBuilder: (_, _) => const SizedBox(width: 10),
         itemBuilder: (context, i) {
           final anime = list[i];
           return Align(
             alignment: Alignment.topCenter,
             child: AnimePosterCard(
               anime: anime,
+              width: cell,
               episodeLabel: episodeLabels[anime.id],
               showNewBadge: showNewBadge,
               onTap: () {
@@ -205,8 +208,14 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
     );
   }
 
-  // 140 lebar -> poster 210 + judul 2 baris + subteks; beri ruang cukup.
-  static const double _rowHeight = 290;
+  /// Lebar poster disamakan dengan sel grid di Jelajah
+  /// (minimal 105dp, jarak 10dp, padding 16dp).
+  double _posterCellWidth(BuildContext context) {
+    const minCell = 105.0, gap = 10.0;
+    final avail = MediaQuery.of(context).size.width - 32;
+    final count = ((avail + gap) / (minCell + gap)).floor().clamp(1, 100);
+    return (avail - gap * (count - 1)) / count;
+  }
 
   @override
   Widget build(BuildContext context) {
