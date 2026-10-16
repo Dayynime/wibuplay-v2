@@ -7,7 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:video_player/video_player.dart';
+import 'package:wibuplay/core/wp_video.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../../core/theme/app_colors.dart';
@@ -84,7 +84,7 @@ class PlayerPlayback {
   int get hashCode => Object.hash(isPlaying, isBuffering, positionMs, durationMs);
 }
 
-/// Port PlayerScreen.kt. ExoPlayer diganti video_player (ExoPlayer di Android).
+/// Port PlayerScreen.kt. ExoPlayer diganti media_kit (libmpv, fallback software decode).
 class PlayerScreen extends ConsumerStatefulWidget {
   const PlayerScreen({
     super.key,
@@ -108,8 +108,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
   /// false saat app di background: detik itu tidak dihitung untuk XP.
   bool _inForeground = true;
 
-  VideoPlayerController? _vc;
+  WpVideoController? _vc;
   String? _loadedLink;
+  int _decoderRetries = 0;
   final ValueNotifier<PlayerPlayback> _pb = ValueNotifier<PlayerPlayback>(const PlayerPlayback());
 
   bool _showControls = true;
@@ -291,6 +292,31 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     if (mounted) setState(() {});
   }
 
+  /// Error decoder hardware (MediaCodecVideoRenderer) sering sementara:
+  /// decoder masih dipakai / belum dilepas. Retry otomatis max 2x.
+  bool _retryDecoder(String? desc) {
+    final d = desc ?? '';
+    final isDecoder = d.contains('MediaCodec') || d.contains('Decoder');
+    if (!isDecoder || _decoderRetries >= 2 || _currentLink == null) {
+      return false;
+    }
+    _decoderRetries++;
+    final link = _currentLink;
+    final vc = _vc;
+    _vc = null;
+    vc?.removeListener(_onVideo);
+    _loadedLink = null;
+    Future<void>(() async {
+      try {
+        await vc?.dispose();
+      } catch (_) {}
+      // beri waktu codec dilepas sebelum init ulang
+      await Future<void>.delayed(Duration(milliseconds: 600 * _decoderRetries));
+      if (mounted) await _loadLink(link);
+    });
+    return true;
+  }
+
   Future<void> _loadLink(String? link) async {
     if (link == null || link.trim().isEmpty) return;
     final adopted = _adoptedLink;
@@ -313,6 +339,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
       }
     }
     if (link == _loadedLink) return;
+    if (link != _currentLink) _decoderRetries = 0;
     _loadedLink = link;
     _currentLink = link;
 
@@ -320,11 +347,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     old?.removeListener(_onVideo);
     final resumeMs = ref.read(playerControllerProvider(_args)).resumePositionMs;
 
-    final VideoPlayerController vc;
+    final WpVideoController vc;
     try {
       vc = link.startsWith('file://')
-          ? VideoPlayerController.file(File.fromUri(Uri.parse(link)))
-          : VideoPlayerController.networkUrl(Uri.parse(link));
+          ? WpVideoController.file(File.fromUri(Uri.parse(link)))
+          : WpVideoController.networkUrl(Uri.parse(link));
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -370,6 +397,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
       if (mounted && _vc == vc) {
         _pb.value = const PlayerPlayback(isBuffering: false);
         final desc = vc.value.errorDescription;
+        if (_retryDecoder(desc ?? '$e')) return;
         setState(() {
           _playerError = true;
           _playerErrorDetail = (desc != null && desc.isNotEmpty) ? desc : '$e';
@@ -383,6 +411,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     if (vc == null || !mounted) return;
     final v = vc.value;
     if (v.hasError && !_playerError) {
+      if (_retryDecoder(v.errorDescription)) return;
       setState(() {
         _playerError = true;
         _playerErrorDetail = v.errorDescription;
@@ -879,7 +908,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
       child: Center(
         child: AspectRatio(
           aspectRatio: ratio > 0 ? ratio : 16 / 9,
-          child: VideoPlayer(vc),
+          child: WpVideoView(vc),
         ),
       ),
     );

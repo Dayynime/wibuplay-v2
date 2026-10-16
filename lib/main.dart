@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:media_kit/media_kit.dart';
 
 import 'core/firebase_config.dart';
 import 'core/remote_config_manager.dart';
@@ -64,6 +65,7 @@ Future<void> _initBackend() async {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  MediaKit.ensureInitialized();
 
   // Port MainActivity: edge-to-edge, status/nav bar warna BackgroundDark, ikon terang.
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);

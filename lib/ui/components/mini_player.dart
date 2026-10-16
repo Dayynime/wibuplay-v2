@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:video_player/video_player.dart';
+import 'package:wibuplay/core/wp_video.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/watch_xp_gate.dart';
@@ -33,7 +33,7 @@ class MiniPlayerInfo {
   final double speed;
 }
 
-/// Menyimpan SATU VideoPlayerController yang dititipkan dari PlayerScreen saat
+/// Menyimpan SATU WpVideoController yang dititipkan dari PlayerScreen saat
 /// user menekan back sambil masih menonton (port MiniPlayerManager.kt).
 /// Berbeda dari PiP sistem: ini murni di dalam app.
 class MiniPlayerManager extends ChangeNotifier {
@@ -41,11 +41,11 @@ class MiniPlayerManager extends ChangeNotifier {
 
   static final MiniPlayerManager instance = MiniPlayerManager._();
 
-  VideoPlayerController? _controller;
+  WpVideoController? _controller;
   MiniPlayerInfo? _info;
   bool _disposed = false;
 
-  VideoPlayerController? get controller => _controller;
+  WpVideoController? get controller => _controller;
   MiniPlayerInfo? get info => _info;
   bool get active => _controller != null && _info != null;
 
@@ -61,7 +61,7 @@ class MiniPlayerManager extends ChangeNotifier {
   void _onVideo() => notifyListeners();
 
   /// Kepemilikan controller pindah ke sini (TIDAK di-dispose).
-  void activate(VideoPlayerController controller, MiniPlayerInfo info) {
+  void activate(WpVideoController controller, MiniPlayerInfo info) {
     final old = _controller;
     if (old != null && !identical(old, controller)) {
       old.removeListener(_onVideo);
@@ -76,7 +76,7 @@ class MiniPlayerManager extends ChangeNotifier {
   /// Dipanggil PlayerScreen saat dibuka. Kalau episodenya sama persis, controller
   /// diserahkan balik (posisi & buffer terpakai, tanpa reload). Kalau beda,
   /// mini player lama ditutup supaya tidak ada dua video bersuara bersamaan.
-  ({VideoPlayerController controller, MiniPlayerInfo info})? consumeForExpand(
+  ({WpVideoController controller, MiniPlayerInfo info})? consumeForExpand(
     String movieId,
     String episodeId,
   ) {
@@ -265,7 +265,7 @@ class _MiniPlayerOverlayState extends ConsumerState<MiniPlayerOverlay>
                   children: [
                     if (vc.value.isInitialized)
                       Center(
-                        child: AspectRatio(aspectRatio: ratio, child: VideoPlayer(vc)),
+                        child: AspectRatio(aspectRatio: ratio, child: WpVideoView(vc)),
                       )
                     else if (info.posterUrl.isNotEmpty)
                       NetImage(info.posterUrl),

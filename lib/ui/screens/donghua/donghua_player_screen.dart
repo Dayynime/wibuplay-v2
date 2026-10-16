@@ -6,7 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:video_player/video_player.dart';
+import 'package:wibuplay/core/wp_video.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../../core/error_message.dart';
@@ -82,7 +82,7 @@ class _DonghuaPlayerScreenState extends ConsumerState<DonghuaPlayerScreen>
   /// false saat app di background: detik itu tidak dihitung untuk XP.
   bool _inForeground = true;
 
-  VideoPlayerController? _vc;
+  WpVideoController? _vc;
   String? _loadedUrl;
   String? _pendingUrl;
   final ValueNotifier<PlayerPlayback> _pb =
@@ -156,9 +156,9 @@ class _DonghuaPlayerScreenState extends ConsumerState<DonghuaPlayerScreen>
     final resumeMs = old?.value.position.inMilliseconds ?? 0;
     old?.removeListener(_onVideo);
 
-    final VideoPlayerController vc;
+    final WpVideoController vc;
     try {
-      vc = VideoPlayerController.networkUrl(
+      vc = WpVideoController.networkUrl(
         Uri.parse(url),
         httpHeaders: AnichinNetwork.videoHeaders,
       );
@@ -641,7 +641,7 @@ class _DonghuaPlayerScreenState extends ConsumerState<DonghuaPlayerScreen>
       child: Center(
         child: AspectRatio(
           aspectRatio: ratio > 0 ? ratio : 16 / 9,
-          child: VideoPlayer(vc),
+          child: WpVideoView(vc),
         ),
       ),
     );

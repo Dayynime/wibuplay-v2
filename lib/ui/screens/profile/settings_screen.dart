@@ -597,7 +597,7 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _DotLine(
-                        text: 'Flutter · Material 3 · video_player',
+                        text: 'Flutter · Material 3 · media_kit · video_player',
                         color: AppColors.textMuted,
                       ),
                       SizedBox(height: 6),
