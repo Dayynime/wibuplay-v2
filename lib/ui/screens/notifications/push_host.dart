@@ -29,6 +29,7 @@ class PushHost extends ConsumerStatefulWidget {
 class _PushHostState extends ConsumerState<PushHost> {
   final List<StreamSubscription<dynamic>> _subs = [];
   OverlayEntry? _banner;
+  Timer? _syncTimer;
   Timer? _bannerTimer;
 
   @override
@@ -36,11 +37,21 @@ class _PushHostState extends ConsumerState<PushHost> {
     super.initState();
     AuthRepository.beforeSignOut = PushService.instance.unregister;
 
+    // Push didaftarkan BELAKANGAN (5 detik setelah app siap) supaya tidak
+    // rebutan jaringan dengan data akun (profil, ZCoin, premium) saat app
+    // baru dibuka. Logout tetap diproses langsung.
     ref.listenManual(authUserProvider, (_, next) {
-      PushService.instance.syncForUser(
-        ref.read(notificationRepositoryProvider),
-        next.valueOrNull?.uid,
-      );
+      final uid = next.valueOrNull?.uid;
+      _syncTimer?.cancel();
+      if (uid == null || uid.isEmpty) {
+        PushService.instance.syncForUser(ref.read(notificationRepositoryProvider), null);
+        return;
+      }
+      _syncTimer = Timer(const Duration(seconds: 5), () {
+        if (!mounted) return;
+        if (ref.read(authUserProvider).valueOrNull?.uid != uid) return;
+        PushService.instance.syncForUser(ref.read(notificationRepositoryProvider), uid);
+      });
     }, fireImmediately: true);
 
     if (!FirebaseConfig.ready) return;
@@ -57,6 +68,7 @@ class _PushHostState extends ConsumerState<PushHost> {
 
   @override
   void dispose() {
+    _syncTimer?.cancel();
     for (final s in _subs) {
       s.cancel();
     }

@@ -466,10 +466,20 @@ final notificationRepositoryProvider = Provider<NotificationRepository>(
   (ref) => NotificationRepository(ref.watch(supabaseDioProvider)),
 );
 
+/// Badge pertama setelah app dibuka ditunda sebentar supaya data akun
+/// (profil, ZCoin, premium) yang lebih penting dimuat duluan.
+bool _unreadFirstLoad = true;
+
 /// Jumlah notif belum dibaca (badge lonceng Beranda). Gagal = 0.
-final unreadNotificationsProvider = FutureProvider.autoDispose<int>((ref) async {
+/// keepAlive: tidak diambil ulang tiap Beranda di-scroll; di-refresh lewat
+/// invalidate (push masuk, buka/tutup layar Notifikasi).
+final unreadNotificationsProvider = FutureProvider<int>((ref) async {
   final uid = ref.watch(authUserProvider).valueOrNull?.uid;
   if (uid == null || uid.isEmpty) return 0;
+  if (_unreadFirstLoad) {
+    _unreadFirstLoad = false;
+    await Future<void>.delayed(const Duration(seconds: 3));
+  }
   try {
     return await ref.watch(notificationRepositoryProvider).unreadCount();
   } catch (_) {
