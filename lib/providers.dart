@@ -38,6 +38,8 @@ import 'data/repository/wallpaper_repository.dart';
 import 'data/repository/avatar_frame_repository.dart';
 import 'data/repository/gift_repository.dart';
 import 'data/repository/notification_repository.dart';
+import 'data/repository/home_bootstrap_repository.dart';
+import 'data/models/home_bootstrap.dart';
 import 'data/repository/tree_repository.dart';
 import 'data/supabase/supabase_client.dart';
 
@@ -160,11 +162,14 @@ final xpRepositoryProvider = Provider<XpRepository>(
 /// XP/level sendiri per uid. Gagal load dianggap "belum pernah dapat XP"
 /// (null), bukan error. Di-invalidate setelah heartbeat sukses.
 final myXpProvider = FutureProvider.family<UserXp?, String>((ref, uid) async {
-  try {
-    return await ref.watch(xpRepositoryProvider).getMyXp(uid);
-  } catch (_) {
-    return null;
-  }
+  final repo = ref.watch(xpRepositoryProvider);
+  return viaHomeBootstrap<UserXp?>(ref, uid, 'xp', (b) => b.xp, () async {
+    try {
+      return await repo.getMyXp(uid);
+    } catch (_) {
+      return null;
+    }
+  });
 });
 
 final accountRepositoryProvider = Provider<AccountRepository>(
@@ -172,9 +177,11 @@ final accountRepositoryProvider = Provider<AccountRepository>(
 );
 
 /// Status Premium lengkap (is_premium + expires_at) per uid. Gagal cek = tidak premium.
-final premiumStatusProvider = FutureProvider.family<PremiumStatus, String>(
-  (ref, uid) => ref.watch(accountRepositoryProvider).getPremiumStatus(uid),
-);
+final premiumStatusProvider = FutureProvider.family<PremiumStatus, String>((ref, uid) {
+  final repo = ref.watch(accountRepositoryProvider);
+  return viaHomeBootstrap<PremiumStatus>(
+      ref, uid, 'premium', (b) => b.premium, () => repo.getPremiumStatus(uid));
+});
 
 /// Status Premium per uid (gagal cek = tidak premium). Berbagi satu request
 /// dengan [premiumStatusProvider] supaya Beranda tidak mengecek dua kali.
@@ -183,14 +190,17 @@ final premiumProvider = FutureProvider.family<bool, String>(
 );
 
 /// Kode akun + ID urut (kartu profil Beranda).
-final profileIdentityProvider = FutureProvider.family<ProfileIdentity, String>(
-  (ref, uid) => ref.watch(accountRepositoryProvider).getProfileIdentity(uid),
-);
+final profileIdentityProvider = FutureProvider.family<ProfileIdentity, String>((ref, uid) {
+  final repo = ref.watch(accountRepositoryProvider);
+  return viaHomeBootstrap<ProfileIdentity>(
+      ref, uid, 'identity', (b) => b.identity, () => repo.getProfileIdentity(uid));
+});
 
 /// Saldo ZCoin per uid. Gagal = 0.
-final coinBalanceProvider = FutureProvider.family<int, String>(
-  (ref, uid) => ref.watch(accountRepositoryProvider).getCoinBalance(uid),
-);
+final coinBalanceProvider = FutureProvider.family<int, String>((ref, uid) {
+  final repo = ref.watch(accountRepositoryProvider);
+  return viaHomeBootstrap<int>(ref, uid, 'coins', (b) => b.coins, () => repo.getCoinBalance(uid));
+});
 
 final storeRepositoryProvider = Provider<StoreRepository>(
   (ref) => StoreRepository(ref.watch(supabaseDioProvider)),
@@ -208,11 +218,14 @@ final coinPackagesProvider = FutureProvider.autoDispose<List<CoinPackage>>(
 
 /// Profil chat (username/avatar) per uid. Gagal = null.
 final chatProfileProvider = FutureProvider.family<ChatProfile?, String>((ref, uid) async {
-  try {
-    return await ref.watch(chatRepositoryProvider).getProfile(uid);
-  } catch (_) {
-    return null;
-  }
+  final repo = ref.watch(chatRepositoryProvider);
+  return viaHomeBootstrap<ChatProfile?>(ref, uid, 'profile', (b) => b.profile, () async {
+    try {
+      return await repo.getProfile(uid);
+    } catch (_) {
+      return null;
+    }
+  });
 });
 
 /// Tanggal gabung Zenime per uid (Stat "Join Zenime" di profil). Gagal = null.
@@ -452,12 +465,89 @@ final privateChatRepositoryProvider = Provider<PrivateChatRepository>(
 final incomingFriendRequestsProvider = FutureProvider.autoDispose<int>((ref) async {
   final uid = ref.watch(authUserProvider).valueOrNull?.uid;
   if (uid == null || uid.isEmpty) return 0;
+  final repo = ref.watch(friendRepositoryProvider);
+  return viaHomeBootstrap<int>(ref, uid, 'friend_requests', (b) => b.friendRequests, () async {
+    try {
+      return await repo.countIncomingRequests(uid);
+    } catch (_) {
+      return 0;
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Data awal Beranda dalam SATU request (Edge Function `home-bootstrap`).
+//
+// Alur buka app untuk akun sendiri:
+//  1. Salinan terakhir di HP langsung ditampilkan (tanpa nunggu jaringan).
+//  2. home-bootstrap diambil sekali; begitu datang, semua kartu ikut terbarui.
+//  3. Setelah itu tiap provider kembali ke jalur lamanya sendiri (mis. saldo
+//     di-invalidate setelah beli -> ambil saldo terbaru, bukan data awal).
+// Kalau home-bootstrap gagal / belum dideploy, semua otomatis pakai jalur lama.
+
+final homeBootstrapRepositoryProvider = Provider<HomeBootstrapRepository>(
+  (ref) => HomeBootstrapRepository(ref.watch(supabaseDioProvider)),
+);
+
+/// Salinan terakhir di HP untuk akun yang login.
+final cachedHomeBootstrapProvider = FutureProvider<HomeBootstrap?>((ref) async {
+  final uid = ref.watch(authUserProvider.select((a) => a.valueOrNull?.uid));
+  if (uid == null || uid.isEmpty) return null;
+  return ref.watch(homeBootstrapRepositoryProvider).loadCache(uid);
+});
+
+/// Data segar dari server (null = gagal, pakai jalur lama).
+final homeBootstrapProvider = FutureProvider<HomeBootstrap?>((ref) async {
+  final uid = ref.watch(authUserProvider.select((a) => a.valueOrNull?.uid));
+  if (uid == null || uid.isEmpty) return null;
+  final repo = ref.watch(homeBootstrapRepositoryProvider);
   try {
-    return await ref.watch(friendRepositoryProvider).countIncomingRequests(uid);
+    final b = await repo.fetch();
+    if (b.uid != uid) return null;
+    await repo.saveCache(b);
+    return b;
   } catch (_) {
-    return 0;
+    return null;
   }
 });
+
+/// Bagian (field|uid) yang sudah memakai data segar home-bootstrap.
+final Set<String> _homeBootstrapUsed = <String>{};
+
+/// Ambil satu bagian data akun sendiri dari home-bootstrap (cache dulu, lalu
+/// data segar). Untuk uid orang lain, atau setelah data awal terpakai, atau
+/// kalau bagian itu kosong, langsung pakai [fallback] (jalur lama).
+Future<T> viaHomeBootstrap<T>(
+  Ref<Object?> ref,
+  String uid,
+  String field,
+  T? Function(HomeBootstrap b) pick,
+  Future<T> Function() fallback,
+) async {
+  final me = ref.watch(authUserProvider.select((a) => a.valueOrNull?.uid));
+  final key = '$field|$uid';
+  if (me == null || me.isEmpty || me != uid || _homeBootstrapUsed.contains(key)) {
+    return fallback();
+  }
+  final fresh = ref.watch(homeBootstrapProvider);
+  if (fresh.hasValue) {
+    _homeBootstrapUsed.add(key);
+    final b = fresh.value;
+    final v = b == null ? null : pick(b);
+    return v ?? await fallback();
+  }
+  // Data segar belum datang: tampilkan salinan terakhir kalau ada. Provider
+  // ini otomatis jalan ulang begitu data segar tiba (karena di-watch).
+  final cached = ref.watch(cachedHomeBootstrapProvider).valueOrNull;
+  final c = cached == null ? null : pick(cached);
+  if (c != null) return c;
+  // Belum ada salinan: tunggu data segar. Kunci TIDAK ditandai di sini; begitu
+  // data segar tiba provider jalan ulang lewat cabang hasValue di atas (tanpa
+  // request tambahan) dan menandainya di sana.
+  final b = await ref.watch(homeBootstrapProvider.future);
+  final v = b == null ? null : pick(b);
+  return v ?? await fallback();
+}
 
 // ---------------------------------------------------------------------------
 // Notifikasi (lonceng + push), Edge Function `zenime-notify`.
@@ -466,25 +556,20 @@ final notificationRepositoryProvider = Provider<NotificationRepository>(
   (ref) => NotificationRepository(ref.watch(supabaseDioProvider)),
 );
 
-/// Badge pertama setelah app dibuka ditunda sebentar supaya data akun
-/// (profil, ZCoin, premium) yang lebih penting dimuat duluan.
-bool _unreadFirstLoad = true;
-
 /// Jumlah notif belum dibaca (badge lonceng Beranda). Gagal = 0.
-/// keepAlive: tidak diambil ulang tiap Beranda di-scroll; di-refresh lewat
-/// invalidate (push masuk, buka/tutup layar Notifikasi).
+/// Pertama kali dari home-bootstrap (tanpa request tambahan); setelah itu
+/// di-refresh lewat invalidate (push masuk, buka/tutup layar Notifikasi).
 final unreadNotificationsProvider = FutureProvider<int>((ref) async {
   final uid = ref.watch(authUserProvider).valueOrNull?.uid;
   if (uid == null || uid.isEmpty) return 0;
-  if (_unreadFirstLoad) {
-    _unreadFirstLoad = false;
-    await Future<void>.delayed(const Duration(seconds: 3));
-  }
-  try {
-    return await ref.watch(notificationRepositoryProvider).unreadCount();
-  } catch (_) {
-    return 0;
-  }
+  final repo = ref.watch(notificationRepositoryProvider);
+  return viaHomeBootstrap<int>(ref, uid, 'unread', (b) => b.unread, () async {
+    try {
+      return await repo.unreadCount();
+    } catch (_) {
+      return 0;
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------
