@@ -175,7 +175,7 @@ class GiftRepository {
       final d = await callAuthedFunction(_dio, 'premium-gift', {
         'action': 'giveaway_claim',
         'giveaway_id': id,
-      });
+      }, appCheck: true);
       final c = d is Map ? d['claim'] : null;
       return c is Map ? ((c['days'] as num?)?.toInt() ?? 0) : 0;
     } catch (e) {

@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import '../../core/app_check_header.dart';
 import '../../core/firebase_config.dart';
 import '../models/chat_models.dart';
 import '../models/support_models.dart';
@@ -39,7 +40,10 @@ class XpRepository {
       final res = await _dio.post<dynamic>(
         'functions/v1/watch-xp-heartbeat',
         data: {'minutes': minutes},
-        options: Options(headers: {'Authorization': 'Bearer $token'}),
+        options: Options(headers: {
+          'Authorization': 'Bearer $token',
+          ...await appCheckHeaders(),
+        }),
       );
       final data = res.data;
       return data is Map && data['success'] == true;

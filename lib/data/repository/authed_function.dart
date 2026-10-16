@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import '../../core/app_check_header.dart';
 import '../../core/firebase_config.dart';
 
 /// Panggil Edge Function Supabase dengan Firebase ID Token asli di header
@@ -9,8 +10,9 @@ import '../../core/firebase_config.dart';
 Future<dynamic> callAuthedFunction(
   Dio dio,
   String function,
-  Map<String, dynamic> body,
-) async {
+  Map<String, dynamic> body, {
+  bool appCheck = false,
+}) async {
   if (!FirebaseConfig.ready) {
     throw Exception('Login belum tersedia di perangkat ini.');
   }
@@ -22,7 +24,10 @@ Future<dynamic> callAuthedFunction(
     final res = await dio.post<dynamic>(
       'functions/v1/$function',
       data: body,
-      options: Options(headers: {'Authorization': 'Bearer $token'}),
+      options: Options(headers: {
+        'Authorization': 'Bearer $token',
+        if (appCheck) ...await appCheckHeaders(),
+      }),
     );
     return res.data;
   } catch (e) {
