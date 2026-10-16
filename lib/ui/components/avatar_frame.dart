@@ -18,8 +18,27 @@ class AvatarFrameCache extends StateNotifier<Map<String, String>> {
   final Set<String> _pending = {};
   Timer? _timer;
 
+  /// uid yang datanya sedang diambil layar lain (mis. Profil publik lewat
+  /// screen-data): jangan ditembak terpisah dulu.
+  final Set<String> _reserved = {};
+
+  void reserve(String uid) {
+    if (uid.isNotEmpty && !_seen.contains(uid)) _reserved.add(uid);
+  }
+
+  /// Hasil dari layar yang memesan (null = tidak pakai border).
+  void fill(String uid, String? frameId) {
+    _reserved.remove(uid);
+    setLocal(uid, frameId);
+  }
+
+  /// Layar gagal ambil data: kembali ke jalur biasa.
+  void release(String uid) {
+    if (_reserved.remove(uid)) request(uid);
+  }
+
   void request(String uid) {
-    if (uid.isEmpty || _seen.contains(uid)) return;
+    if (uid.isEmpty || _seen.contains(uid) || _reserved.contains(uid)) return;
     _seen.add(uid);
     _pending.add(uid);
     _timer ??= Timer(const Duration(milliseconds: 150), _flush);

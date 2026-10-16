@@ -39,6 +39,8 @@ import 'data/repository/avatar_frame_repository.dart';
 import 'data/repository/gift_repository.dart';
 import 'data/repository/notification_repository.dart';
 import 'data/repository/home_bootstrap_repository.dart';
+import 'data/repository/screen_data_repository.dart';
+import 'core/screen_seed.dart';
 import 'data/models/home_bootstrap.dart';
 import 'data/repository/tree_repository.dart';
 import 'data/supabase/supabase_client.dart';
@@ -78,9 +80,11 @@ final publicProfileRepositoryProvider = Provider<PublicProfileRepository>(
 
 /// Favorit/riwayat publik milik user lain (profil publik). Gagal = lempar error.
 final publicProfileContentProvider =
-    FutureProvider.autoDispose.family<PublicProfileContent, String>(
-  (ref, uid) => ref.watch(publicProfileRepositoryProvider).getPublicContent(uid),
-);
+    FutureProvider.autoDispose.family<PublicProfileContent, String>((ref, uid) {
+  final repo = ref.watch(publicProfileRepositoryProvider);
+  return viaScreenSeed<PublicProfileContent>(
+      'content', uid, () => repo.getPublicContent(uid), () => repo.getPublicContent(uid));
+});
 
 /// Token premium bertanda tangan server (buat endpoint donghua).
 final premiumTokenManagerProvider = Provider<PremiumTokenManager>(
@@ -163,13 +167,16 @@ final xpRepositoryProvider = Provider<XpRepository>(
 /// (null), bukan error. Di-invalidate setelah heartbeat sukses.
 final myXpProvider = FutureProvider.family<UserXp?, String>((ref, uid) async {
   final repo = ref.watch(xpRepositoryProvider);
-  return viaHomeBootstrap<UserXp?>(ref, uid, 'xp', (b) => b.xp, () async {
+  Future<UserXp?> plain() async {
     try {
       return await repo.getMyXp(uid);
     } catch (_) {
       return null;
     }
-  });
+  }
+
+  return viaScreenSeed<UserXp?>('xp', uid,
+      () => viaHomeBootstrap<UserXp?>(ref, uid, 'xp', (b) => b.xp, plain), plain);
 });
 
 final accountRepositoryProvider = Provider<AccountRepository>(
@@ -179,8 +186,12 @@ final accountRepositoryProvider = Provider<AccountRepository>(
 /// Status Premium lengkap (is_premium + expires_at) per uid. Gagal cek = tidak premium.
 final premiumStatusProvider = FutureProvider.family<PremiumStatus, String>((ref, uid) {
   final repo = ref.watch(accountRepositoryProvider);
-  return viaHomeBootstrap<PremiumStatus>(
-      ref, uid, 'premium', (b) => b.premium, () => repo.getPremiumStatus(uid));
+  return viaScreenSeed<PremiumStatus>(
+      'premium',
+      uid,
+      () => viaHomeBootstrap<PremiumStatus>(
+          ref, uid, 'premium', (b) => b.premium, () => repo.getPremiumStatus(uid)),
+      () => repo.getPremiumStatus(uid));
 });
 
 /// Status Premium per uid (gagal cek = tidak premium). Berbagi satu request
@@ -219,23 +230,31 @@ final coinPackagesProvider = FutureProvider.autoDispose<List<CoinPackage>>(
 /// Profil chat (username/avatar) per uid. Gagal = null.
 final chatProfileProvider = FutureProvider.family<ChatProfile?, String>((ref, uid) async {
   final repo = ref.watch(chatRepositoryProvider);
-  return viaHomeBootstrap<ChatProfile?>(ref, uid, 'profile', (b) => b.profile, () async {
+  Future<ChatProfile?> plain() async {
     try {
       return await repo.getProfile(uid);
     } catch (_) {
       return null;
     }
-  });
+  }
+
+  return viaScreenSeed<ChatProfile?>('profile', uid,
+      () => viaHomeBootstrap<ChatProfile?>(ref, uid, 'profile', (b) => b.profile, plain), plain);
 });
 
 /// Tanggal gabung Zenime per uid (Stat "Join Zenime" di profil). Gagal = null.
 final joinDateProvider = FutureProvider.family<DateTime?, String>((ref, uid) async {
   if (uid.isEmpty) return null;
-  try {
-    return await ref.watch(chatRepositoryProvider).getJoinDate(uid);
-  } catch (_) {
-    return null;
+  final repo = ref.watch(chatRepositoryProvider);
+  Future<DateTime?> plain() async {
+    try {
+      return await repo.getJoinDate(uid);
+    } catch (_) {
+      return null;
+    }
   }
+
+  return viaScreenSeed<DateTime?>('join', uid, plain, plain);
 });
 
 /// Status Premium user yang sedang login.
@@ -426,12 +445,17 @@ final homeCuplixProvider = FutureProvider.autoDispose<List<CuplixItem>>((ref) as
 /// Tag clan satu user (null = belum gabung clan / gagal).
 final userClanTagProvider = FutureProvider.autoDispose.family<String?, String>((ref, uid) async {
   if (uid.isEmpty) return null;
-  try {
-    final map = await ref.watch(chatRepositoryProvider).getClanTagsForUids([uid]);
-    return map[uid];
-  } catch (_) {
-    return null;
+  final repo = ref.watch(chatRepositoryProvider);
+  Future<String?> plain() async {
+    try {
+      final map = await repo.getClanTagsForUids([uid]);
+      return map[uid];
+    } catch (_) {
+      return null;
+    }
   }
+
+  return viaScreenSeed<String?>('clan_tag', uid, plain, plain);
 });
 
 /// Komentar milik 1 user (tab Komentar di Profil). Gagal = error (UI tampil pesan).
@@ -442,11 +466,16 @@ final myCommentsProvider =
 
 /// Total komentar milik 1 user (stat di Profil). Gagal = null.
 final myCommentCountProvider = FutureProvider.autoDispose.family<int?, String>((ref, uid) async {
-  try {
-    return await ref.watch(commentRepositoryProvider).getMyCommentCount(uid);
-  } catch (_) {
-    return null;
+  final repo = ref.watch(commentRepositoryProvider);
+  Future<int?> plain() async {
+    try {
+      return await repo.getMyCommentCount(uid);
+    } catch (_) {
+      return null;
+    }
   }
+
+  return viaScreenSeed<int?>('comment_count', uid, plain, plain);
 });
 
 final friendRepositoryProvider = Provider<FriendRepository>(
@@ -474,6 +503,11 @@ final incomingFriendRequestsProvider = FutureProvider.autoDispose<int>((ref) asy
     }
   });
 });
+
+/// Data satu layar dalam satu request (Edge Function `screen-data`).
+final screenDataRepositoryProvider = Provider<ScreenDataRepository>(
+  (ref) => ScreenDataRepository(ref.watch(supabaseDioProvider)),
+);
 
 // ---------------------------------------------------------------------------
 // Data awal Beranda dalam SATU request (Edge Function `home-bootstrap`).

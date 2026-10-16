@@ -19,6 +19,7 @@ import '../../components/join_date_stat.dart';
 import '../clan/clan_browse_screen.dart';
 import '../xp/xp_leaderboard_screen.dart';
 import 'profile_controller.dart';
+import 'profile_screen_seed.dart';
 import 'profile_screen.dart';
 
 /// Buka profil publik user lain (dari Chat Global, Chat Teman, layar Teman).
@@ -58,7 +59,22 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
   @override
   void initState() {
     super.initState();
-    if (!_isMe && _myUid.isNotEmpty) _loadRelation();
+    _loadScreenData();
+  }
+
+  /// Semua data profil lewat SATU request (screen-data). Bagian yang gagal
+  /// otomatis diambil lewat jalur lama oleh provider masing-masing.
+  Future<void> _loadScreenData() async {
+    final relation = await loadProfileScreenSeed(ref, widget.uid);
+    if (!mounted || _isMe || _myUid.isEmpty) return;
+    if (relation != null) {
+      setState(() {
+        _relation = relation;
+        _relationFailed = false;
+      });
+    } else {
+      _loadRelation();
+    }
   }
 
   Future<void> _loadRelation() async {

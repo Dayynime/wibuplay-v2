@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/screen_seed.dart';
 import '../../providers.dart';
 
 /// Role staff Zenime (tabel `user_roles`). Port ZenimeRole di Zenime.
@@ -170,7 +171,16 @@ final _roleBatcherProvider =
 final roleInfoProvider =
     FutureProvider.autoDispose.family<RoleInfo?, String>((ref, uid) async {
   if (uid.isEmpty) return null;
-  final info = await ref.watch(_roleBatcherProvider).load(uid);
+  final batcher = ref.watch(_roleBatcherProvider);
+  // Layar Profil publik menitipkan role dari screen-data (tanpa request lagi).
+  if (ScreenSeed.active(uid)) {
+    final (hit, value) = await ScreenSeed.take('role', uid);
+    if (hit) {
+      ref.keepAlive();
+      return value as RoleInfo?;
+    }
+  }
+  final info = await batcher.load(uid);
   ref.keepAlive();
   return info;
 });
