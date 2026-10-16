@@ -118,6 +118,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
   int _tickCount = 0;
   bool _endedHandled = false;
   bool _playerError = false;
+  // Detail teknis error pemutaran (ditampilkan di overlay untuk diagnosa).
+  String? _playerErrorDetail;
+  String? _currentLink;
   bool _wasPlaying = false;
   String? _gestureText;
 
@@ -283,6 +286,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     _pb.value = const PlayerPlayback(isBuffering: false);
     _wasPlaying = false;
     _playerError = false;
+    _playerErrorDetail = null;
     WakelockPlus.disable();
     if (mounted) setState(() {});
   }
@@ -310,6 +314,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     }
     if (link == _loadedLink) return;
     _loadedLink = link;
+    _currentLink = link;
 
     final old = _vc;
     old?.removeListener(_onVideo);
@@ -320,8 +325,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
       vc = link.startsWith('file://')
           ? VideoPlayerController.file(File.fromUri(Uri.parse(link)))
           : VideoPlayerController.networkUrl(Uri.parse(link));
-    } catch (_) {
-      if (mounted) setState(() => _playerError = true);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _playerError = true;
+          _playerErrorDetail = 'Link tidak valid: $e';
+        });
+      }
       return;
     }
     _vc = vc;
@@ -329,6 +339,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     _outroSkipped = false;
     _wasPlaying = false;
     _playerError = false;
+    _playerErrorDetail = null;
     _pb.value = const PlayerPlayback();
     if (mounted) setState(() {});
     await old?.dispose();
@@ -355,10 +366,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
       if (!mounted || _vc != vc) return;
       _onVideo();
       setState(() {});
-    } catch (_) {
+    } catch (e) {
       if (mounted && _vc == vc) {
         _pb.value = const PlayerPlayback(isBuffering: false);
-        setState(() => _playerError = true);
+        final desc = vc.value.errorDescription;
+        setState(() {
+          _playerError = true;
+          _playerErrorDetail = (desc != null && desc.isNotEmpty) ? desc : '$e';
+        });
       }
     }
   }
@@ -367,7 +382,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     final vc = _vc;
     if (vc == null || !mounted) return;
     final v = vc.value;
-    if (v.hasError && !_playerError) setState(() => _playerError = true);
+    if (v.hasError && !_playerError) {
+      setState(() {
+        _playerError = true;
+        _playerErrorDetail = v.errorDescription;
+      });
+    }
 
     final snap = PlayerPlayback(
       isPlaying: v.isPlaying,
@@ -1500,6 +1520,24 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                   fontWeight: FontWeight.w600,
                 ),
               ),
+              if (_playerErrorDetail != null || _currentLink != null) ...[
+                const SizedBox(height: 6),
+                Text(
+                  [
+                    if (_currentLink != null)
+                      'Host: ${Uri.tryParse(_currentLink!)?.host ?? '-'}'
+                          '${_currentLink!.startsWith('http://') ? ' (HTTP)' : ''}',
+                    if (_playerErrorDetail != null) _playerErrorDetail!,
+                  ].join('\n'),
+                  textAlign: TextAlign.center,
+                  maxLines: 4,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 10,
+                  ),
+                ),
+              ],
               const SizedBox(height: 10),
               FilledButton(
                 onPressed: _openServerSheet,
