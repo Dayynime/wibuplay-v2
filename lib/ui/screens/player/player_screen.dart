@@ -1549,24 +1549,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              if (_playerErrorDetail != null || _currentLink != null) ...[
-                const SizedBox(height: 6),
-                Text(
-                  [
-                    if (_currentLink != null)
-                      'Host: ${Uri.tryParse(_currentLink!)?.host ?? '-'}'
-                          '${_currentLink!.startsWith('http://') ? ' (HTTP)' : ''}',
-                    if (_playerErrorDetail != null) _playerErrorDetail!,
-                  ].join('\n'),
-                  textAlign: TextAlign.center,
-                  maxLines: 4,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 10,
-                  ),
-                ),
-              ],
               const SizedBox(height: 10),
               FilledButton(
                 onPressed: _openServerSheet,
