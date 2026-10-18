@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -58,18 +59,14 @@ class MiniPlayerManager extends ChangeNotifier {
     });
   }
 
-  void _onVideo() => notifyListeners();
-
   /// Kepemilikan controller pindah ke sini (TIDAK di-dispose).
   void activate(WpVideoController controller, MiniPlayerInfo info) {
     final old = _controller;
     if (old != null && !identical(old, controller)) {
-      old.removeListener(_onVideo);
       old.dispose();
     }
     _controller = controller;
     _info = info;
-    controller.addListener(_onVideo);
     _notifySafe();
   }
 
@@ -84,7 +81,6 @@ class MiniPlayerManager extends ChangeNotifier {
     final i = _info;
     if (c == null || i == null) return null;
     if (i.movieId == movieId && i.episodeId == episodeId) {
-      c.removeListener(_onVideo);
       _controller = null;
       _info = null;
       _notifySafe();
@@ -98,7 +94,6 @@ class MiniPlayerManager extends ChangeNotifier {
   void close() {
     final c = _controller;
     if (c == null && _info == null) return;
-    c?.removeListener(_onVideo);
     c?.pause();
     c?.dispose();
     _controller = null;
@@ -123,9 +118,14 @@ class MiniPlayerManager extends ChangeNotifier {
   }
 }
 
-/// Kartu video mengambang di atas semua layar. Geser badan kartu = pindah,
-/// tap = buka kembali player penuh, tombol play/pause dan X di kartu.
+/// Kartu video mengambang di atas semua layar. Geser badan kartu = pindah
+/// (menempel ke tepi kiri/kanan saat dilepas), tap = buka kembali player
+/// penuh, tombol play/pause dan X di kartu.
 /// Dipasang di MaterialApp.builder (lihat main.dart).
+///
+/// Performa: posisi disimpan di ValueNotifier sehingga saat digeser HANYA
+/// posisi kartu yang diperbarui (video & kontrol tidak dibangun ulang), dan
+/// tiap tick video cuma memperbarui bar progres / ikon play.
 class MiniPlayerOverlay extends ConsumerStatefulWidget {
   const MiniPlayerOverlay({super.key});
 
@@ -134,13 +134,22 @@ class MiniPlayerOverlay extends ConsumerStatefulWidget {
 }
 
 class _MiniPlayerOverlayState extends ConsumerState<MiniPlayerOverlay>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver, SingleTickerProviderStateMixin {
   static const double _cardW = 200;
   static const double _cardH = _cardW * 9 / 16;
 
-  Offset? _pos;
+  /// Jarak kartu ke tepi layar saat menempel.
+  static const double _edge = 12;
+
+  final ValueNotifier<Offset> _pos = ValueNotifier<Offset>(Offset.zero);
+  final ValueNotifier<bool> _dragging = ValueNotifier<bool>(false);
+  final ValueNotifier<bool> _controlsVisible = ValueNotifier<bool>(true);
+
+  late final AnimationController _snapCtl;
+  Animation<Offset>? _snapAnim;
+
+  bool _posReady = false;
   String? _forEpisode;
-  bool _controlsVisible = true;
   Timer? _hideTimer;
   Timer? _xpTick;
   bool _inForeground = true;
@@ -150,6 +159,13 @@ class _MiniPlayerOverlayState extends ConsumerState<MiniPlayerOverlay>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _xpTick = Timer.periodic(const Duration(seconds: 1), _onXpTick);
+    _snapCtl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 280),
+    )..addListener(() {
+        final a = _snapAnim;
+        if (a != null) _pos.value = a.value;
+      });
   }
 
   @override
@@ -181,15 +197,63 @@ class _MiniPlayerOverlayState extends ConsumerState<MiniPlayerOverlay>
     _xpTick?.cancel();
     WatchXpGate.release(this);
     _hideTimer?.cancel();
+    _snapCtl.dispose();
+    _pos.dispose();
+    _dragging.dispose();
+    _controlsVisible.dispose();
     super.dispose();
   }
 
   void _showControlsBriefly() {
     _hideTimer?.cancel();
-    setState(() => _controlsVisible = true);
+    _controlsVisible.value = true;
     _hideTimer = Timer(const Duration(milliseconds: 1800), () {
-      if (mounted) setState(() => _controlsVisible = false);
+      if (mounted) _controlsVisible.value = false;
     });
+  }
+
+  /// Batasi posisi kartu di dalam area aman layar.
+  Offset _clamp(Offset o, Size size, EdgeInsets pad, {double margin = 0}) {
+    final minX = margin;
+    final maxX = math.max(minX, size.width - _cardW - margin);
+    final minY = pad.top + margin;
+    final maxY = math.max(minY, size.height - _cardH - pad.bottom - margin);
+    return Offset(
+      o.dx.clamp(minX, maxX).toDouble(),
+      o.dy.clamp(minY, maxY).toDouble(),
+    );
+  }
+
+  void _onPanStart() {
+    _snapCtl.stop();
+    _hideTimer?.cancel();
+    _dragging.value = true;
+  }
+
+  void _onPanUpdate(DragUpdateDetails d, Size size, EdgeInsets pad) {
+    _pos.value = _clamp(_pos.value + d.delta, size, pad);
+  }
+
+  /// Lepas jari: menempel ke tepi terdekat (memperhitungkan lemparan) dengan
+  /// animasi halus, seperti mini player aplikasi nonton lain.
+  void _onPanEnd(DragEndDetails d, Size size, EdgeInsets pad) {
+    _dragging.value = false;
+    final v = d.velocity.pixelsPerSecond;
+    final cur = _pos.value;
+    final projectedCx = cur.dx + _cardW / 2 + v.dx * 0.12;
+    final toRight = projectedCx > size.width / 2;
+    final targetX = toRight ? size.width - _cardW - _edge : _edge;
+    final target = _clamp(
+      Offset(targetX, cur.dy + v.dy * 0.08),
+      size,
+      pad,
+      margin: _edge,
+    );
+    _snapAnim = Tween<Offset>(begin: cur, end: target).animate(
+      CurvedAnimation(parent: _snapCtl, curve: Curves.easeOutCubic),
+    );
+    _snapCtl.forward(from: 0);
+    _showControlsBriefly();
   }
 
   @override
@@ -200,151 +264,208 @@ class _MiniPlayerOverlayState extends ConsumerState<MiniPlayerOverlay>
         final m = MiniPlayerManager.instance;
         final info = m.info;
         final vc = m.controller;
-        if (info == null || vc == null) return const SizedBox.shrink();
+        if (info == null || vc == null) {
+          _posReady = false;
+          _forEpisode = null;
+          return const SizedBox.shrink();
+        }
 
         final size = MediaQuery.sizeOf(context);
         final pad = MediaQuery.paddingOf(context);
 
-        // Posisi awal (kanan atas) tiap ada sesi mini player baru.
-        if (_forEpisode != info.episodeId || _pos == null) {
+        // Posisi awal (kanan atas) tiap mini player baru muncul. Kalau cuma
+        // ganti episode saat kartu sudah tampil, posisinya dibiarkan.
+        if (!_posReady) {
+          _posReady = true;
+          _pos.value = Offset(size.width - _cardW - _edge, pad.top + 72);
+        }
+        if (_forEpisode != info.episodeId) {
           _forEpisode = info.episodeId;
-          _pos = Offset(size.width - _cardW - 12, pad.top + 72);
-          _controlsVisible = true;
-          _hideTimer?.cancel();
-          _hideTimer = Timer(const Duration(milliseconds: 1800), () {
-            if (mounted) setState(() => _controlsVisible = false);
+          // Ditunda: jangan ubah notifier saat fase build.
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _showControlsBriefly();
           });
         }
-        final pos = _pos!;
-        final isPlaying = vc.value.isPlaying;
-        final dur = vc.value.duration.inMilliseconds;
-        final progress =
-            dur > 0 ? (vc.value.position.inMilliseconds / dur).clamp(0.0, 1.0) : 0.0;
-        final ratio = vc.value.isInitialized && vc.value.aspectRatio > 0
-            ? vc.value.aspectRatio
-            : 16 / 9;
 
-        return Positioned(
-          left: pos.dx,
-          top: pos.dy,
-          width: _cardW,
-          height: _cardH,
-          child: Material(
-            type: MaterialType.transparency,
-            child: GestureDetector(
-              onPanUpdate: (d) {
-                setState(() {
-                  final next = pos + d.delta;
-                  _pos = Offset(
-                    next.dx.clamp(0.0, size.width - _cardW).toDouble(),
-                    next.dy
-                        .clamp(pad.top, size.height - _cardH - pad.bottom)
-                        .toDouble(),
-                  );
-                });
-              },
-              onTap: () {
-                if (_controlsVisible) {
-                  openPlayerFromMini(info.movieId, info.episodeId);
-                } else {
-                  _showControlsBriefly();
-                }
-              },
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.black,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppColors.accentViolet, width: 1.5),
-                  boxShadow: const [
-                    BoxShadow(color: Color(0x88000000), blurRadius: 14, offset: Offset(0, 4)),
-                  ],
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    if (vc.value.isInitialized)
-                      Center(
-                        child: AspectRatio(aspectRatio: ratio, child: WpVideoView(vc)),
-                      )
-                    else if (info.posterUrl.isNotEmpty)
-                      NetImage(info.posterUrl),
-                    AnimatedOpacity(
-                      opacity: _controlsVisible ? 1 : 0,
-                      duration: const Duration(milliseconds: 150),
-                      child: IgnorePointer(
-                        ignoring: !_controlsVisible,
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            const ColoredBox(color: Color(0x88000000)),
-                            Align(
-                              alignment: Alignment.topLeft,
-                              child: Padding(
-                                padding: const EdgeInsets.fromLTRB(8, 6, 34, 0),
-                                child: Text(
-                                  '${info.title} \u2022 ${info.episodeLabel}',
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color: AppColors.textWhite,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            Align(
-                              alignment: Alignment.topRight,
-                              child: GestureDetector(
-                                onTap: MiniPlayerManager.instance.close,
-                                child: const Padding(
-                                  padding: EdgeInsets.all(6),
-                                  child: Icon(Icons.close, size: 18, color: AppColors.textWhite),
-                                ),
-                              ),
-                            ),
-                            Center(
-                              child: GestureDetector(
-                                onTap: () {
-                                  MiniPlayerManager.instance.togglePlayPause();
-                                  _showControlsBriefly();
-                                },
-                                child: Container(
-                                  width: 40,
-                                  height: 40,
-                                  decoration: const BoxDecoration(
-                                    color: Color(0x66000000),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Icon(
-                                    isPlaying ? Icons.pause : Icons.play_arrow,
-                                    color: AppColors.textWhite,
-                                    size: 26,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    Align(
-                      alignment: Alignment.bottomCenter,
-                      child: LinearProgressIndicator(
-                        value: progress.toDouble(),
-                        minHeight: 3,
-                        color: AppColors.accentViolet,
-                        backgroundColor: const Color(0x40FFFFFF),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+        final card = RepaintBoundary(
+          child: ValueListenableBuilder<bool>(
+            valueListenable: _dragging,
+            builder: (context, dragging, child) => AnimatedScale(
+              scale: dragging ? 1.04 : 1,
+              duration: const Duration(milliseconds: 140),
+              curve: Curves.easeOut,
+              child: child,
             ),
+            child: _card(info, vc),
+          ),
+        );
+
+        // Positioned.fill + Stack: area kosong tidak menyerap sentuhan, dan
+        // posisi kartu diperbarui lewat ValueListenableBuilder saja.
+        return Positioned.fill(
+          child: Stack(
+            children: [
+              ValueListenableBuilder<Offset>(
+                valueListenable: _pos,
+                child: card,
+                builder: (context, pos, child) {
+                  // Dijepit tiap frame supaya tetap di layar saat rotasi /
+                  // ukuran layar berubah.
+                  final p = _clamp(pos, size, pad);
+                  return Positioned(
+                    left: p.dx,
+                    top: p.dy,
+                    width: _cardW,
+                    height: _cardH,
+                    child: child!,
+                  );
+                },
+              ),
+            ],
           ),
         );
       },
+    );
+  }
+
+  Widget _card(MiniPlayerInfo info, WpVideoController vc) {
+    return Material(
+      type: MaterialType.transparency,
+      child: LayoutBuilder(
+        builder: (context, _) {
+          final size = MediaQuery.sizeOf(context);
+          final pad = MediaQuery.paddingOf(context);
+          return GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onPanDown: (_) => _snapCtl.stop(),
+            onPanStart: (_) => _onPanStart(),
+            onPanUpdate: (d) => _onPanUpdate(d, size, pad),
+            onPanEnd: (d) => _onPanEnd(d, size, pad),
+            onPanCancel: () => _dragging.value = false,
+            onTap: () {
+              if (_controlsVisible.value) {
+                openPlayerFromMini(info.movieId, info.episodeId);
+              } else {
+                _showControlsBriefly();
+              }
+            },
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.black,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.accentViolet, width: 1.5),
+                boxShadow: const [
+                  BoxShadow(color: Color(0x88000000), blurRadius: 14, offset: Offset(0, 4)),
+                ],
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // Video: cuma dibangun ulang saat ukuran/inisialisasi berubah.
+                  ListenableBuilder(
+                    listenable: vc,
+                    builder: (context, _) {
+                      if (vc.value.isInitialized) {
+                        final ratio = vc.value.aspectRatio > 0 ? vc.value.aspectRatio : 16 / 9;
+                        return Center(
+                          child: AspectRatio(aspectRatio: ratio, child: WpVideoView(vc)),
+                        );
+                      }
+                      return info.posterUrl.isNotEmpty
+                          ? NetImage(info.posterUrl)
+                          : const SizedBox.shrink();
+                    },
+                  ),
+                  ValueListenableBuilder<bool>(
+                    valueListenable: _controlsVisible,
+                    builder: (context, visible, child) => AnimatedOpacity(
+                      opacity: visible ? 1 : 0,
+                      duration: const Duration(milliseconds: 150),
+                      child: IgnorePointer(ignoring: !visible, child: child),
+                    ),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        const ColoredBox(color: Color(0x88000000)),
+                        Align(
+                          alignment: Alignment.topLeft,
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(8, 6, 34, 0),
+                            child: Text(
+                              '${info.title} \u2022 ${info.episodeLabel}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: AppColors.textWhite,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                        Align(
+                          alignment: Alignment.topRight,
+                          child: GestureDetector(
+                            onTap: MiniPlayerManager.instance.close,
+                            child: const Padding(
+                              padding: EdgeInsets.all(6),
+                              child: Icon(Icons.close, size: 18, color: AppColors.textWhite),
+                            ),
+                          ),
+                        ),
+                        Center(
+                          child: GestureDetector(
+                            onTap: () {
+                              MiniPlayerManager.instance.togglePlayPause();
+                              _showControlsBriefly();
+                            },
+                            child: Container(
+                              width: 40,
+                              height: 40,
+                              decoration: const BoxDecoration(
+                                color: Color(0x66000000),
+                                shape: BoxShape.circle,
+                              ),
+                              // Ikon play/pause mengikuti status video.
+                              child: ListenableBuilder(
+                                listenable: vc,
+                                builder: (context, _) => Icon(
+                                  vc.value.isPlaying ? Icons.pause : Icons.play_arrow,
+                                  color: AppColors.textWhite,
+                                  size: 26,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Align(
+                    alignment: Alignment.bottomCenter,
+                    child: ListenableBuilder(
+                      listenable: vc,
+                      builder: (context, _) {
+                        final dur = vc.value.duration.inMilliseconds;
+                        final progress = dur > 0
+                            ? (vc.value.position.inMilliseconds / dur).clamp(0.0, 1.0)
+                            : 0.0;
+                        return LinearProgressIndicator(
+                          value: progress.toDouble(),
+                          minHeight: 3,
+                          color: AppColors.accentViolet,
+                          backgroundColor: const Color(0x40FFFFFF),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 }
