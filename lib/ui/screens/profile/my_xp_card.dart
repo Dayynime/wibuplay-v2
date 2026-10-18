@@ -7,7 +7,7 @@ import '../../../providers.dart';
 import '../../app_routes.dart';
 import '../xp/xp_leaderboard_screen.dart';
 
-/// Progress bar XP ke level berikutnya di Profil. Cuma bar: tanpa card,
+/// Progress bar XP ke level berikutnya di Profil + angka XP. Tanpa card,
 /// tanpa border radius. Fill beranimasi tiap progress berubah + kilau yang
 /// menyapu terus. Tap = buka leaderboard.
 class MyXpCard extends ConsumerStatefulWidget {
@@ -47,7 +47,10 @@ class _MyXpCardState extends ConsumerState<MyXpCard>
             .push<void>(fadeRoute(const XpLeaderboardScreen())),
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 6),
-          child: SizedBox(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+          SizedBox(
             height: 6,
             child: Stack(
               fit: StackFit.expand,
@@ -99,6 +102,34 @@ class _MyXpCardState extends ConsumerState<MyXpCard>
                 ),
               ],
             ),
+          ),
+          const SizedBox(height: 6),
+          TweenAnimationBuilder<int>(
+            tween: IntTween(begin: 0, end: p.xpIntoLevel),
+            duration: const Duration(milliseconds: 1100),
+            curve: Curves.easeOutCubic,
+            builder: (context, into, _) => Row(
+              children: [
+                Text(
+                  '$into / ${p.xpNeededForLevel} XP',
+                  style: const TextStyle(
+                    color: AppColors.textWhite,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  '${(p.xpNeededForLevel - into).clamp(0, p.xpNeededForLevel)} XP lagi ke Level ${level + 1}',
+                  style: const TextStyle(
+                    color: AppColors.textMuted,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+            ],
           ),
         ),
       ),
