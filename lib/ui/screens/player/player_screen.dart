@@ -115,6 +115,12 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
 
   bool _showControls = true;
   Timer? _hideTimer;
+
+  // Kunci layar (fullscreen): semua sentuhan & tombol back diabaikan sampai
+  // dibuka lewat ikon gembok.
+  bool _screenLocked = false;
+  bool _lockButtonVisible = false;
+  Timer? _lockHideTimer;
   Timer? _tick;
   int _tickCount = 0;
   bool _endedHandled = false;
@@ -188,6 +194,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     WidgetsBinding.instance.removeObserver(this);
     WatchXpGate.release(this);
     _hideTimer?.cancel();
+    _lockHideTimer?.cancel();
     _tick?.cancel();
     _flashTimer?.cancel();
     _levels.dispose();
@@ -763,8 +770,106 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     _scheduleHide();
   }
 
+  // ------------------------------------------------------------ kunci layar
+
+  void _lockScreen() {
+    _hideTimer?.cancel();
+    setState(() {
+      _screenLocked = true;
+      _showControls = false;
+      _showEpisodeList = false;
+      _lockButtonVisible = true;
+    });
+    _scheduleHideLockButton();
+  }
+
+  void _unlockScreen() {
+    _lockHideTimer?.cancel();
+    setState(() {
+      _screenLocked = false;
+      _lockButtonVisible = false;
+      _showControls = true;
+    });
+    _scheduleHide();
+  }
+
+  void _scheduleHideLockButton() {
+    _lockHideTimer?.cancel();
+    _lockHideTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted) setState(() => _lockButtonVisible = false);
+    });
+  }
+
+  /// Layar terkunci: ketuk di mana saja cuma memunculkan ikon gembok sebentar.
+  void _onLockedTap() {
+    setState(() => _lockButtonVisible = true);
+    _scheduleHideLockButton();
+  }
+
+  void _showLockedHint() {
+    _onLockedTap();
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text('Layar terkunci. Ketuk ikon gembok untuk membuka.'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+  }
+
+  Widget _lockedLayout() {
+    return ColoredBox(
+      color: Colors.black,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          _videoSurface(),
+          // Penyerap semua sentuhan (tanpa seek/volume/kecerahan/double tap).
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: _onLockedTap,
+            onHorizontalDragStart: (_) {},
+            onVerticalDragStart: (_) {},
+            onDoubleTap: () {},
+          ),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Padding(
+              padding: const EdgeInsets.only(left: 24),
+              child: AnimatedOpacity(
+                opacity: _lockButtonVisible ? 1 : 0,
+                duration: const Duration(milliseconds: 200),
+                child: IgnorePointer(
+                  ignoring: !_lockButtonVisible,
+                  child: GestureDetector(
+                    onTap: _unlockScreen,
+                    child: Container(
+                      width: 48,
+                      height: 48,
+                      decoration: const BoxDecoration(
+                        color: Color(0x99000000),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.lock, color: AppColors.textWhite, size: 24),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _applyFullscreen(bool fullscreen) {
     _showEpisodeList = false;
+    if (!fullscreen) {
+      _screenLocked = false;
+      _lockButtonVisible = false;
+      _lockHideTimer?.cancel();
+    }
     if (fullscreen) {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
       SystemChrome.setPreferredOrientations(
@@ -876,6 +981,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
+        if (_screenLocked) {
+          _showLockedHint();
+          return;
+        }
         if (ui.isFullscreen) {
           if (_showEpisodeList) {
             setState(() => _showEpisodeList = false);
@@ -945,6 +1054,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
               onOpenServers: _openServerSheet,
               onOpenSettings: _openSettingsSheet,
               onEnterPip: _enterPip,
+              onLock: fullscreen ? _lockScreen : null,
               onOpenEpisodes: fullscreen
                   ? () => setState(() {
                         _showEpisodeList = true;
@@ -987,6 +1097,17 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
   // ------------------------------------------------------------- fullscreen
 
   Widget _fullscreenLayout(PlayerUiState ui, ({bool ready, bool locked}) gate) {
+    if (_screenLocked) {
+      // Episode terkunci Premium: buka kunci layar otomatis supaya tombol
+      // back / overlay terkunci tetap bisa dipakai.
+      if (gate.locked) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _screenLocked) _unlockScreen();
+        });
+      } else {
+        return _lockedLayout();
+      }
+    }
     return ColoredBox(
       color: Colors.black,
       child: GestureDetector(
@@ -1630,6 +1751,7 @@ class PlayerControlsOverlay extends StatefulWidget {
     required this.onOpenServers,
     required this.onOpenSettings,
     required this.onEnterPip,
+    required this.onLock,
     required this.onOpenEpisodes,
     required this.onRewind,
     required this.onForward,
@@ -1655,6 +1777,9 @@ class PlayerControlsOverlay extends StatefulWidget {
   final VoidCallback onOpenServers;
   final VoidCallback onOpenSettings;
   final VoidCallback onEnterPip;
+
+  /// Hanya diisi di fullscreen (kunci layar).
+  final VoidCallback? onLock;
 
   /// Hanya diisi di fullscreen (panel daftar episode).
   final VoidCallback? onOpenEpisodes;
@@ -1747,6 +1872,17 @@ class PlayerControlsOverlayState extends State<PlayerControlsOverlay> {
                                     Icons.playlist_play,
                                     color: AppColors.textWhite,
                                     size: 24,
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+                              ],
+                              if (widget.onLock != null) ...[
+                                GestureDetector(
+                                  onTap: widget.onLock,
+                                  child: const Icon(
+                                    Icons.lock_open_outlined,
+                                    color: AppColors.textWhite,
+                                    size: 22,
                                   ),
                                 ),
                                 const SizedBox(width: 10),
