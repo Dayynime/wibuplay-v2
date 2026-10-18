@@ -1,0 +1,477 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../gift/top_giver_screen.dart';
+import '../../../core/firebase_config.dart';
+import '../../../core/remote_config_manager.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_theme.dart';
+import '../../../data/models/anime_item.dart';
+import '../../../data/models/home_sections.dart';
+import '../../../providers.dart';
+import '../../app_routes.dart';
+import '../support/top_support_screen.dart';
+import '../xp/xp_leaderboard_screen.dart';
+import '../clan/clan_browse_screen.dart';
+import '../download/offline_downloads_view.dart';
+import '../notifications/notifications_screen.dart';
+import '../../components/cards.dart';
+import '../../components/chat_ticker.dart';
+import '../../components/comic_home_section.dart';
+import '../../components/common_components.dart';
+import '../../components/donghua_hot_section.dart';
+import '../../components/hero_banner.dart';
+import '../../components/home_profile_header.dart';
+import '../../components/shimmer.dart';
+import '../../components/staggered_section.dart';
+import '../../components/home_section_cards.dart';
+import 'home_controller.dart';
+
+/// Port HomeScreen.kt.
+class HomeScreen extends ConsumerWidget {
+  const HomeScreen({
+    super.key,
+    required this.onAnimeClick,
+    required this.onWatchEpisode,
+    required this.onSearchClick,
+    required this.onSeeAllClick,
+    required this.onProfileClick,
+    required this.onCuplixClick,
+    required this.onComicSeeAllClick,
+  });
+
+  final ValueChanged<String> onAnimeClick;
+  final void Function(String movieId, String episodeId) onWatchEpisode;
+  final VoidCallback onSearchClick;
+  final ValueChanged<String> onSeeAllClick;
+
+  /// Ketuk klip / "Lihat semua" di section Cuplix: buka tab Cuplix.
+  final VoidCallback onCuplixClick;
+
+  /// "Lihat semua" di section Komik: buka tab Komik.
+  final VoidCallback onComicSeeAllClick;
+
+  /// Ketuk kartu profil / chip Premium / chip ZCoin / tombol Premium: buka tab Profil.
+  final VoidCallback onProfileClick;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(homeControllerProvider);
+
+    final Widget body;
+    if (state.isLoading && !state.hasValue) {
+      body = const _HomeLoadingSkeleton(key: ValueKey('loading'));
+    } else if (state.hasError && !state.hasValue) {
+      Future<void> retry() async {
+        // Paksa ambil api_base_url terbaru dulu (kalau baru di-Publish).
+        await RemoteConfigManager.forceRefresh();
+        ref.read(homeControllerProvider.notifier).loadHomeData(forceRefresh: true);
+      }
+
+      // Gagal memuat (biasanya offline) tapi ada video yang sudah didownload:
+      // tampilkan daftarnya supaya tetap bisa ditonton, seperti Zenime.
+      final hasDownloads = ref.watch(localStoreProvider.select((s) => s.downloads.isNotEmpty));
+      body = hasDownloads
+          ? OfflineDownloadsView(
+              key: const ValueKey('offline'),
+              message: _cleanError(state.error),
+              onRetry: retry,
+              onPlay: onWatchEpisode,
+            )
+          : Center(
+              key: const ValueKey('error'),
+              child: ErrorState(
+                message: _cleanError(state.error),
+                onRetry: retry,
+              ),
+            );
+    } else if (state.isLoading) {
+      // Muat ulang paksa: tampil skeleton lagi seperti HomeUiState.Loading
+      body = const _HomeLoadingSkeleton(key: ValueKey('loading'));
+    } else {
+      body = _HomeContent(
+        key: const ValueKey('content'),
+        sections: state.requireValue,
+        onAnimeClick: onAnimeClick,
+        onWatchEpisode: onWatchEpisode,
+        onSearchClick: onSearchClick,
+        onSeeAllClick: onSeeAllClick,
+        onProfileClick: onProfileClick,
+        onCuplixClick: onCuplixClick,
+        onComicSeeAllClick: onComicSeeAllClick,
+      );
+    }
+
+    return ColoredBox(
+      color: AppColors.backgroundDark,
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 250),
+        child: body,
+      ),
+    );
+  }
+
+  static String _cleanError(Object? e) {
+    final s = e?.toString() ?? 'Gagal memuat data beranda';
+    return s.startsWith('Exception: ') ? s.substring('Exception: '.length) : s;
+  }
+}
+
+class _HomeContent extends ConsumerStatefulWidget {
+  const _HomeContent({
+    super.key,
+    required this.sections,
+    required this.onAnimeClick,
+    required this.onWatchEpisode,
+    required this.onSearchClick,
+    required this.onSeeAllClick,
+    required this.onProfileClick,
+    required this.onCuplixClick,
+    required this.onComicSeeAllClick,
+  });
+
+  final HomeSectionData sections;
+  final ValueChanged<String> onAnimeClick;
+  final void Function(String movieId, String episodeId) onWatchEpisode;
+  final VoidCallback onSearchClick;
+  final ValueChanged<String> onSeeAllClick;
+  final VoidCallback onProfileClick;
+  final VoidCallback onCuplixClick;
+
+  /// "Lihat semua" di section Komik: buka tab Komik.
+  final VoidCallback onComicSeeAllClick;
+
+  @override
+  ConsumerState<_HomeContent> createState() => _HomeContentState();
+}
+
+class _HomeContentState extends ConsumerState<_HomeContent> {
+  final ScrollController _scroll = ScrollController();
+  bool _isScrolled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(_onScroll);
+  }
+
+  void _onScroll() {
+    final scrolled = _scroll.hasClients && _scroll.offset > 40;
+    if (scrolled != _isScrolled) setState(() => _isScrolled = scrolled);
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  Widget _posterRow(
+    List<AnimeItem> list, {
+    Map<String, String> episodeLabels = const {},
+    bool showNewBadge = false,
+  }) {
+    final cell = _posterCellWidth(context);
+    return SizedBox(
+      // tinggi sama seperti sel grid Jelajah: poster 2:3 + judul + subteks
+      height: cell * 1.5 + 62,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        itemCount: list.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 10),
+        itemBuilder: (context, i) {
+          final anime = list[i];
+          return Align(
+            alignment: Alignment.topCenter,
+            child: AnimePosterCard(
+              anime: anime,
+              width: cell,
+              episodeLabel: episodeLabels[anime.id],
+              showNewBadge: showNewBadge,
+              onTap: () {
+                final id = anime.id;
+                if (id != null) widget.onAnimeClick(id);
+              },
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  /// Lebar poster disamakan dengan sel grid di Jelajah
+  /// (minimal 105dp, jarak 10dp, padding 16dp).
+  double _posterCellWidth(BuildContext context) {
+    const minCell = 105.0, gap = 10.0;
+    final avail = MediaQuery.of(context).size.width - 32;
+    final count = ((avail + gap) / (minCell + gap)).floor().clamp(1, 100);
+    return (avail - gap * (count - 1)) / count;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final sections = widget.sections;
+    final cuplixClips = ref.watch(homeCuplixProvider).valueOrNull ?? const [];
+    final donghuaHot = ref.watch(donghuaHotProvider).valueOrNull ?? const [];
+    final user = ref.watch(authUserProvider).valueOrNull;
+    final showProfileHeader = user != null && FirebaseConfig.ready;
+
+    Widget section({
+      required int delayMs,
+      required String title,
+      required Widget child,
+      String? actionText,
+      VoidCallback? onAction,
+      bool gapAfterHeader = true,
+    }) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 16),
+          SectionHeader(title: title, actionText: actionText, onActionClick: onAction),
+          if (gapAfterHeader) const SizedBox(height: 8),
+          child,
+        ],
+      );
+    }
+
+    return PageEntrance(
+      child: ListView(
+      controller: _scroll,
+      padding: const EdgeInsets.only(bottom: 135),
+      children: [
+        // Header: nama app + tombol cari
+        SafeArea(
+          bottom: false,
+          child: Opacity(
+            opacity: _isScrolled ? 0.94 : 1.0,
+            // Sudah login: kartu profil ala Zenime. Belum login: header lama
+            // (logo + tombol cari).
+            child: showProfileHeader
+                ? HomeProfileHeader(
+                    user: user!,
+                    onSearchClick: widget.onSearchClick,
+                    onNotificationClick: () => Navigator.of(context)
+                        .push<void>(fadeRoute(const NotificationsScreen()))
+                        .then((_) {
+                      ref.invalidate(unreadNotificationsProvider);
+                      ref.invalidate(incomingFriendRequestsProvider);
+                    }),
+                    onProfileClick: widget.onProfileClick,
+                    onPremiumClick: () => openPremium(context),
+                    onCoinClick: () => openCoin(context),
+                    onShieldClick: () => Navigator.of(context).push<void>(fadeRoute(
+                        const ClanBrowseScreen(
+                            initialMode: ClanBrowseMode.leaderboard))),
+                  )
+                : Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            'Zen',
+                            style: TextStyle(
+                              color: AppColors.textWhite,
+                              fontSize: 24,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                          Text(
+                            'ime',
+                            style: TextStyle(
+                              color: AppColors.accentViolet,
+                              fontSize: 24,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Text(
+                        'Streaming Anime Tanpa Batas',
+                        style: TextStyle(color: AppColors.textMuted, fontSize: 11),
+                      ),
+                    ],
+                  ),
+                  GestureDetector(
+                    onTap: widget.onSearchClick,
+                    child: Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceDark,
+                        borderRadius: AppShapes.card,
+                      ),
+                      child: const Icon(Icons.search, color: AppColors.textWhite, size: 20),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+
+        // 1. Hero carousel
+        if (sections.slider.isNotEmpty)
+          Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: HeroBanner(
+                sliderItems: sections.slider,
+                topXp: ref.watch(heroTopXpProvider).valueOrNull ?? const [],
+                topClans: ref.watch(heroTopClansProvider).valueOrNull ?? const [],
+                topSupport: ref.watch(topSupportersProvider).valueOrNull ?? const [],
+                onLeaderboardClick: () => Navigator.of(context)
+                    .push<void>(fadeRoute(const XpLeaderboardScreen())),
+                onClanLeaderboardClick: () => Navigator.of(context)
+                    .push<void>(fadeRoute(const ClanBrowseScreen())),
+                onSupportClick: () => Navigator.of(context)
+                    .push<void>(fadeRoute(const TopSupportScreen())),
+                topGivers: ref.watch(topGiversProvider).valueOrNull?.givers ?? const [],
+                giverClanTags: ref.watch(topGiversProvider).valueOrNull?.clanTags ?? const {},
+                onGiverClick: () => Navigator.of(context)
+                    .push<void>(fadeRoute(const TopGiverScreen())),
+                onItemClick: (item) {
+                  final id = item.id;
+                  if (id != null) widget.onAnimeClick(id);
+                },
+              ),
+            ),
+
+        // Chat global terbaru (bergeser otomatis), di bawah hero
+        const Padding(
+            padding: EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: ChatTicker(),
+          ),
+
+        // Urutan section mengikuti Beranda Zenime.
+
+        // 2. Cuplix
+        if (cuplixClips.isNotEmpty)
+          section(
+            delayMs: 150,
+            title: 'Cuplix',
+            actionText: 'Lihat semua',
+            onAction: widget.onCuplixClick,
+            child: CuplixThumbRow(clips: cuplixClips, onClipClick: widget.onCuplixClick),
+          ),
+
+        // 3. Episode Baru (data/home/list -> update) + label nomor episode
+        if (sections.update.isNotEmpty)
+          section(
+            delayMs: 180,
+            title: 'Episode Baru',
+            child: _posterRow(sections.update, episodeLabels: sections.updateLabels),
+          ),
+
+        // 4. Sedang Hangat (hot) - kartu cover 16:9
+        if (sections.hot.isNotEmpty)
+          section(
+            delayMs: 220,
+            title: 'Sedang Hangat',
+            actionText: 'Lihat semua',
+            onAction: () => widget.onSeeAllClick('hot'),
+            child: AnimeCoverBannerRow(
+              items: sections.hot,
+              onAnimeClick: widget.onAnimeClick,
+            ),
+          ),
+
+        // 5. Jadwal Hari Ini
+        if (sections.today.isNotEmpty)
+          section(
+            delayMs: 260,
+            title: 'Jadwal Hari Ini',
+            child: _posterRow(sections.today),
+          ),
+
+        // 6. Judul Baru (new) + badge "New"
+        if (sections.newRelease.isNotEmpty)
+          section(
+            delayMs: 300,
+            title: 'Judul Baru',
+            child: _posterRow(sections.newRelease, showNewBadge: true),
+          ),
+
+        // Donghua (API Anichin): bento top 3, gagal/kosong = section tidak tampil.
+        if (donghuaHot.isNotEmpty)
+          DonghuaHotSection(
+              cards: donghuaHot,
+              onCardClick: (slug) => openDonghuaDetail(context, slug),
+              onSeeAllClick: () => openDonghua(context),
+            ),
+
+        // Komik terbaru (API Sanka / Bacakomik): gagal/kosong = section tidak tampil.
+        ComicHomeSection(
+            onComicClick: (key) => openComicDetail(context, key),
+            onSeeAllClick: widget.onComicSeeAllClick,
+          ),
+
+        // 7. Terpopuler - kartu berperingkat
+        if (sections.popular.isNotEmpty)
+          section(
+            delayMs: 340,
+            title: 'Terpopuler',
+            child: AnimeRankedRow(
+              items: sections.popular,
+              onAnimeClick: widget.onAnimeClick,
+            ),
+          ),
+
+        // 8. Jas Por Yu (random) - kartu cover 16:9
+        if (sections.random.isNotEmpty)
+          section(
+            delayMs: 380,
+            title: 'Jas Por Yu',
+            child: AnimeCoverBannerRow(
+              items: sections.random,
+              onAnimeClick: widget.onAnimeClick,
+            ),
+          ),
+
+        // 9. Paling Dinanti (waiting)
+        if (sections.waiting.isNotEmpty)
+          section(
+            delayMs: 420,
+            title: 'Paling Dinanti',
+            child: _posterRow(sections.waiting),
+          ),
+      ],
+    ),
+    );
+  }
+}
+
+class _HomeLoadingSkeleton extends StatelessWidget {
+  const _HomeLoadingSkeleton({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      bottom: false,
+      child: const Padding(
+        padding: EdgeInsets.only(top: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: HeroBannerSkeleton(),
+            ),
+            SizedBox(height: 24),
+            AnimeRowSkeleton(),
+            SizedBox(height: 24),
+            AnimeRowSkeleton(),
+          ],
+        ),
+      ),
+    );
+  }
+}

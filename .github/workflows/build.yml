@@ -1,0 +1,230 @@
+name: Build APK (debug + profile)
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+# Push baru ke branch yang sama membatalkan build lama yang masih jalan.
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  APP_NAME: Zenime                           # nama artifact
+  APP_VERSION_CODE: ${{ github.run_number }}   # versionCode naik otomatis (--build-number)
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      # Repo ini belum punya folder android/. Kalau belum ada, dibuat saat CI
+      # (namespace com.dayynime.wibuplay, applicationId diganti ke Zenime di langkah berikutnya). Kalau nanti android/
+      # di-commit, langkah ini otomatis dilewati.
+      - name: Siapkan folder android (kalau belum ada)
+        run: |
+          if [ ! -d android ]; then
+            flutter create . --platforms=android --org com.dayynime --project-name wibuplay
+          fi
+
+      # applicationId disamakan dengan Zenime (com.aistudio.zenime.app) supaya APK
+      # Versi Flutter ini menggantikan/meng-update app Zenime di perangkat. Hanya
+      # applicationId yang diganti; namespace bawaan flutter create
+      # (com.dayynime.wibuplay) dibiarkan karena keduanya independen dan
+      # MainActivity tetap cocok. Aman dijalankan ulang kalau android/ di-commit.
+      - name: Atur applicationId (ikut Zenime)
+        run: |
+          python3 - <<'PY'
+          import glob, re, sys
+          files = glob.glob('android/app/build.gradle*')
+          if not files:
+              print('::error::android/app/build.gradle(.kts) tidak ditemukan')
+              sys.exit(1)
+          p = files[0]
+          s = open(p, encoding='utf-8').read()
+          s, n = re.subn(r'applicationId\s*=?\s*["\'][^"\']*["\']', 'applicationId = "com.aistudio.zenime.app"', s, count=1)
+          if n != 1:
+              print('::error::applicationId tidak ditemukan di ' + p)
+              sys.exit(1)
+          open(p, 'w', encoding='utf-8').write(s)
+          PY
+          grep -n "applicationId\|namespace" android/app/build.gradle*
+
+      # flutter create tidak menaruh INTERNET di manifest utama (hanya debug/profile),
+      # dan Android 9+ memblokir HTTP polos. Samakan dengan manifest Kotlin:
+      # INTERNET, ACCESS_NETWORK_STATE, networkSecurityConfig, label "Zenime".
+      - name: Atur AndroidManifest (internet + cleartext + nama)
+        run: |
+          python3 - <<'PY'
+          import re
+          p = 'android/app/src/main/AndroidManifest.xml'
+          s = open(p, encoding='utf-8').read()
+          if 'android.permission.INTERNET' not in s:
+              s = s.replace('<application', '<uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>\n    <application', 1)
+          if 'REQUEST_INSTALL_PACKAGES' not in s:
+              s = s.replace('<application', '<uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>\n    <application', 1)
+          if 'supportsPictureInPicture' not in s:
+              s = s.replace('<activity', '<activity android:supportsPictureInPicture="true"', 1)
+          # Keamanan (sama dengan Zenime): cleartext HTTP cuma untuk host di
+          # res/xml/network_security_config.xml (bukan global), backup dimatikan,
+          # <queries> supaya IntegrityGuard bisa melihat app lain di Android 11+.
+          if 'networkSecurityConfig' not in s:
+              s = s.replace('<application', '<application android:networkSecurityConfig="@xml/network_security_config" android:allowBackup="false"', 1)
+          # PENTING: template flutter create SUDAH punya <queries> (PROCESS_TEXT),
+          # jadi jangan cuma cek '<queries>' -- sisipkan intent LAUNCHER ke dalamnya.
+          # Tanpa ini, di Android 11+ app lain (Reqable, PCAPdroid, dll) tidak
+          # terlihat dan IntegrityGuard tidak pernah mendeteksi apa pun.
+          launcher_q = ('<intent>\n            <action android:name="android.intent.action.MAIN"/>\n'
+                        '            <category android:name="android.intent.category.LAUNCHER"/>\n        </intent>')
+          if 'integrity-guard-queries' not in s:
+              if '</queries>' in s:
+                  s = s.replace('</queries>', '    <!-- integrity-guard-queries -->\n        ' + launcher_q + '\n    </queries>', 1)
+              else:
+                  s = s.replace('<application', '<queries>\n        <!-- integrity-guard-queries -->\n        ' + launcher_q + '\n    </queries>\n    <application', 1)
+          s = re.sub(r'android:label="[^"]*"', 'android:label="Zenime"', s, count=1)
+          open(p, 'w', encoding='utf-8').write(s)
+          PY
+          grep -n "INTERNET\|REQUEST_INSTALL_PACKAGES\|networkSecurityConfig\|allowBackup\|queries\|supportsPictureInPicture\|android:label" android/app/src/main/AndroidManifest.xml
+
+      # Picture-in-Picture: MainActivity bawaan flutter create diganti versi
+      # dengan MethodChannel "wibuplay/pip" (android_native/MainActivity.kt).
+      - name: Pasang MainActivity (PiP)
+        run: |
+          DIR=$(dirname "$(find android/app/src/main -name MainActivity.kt -o -name MainActivity.java | head -n1)")
+          rm -f "$DIR"/MainActivity.kt "$DIR"/MainActivity.java
+          mkdir -p android/app/src/main/kotlin/com/dayynime/wibuplay
+          cp android_native/MainActivity.kt android/app/src/main/kotlin/com/dayynime/wibuplay/MainActivity.kt
+          find android/app/src/main -name 'MainActivity.*'
+
+      # Ikon app + splash screen Zenime. Sumbernya folder android_res/ di repo
+      # (ikon adaptive dari app Zenime). flutter create membuat ic_launcher.png
+      # bawaan; harus dihapus dulu, kalau tidak bentrok dengan ic_launcher.webp.
+      - name: Pasang ikon dan splash Zenime
+        run: |
+          RES=android/app/src/main/res
+          rm -f "$RES"/mipmap-*/ic_launcher.png "$RES"/mipmap-*/ic_launcher_round.png
+          cp -r android_res/. "$RES/"
+          ls "$RES/mipmap-xxxhdpi" "$RES/drawable"
+
+      # Push notif (FCM). Nilai Firebase native ditulis ke res/values supaya
+      # FirebaseApp default sudah ada di proses Android sebelum Flutter jalan
+      # (wajib agar notif tetap diterima saat app ditutup), plus izin
+      # POST_NOTIFICATIONS (Android 13+), ikon kecil, warna, dan channel default.
+      - name: Pasang Firebase Messaging (push notif)
+        env:
+          FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+          FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+        run: |
+          python3 - <<'PY'
+          import os
+          from xml.sax.saxutils import escape
+          api = os.environ.get('FIREBASE_API_KEY', '').strip()
+          app = os.environ.get('FIREBASE_APP_ID', '').strip()
+          if not api or not app:
+              print('::warning::FIREBASE_API_KEY/FIREBASE_APP_ID kosong: push notif saat app ditutup tidak akan jalan')
+          else:
+              vals = {
+                  'google_app_id': app,
+                  'google_api_key': api,
+                  'gcm_defaultSenderId': '936105562787',
+                  'project_id': 'zenime-609d0',
+                  'google_storage_bucket': 'zenime-609d0.firebasestorage.app',
+              }
+              xml = '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n'
+              for k, v in vals.items():
+                  xml += '    <string name="%s" translatable="false">%s</string>\n' % (k, escape(v))
+              xml += '</resources>\n'
+              open('android/app/src/main/res/values/zenime_firebase.xml', 'w', encoding='utf-8').write(xml)
+          p = 'android/app/src/main/AndroidManifest.xml'
+          s = open(p, encoding='utf-8').read()
+          if 'android.permission.POST_NOTIFICATIONS' not in s:
+              s = s.replace('<application', '<uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>\n    <application', 1)
+          if 'default_notification_icon' not in s:
+              i = s.index('<application')
+              j = s.index('>', i) + 1
+              meta = ('\n        <meta-data android:name="com.google.firebase.messaging.default_notification_icon" android:resource="@drawable/ic_stat_zenime"/>'
+                      '\n        <meta-data android:name="com.google.firebase.messaging.default_notification_color" android:resource="@color/zenime_notification"/>'
+                      '\n        <meta-data android:name="com.google.firebase.messaging.default_notification_channel_id" android:value="zenime_social"/>')
+              s = s[:j] + meta + s[j:]
+          open(p, 'w', encoding='utf-8').write(s)
+          PY
+          grep -n "POST_NOTIFICATIONS\|default_notification" android/app/src/main/AndroidManifest.xml
+          ls android/app/src/main/res/values/
+
+      - name: Ambil dependency
+        run: flutter pub get
+
+      # Profile = padanan build "perf": AOT seperti release tapi ditandatangani debug key,
+      # jadi performa asli bisa dites tanpa keystore produksi.
+      # Opsional: debug keystore yang STABIL (base64 di secret DEBUG_KEYSTORE_BASE64)
+      # supaya SHA-1 tidak berubah tiap build. Wajib kalau mau Login Google,
+      # karena SHA-1 harus didaftarkan di Firebase. Login email tidak butuh ini.
+      - name: Pakai debug keystore tetap (kalau secret ada)
+        env:
+          DEBUG_KEYSTORE_BASE64: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$DEBUG_KEYSTORE_BASE64" ]; then
+            mkdir -p ~/.android
+            echo "$DEBUG_KEYSTORE_BASE64" | base64 -d > ~/.android/debug.keystore
+            echo "debug keystore tetap dipasang"
+          fi
+
+      # Firebase Zenime (project yang sama dengan app Kotlin) dikirim lewat
+      # secret FIREBASE_API_KEY dan FIREBASE_APP_ID (dari google-services.json).
+      - name: Build Debug APK
+        run: >
+          flutter build apk --debug --build-number=$APP_VERSION_CODE
+          --dart-define=FIREBASE_API_KEY=${{ secrets.FIREBASE_API_KEY }}
+          --dart-define=FIREBASE_APP_ID=${{ secrets.FIREBASE_APP_ID }}
+
+      - name: Build Profile APK
+        run: >
+          flutter build apk --profile --build-number=$APP_VERSION_CODE
+          --dart-define=FIREBASE_API_KEY=${{ secrets.FIREBASE_API_KEY }}
+          --dart-define=FIREBASE_APP_ID=${{ secrets.FIREBASE_APP_ID }}
+
+      - name: Upload Debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APP_NAME }}-debug
+          path: build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 7
+
+      - name: Upload Profile APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APP_NAME }}-profile
+          path: build/app/outputs/flutter-apk/app-profile.apk
+          retention-days: 7
+
+      - name: Ringkasan ukuran APK
+        if: always()
+        run: |
+          {
+            echo "### APK hasil build #${{ github.run_number }}"
+            echo '```'
+            ls -lh build/app/outputs/flutter-apk/*.apk 2>/dev/null || echo "tidak ada APK"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

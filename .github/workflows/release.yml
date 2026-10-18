@@ -1,0 +1,341 @@
+name: Release APK (signed)
+
+on:
+  push:
+    tags: [ 'v*' ]          # contoh: git tag v2.4 && git push origin v2.4 (x.y atau x.y.z)
+  workflow_dispatch:
+    inputs:
+      version_name:
+        description: 'Versi (format x.y atau x.y.z, contoh 2.4)'
+        required: true
+        default: '2.7'
+      publish:
+        description: 'Buat GitHub Release + upload APK?'
+        type: boolean
+        default: false
+      adi_snippet:
+        description: 'Opsional: snippet verifikasi developer Android (isi adi-registration.properties). Kosongkan untuk rilis biasa.'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+env:
+  APP_NAME: Zenime        # nama file APK
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Tentukan versi
+        env:
+          INPUT_VERSION: ${{ inputs.version_name }}
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            V="${GITHUB_REF_NAME#v}"
+          else
+            V="$INPUT_VERSION"
+          fi
+          if ! echo "$V" | grep -Eq '^[0-9]+\.[0-9]+(\.[0-9]+)?$'; then
+            echo "::error::Versi '$V' tidak valid. Pakai format x.y atau x.y.z (contoh 2.4)"
+            exit 1
+          fi
+          IFS=. read -r MA MI PA <<< "$V"
+          PA=${PA:-0}
+          CODE=$(( MA * 10000 + MI * 100 + PA ))
+          echo "APP_VERSION_NAME=$V" >> "$GITHUB_ENV"
+          echo "APP_VERSION_CODE=$CODE" >> "$GITHUB_ENV"
+          echo "Versi $V (versionCode $CODE)"
+
+      - name: Pastikan secret keystore ada
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          for v in KEYSTORE_BASE64 STORE_PASSWORD KEY_PASSWORD; do
+            if [ -z "${!v}" ]; then
+              echo "::error::Secret $v belum diisi (Settings > Secrets and variables > Actions)"
+              exit 1
+            fi
+          done
+
+      - name: Decode keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          echo "KEYSTORE_PATH=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Siapkan folder android (kalau belum ada)
+        run: |
+          if [ ! -d android ]; then
+            flutter create . --platforms=android --org com.dayynime --project-name wibuplay
+          fi
+
+      # applicationId disamakan dengan Zenime (com.aistudio.zenime.app) supaya APK
+      # Versi Flutter ini menggantikan/meng-update app Zenime di perangkat. Hanya
+      # applicationId yang diganti; namespace bawaan flutter create
+      # (com.dayynime.wibuplay) dibiarkan karena keduanya independen dan
+      # MainActivity tetap cocok. Aman dijalankan ulang kalau android/ di-commit.
+      - name: Atur applicationId (ikut Zenime)
+        run: |
+          python3 - <<'PY'
+          import glob, re, sys
+          files = glob.glob('android/app/build.gradle*')
+          if not files:
+              print('::error::android/app/build.gradle(.kts) tidak ditemukan')
+              sys.exit(1)
+          p = files[0]
+          s = open(p, encoding='utf-8').read()
+          s, n = re.subn(r'applicationId\s*=?\s*["\'][^"\']*["\']', 'applicationId = "com.aistudio.zenime.app"', s, count=1)
+          if n != 1:
+              print('::error::applicationId tidak ditemukan di ' + p)
+              sys.exit(1)
+          open(p, 'w', encoding='utf-8').write(s)
+          PY
+          grep -n "applicationId\|namespace" android/app/build.gradle*
+
+      # flutter create tidak menaruh INTERNET di manifest utama (hanya debug/profile),
+      # dan Android 9+ memblokir HTTP polos. Samakan dengan manifest Kotlin:
+      # INTERNET, ACCESS_NETWORK_STATE, networkSecurityConfig, label "Zenime".
+      - name: Atur AndroidManifest (internet + cleartext + nama)
+        run: |
+          python3 - <<'PY'
+          import re
+          p = 'android/app/src/main/AndroidManifest.xml'
+          s = open(p, encoding='utf-8').read()
+          if 'android.permission.INTERNET' not in s:
+              s = s.replace('<application', '<uses-permission android:name="android.permission.INTERNET"/>\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>\n    <application', 1)
+          if 'REQUEST_INSTALL_PACKAGES' not in s:
+              s = s.replace('<application', '<uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>\n    <application', 1)
+          if 'supportsPictureInPicture' not in s:
+              s = s.replace('<activity', '<activity android:supportsPictureInPicture="true"', 1)
+          # Keamanan (sama dengan Zenime): cleartext HTTP cuma untuk host di
+          # res/xml/network_security_config.xml (bukan global), backup dimatikan,
+          # <queries> supaya IntegrityGuard bisa melihat app lain di Android 11+.
+          if 'networkSecurityConfig' not in s:
+              s = s.replace('<application', '<application android:networkSecurityConfig="@xml/network_security_config" android:allowBackup="false"', 1)
+          # PENTING: template flutter create SUDAH punya <queries> (PROCESS_TEXT),
+          # jadi jangan cuma cek '<queries>' -- sisipkan intent LAUNCHER ke dalamnya.
+          # Tanpa ini, di Android 11+ app lain (Reqable, PCAPdroid, dll) tidak
+          # terlihat dan IntegrityGuard tidak pernah mendeteksi apa pun.
+          launcher_q = ('<intent>\n            <action android:name="android.intent.action.MAIN"/>\n'
+                        '            <category android:name="android.intent.category.LAUNCHER"/>\n        </intent>')
+          if 'integrity-guard-queries' not in s:
+              if '</queries>' in s:
+                  s = s.replace('</queries>', '    <!-- integrity-guard-queries -->\n        ' + launcher_q + '\n    </queries>', 1)
+              else:
+                  s = s.replace('<application', '<queries>\n        <!-- integrity-guard-queries -->\n        ' + launcher_q + '\n    </queries>\n    <application', 1)
+          s = re.sub(r'android:label="[^"]*"', 'android:label="Zenime"', s, count=1)
+          open(p, 'w', encoding='utf-8').write(s)
+          PY
+          grep -n "INTERNET\|REQUEST_INSTALL_PACKAGES\|networkSecurityConfig\|allowBackup\|queries\|supportsPictureInPicture\|android:label" android/app/src/main/AndroidManifest.xml
+
+      # Picture-in-Picture: MainActivity bawaan flutter create diganti versi
+      # dengan MethodChannel "wibuplay/pip" (android_native/MainActivity.kt).
+      - name: Pasang MainActivity (PiP)
+        run: |
+          DIR=$(dirname "$(find android/app/src/main -name MainActivity.kt -o -name MainActivity.java | head -n1)")
+          rm -f "$DIR"/MainActivity.kt "$DIR"/MainActivity.java
+          mkdir -p android/app/src/main/kotlin/com/dayynime/wibuplay
+          cp android_native/MainActivity.kt android/app/src/main/kotlin/com/dayynime/wibuplay/MainActivity.kt
+          find android/app/src/main -name 'MainActivity.*'
+
+      # Ikon app + splash screen Zenime. Sumbernya folder android_res/ di repo
+      # (ikon adaptive dari app Zenime). flutter create membuat ic_launcher.png
+      # bawaan; harus dihapus dulu, kalau tidak bentrok dengan ic_launcher.webp.
+      - name: Pasang ikon dan splash Zenime
+        run: |
+          RES=android/app/src/main/res
+          rm -f "$RES"/mipmap-*/ic_launcher.png "$RES"/mipmap-*/ic_launcher_round.png
+          cp -r android_res/. "$RES/"
+          ls "$RES/mipmap-xxxhdpi" "$RES/drawable"
+
+      # Hanya untuk pendaftaran nama paket (Verifikasi developer Android):
+      # snippet dari Play Console ditaruh di assets APK.
+      - name: Sisipkan adi-registration.properties (opsional)
+        if: ${{ inputs.adi_snippet != '' }}
+        env:
+          ADI_SNIPPET: ${{ inputs.adi_snippet }}
+        run: |
+          mkdir -p android/app/src/main/assets
+          printf '%s\n' "$ADI_SNIPPET" > android/app/src/main/assets/adi-registration.properties
+          echo "Isi adi-registration.properties:"
+          cat android/app/src/main/assets/adi-registration.properties
+
+      # Push notif (FCM). Nilai Firebase native ditulis ke res/values supaya
+      # FirebaseApp default sudah ada di proses Android sebelum Flutter jalan
+      # (wajib agar notif tetap diterima saat app ditutup), plus izin
+      # POST_NOTIFICATIONS (Android 13+), ikon kecil, warna, dan channel default.
+      - name: Pasang Firebase Messaging (push notif)
+        env:
+          FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+          FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+        run: |
+          python3 - <<'PY'
+          import os
+          from xml.sax.saxutils import escape
+          api = os.environ.get('FIREBASE_API_KEY', '').strip()
+          app = os.environ.get('FIREBASE_APP_ID', '').strip()
+          if not api or not app:
+              print('::warning::FIREBASE_API_KEY/FIREBASE_APP_ID kosong: push notif saat app ditutup tidak akan jalan')
+          else:
+              vals = {
+                  'google_app_id': app,
+                  'google_api_key': api,
+                  'gcm_defaultSenderId': '936105562787',
+                  'project_id': 'zenime-609d0',
+                  'google_storage_bucket': 'zenime-609d0.firebasestorage.app',
+              }
+              xml = '<?xml version="1.0" encoding="utf-8"?>\n<resources>\n'
+              for k, v in vals.items():
+                  xml += '    <string name="%s" translatable="false">%s</string>\n' % (k, escape(v))
+              xml += '</resources>\n'
+              open('android/app/src/main/res/values/zenime_firebase.xml', 'w', encoding='utf-8').write(xml)
+          p = 'android/app/src/main/AndroidManifest.xml'
+          s = open(p, encoding='utf-8').read()
+          if 'android.permission.POST_NOTIFICATIONS' not in s:
+              s = s.replace('<application', '<uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>\n    <application', 1)
+          if 'default_notification_icon' not in s:
+              i = s.index('<application')
+              j = s.index('>', i) + 1
+              meta = ('\n        <meta-data android:name="com.google.firebase.messaging.default_notification_icon" android:resource="@drawable/ic_stat_zenime"/>'
+                      '\n        <meta-data android:name="com.google.firebase.messaging.default_notification_color" android:resource="@color/zenime_notification"/>'
+                      '\n        <meta-data android:name="com.google.firebase.messaging.default_notification_channel_id" android:value="zenime_social"/>')
+              s = s[:j] + meta + s[j:]
+          open(p, 'w', encoding='utf-8').write(s)
+          PY
+          grep -n "POST_NOTIFICATIONS\|default_notification" android/app/src/main/AndroidManifest.xml
+          ls android/app/src/main/res/values/
+
+      - name: Ambil dependency
+        run: flutter pub get
+
+      # SHA-256 sertifikat penandatangan RESMI, dipakai IntegrityGuard buat
+      # mendeteksi APK yang di-decompile lalu di-sign ulang pakai key lain.
+      # Dihitung dari keystore rilis (sama dengan yang dipakai apksigner nanti),
+      # jadi tidak butuh secret baru.
+      - name: Hitung SHA-256 sertifikat rilis
+        env:
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: |
+          SHA=$(keytool -list -v -keystore "$KEYSTORE_PATH" -alias "${KEY_ALIAS:-upload}" -storepass "$STORE_PASSWORD" 2>/dev/null | grep -m1 'SHA256:' | sed 's/.*SHA256: *//' | tr -d ':' | tr 'A-F' 'a-f')
+          if [ -z "$SHA" ]; then
+            echo "::error::Gagal membaca SHA-256 sertifikat dari keystore (cek KEY_ALIAS dan STORE_PASSWORD)"
+            exit 1
+          fi
+          echo "APK_SIG_SHA256=$SHA" >> "$GITHUB_ENV"
+
+      # Firebase Zenime (project yang sama dengan app Kotlin), dari google-services.json.
+      - name: Build Release APK
+        run: >
+          flutter build apk --release
+          --obfuscate --split-debug-info=build/symbols
+          --build-name=$APP_VERSION_NAME --build-number=$APP_VERSION_CODE
+          --dart-define=FIREBASE_API_KEY=${{ secrets.FIREBASE_API_KEY }}
+          --dart-define=FIREBASE_APP_ID=${{ secrets.FIREBASE_APP_ID }}
+          --dart-define=APK_SIG_SHA256=$APK_SIG_SHA256
+
+      # Flutter menandatangani APK rilis dengan debug key kalau gradle belum diatur.
+      # Daripada menambal build.gradle.kts, APK ditandatangani ulang di sini pakai
+      # apksigner dan keystore dari secret.
+      - name: Tanda tangan APK
+        env:
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}   # opsional, default "upload"
+        run: |
+          SIGNER=$(ls -d "${ANDROID_HOME:-/usr/local/lib/android/sdk}"/build-tools/* | sort -V | tail -1)/apksigner
+          if [ ! -x "$SIGNER" ]; then
+            echo "::error::apksigner tidak ditemukan"
+            exit 1
+          fi
+          mkdir -p dist
+          "$SIGNER" sign \
+            --ks "$KEYSTORE_PATH" \
+            --ks-key-alias "${KEY_ALIAS:-upload}" \
+            --ks-pass env:STORE_PASSWORD \
+            --key-pass env:KEY_PASSWORD \
+            --out "dist/${APP_NAME}-v${APP_VERSION_NAME}.apk" \
+            build/app/outputs/flutter-apk/app-release.apk
+
+      - name: Verifikasi tanda tangan
+        run: |
+          APK="dist/${APP_NAME}-v${APP_VERSION_NAME}.apk"
+          SIGNER=$(ls -d "${ANDROID_HOME:-/usr/local/lib/android/sdk}"/build-tools/* | sort -V | tail -1)/apksigner
+          "$SIGNER" verify --print-certs "$APK" | tee "$RUNNER_TEMP/certs.txt"
+          # Zenime yang beredar ditandatangani debug.keystore (CN=Android Debug,
+          # SHA-1 0A:D0:D7:...:EA:D3). Supaya versi Flutter ini bisa meng-update Zenime
+          # tanpa uninstall, key itu sengaja dipakai lagi, jadi ini hanya
+          # peringatan, bukan error.
+          if grep -qi "CN=Android Debug" "$RUNNER_TEMP/certs.txt"; then
+            echo "::warning::APK rilis ditandatangani debug key (sengaja, mengikuti Zenime)."
+          fi
+
+          # Sidik jari sertifikat (SHA-1/SHA-256) untuk didaftarkan di Firebase
+          # (Project settings > app Wibuplay > Add fingerprint), supaya Login
+          # Google jalan. Tetap sama selama keystore-nya sama.
+          fmt() { sed 's/../&:/g; s/:$//' | tr 'a-f' 'A-F'; }
+          SHA1=$(grep -m1 "SHA-1 digest" "$RUNNER_TEMP/certs.txt" | awk '{print $NF}' | fmt)
+          SHA256=$(grep -m1 "SHA-256 digest" "$RUNNER_TEMP/certs.txt" | awk '{print $NF}' | fmt)
+          {
+            echo "### Sidik jari untuk Firebase"
+            echo "SHA-1:"
+            echo '```'
+            echo "$SHA1"
+            echo '```'
+            echo "SHA-256:"
+            echo '```'
+            echo "$SHA256"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Siapkan file rilis
+        run: |
+          (cd dist && sha256sum "${APP_NAME}-v${APP_VERSION_NAME}.apk" | tee "${APP_NAME}-v${APP_VERSION_NAME}.apk.sha256")
+          ls -lh dist
+
+      # Simbol debug hasil --obfuscate: buat membaca stack trace crash.
+      # Disimpan terpisah (BUKAN di GitHub Release publik).
+      - name: Upload simbol debug
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APP_NAME }}-symbols-v${{ env.APP_VERSION_NAME }}
+          path: build/symbols
+          retention-days: 90
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APP_NAME }}-release-v${{ env.APP_VERSION_NAME }}
+          path: dist/*
+          retention-days: 30
+
+      - name: Publish GitHub Release
+        if: github.ref_type == 'tag' || inputs.publish
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.APP_VERSION_NAME }}
+          name: ${{ env.APP_NAME }} v${{ env.APP_VERSION_NAME }}
+          generate_release_notes: true
+          files: dist/*

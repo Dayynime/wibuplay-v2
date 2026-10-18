@@ -1,0 +1,162 @@
+import 'dart:async';
+
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../data/models/avatar_frame_models.dart';
+import '../../data/repository/avatar_frame_repository.dart';
+import '../../providers.dart';
+
+/// Cache border yang dipakai tiap uid. Permintaan dari banyak avatar
+/// (chat, komentar) dikumpulkan lalu diambil sekali jalan per batch.
+class AvatarFrameCache extends StateNotifier<Map<String, String>> {
+  AvatarFrameCache(this._repo) : super(const {});
+
+  final AvatarFrameRepository _repo;
+  final Set<String> _seen = {};
+  final Set<String> _pending = {};
+  Timer? _timer;
+
+  /// uid yang datanya sedang diambil layar lain (mis. Profil publik lewat
+  /// screen-data): jangan ditembak terpisah dulu.
+  final Set<String> _reserved = {};
+
+  void reserve(String uid) {
+    if (uid.isNotEmpty && !_seen.contains(uid)) _reserved.add(uid);
+  }
+
+  /// Hasil dari layar yang memesan (null = tidak pakai border).
+  void fill(String uid, String? frameId) {
+    _reserved.remove(uid);
+    setLocal(uid, frameId);
+  }
+
+  /// Layar gagal ambil data: kembali ke jalur biasa.
+  void release(String uid) {
+    if (_reserved.remove(uid)) request(uid);
+  }
+
+  void request(String uid) {
+    if (uid.isEmpty || _seen.contains(uid) || _reserved.contains(uid)) return;
+    _seen.add(uid);
+    _pending.add(uid);
+    _timer ??= Timer(const Duration(milliseconds: 150), _flush);
+  }
+
+  Future<void> _flush() async {
+    _timer = null;
+    final batch = _pending.toList();
+    _pending.clear();
+    if (batch.isEmpty) return;
+    try {
+      final found = await _repo.getEquippedForUids(batch);
+      if (!mounted || found.isEmpty) return;
+      state = {...state, ...found};
+    } catch (_) {
+      // Gagal = tampil tanpa border; tidak dicoba ulang di sesi ini.
+    }
+  }
+
+  /// Update langsung setelah user sendiri pasang/lepas border.
+  void setLocal(String uid, String? frameId) {
+    _seen.add(uid);
+    final next = {...state};
+    if (frameId == null) {
+      next.remove(uid);
+    } else {
+      next[uid] = frameId;
+    }
+    state = next;
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+}
+
+final avatarFrameCacheProvider =
+    StateNotifierProvider<AvatarFrameCache, Map<String, String>>(
+  (ref) => AvatarFrameCache(ref.watch(avatarFrameRepositoryProvider)),
+);
+
+/// Gambar border: asset bawaan app, atau file Storage yang di-cache di disk
+/// (sekali unduh per border, animasi WebP tetap jalan).
+ImageProvider? avatarFrameImage(String? id) {
+  final asset = avatarFrameAsset(id);
+  if (asset != null) return AssetImage(asset);
+  final url = avatarFrameUrl(id);
+  if (url != null) return CachedNetworkImageProvider(url);
+  return null;
+}
+
+/// Bungkus avatar bulat berukuran [size] dengan border milik [uid].
+/// Border digambar 1.25x lebih besar dan meluber keluar, jadi ukuran
+/// layout avatar TIDAK berubah.
+class FramedAvatar extends ConsumerWidget {
+  const FramedAvatar({
+    super.key,
+    required this.uid,
+    required this.size,
+    required this.child,
+  })  : previewFrameId = null,
+        _preview = false;
+
+  /// Pakai border tertentu (untuk pratinjau di toko), bukan milik uid.
+  const FramedAvatar.preview({
+    super.key,
+    required String? frameId,
+    required this.size,
+    required this.child,
+  })  : uid = '',
+        previewFrameId = frameId,
+        _preview = true;
+
+  final String uid;
+  final double size;
+  final Widget child;
+  final String? previewFrameId;
+  final bool _preview;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    String? id;
+    if (_preview) {
+      id = previewFrameId;
+    } else if (uid.isNotEmpty) {
+      ref.read(avatarFrameCacheProvider.notifier).request(uid);
+      id = ref.watch(avatarFrameCacheProvider.select((m) => m[uid]));
+    }
+    final image = avatarFrameImage(id);
+    final scale = avatarFrameScale(id);
+    final ext = size * (scale - 1) / 2;
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned.fill(child: child),
+          if (image != null)
+            Positioned(
+              left: -ext,
+              top: -ext,
+              width: size * scale,
+              height: size * scale,
+              child: IgnorePointer(
+                child: Image(
+                  image: image,
+                  gaplessPlayback: true,
+                  filterQuality: FilterQuality.medium,
+                  // Gagal unduh = avatar tampil tanpa border.
+                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
