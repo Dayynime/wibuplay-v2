@@ -24,6 +24,7 @@ import '../auth/login_screen.dart';
 import '../clan/clan_browse_screen.dart';
 import 'image_crop_screen.dart';
 import 'my_xp_card.dart';
+import 'profile_timeline.dart';
 import 'settings_screen.dart';
 import '../comic/comic_profile_section.dart';
 import '../xp/xp_leaderboard_screen.dart';
@@ -56,6 +57,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     'Favorit',
     'Komentar',
     'Riwayat',
+    'Timeline',
   ];
 
   int _selectedTab = 0;
@@ -415,6 +417,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         return _buildFavorites(favorites);
       case 2:
         return _buildComments(user, premium, name, avatarUrl);
+      case 4:
+        return _buildTimeline(history, user);
       default:
         return _buildHistory(history, user, premium, name, avatarUrl);
     }
@@ -507,6 +511,65 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ],
             ),
           ),
+      ],
+    );
+  }
+
+  // --------------------------------------------------------------- timeline
+
+  /// Tab Timeline: nonton + komentar, urut terbaru, dikelompokkan per hari.
+  Widget _buildTimeline(List<WatchHistoryEntity> history, User? user) {
+    final commentsAsync = user == null ? null : ref.watch(myCommentsProvider(user.uid));
+    final comments = commentsAsync?.valueOrNull ?? const <EpisodeComment>[];
+    final loading = commentsAsync?.isLoading == true && comments.isEmpty;
+
+    final entries = <TimelineEntry>[];
+    for (final h in history) {
+      entries.add(TimelineEntry(
+        time: DateTime.fromMillisecondsSinceEpoch(h.lastWatchedTime),
+        kind: TimelineKind.watch,
+        title: h.movieTitle,
+        subtitle: h.episodeTitle.isNotEmpty ? h.episodeTitle : 'Episode ${h.episodeIndex}',
+        posterUrl: h.moviePoster,
+        progress: h.progressFraction,
+        onTap: () => widget.onWatchEpisode(h.movieId, h.episodeId),
+      ));
+    }
+    for (final c in comments) {
+      final t = c.time;
+      if (t == null) continue;
+      final ep = (c.episodeIndex ?? '').isNotEmpty ? 'Ep ${c.episodeIndex} · ' : '';
+      entries.add(TimelineEntry(
+        time: t,
+        kind: TimelineKind.comment,
+        title: (c.animeTitle ?? '').isNotEmpty ? c.animeTitle! : 'Komentar',
+        subtitle: '$ep${c.comment}',
+        posterUrl: c.animePosterUrl,
+        onTap: () => widget.onAnimeClick(c.animeId),
+      ));
+    }
+    entries.sort((a, b) => b.time.compareTo(a.time));
+    final shown = entries.take(60).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const ProfileSectionHeader(icon: Icons.timeline, title: 'Timeline'),
+        if (shown.isEmpty && loading)
+          const SizedBox(
+            height: 130,
+            child: Center(
+              child: SizedBox(
+                width: 28,
+                height: 28,
+                child: CircularProgressIndicator(strokeWidth: 3, color: AppColors.accentViolet),
+              ),
+            ),
+          )
+        else if (shown.isEmpty)
+          const ProfileEmptyBox(text: 'Belum ada jejak. Mulai nonton atau komentar, yuk!')
+        else
+          ProfileTimeline(entries: shown),
       ],
     );
   }
