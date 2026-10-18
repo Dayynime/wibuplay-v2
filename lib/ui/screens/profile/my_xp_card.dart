@@ -7,90 +7,95 @@ import '../../../providers.dart';
 import '../../app_routes.dart';
 import '../xp/xp_leaderboard_screen.dart';
 
-/// Kartu ringkas "Level nonton" di Profil: progress XP ke level berikutnya +
-/// tombol ke leaderboard (port MyXpCard.kt). Belum pernah nonton = belum ada
-/// baris user_xp, ditampilkan sebagai Level 1 / 0 XP supaya fiturnya terlihat.
-class MyXpCard extends ConsumerWidget {
+/// Progress bar XP ke level berikutnya di Profil. Cuma bar: tanpa card,
+/// tanpa border radius. Fill beranimasi tiap progress berubah + kilau yang
+/// menyapu terus. Tap = buka leaderboard.
+class MyXpCard extends ConsumerStatefulWidget {
   const MyXpCard({super.key, required this.firebaseUid});
 
   final String firebaseUid;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final xp = ref.watch(myXpProvider(firebaseUid)).valueOrNull;
+  ConsumerState<MyXpCard> createState() => _MyXpCardState();
+}
+
+class _MyXpCardState extends ConsumerState<MyXpCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _shine = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2200),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _shine.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final xp = ref.watch(myXpProvider(widget.firebaseUid)).valueOrNull;
     final level = xp?.level ?? 1;
     final totalXp = xp?.totalXp ?? 0;
     final p = XpLevelFormula.progress(totalXp, level);
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Material(
-        color: AppColors.surfaceDark,
-        borderRadius: BorderRadius.circular(14),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(14),
-          onTap: () => Navigator.of(context)
-              .push<void>(fadeRoute(const XpLeaderboardScreen())),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => Navigator.of(context)
+            .push<void>(fadeRoute(const XpLeaderboardScreen())),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: SizedBox(
+            height: 6,
+            child: Stack(
+              fit: StackFit.expand,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: AppColors.accentViolet,
-                        borderRadius: BorderRadius.circular(50),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
+                const ColoredBox(color: Colors.white12),
+                TweenAnimationBuilder<double>(
+                  tween: Tween<double>(begin: 0, end: p.fraction),
+                  duration: const Duration(milliseconds: 1100),
+                  curve: Curves.easeOutCubic,
+                  builder: (context, v, _) => FractionallySizedBox(
+                    alignment: Alignment.centerLeft,
+                    widthFactor: v,
+                    child: ClipRect(
+                      child: Stack(
+                        fit: StackFit.expand,
                         children: [
-                          const Icon(Icons.bolt, size: 14, color: Colors.white),
-                          const SizedBox(width: 4),
-                          Text(
-                            'Level $level',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
+                          const DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  AppColors.accentViolet,
+                                  AppColors.accentVioletLight,
+                                ],
+                              ),
+                            ),
+                          ),
+                          AnimatedBuilder(
+                            animation: _shine,
+                            builder: (context, _) => FractionallySizedBox(
+                              alignment: Alignment(-1 + 3 * _shine.value, 0),
+                              widthFactor: 0.35,
+                              child: const DecoratedBox(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      Color(0x00FFFFFF),
+                                      Color(0x66FFFFFF),
+                                      Color(0x00FFFFFF),
+                                    ],
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    const Expanded(
-                      child: Text(
-                        'dari nonton anime',
-                        style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
-                      ),
-                    ),
-                    const Text(
-                      'Leaderboard ›',
-                      style: TextStyle(
-                        color: AppColors.accentVioletLight,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: p.fraction,
-                    minHeight: 8,
-                    color: AppColors.accentViolet,
-                    backgroundColor: Colors.white12,
                   ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  '${p.xpIntoLevel} / ${p.xpNeededForLevel} XP ke Level ${level + 1}',
-                  style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
                 ),
               ],
             ),

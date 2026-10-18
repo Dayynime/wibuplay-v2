@@ -23,6 +23,7 @@ import '../../components/role_badges.dart';
 import '../auth/login_screen.dart';
 import '../clan/clan_browse_screen.dart';
 import 'image_crop_screen.dart';
+import 'my_xp_card.dart';
 import 'settings_screen.dart';
 import '../comic/comic_profile_section.dart';
 import '../xp/xp_leaderboard_screen.dart';
@@ -237,6 +238,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ),
               ),
               const SizedBox(height: 18),
+              // Progress bar XP (tap = buka leaderboard).
+              if (uid.isNotEmpty) ...[
+                MyXpCard(firebaseUid: uid),
+                const SizedBox(height: 12),
+              ],
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Row(
