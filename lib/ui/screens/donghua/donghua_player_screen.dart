@@ -90,6 +90,11 @@ class _DonghuaPlayerScreenState extends ConsumerState<DonghuaPlayerScreen>
 
   bool _showControls = true;
   bool _fullscreen = false;
+
+  // Kunci layar (fullscreen): sentuhan & tombol back diabaikan sampai dibuka.
+  bool _screenLocked = false;
+  bool _lockButtonVisible = false;
+  Timer? _lockHideTimer;
   bool _playerError = false;
   bool _wasPlaying = false;
   bool _showEpisodeList = false;
@@ -127,6 +132,7 @@ class _DonghuaPlayerScreenState extends ConsumerState<DonghuaPlayerScreen>
     WidgetsBinding.instance.removeObserver(this);
     WatchXpGate.release(this);
     _hideTimer?.cancel();
+    _lockHideTimer?.cancel();
     _tick?.cancel();
     _flashTimer?.cancel();
     _levels.dispose();
@@ -315,7 +321,95 @@ class _DonghuaPlayerScreenState extends ConsumerState<DonghuaPlayerScreen>
     _scheduleHide();
   }
 
+  // ------------------------------------------------------------ kunci layar
+
+  void _lockScreen() {
+    _hideTimer?.cancel();
+    setState(() {
+      _screenLocked = true;
+      _showControls = false;
+      _showEpisodeList = false;
+      _lockButtonVisible = true;
+    });
+    _scheduleHideLockButton();
+  }
+
+  void _unlockScreen() {
+    _lockHideTimer?.cancel();
+    setState(() {
+      _screenLocked = false;
+      _lockButtonVisible = false;
+      _showControls = true;
+    });
+    _scheduleHide();
+  }
+
+  void _scheduleHideLockButton() {
+    _lockHideTimer?.cancel();
+    _lockHideTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted) setState(() => _lockButtonVisible = false);
+    });
+  }
+
+  /// Layar terkunci: ketuk di mana saja cuma memunculkan ikon gembok sebentar.
+  void _onLockedTap() {
+    setState(() => _lockButtonVisible = true);
+    _scheduleHideLockButton();
+  }
+
+  void _showLockedHint() {
+    _onLockedTap();
+    _toast('Layar terkunci. Ketuk ikon gembok untuk membuka.');
+  }
+
+  Widget _lockedPlayer() {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        _videoSurface(),
+        // Penyerap semua sentuhan (tanpa seek/volume/kecerahan/double tap).
+        GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: _onLockedTap,
+          onHorizontalDragStart: (_) {},
+          onVerticalDragStart: (_) {},
+          onDoubleTap: () {},
+        ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Padding(
+            padding: const EdgeInsets.only(left: 24),
+            child: AnimatedOpacity(
+              opacity: _lockButtonVisible ? 1 : 0,
+              duration: const Duration(milliseconds: 200),
+              child: IgnorePointer(
+                ignoring: !_lockButtonVisible,
+                child: GestureDetector(
+                  onTap: _unlockScreen,
+                  child: Container(
+                    width: 48,
+                    height: 48,
+                    decoration: const BoxDecoration(
+                      color: Color(0x99000000),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.lock, color: Colors.white, size: 24),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   void _setFullscreen(bool fullscreen) {
+    if (!fullscreen) {
+      _screenLocked = false;
+      _lockButtonVisible = false;
+      _lockHideTimer?.cancel();
+    }
     setState(() {
       _fullscreen = fullscreen;
       _showEpisodeList = false;
@@ -526,7 +620,12 @@ class _DonghuaPlayerScreenState extends ConsumerState<DonghuaPlayerScreen>
     return PopScope(
       canPop: !_fullscreen,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop && _fullscreen) _setFullscreen(false);
+        if (didPop) return;
+        if (_screenLocked) {
+          _showLockedHint();
+          return;
+        }
+        if (_fullscreen) _setFullscreen(false);
       },
       child: Scaffold(
         backgroundColor: AppColors.backgroundDark,
@@ -661,6 +760,8 @@ class _DonghuaPlayerScreenState extends ConsumerState<DonghuaPlayerScreen>
       name: selectedQuality,
     );
 
+    if (_screenLocked && _fullscreen) return _lockedPlayer();
+
     return PlayerGestureLayer(
       levels: _levels,
       child: Stack(
@@ -691,6 +792,7 @@ class _DonghuaPlayerScreenState extends ConsumerState<DonghuaPlayerScreen>
                       onOpenServers: () => _openQualitySheet(medias, selectedQuality, premium),
                       onOpenSettings: _openSpeedSheet,
                       onEnterPip: _enterPip,
+                      onLock: _fullscreen ? _lockScreen : null,
                       onOpenEpisodes: _fullscreen
                           ? () => setState(() {
                                 _showEpisodeList = true;

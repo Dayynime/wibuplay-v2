@@ -424,92 +424,435 @@ class _WallpaperScreenState extends ConsumerState<WallpaperScreen> {
   }
 
   Widget _collectionTab(WallpaperState s) {
-    if (s.inventory.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.only(top: 60),
-        child: Center(
-          child: Text('Belum punya wallpaper. Coba spin dulu!', style: TextStyle(color: AppColors.textSecondary)),
+    return _CollectionView(
+      state: s,
+      equipping: _equipping,
+      onOpen: _openItem,
+      onUnequip: () => _equip(null),
+    );
+  }
+}
+
+// ================================================================ koleksi
+
+enum _CollectionSort { rarity, name }
+
+/// Tab "Koleksiku": ringkasan progres, wallpaper yang sedang dipakai,
+/// filter rarity, urutan, dan grid kartu.
+class _CollectionView extends StatefulWidget {
+  const _CollectionView({
+    required this.state,
+    required this.equipping,
+    required this.onOpen,
+    required this.onUnequip,
+  });
+
+  final WallpaperState state;
+  final bool equipping;
+  final ValueChanged<WallpaperItem> onOpen;
+  final VoidCallback onUnequip;
+
+  @override
+  State<_CollectionView> createState() => _CollectionViewState();
+}
+
+class _CollectionViewState extends State<_CollectionView> {
+  WallpaperRarity? _rarity; // null = semua
+  _CollectionSort _sort = _CollectionSort.rarity;
+
+  static String _sortLabel(_CollectionSort s) =>
+      s == _CollectionSort.rarity ? 'Rarity tertinggi' : 'Nama A-Z';
+
+  @override
+  Widget build(BuildContext context) {
+    final s = widget.state;
+    final inv = s.inventory;
+
+    if (inv.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(32, 56, 32, 0),
+        child: Column(
+          children: [
+            Container(
+              width: 72,
+              height: 72,
+              decoration: const BoxDecoration(color: AppColors.surfaceDark, shape: BoxShape.circle),
+              child: const Icon(Icons.collections_outlined, color: AppColors.textMuted, size: 34),
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              'Koleksimu masih kosong',
+              style: TextStyle(color: AppColors.textWhite, fontWeight: FontWeight.w800, fontSize: 16),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Coba spin dulu untuk dapat wallpaper pertamamu!',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+            ),
+          ],
         ),
       );
     }
+
+    final counts = <WallpaperRarity, int>{};
+    for (final w in inv) {
+      counts[w.rarity] = (counts[w.rarity] ?? 0) + 1;
+    }
+    // Filter yang isinya sudah habis (mis. wallpaper dilepas) kembali ke "Semua".
+    final selected = (_rarity != null && (counts[_rarity] ?? 0) > 0) ? _rarity : null;
+
+    final shown = inv.where((w) => selected == null || w.rarity == selected).toList()
+      ..sort((a, b) {
+        if (_sort == _CollectionSort.rarity) {
+          final r = b.rarity.index.compareTo(a.rarity.index);
+          if (r != 0) return r;
+        }
+        return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+      });
+
+    WallpaperItem? equipped;
+    for (final w in inv) {
+      if (w.id == s.equippedId) {
+        equipped = w;
+        break;
+      }
+    }
+
+    final total = s.pool.isEmpty ? inv.length : s.pool.length;
+    final progress = total == 0 ? 0.0 : (inv.length / total).clamp(0.0, 1.0);
+
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        if (s.equippedId != null)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                onPressed: _equipping ? null : () => _equip(null),
-                icon: const Icon(Icons.layers_clear_outlined, size: 18),
-                label: const Text('Lepas wallpaper'),
-              ),
-            ),
-          ),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
+        // ---- ringkasan progres
+        Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          itemCount: s.inventory.length,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            mainAxisSpacing: 10,
-            crossAxisSpacing: 10,
-            childAspectRatio: 16 / 11,
-          ),
-          itemBuilder: (_, i) {
-            final w = s.inventory[i];
-            final on = s.equippedId == w.id;
-            return GestureDetector(
-              onTap: () => _openItem(w),
-              child: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: on ? AppColors.accentViolet : w.rarity.color.withValues(alpha: 0.6), width: on ? 2.5 : 1.5),
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      CachedNetworkImage(
-                        imageUrl: w.previewUrl,
-                        fit: BoxFit.cover,
-                        errorWidget: (_, __, ___) => const ColoredBox(color: AppColors.surfaceDark),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceDark,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0x14FFFFFF)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '${inv.length}',
+                      style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w800, height: 1),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 4, bottom: 2),
+                      child: Text(
+                        '/ $total dimiliki',
+                        style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
                       ),
-                      const DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [Colors.transparent, Color(0xCC000000)],
+                    ),
+                    const Spacer(),
+                    Text(
+                      '${(progress * 100).round()}%',
+                      style: const TextStyle(color: AppColors.textWhite, fontWeight: FontWeight.w800),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: Stack(
+                    children: [
+                      Container(height: 8, color: AppColors.surfaceVariantDark),
+                      TweenAnimationBuilder<double>(
+                        tween: Tween(begin: 0, end: progress),
+                        duration: const Duration(milliseconds: 900),
+                        curve: Curves.easeOutCubic,
+                        builder: (_, v, __) => FractionallySizedBox(
+                          widthFactor: v,
+                          child: Container(
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              gradient: LinearGradient(colors: [Color(0xFF8B3DFF), Color(0xFFE4344A)]),
+                            ),
                           ),
                         ),
                       ),
-                      Positioned(
-                        left: 8,
-                        right: 8,
-                        bottom: 6,
-                        child: Text(w.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700)),
-                      ),
-                      Positioned(top: 6, left: 6, child: _RarityPill(rarity: w.rarity)),
-                      if (on)
-                        const Positioned(
-                          top: 6,
-                          right: 6,
-                          child: Icon(Icons.check_circle, color: AppColors.accentViolet, size: 20),
-                        ),
                     ],
                   ),
                 ),
+                const SizedBox(height: 14),
+                // ---- wallpaper yang sedang dipakai
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceVariantDark,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: equipped == null
+                      ? const Row(
+                          children: [
+                            Padding(
+                              padding: EdgeInsets.all(8),
+                              child: Icon(Icons.layers_outlined, color: AppColors.textMuted, size: 22),
+                            ),
+                            SizedBox(width: 4),
+                            Expanded(
+                              child: Text(
+                                'Belum ada wallpaper yang dipakai. Ketuk salah satu di bawah untuk memasang.',
+                                style: TextStyle(color: AppColors.textSecondary, fontSize: 12.5, height: 1.3),
+                              ),
+                            ),
+                          ],
+                        )
+                      : Row(
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(10),
+                              child: SizedBox(
+                                width: 72,
+                                height: 46,
+                                child: CachedNetworkImage(
+                                  imageUrl: equipped.previewUrl,
+                                  fit: BoxFit.cover,
+                                  errorWidget: (_, __, ___) => const ColoredBox(color: AppColors.surfaceDark),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'SEDANG DIPAKAI',
+                                    style: TextStyle(
+                                      color: AppColors.textMuted,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 0.8,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    equipped.name,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: AppColors.textWhite,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: widget.equipping ? null : widget.onUnequip,
+                              child: const Text('Lepas'),
+                            ),
+                          ],
+                        ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // ---- filter rarity
+        SizedBox(
+          height: 40,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            children: [
+              _FilterChip(
+                label: 'Semua',
+                count: inv.length,
+                selected: selected == null,
+                onTap: () => setState(() => _rarity = null),
+              ),
+              for (final r in WallpaperRarity.values.reversed)
+                if ((counts[r] ?? 0) > 0) ...[
+                  const SizedBox(width: 8),
+                  _FilterChip(
+                    label: r.label,
+                    count: counts[r]!,
+                    rarity: r,
+                    selected: selected == r,
+                    onTap: () => setState(() => _rarity = selected == r ? null : r),
+                  ),
+                ],
+            ],
+          ),
+        ),
+
+        // ---- jumlah + urutan
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 8, 0),
+          child: Row(
+            children: [
+              Text(
+                '${shown.length} wallpaper',
+                style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+              ),
+              const Spacer(),
+              PopupMenuButton<_CollectionSort>(
+                tooltip: 'Urutkan',
+                color: AppColors.surfaceElevated,
+                initialValue: _sort,
+                onSelected: (v) => setState(() => _sort = v),
+                itemBuilder: (_) => [
+                  for (final o in _CollectionSort.values)
+                    PopupMenuItem(
+                      value: o,
+                      child: Text(_sortLabel(o), style: const TextStyle(color: AppColors.textWhite)),
+                    ),
+                ],
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.sort_rounded, size: 18, color: AppColors.textSecondary),
+                      const SizedBox(width: 4),
+                      Text(
+                        _sortLabel(_sort),
+                        style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        // ---- grid
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+          itemCount: shown.length,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+            childAspectRatio: 0.82,
+          ),
+          itemBuilder: (_, i) {
+            final w = shown[i];
+            return TweenAnimationBuilder<double>(
+              key: ValueKey('${selected?.name}-${_sort.name}-${w.id}'),
+              tween: Tween(begin: 0, end: 1),
+              duration: Duration(milliseconds: 260 + math.min(i, 8) * 40),
+              curve: Curves.easeOutCubic,
+              builder: (_, v, child) => Opacity(
+                opacity: v,
+                child: Transform.translate(offset: Offset(0, 12 * (1 - v)), child: child),
+              ),
+              child: _CollectionCard(
+                item: w,
+                equipped: s.equippedId == w.id,
+                onTap: () => widget.onOpen(w),
               ),
             );
           },
         ),
       ],
+    );
+  }
+}
+
+class _CollectionCard extends StatelessWidget {
+  const _CollectionCard({required this.item, required this.equipped, required this.onTap});
+
+  final WallpaperItem item;
+  final bool equipped;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final r = item.rarity;
+    final high = r.index >= WallpaperRarity.epic.index;
+    final borderColor = equipped ? AppColors.accentViolet : r.color.withValues(alpha: 0.55);
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: borderColor, width: equipped ? 2.5 : 1.3),
+          boxShadow: [
+            if (high) BoxShadow(color: r.color.withValues(alpha: 0.25), blurRadius: 16),
+            if (equipped) BoxShadow(color: AppColors.accentViolet.withValues(alpha: 0.35), blurRadius: 14),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              CachedNetworkImage(
+                imageUrl: item.previewUrl,
+                fit: BoxFit.cover,
+                placeholder: (_, __) => const ColoredBox(color: AppColors.surfaceVariantDark),
+                errorWidget: (_, __, ___) => const ColoredBox(color: AppColors.surfaceVariantDark),
+              ),
+              const DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.center,
+                    end: Alignment.bottomCenter,
+                    colors: [Colors.transparent, Color(0xE6000000)],
+                  ),
+                ),
+              ),
+              Positioned(top: 8, left: 8, child: _RarityPill(rarity: r)),
+              if (equipped)
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppColors.accentViolet,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.check_rounded, color: Colors.white, size: 12),
+                        SizedBox(width: 3),
+                        Text(
+                          'Dipakai',
+                          style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              Positioned(
+                left: 10,
+                right: 10,
+                bottom: 10,
+                child: Text(
+                  item.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    height: 1.2,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

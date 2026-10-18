@@ -1751,7 +1751,7 @@ class PlayerControlsOverlay extends StatefulWidget {
     required this.onOpenServers,
     required this.onOpenSettings,
     required this.onEnterPip,
-    required this.onLock,
+    this.onLock,
     required this.onOpenEpisodes,
     required this.onRewind,
     required this.onForward,
