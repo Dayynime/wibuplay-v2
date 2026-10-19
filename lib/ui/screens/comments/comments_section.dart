@@ -613,8 +613,16 @@ class CommentItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final wp = wallpaper;
     final content = _buildContent(context);
-    if (wp == null) return content;
-    return CommentWallpaperFrame(wallpaper: wp, child: content);
+    final framed =
+        wp == null ? content : CommentWallpaperFrame(wallpaper: wp, child: content);
+    // Tap di mana saja pada area komentar = buka profil pengirim. Avatar,
+    // nama, Reply, dan menu titik tiga tetap punya tap sendiri (yang paling
+    // dalam menang), jadi tidak bentrok.
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => openPublicProfile(context, comment.firebaseUid),
+      child: framed,
+    );
   }
 
   Widget _buildContent(BuildContext context) {
