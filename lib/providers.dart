@@ -143,6 +143,17 @@ final topGiversProvider = FutureProvider<TopGiversData>((ref) async {
   return TopGiversData(givers: givers, clanTags: await clansF, levels: await levelsF);
 });
 
+/// Peringkat Top Giver satu user (null = tidak masuk leaderboard). Dipakai
+/// tag "TOP GIVER" di profil, chat, dan leaderboard.
+final topGiverRankProvider = Provider.family<int?, String>((ref, uid) {
+  final data = ref.watch(topGiversProvider).valueOrNull;
+  if (data == null) return null;
+  for (final g in data.givers) {
+    if (g.firebaseUid == uid) return g.rank;
+  }
+  return null;
+});
+
 /// Pohon ZCoin (mini game idle, Edge Function `tree-game`).
 final treeRepositoryProvider = Provider<TreeRepository>(
   (ref) => TreeRepository(ref.watch(supabaseDioProvider)),

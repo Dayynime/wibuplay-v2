@@ -18,6 +18,7 @@ import '../gift/gift_premium_sheet.dart';
 import '../gift/giveaway.dart';
 import '../../components/game_badges.dart';
 import '../../components/role_badges.dart';
+import '../../components/top_giver_badge.dart';
 import '../../components/swipe_to_reply.dart';
 import '../friends/friends_screen.dart';
 import '../profile/public_profile_screen.dart';
@@ -674,15 +675,17 @@ class ChatMessageBubble extends StatelessWidget {
                 ],
               ],
             ),
-            // Baris 2: badge clan + level, di bawah username.
-            if (clanTag != null || level != null) ...[
+            // Baris 2: badge clan + level + Top Giver, di bawah username.
+            if (clanTag != null || level != null || m.firebaseUid.isNotEmpty) ...[
               const SizedBox(height: 3),
-              Row(
-                mainAxisSize: MainAxisSize.min,
+              Wrap(
+                spacing: 4,
+                runSpacing: 3,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   if (clanTag != null) ClanRainbowBadge(text: clanTag!),
-                  if (clanTag != null && level != null) const SizedBox(width: 4),
                   if (level != null) LevelBadge(level: level!),
+                  TopGiverBadge(firebaseUid: m.firebaseUid, height: 16),
                 ],
               ),
             ],

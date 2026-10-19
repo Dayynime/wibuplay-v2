@@ -15,6 +15,7 @@ import '../../components/cards.dart';
 import '../../components/game_badges.dart';
 import '../../components/net_image.dart';
 import '../../components/role_badges.dart';
+import '../../components/top_giver_badge.dart';
 import '../../components/join_date_stat.dart';
 import '../clan/clan_browse_screen.dart';
 import '../comments/comments_section.dart' show openCommentThreadFromProfile;
@@ -334,6 +335,7 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
                   LevelBadge(level: level, height: 20),
                   if (_has(clanTag)) ClanRainbowBadge(text: clanTag!, height: 20),
                   RoleBadge(firebaseUid: uid, height: 20),
+                  TopGiverBadge(firebaseUid: uid, height: 20),
                 ],
               ),
               const SizedBox(height: 18),

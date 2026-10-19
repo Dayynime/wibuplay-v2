@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../data/models/support_models.dart';
 import '../../../providers.dart';
 import '../../components/game_badges.dart';
+import '../../components/top_giver_badge.dart';
 import '../profile/public_profile_screen.dart' show openPublicProfile;
 import '../../glass/glass.dart';
 
@@ -209,6 +210,8 @@ class _PodiumEntry extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(color: AppColors.textWhite, fontWeight: FontWeight.w700),
           ),
+          const SizedBox(height: 4),
+          TopGiverChip(height: 16),
           const SizedBox(height: 2),
           Text(
             _days(giver.days),
@@ -278,7 +281,11 @@ class _GiverTile extends StatelessWidget {
                         ClanRainbowBadge(text: clan!),
                         const SizedBox(width: 6),
                       ],
-                      if (level != null) LevelBadge(level: level!),
+                      if (level != null) ...[
+                        LevelBadge(level: level!),
+                        const SizedBox(width: 6),
+                      ],
+                      TopGiverChip(height: 16),
                     ],
                   ),
                 ],
