@@ -211,6 +211,27 @@ Future<void> showCommentThreadSheet(
   });
 }
 
+/// Dipanggil dari Profil (profil sendiri / profil orang): tap komentar =
+/// buka sheet "Threads" yang SAMA dengan halaman episode, berisi komentar itu
+/// + semua balasannya. Kalau komentar yang diketuk ternyata balasan, yang
+/// dibuka thread induknya supaya konteksnya lengkap.
+Future<void> openCommentThreadFromProfile(BuildContext context, EpisodeComment c) {
+  final args = (c.episodeId, c.animeId);
+  final container = ProviderScope.containerOf(context, listen: false);
+  // Controller-nya autoDispose: tahan selama sheet terbuka.
+  final keepAlive = container.listen(commentsControllerProvider(args), (_, __) {});
+  container.read(commentsControllerProvider(args).notifier).openThread(c.parentId ?? c.id);
+  return showCommentThreadSheet(
+    context,
+    args: args,
+    meta: CommentMeta(
+      animeTitle: c.animeTitle,
+      animePosterUrl: c.animePosterUrl,
+      episodeIndex: c.episodeIndex,
+    ),
+  ).whenComplete(keepAlive.close);
+}
+
 class _ThreadSheet extends ConsumerWidget {
   const _ThreadSheet({
     required this.args,
@@ -302,6 +323,25 @@ class _ThreadSheet extends ConsumerWidget {
                 shrinkWrap: true,
                 padding: EdgeInsets.zero,
                 children: [
+                  if (parent == null)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 36),
+                      child: Center(
+                        child: s.isLoading
+                            ? const SizedBox(
+                                width: 26,
+                                height: 26,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 3,
+                                  color: AppColors.accentViolet,
+                                ),
+                              )
+                            : const Text(
+                                'Komentar tidak ditemukan',
+                                style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                              ),
+                      ),
+                    ),
                   if (parent != null) ...[
                     item(parent, () => ctrl.setReplyTarget(null)),
                     const Divider(

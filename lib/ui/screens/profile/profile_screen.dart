@@ -23,6 +23,7 @@ import '../../components/role_badges.dart';
 import '../auth/login_screen.dart';
 import '../clan/clan_browse_screen.dart';
 import 'image_crop_screen.dart';
+import '../comments/comments_section.dart' show openCommentThreadFromProfile;
 import 'my_xp_card.dart';
 import 'profile_timeline.dart';
 import 'settings_screen.dart';
@@ -466,7 +467,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             username: name,
             avatarUrl: avatarUrl,
             isPremium: premium,
-            onTap: () => widget.onAnimeClick(c.animeId),
+            onTap: () => openCommentThreadFromProfile(context, c),
           ),
         ));
       }
@@ -545,7 +546,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         title: (c.animeTitle ?? '').isNotEmpty ? c.animeTitle! : 'Komentar',
         subtitle: '$ep${c.comment}',
         posterUrl: c.animePosterUrl,
-        onTap: () => widget.onAnimeClick(c.animeId),
+        onTap: () => openCommentThreadFromProfile(context, c),
       ));
     }
     entries.sort((a, b) => b.time.compareTo(a.time));
@@ -709,7 +710,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                         username: name,
                         avatarUrl: avatarUrl,
                         isPremium: premium,
-                        onTap: () => widget.onAnimeClick(list[i].animeId),
+                        onTap: () => openCommentThreadFromProfile(context, list[i]),
                       ),
                       if (i != list.length - 1) const SizedBox(height: 22),
                     ],

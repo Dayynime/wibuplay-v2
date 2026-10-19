@@ -17,6 +17,7 @@ import '../../components/net_image.dart';
 import '../../components/role_badges.dart';
 import '../../components/join_date_stat.dart';
 import '../clan/clan_browse_screen.dart';
+import '../comments/comments_section.dart' show openCommentThreadFromProfile;
 import '../xp/xp_leaderboard_screen.dart';
 import 'profile_controller.dart';
 import 'profile_screen_seed.dart';
@@ -681,7 +682,7 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
           username: name,
           avatarUrl: avatarUrl,
           isPremium: premium,
-          onTap: () => openDetail(context, c.animeId),
+          onTap: () => openCommentThreadFromProfile(context, c),
         ),
       ));
     }
@@ -789,7 +790,7 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
                       username: name,
                       avatarUrl: avatarUrl,
                       isPremium: premium,
-                      onTap: () => openDetail(context, list[i].animeId),
+                      onTap: () => openCommentThreadFromProfile(context, list[i]),
                     ),
                     if (i != list.length - 1) const SizedBox(height: 22),
                   ],
