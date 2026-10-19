@@ -13,6 +13,7 @@ import '../../components/shimmer.dart';
 import '../auth/login_screen.dart';
 import 'checkout_sheet.dart';
 import 'store_widgets.dart';
+import '../../glass/glass.dart';
 
 /// Halaman beli Premium. Port PremiumScreen.kt dengan tampilan baru:
 /// hero emas, kartu manfaat, pilih paket, dan bar bayar yang menempel.
@@ -102,7 +103,7 @@ class _PremiumScreenState extends ConsumerState<PremiumScreen>
     final savings = premiumSavingPercents(pkgs);
     final selected = _selected(pkgs, savings);
 
-    return Scaffold(
+    return GlassScaffold(
       backgroundColor: AppColors.backgroundDark,
       body: Column(
         children: [

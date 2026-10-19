@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../../../core/integrity_guard.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../glass/glass.dart';
 
 /// Gerbang keamanan paling luar (port blockedTool di MainActivity.kt Zenime).
 ///
@@ -67,7 +68,7 @@ class _IntegrityGateState extends State<IntegrityGate> with WidgetsBindingObserv
       );
     }
     if (!_ready) {
-      return const Scaffold(backgroundColor: AppColors.backgroundDark);
+      return const GlassScaffold(backgroundColor: AppColors.backgroundDark);
     }
     return widget.child;
   }

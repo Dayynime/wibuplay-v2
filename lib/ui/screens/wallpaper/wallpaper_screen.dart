@@ -14,6 +14,7 @@ import '../../../providers.dart';
 import '../../app_routes.dart' show fadeRoute;
 import '../store/coin_screen.dart';
 import '../comments/comments_section.dart' show CommentWallpaperFrame;
+import '../../glass/glass.dart';
 
 /// Wallpaper Komentar: gacha pakai ZCoin + koleksi untuk dipasang.
 ///
@@ -213,7 +214,7 @@ class _WallpaperScreenState extends ConsumerState<WallpaperScreen> {
 
   void _openItem(WallpaperItem w) {
     final equipped = _state?.equippedId == w.id;
-    showModalBottomSheet<void>(
+    showGlassSheet<void>(
       context: context,
       backgroundColor: AppColors.backgroundDarkSecondary,
       showDragHandle: true,
@@ -290,9 +291,9 @@ class _WallpaperScreenState extends ConsumerState<WallpaperScreen> {
   @override
   Widget build(BuildContext context) {
     final s = _state;
-    return Scaffold(
+    return GlassScaffold(
       backgroundColor: AppColors.backgroundDark,
-      appBar: AppBar(
+      appBar: GlassAppBar(
         backgroundColor: AppColors.backgroundDark,
         foregroundColor: AppColors.textWhite,
         surfaceTintColor: Colors.transparent,
@@ -1823,9 +1824,9 @@ class _CatalogPageState extends State<_CatalogPage> {
         .toList();
     final progress = all.isEmpty ? 0.0 : owned / all.length;
 
-    return Scaffold(
+    return GlassScaffold(
       backgroundColor: AppColors.backgroundDark,
-      appBar: AppBar(
+      appBar: GlassAppBar(
         backgroundColor: AppColors.backgroundDark,
         foregroundColor: AppColors.textWhite,
         surfaceTintColor: Colors.transparent,
@@ -2012,7 +2013,7 @@ class _CatalogPageState extends State<_CatalogPage> {
   void _openDetail(WallpaperItem w) {
     final owned = widget.ownedIds.contains(w.id);
     final equipped = widget.equippedId == w.id;
-    showModalBottomSheet<void>(
+    showGlassSheet<void>(
       context: context,
       backgroundColor: AppColors.backgroundDarkSecondary,
       showDragHandle: true,

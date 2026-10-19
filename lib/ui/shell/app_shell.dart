@@ -10,6 +10,7 @@ import '../screens/explore/explore_screen.dart';
 import '../screens/home/home_screen.dart';
 import '../screens/profile/profile_screen.dart';
 import '../screens/schedule/schedule_screen.dart';
+import '../glass/glass.dart';
 
 /// Port AppNavigation.kt: 5 tab + bottom bar melayang.
 /// Beranda, Jelajah, Jadwal, Menu (Donghua/Komik/Gacha), Profil; Detail dan Player dibuka lewat
@@ -60,7 +61,7 @@ class _AppShellState extends ConsumerState<AppShell> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return GlassScaffold(
       backgroundColor: AppColors.backgroundDark,
       body: Stack(
         children: [

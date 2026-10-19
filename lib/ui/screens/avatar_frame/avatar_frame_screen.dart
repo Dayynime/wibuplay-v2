@@ -10,6 +10,7 @@ import '../../app_routes.dart' show fadeRoute;
 import '../../components/avatar_frame.dart';
 import '../../components/game_badges.dart' show UserAvatar;
 import '../store/coin_screen.dart';
+import '../../glass/glass.dart';
 
 /// Toko Border Avatar: tab Shop/Koleksi, cari nama, filter tier,
 /// pratinjau di avatar sendiri, beli pakai ZCoin, pasang / lepas.
@@ -183,9 +184,9 @@ class _AvatarFrameScreenState extends ConsumerState<AvatarFrameScreen> {
     final uid = ref.watch(authUserProvider).valueOrNull?.uid ?? '';
     final profile = uid.isEmpty ? null : ref.watch(chatProfileProvider(uid)).valueOrNull;
 
-    return Scaffold(
+    return GlassScaffold(
       backgroundColor: AppColors.backgroundDark,
-      appBar: AppBar(
+      appBar: GlassAppBar(
         backgroundColor: AppColors.backgroundDark,
         title: const Text('Border Avatar'),
       ),
@@ -320,7 +321,7 @@ class _AvatarFrameScreenState extends ConsumerState<AvatarFrameScreen> {
     final s = _state;
     if (s == null) return;
     setState(() => _selected = f.id);
-    final go = await showModalBottomSheet<bool>(
+    final go = await showGlassSheet<bool>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,

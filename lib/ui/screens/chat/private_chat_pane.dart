@@ -11,6 +11,7 @@ import '../../../data/models/friend_models.dart';
 import '../../components/friend_avatar.dart';
 import '../../components/swipe_to_reply.dart';
 import 'private_chat_controller.dart';
+import '../../glass/glass.dart';
 
 String _two(int n) => n.toString().padLeft(2, '0');
 
@@ -67,7 +68,7 @@ class _PrivateChatPaneState extends ConsumerState<PrivateChatPane> {
       senderUid == widget.myUid ? 'Kamu' : friend.username;
 
   void _showActions(PrivateMessage m) {
-    showModalBottomSheet<void>(
+    showGlassSheet<void>(
       context: context,
       backgroundColor: AppColors.surfaceDark,
       builder: (ctx) => SafeArea(

@@ -8,6 +8,7 @@ import '../../../core/build_flags.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/update_checker.dart';
 import 'force_update_screen.dart';
+import '../../glass/glass.dart';
 
 enum _Phase { checking, blocked, ok }
 
@@ -158,7 +159,7 @@ class _SplashState extends State<_Splash> with SingleTickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return GlassScaffold(
       backgroundColor: AppColors.backgroundDark,
       body: Center(
         child: AnimatedBuilder(

@@ -6,6 +6,7 @@ import '../../../core/build_flags.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/repository/safety_repository.dart';
 import '../../../providers.dart';
+import '../../glass/glass.dart';
 
 void _toast(BuildContext context, String msg) {
   ScaffoldMessenger.of(context)
@@ -25,7 +26,7 @@ Future<void> showReportSheet(
   int? messageId,
   String? messageText,
 }) async {
-  final sent = await showModalBottomSheet<bool>(
+  final sent = await showGlassSheet<bool>(
     context: context,
     isScrollControlled: true,
     backgroundColor: AppColors.surfaceDark,
@@ -360,9 +361,9 @@ class _BlockedUsersScreenState extends ConsumerState<BlockedUsersScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return GlassScaffold(
       backgroundColor: AppColors.backgroundDark,
-      appBar: AppBar(
+      appBar: GlassAppBar(
         backgroundColor: AppColors.backgroundDark,
         foregroundColor: AppColors.textWhite,
         title: const Text('Pengguna Diblokir'),

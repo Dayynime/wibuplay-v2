@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/premium_access.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/stream_data.dart';
+import '../../glass/glass.dart';
 
 /// Tag, warna, dan kalimat penjelas per kualitas -- gaya "Pilihan Kualitas
 /// Video" di Zenime (port qualityTag/qualityAccentColor/qualityDescription).
@@ -52,7 +53,7 @@ Future<void> showQualityPickerSheet(
   required VoidCallback onLocked,
 }) {
   final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
-  return showModalBottomSheet<void>(
+  return showGlassSheet<void>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,

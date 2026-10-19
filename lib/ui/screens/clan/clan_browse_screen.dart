@@ -10,6 +10,7 @@ import '../auth/login_screen.dart';
 import 'clan_screen.dart';
 import 'create_clan_screen.dart';
 import 'clan_widgets.dart';
+import '../../glass/glass.dart';
 
 enum ClanBrowseMode { all, leaderboard, mine }
 
@@ -58,9 +59,9 @@ class _ClanBrowseScreenState extends ConsumerState<ClanBrowseScreen> {
     final clans = ref.watch(allClansProvider);
     final myClanId = ref.watch(myClanMembershipProvider).valueOrNull?.clanId;
 
-    return Scaffold(
+    return GlassScaffold(
       backgroundColor: AppColors.backgroundDark,
-      appBar: AppBar(
+      appBar: GlassAppBar(
         backgroundColor: AppColors.backgroundDark,
         foregroundColor: AppColors.textWhite,
         elevation: 0,

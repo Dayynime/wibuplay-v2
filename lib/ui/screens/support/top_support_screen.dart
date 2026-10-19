@@ -14,6 +14,7 @@ import '../../../data/models/support_models.dart';
 import '../../../providers.dart';
 import '../../components/game_badges.dart';
 import '../profile/public_profile_screen.dart';
+import '../../glass/glass.dart';
 
 /// Halaman Top Support: podium 3 donatur teratas + daftar peringkat + ajakan
 /// donasi lewat halaman donasi Zenime Store (QRIS). Dibuka dari slide TOP SUPPORT di carousel Beranda.
@@ -28,9 +29,9 @@ class TopSupportScreen extends ConsumerWidget {
         ? null
         : ref.watch(profileIdentityProvider(uid)).valueOrNull?.zenimeCode;
 
-    return Scaffold(
+    return GlassScaffold(
       backgroundColor: AppColors.backgroundDark,
-      appBar: AppBar(
+      appBar: GlassAppBar(
         backgroundColor: AppColors.backgroundDark,
         foregroundColor: AppColors.textWhite,
         elevation: 0,

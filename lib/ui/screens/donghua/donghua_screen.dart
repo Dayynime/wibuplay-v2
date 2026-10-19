@@ -7,6 +7,7 @@ import '../../components/common_components.dart';
 import '../../components/shimmer.dart';
 import 'donghua_controller.dart';
 import 'donghua_widgets.dart';
+import '../../glass/glass.dart';
 
 /// Port DonghuaScreen.kt: daftar donghua (Terbaru / Ongoing / Semua), cari,
 /// dan filter genre. Dibuka dari section "Donghua" di Beranda, bukan dari
@@ -95,7 +96,7 @@ class _DonghuaScreenState extends ConsumerState<DonghuaScreen> {
       );
     }
 
-    return Scaffold(
+    return GlassScaffold(
       backgroundColor: AppColors.backgroundDark,
       body: SafeArea(
         bottom: false,

@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../providers.dart';
 import 'store_widgets.dart';
+import '../../glass/glass.dart';
 
 /// Bottom sheet checkout yang dipakai bareng halaman Premium dan ZCoin.
 /// Port CheckoutSheet.kt: ringkasan pesanan, kode akun (bisa disalin), bayar
@@ -24,7 +25,7 @@ Future<void> showCheckoutSheet(
   required Color onGradient,
   VoidCallback? onLaunched,
 }) {
-  return showModalBottomSheet<void>(
+  return showGlassSheet<void>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,

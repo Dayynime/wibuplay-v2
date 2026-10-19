@@ -25,6 +25,7 @@ import '../player/player_gestures.dart';
 import '../player/player_screen.dart';
 import '../player/quality_sheet.dart';
 import 'donghua_widgets.dart';
+import '../../glass/glass.dart';
 
 /// Link video langsung (GET /video-source/{slug}). Dijaga token premium di
 /// server. Diambil FRESH tiap layar dibuka (link ada masa berlakunya).
@@ -433,7 +434,7 @@ class _DonghuaPlayerScreenState extends ConsumerState<DonghuaPlayerScreen>
 
   void _openSpeedSheet() {
     const speeds = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
-    showModalBottomSheet<void>(
+    showGlassSheet<void>(
       context: context,
       backgroundColor: AppColors.surfaceDark,
       shape: const RoundedRectangleBorder(
@@ -627,7 +628,7 @@ class _DonghuaPlayerScreenState extends ConsumerState<DonghuaPlayerScreen>
         }
         if (_fullscreen) _setFullscreen(false);
       },
-      child: Scaffold(
+      child: GlassScaffold(
         backgroundColor: AppColors.backgroundDark,
         body: ValueListenableBuilder<bool>(
           valueListenable: PipController.isInPip,

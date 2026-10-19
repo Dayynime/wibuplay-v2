@@ -11,6 +11,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../data/repository/auth_repository.dart';
 import '../../../providers.dart';
 import 'login_posters.dart';
+import '../../glass/glass.dart';
 
 enum _Mode { signIn, signUp }
 
@@ -198,7 +199,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) _closeEmail();
       },
-      child: Scaffold(
+      child: GlassScaffold(
         backgroundColor: AppColors.backgroundDark,
         // Backdrop tidak ikut mengecil saat keyboard muncul; panel yang naik.
         resizeToAvoidBottomInset: false,

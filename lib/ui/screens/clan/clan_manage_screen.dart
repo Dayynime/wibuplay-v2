@@ -10,6 +10,7 @@ import '../../../data/repository/clan_repository.dart';
 import '../../../providers.dart';
 import '../../components/game_badges.dart';
 import 'clan_widgets.dart';
+import '../../glass/glass.dart';
 
 String _thousands(int v) {
   final s = v.abs().toString();
@@ -78,9 +79,9 @@ class _ClanManageScreenState extends ConsumerState<ClanManageScreen> {
     final clan = ref.watch(clanDetailProvider(widget.clanId)).valueOrNull?.clan;
     final tab = _isLeader ? _tab : 0;
 
-    return Scaffold(
+    return GlassScaffold(
       backgroundColor: AppColors.backgroundDark,
-      appBar: AppBar(
+      appBar: GlassAppBar(
         backgroundColor: AppColors.backgroundDark,
         foregroundColor: AppColors.textWhite,
         elevation: 0,

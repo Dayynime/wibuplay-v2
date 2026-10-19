@@ -12,6 +12,7 @@ import '../../components/game_badges.dart';
 import '../../components/shimmer.dart';
 import '../profile/public_profile_screen.dart';
 import 'add_friend_screen.dart';
+import '../../glass/glass.dart';
 
 /// Layar Teman: permintaan masuk (terima/tolak), daftar teman (tap buka
 /// profil, menu ⋮ buat salin ID / hapus), dan permintaan terkirim (batalkan).
@@ -123,9 +124,9 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
             ? '${friends.length} teman · $pending permintaan baru'
             : '${friends.length} teman';
 
-    return Scaffold(
+    return GlassScaffold(
       backgroundColor: AppColors.backgroundDark,
-      appBar: AppBar(
+      appBar: GlassAppBar(
         backgroundColor: AppColors.backgroundDark,
         surfaceTintColor: Colors.transparent,
         foregroundColor: Colors.white,

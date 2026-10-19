@@ -25,6 +25,7 @@ import 'private_chat_controller.dart';
 import 'private_chat_pane.dart';
 import 'chat_controller.dart';
 import '../../components/avatar_frame.dart';
+import '../../glass/glass.dart';
 
 Color? _parseHex(String? hex) {
   if (hex == null) return null;
@@ -149,7 +150,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   void _showActions(ChatMessage m, ChatUiState s) {
-    showModalBottomSheet<void>(
+    showGlassSheet<void>(
       context: context,
       backgroundColor: AppColors.surfaceDark,
       builder: (ctx) => SafeArea(
@@ -272,9 +273,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) ref.read(privateChatControllerProvider.notifier).closeChat();
       },
-      child: Scaffold(
+      child: GlassScaffold(
         backgroundColor: AppColors.backgroundDark,
-        appBar: AppBar(
+        appBar: GlassAppBar(
           backgroundColor: AppColors.backgroundDark,
           elevation: 0,
           title: Text(_tab == 0 ? 'Chat Global' : 'Chat Teman'),

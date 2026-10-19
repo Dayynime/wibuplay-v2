@@ -12,6 +12,7 @@ import '../../../providers.dart';
 import '../../components/game_badges.dart' show UserAvatar;
 import '../../components/role_badges.dart';
 import 'admin_wallpaper_tab.dart';
+import '../../glass/glass.dart';
 
 const Color _banRed = Color(0xFFE53935);
 const Color _banRedSoft = Color(0xFFE57373);
@@ -179,9 +180,9 @@ class _AdminScreenState extends ConsumerState<AdminScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return GlassScaffold(
       backgroundColor: AppColors.backgroundDark,
-      appBar: AppBar(
+      appBar: GlassAppBar(
         backgroundColor: AppColors.backgroundDark,
         foregroundColor: AppColors.textWhite,
         surfaceTintColor: Colors.transparent,

@@ -5,6 +5,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../data/repository/gift_repository.dart';
 import '../../../providers.dart';
 import '../../app_routes.dart' show openPremium;
+import '../../glass/glass.dart';
 
 const Color _gold = Color(0xFFF5B73B);
 const Color _goldDeep = Color(0xFFE0892B);
@@ -17,7 +18,7 @@ Future<Map<String, dynamic>?> showGiftPremiumSheet(
   required String recipientName,
   required String channel,
 }) {
-  return showModalBottomSheet<Map<String, dynamic>?>(
+  return showGlassSheet<Map<String, dynamic>?>(
     context: context,
     useRootNavigator: true,
     isScrollControlled: true,

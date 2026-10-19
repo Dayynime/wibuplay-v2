@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../glass/glass.dart';
 
 const List<double> kPlaybackSpeeds = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
 
@@ -26,7 +27,7 @@ Future<void> showPlayerSettingsSheet(
   var curIntro = autoSkipIntro;
   var curOutro = autoSkipOutro;
 
-  return showModalBottomSheet<void>(
+  return showGlassSheet<void>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,

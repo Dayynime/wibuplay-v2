@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import '../../../core/apk_downloader.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../glass/glass.dart';
 
 /// Layar SATU-SATUNYA yang tampil kalau ada release GitHub lebih baru dari
 /// versi app yang berjalan (lihat UpdateGate). Tidak ada tombol back/skip.
@@ -81,7 +82,7 @@ class _ForceUpdateScreenState extends State<ForceUpdateScreen>
     final failed = widget.downloadState is DownloadFailed;
     return PopScope(
       canPop: false, // wajib update: tombol back tidak melakukan apa-apa
-      child: Scaffold(
+      child: GlassScaffold(
         backgroundColor: AppColors.backgroundDark,
         body: Stack(
           fit: StackFit.expand,

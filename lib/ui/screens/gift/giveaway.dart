@@ -7,6 +7,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../data/repository/gift_repository.dart';
 import '../../../providers.dart';
 import '../../app_routes.dart' show openPremium;
+import '../../glass/glass.dart';
 
 const Color _gold = Color(0xFFF5B73B);
 const Color _goldDeep = Color(0xFFE0892B);
@@ -236,7 +237,7 @@ class _GiveawayCardState extends ConsumerState<GiveawayCard> {
 // =============================================================== buat
 
 Future<void> showCreateGiveawaySheet(BuildContext context) {
-  return showModalBottomSheet<void>(
+  return showGlassSheet<void>(
     context: context,
     useRootNavigator: true,
     isScrollControlled: true,

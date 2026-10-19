@@ -11,6 +11,7 @@ import '../../components/friend_avatar.dart';
 import '../../components/game_badges.dart';
 import '../../components/shimmer.dart';
 import '../profile/public_profile_screen.dart';
+import '../../glass/glass.dart';
 
 /// Layar Cari Teman: menampilkan semua user, bisa dicari lewat username atau
 /// ID (angka di "ID #123"), dan langsung bisa Tambah / Batalkan / Terima.
@@ -178,9 +179,9 @@ class _AddFriendScreenState extends ConsumerState<AddFriendScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return GlassScaffold(
       backgroundColor: AppColors.backgroundDark,
-      appBar: AppBar(
+      appBar: GlassAppBar(
         backgroundColor: AppColors.backgroundDark,
         surfaceTintColor: Colors.transparent,
         foregroundColor: Colors.white,

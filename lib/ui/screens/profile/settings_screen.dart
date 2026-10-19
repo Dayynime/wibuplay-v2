@@ -21,6 +21,7 @@ import '../safety/safety_actions.dart';
 import '../friends/friends_screen.dart';
 import '../wallpaper/wallpaper_screen.dart';
 import 'profile_screen.dart' show ProfileAvatar, showEditProfileSheet;
+import '../../glass/glass.dart';
 
 /// Halaman Pengaturan sendiri (dibuka dari ikon gear di pojok kanan atas
 /// Profil). Isinya dulu tab "Pengaturan" di Profil, ditambah menu Download.
@@ -138,9 +139,9 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
         user == null ? 0 : (ref.watch(incomingFriendRequestsProvider).valueOrNull ?? 0);
     final store = ref.watch(localStoreProvider);
 
-    return Scaffold(
+    return GlassScaffold(
       backgroundColor: AppColors.backgroundDark,
-      appBar: AppBar(
+      appBar: GlassAppBar(
         backgroundColor: AppColors.backgroundDark,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
@@ -377,6 +378,31 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen> {
                   ],
                 ],
               ),
+
+            // --------------------------------------------------------- Tampilan
+            const SizedBox(height: 22),
+            const _GroupLabel('Tampilan'),
+            _GroupCard(
+              children: [
+                Consumer(
+                  builder: (context, ref, _) {
+                    final glass = ref.watch(glassSettingsProvider);
+                    return _SettingsRow(
+                      leading: const _IconChip(icon: Icons.auto_awesome_outlined),
+                      title: 'Liquid Glass',
+                      subtitle: glass.enabled ? 'Efek kaca aktif' : 'Efek kaca mati',
+                      trailing: _Toggle(
+                        value: glass.enabled,
+                        onChanged: (v) => ref.read(glassSettingsProvider).setEnabled(v),
+                      ),
+                      onTap: () => ref
+                          .read(glassSettingsProvider)
+                          .setEnabled(!glass.enabled),
+                    );
+                  },
+                ),
+              ],
+            ),
 
             // ------------------------------------------------------- Pemutaran
             const SizedBox(height: 22),
@@ -642,11 +668,13 @@ class _GroupCard extends StatelessWidget {
   final List<Widget> children;
 
   @override
-  Widget build(BuildContext context) => Material(
-        color: AppColors.surfaceCard,
+  Widget build(BuildContext context) => GlassSurface(
         borderRadius: AppShapes.card,
-        clipBehavior: Clip.antiAlias,
-        child: Column(children: children),
+        blur: GlassBlur.thin,
+        child: Material(
+          type: MaterialType.transparency,
+          child: Column(children: children),
+        ),
       );
 }
 

@@ -13,6 +13,7 @@ import '../store/premium_screen.dart';
 import '../tree/tree_screen.dart';
 import '../wallpaper/wallpaper_screen.dart';
 import '../avatar_frame/avatar_frame_screen.dart';
+import '../../glass/glass.dart';
 
 // Poster sama dengan slide onboarding (CDN publik MyAnimeList, tidak di-bundle).
 const String _kDonghuaPoster = 'https://cdn.myanimelist.net/images/anime/1438/101531l.jpg';
@@ -31,7 +32,7 @@ class MenuScreen extends ConsumerWidget {
     final historyCount = ref.watch(profileHistoryProvider).length;
     final favoriteCount = ref.watch(profileFavoritesProvider).length;
 
-    return Scaffold(
+    return GlassScaffold(
       backgroundColor: AppColors.backgroundDark,
       body: SafeArea(
         bottom: false,

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../app_routes.dart';
 import 'downloads_tab.dart';
+import '../../glass/glass.dart';
 
 /// Halaman Download (dibuka dari Pengaturan): episode offline lintas anime.
 /// Bisa dibuka semua user; yang khusus Premium hanya memulai download baru.
@@ -11,9 +12,9 @@ class DownloadsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return GlassScaffold(
       backgroundColor: AppColors.backgroundDark,
-      appBar: AppBar(
+      appBar: GlassAppBar(
         backgroundColor: AppColors.backgroundDark,
         surfaceTintColor: Colors.transparent,
         elevation: 0,

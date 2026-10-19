@@ -24,6 +24,7 @@ import 'ui/screens/onboarding/onboarding_gate.dart';
 import 'ui/screens/security/integrity_gate.dart';
 import 'ui/screens/update/update_gate.dart';
 import 'ui/shell/app_shell.dart';
+import 'ui/glass/glass.dart';
 
 /// Firebase (login Zenime) + Remote Config. Dipanggil [IntegrityGate] HANYA
 /// setelah lolos cek keamanan, jadi tidak ada request jaringan sama sekali
@@ -79,13 +80,17 @@ Future<void> main() async {
   );
 
   final store = await LocalStore.open();
+  final glass = await GlassSettings.open();
   // Impor sekali favorit/riwayat/download dari database Room Zenime lama
   // (applicationId sama), supaya data tidak hilang saat update ke Wibuplay.
   await ZenimeRoomMigration.run(store);
 
   runApp(
     ProviderScope(
-      overrides: [localStoreProvider.overrideWith((ref) => store)],
+      overrides: [
+        localStoreProvider.overrideWith((ref) => store),
+        glassSettingsProvider.overrideWith((ref) => glass),
+      ],
       child: const ZenimeApp(),
     ),
   );
@@ -101,10 +106,11 @@ class ZenimeApp extends ConsumerWidget {
     // minimal 1,8 detik hanya saat intro belum pernah dilihat, supaya buka app
     // berikutnya tetap cepat.
     final introSeen = ref.read(localStoreProvider).onboardingSeen;
+    final glassOn = ref.watch(glassSettingsProvider.select((s) => s.enabled));
     return MaterialApp(
       title: 'Zenime',
       debugShowCheckedModeBanner: false,
-      theme: buildAppTheme(),
+      theme: buildAppTheme(glass: glassOn),
       navigatorKey: appNavigatorKey,
       navigatorObservers: [routeObserver],
       // Mini player ngambang di atas semua layar (di luar Navigator).

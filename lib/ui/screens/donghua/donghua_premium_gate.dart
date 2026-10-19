@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../providers.dart';
+import '../../glass/glass.dart';
 
 /// Gate nonton donghua: BENERAN memblokir pemutar kalau non-premium.
 /// Daftar & detail donghua (sinopsis, daftar episode) tetap terbuka untuk
@@ -51,7 +52,7 @@ class _DonghuaLockedScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return GlassScaffold(
       backgroundColor: AppColors.backgroundDark,
       body: SafeArea(
         child: Stack(

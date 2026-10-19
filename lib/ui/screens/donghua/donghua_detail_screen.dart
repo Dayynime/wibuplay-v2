@@ -6,6 +6,7 @@ import '../../../data/models/anichin_models.dart';
 import '../../components/common_components.dart';
 import 'donghua_detail_controller.dart';
 import 'donghua_widgets.dart';
+import '../../glass/glass.dart';
 
 const int _episodeColumns = 3;
 const Color _starYellow = Color(0xFFFFC107);
@@ -118,7 +119,7 @@ class _DonghuaDetailScreenState extends ConsumerState<DonghuaDetailScreen>
   Widget build(BuildContext context) {
     final s = ref.watch(donghuaDetailControllerProvider(widget.slug));
 
-    return Scaffold(
+    return GlassScaffold(
       backgroundColor: AppColors.backgroundDark,
       body: Builder(builder: (context) {
         if (s.isLoading) {

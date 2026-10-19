@@ -17,6 +17,7 @@ import '../../components/net_image.dart';
 import '../../components/poster_holder.dart';
 import '../download/download_actions.dart';
 import 'detail_controller.dart';
+import '../../glass/glass.dart';
 
 bool _blank(String? s) => s == null || s.trim().isEmpty;
 
@@ -176,7 +177,7 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
       body = _loaded(ui);
     }
 
-    return Scaffold(backgroundColor: AppColors.backgroundDark, body: body);
+    return GlassScaffold(backgroundColor: AppColors.backgroundDark, body: body);
   }
 
   Widget _heroGradient() => const DecoratedBox(

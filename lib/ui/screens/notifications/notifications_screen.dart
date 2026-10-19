@@ -11,6 +11,7 @@ import '../../components/game_badges.dart';
 import '../comments/comments_section.dart' show formatCommentRelativeTime;
 import '../friends/friends_screen.dart';
 import 'notification_router.dart';
+import '../../glass/glass.dart';
 
 /// Lonceng Beranda: daftar notifikasi (pertemanan & clan). Begitu dibuka,
 /// semua ditandai dibaca di server (badge hilang), tapi titik "baru" tetap
@@ -125,9 +126,9 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   Widget build(BuildContext context) {
     final incoming = ref.watch(incomingFriendRequestsProvider).valueOrNull ?? 0;
 
-    return Scaffold(
+    return GlassScaffold(
       backgroundColor: AppColors.backgroundDark,
-      appBar: AppBar(
+      appBar: GlassAppBar(
         backgroundColor: AppColors.backgroundDark,
         surfaceTintColor: Colors.transparent,
         foregroundColor: Colors.white,

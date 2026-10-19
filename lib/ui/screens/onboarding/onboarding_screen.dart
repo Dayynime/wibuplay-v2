@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../components/net_image.dart';
 import '../auth/login_posters.dart';
+import '../../glass/glass.dart';
 
 // -----------------------------------------------------------------------------
 // Port OnboardingScreen.kt Zenime.
@@ -147,7 +148,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           curve: Curves.easeOutCubic,
         );
       },
-      child: Scaffold(
+      child: GlassScaffold(
         backgroundColor: AppColors.backgroundDark,
         body: Stack(
           children: [

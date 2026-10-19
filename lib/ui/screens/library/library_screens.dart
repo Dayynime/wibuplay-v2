@@ -11,6 +11,7 @@ import '../../app_routes.dart';
 import '../../components/cards.dart';
 import '../comic/comic_profile_section.dart';
 import '../profile/profile_controller.dart';
+import '../../glass/glass.dart';
 import '../profile/profile_screen.dart'
     show ProfileEmptyBox, ProfileWatchHistoryRow;
 
@@ -69,7 +70,7 @@ class _LibraryTabs extends StatelessWidget {
   }
 }
 
-AppBar _appBar(String title, {List<Widget>? actions}) => AppBar(
+PreferredSizeWidget _appBar(String title, {List<Widget>? actions}) => GlassAppBar(
       backgroundColor: AppColors.backgroundDark,
       foregroundColor: AppColors.textWhite,
       surfaceTintColor: Colors.transparent,
@@ -141,7 +142,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
 
     final controller = ref.read(profileControllerProvider);
 
-    return Scaffold(
+    return GlassScaffold(
       backgroundColor: AppColors.backgroundDark,
       appBar: _appBar(
         'Riwayat',
@@ -244,7 +245,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
       if (ok) await controller.removeFavorite(fav.id);
     }
 
-    return Scaffold(
+    return GlassScaffold(
       backgroundColor: AppColors.backgroundDark,
       appBar: _appBar('Favorit'),
       body: Column(

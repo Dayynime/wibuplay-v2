@@ -10,6 +10,7 @@ import '../../../data/repository/clan_photo_uploader.dart';
 import '../../../data/repository/clan_repository.dart';
 import '../../../providers.dart';
 import 'clan_widgets.dart';
+import '../../glass/glass.dart';
 
 /// Biaya bikin clan (ZCoin), sama dengan Zenime (CREATE_CLAN_COST).
 const int createClanCost = 2500;
@@ -138,9 +139,9 @@ class _CreateClanScreenState extends ConsumerState<CreateClanScreen> {
     final canAfford = balance >= createClanCost;
     final canSubmit = _nameValid && _tagValid && canAfford && !_submitting && !_uploading;
 
-    return Scaffold(
+    return GlassScaffold(
       backgroundColor: AppColors.backgroundDark,
-      appBar: AppBar(
+      appBar: GlassAppBar(
         backgroundColor: AppColors.backgroundDark,
         foregroundColor: AppColors.textWhite,
         elevation: 0,

@@ -13,6 +13,7 @@ import '../../components/role_badges.dart';
 import 'comments_controller.dart';
 import '../profile/public_profile_screen.dart';
 import '../../components/avatar_frame.dart';
+import '../../glass/glass.dart';
 
 const Color _kPinnedGold = Color(0xFFE8A317);
 const Color _kSheetColor = AppColors.backgroundDarkSecondary;
@@ -187,7 +188,7 @@ Future<void> showCommentThreadSheet(
   // Inset sistem dibaca dari context layar (bukan context sheet) supaya
   // tinggi navigasi HP ikut dihitung; useSafeArea tidak menyentuh sisi bawah.
   final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
-  return showModalBottomSheet<void>(
+  return showGlassSheet<void>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,

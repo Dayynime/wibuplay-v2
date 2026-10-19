@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
+import '../glass/glass.dart';
 
 /// Port BottomTab + FloatingBottomBar (FloatingBottomBar.kt).
 class BottomTab {
@@ -35,29 +36,13 @@ class FloatingBottomBar extends StatelessWidget {
     final bottomInset = MediaQuery.paddingOf(context).bottom;
     return Padding(
       padding: EdgeInsets.fromLTRB(20, 12, 20, 12 + bottomInset),
-      child: Container(
+      child: GlassSurface(
+        borderRadius: AppShapes.pill,
+        blur: GlassBlur.thick,
+        shadow: true,
+        strength: 1.15,
+        solidColor: AppColors.surfaceDark,
         padding: const EdgeInsets.all(6),
-        decoration: BoxDecoration(
-          borderRadius: AppShapes.pill,
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              AppColors.surfaceDark.withValues(alpha: 0.96),
-              const Color(0xF0080B10),
-            ],
-          ),
-          border: Border.all(
-            color: AppColors.surfaceElevated.withValues(alpha: 0.6),
-          ),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x88000000),
-              blurRadius: 24,
-              offset: Offset(0, 8),
-            ),
-          ],
-        ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [

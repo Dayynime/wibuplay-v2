@@ -22,7 +22,7 @@ TextStyle _ts(FontWeight w, double size, double lineHeight, double spacing, Colo
 }
 
 /// Port Theme.kt + Type.kt. Zenime (Flutter) hanya punya tema gelap.
-ThemeData buildAppTheme() {
+ThemeData buildAppTheme({bool glass = true}) {
   const scheme = ColorScheme.dark(
     primary: AppColors.accentViolet,
     onPrimary: AppColors.textWhite,
@@ -66,5 +66,38 @@ ThemeData buildAppTheme() {
     scaffoldBackgroundColor: AppColors.backgroundDark,
     canvasColor: AppColors.backgroundDark,
     textTheme: textTheme,
+    bottomSheetTheme: const BottomSheetThemeData(
+      backgroundColor: Colors.transparent,
+      modalBackgroundColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+    ),
+    dialogTheme: DialogThemeData(
+      backgroundColor: AppColors.surfaceDark.withValues(alpha: glass ? 0.80 : 1),
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(24),
+        side: BorderSide(color: Colors.white.withValues(alpha: glass ? 0.12 : 0)),
+      ),
+    ),
+    popupMenuTheme: PopupMenuThemeData(
+      color: AppColors.surfaceDark.withValues(alpha: glass ? 0.90 : 1),
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Colors.white.withValues(alpha: glass ? 0.10 : 0)),
+      ),
+    ),
+    snackBarTheme: SnackBarThemeData(
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: AppColors.surfaceElevated.withValues(alpha: glass ? 0.88 : 1),
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Colors.white.withValues(alpha: glass ? 0.10 : 0)),
+      ),
+    ),
   );
 }

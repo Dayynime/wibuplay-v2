@@ -10,6 +10,7 @@ import '../../../data/models/comic_models.dart';
 import '../../components/common_components.dart';
 import 'comic_detail_controller.dart';
 import 'comic_widgets.dart';
+import '../../glass/glass.dart';
 
 const Color _starYellow = Color(0xFFFFB300);
 
@@ -60,7 +61,7 @@ class ComicDetailScreen extends ConsumerWidget {
       );
     }
 
-    return Scaffold(
+    return GlassScaffold(
       backgroundColor: AppColors.backgroundDark,
       // Body Scaffold dikasih constraint LONGGAR. Stack yang isinya cuma
       // Positioned + satu anak biasa (SafeArea) mengecil seukuran anak itu,

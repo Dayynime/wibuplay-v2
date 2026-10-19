@@ -33,6 +33,7 @@ import 'profile_controller.dart';
 import '../../components/avatar_frame.dart';
 import '../../components/join_date_stat.dart';
 import '../../../data/models/avatar_frame_models.dart';
+import '../../glass/glass.dart';
 
 /// Profil Saya ala Zenime: banner full-bleed menyatu dengan avatar, identitas
 /// + badge (level, clan, role) di bawah avatar, stat row 4 kolom, tombol pill
@@ -1246,7 +1247,7 @@ Future<void> showEditProfileSheet(
   required String? fallbackAvatar,
   required bool premium,
 }) {
-  return showModalBottomSheet<void>(
+  return showGlassSheet<void>(
     context: context,
     useRootNavigator: true,
     isScrollControlled: true,

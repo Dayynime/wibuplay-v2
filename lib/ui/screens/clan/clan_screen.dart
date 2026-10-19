@@ -14,6 +14,7 @@ import 'clan_chat_screen.dart';
 import 'clan_manage_screen.dart';
 import 'clan_widgets.dart';
 import '../profile/public_profile_screen.dart';
+import '../../glass/glass.dart';
 
 String _thousands(int v) {
   final s = v.abs().toString();
@@ -142,9 +143,9 @@ class _ClanScreenState extends ConsumerState<ClanScreen> {
   @override
   Widget build(BuildContext context) {
     final detail = ref.watch(clanDetailProvider(widget.clanId));
-    return Scaffold(
+    return GlassScaffold(
       backgroundColor: AppColors.backgroundDark,
-      appBar: AppBar(
+      appBar: GlassAppBar(
         backgroundColor: AppColors.backgroundDark,
         foregroundColor: AppColors.textWhite,
         elevation: 0,

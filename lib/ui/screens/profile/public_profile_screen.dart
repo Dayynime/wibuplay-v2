@@ -22,6 +22,7 @@ import '../xp/xp_leaderboard_screen.dart';
 import 'profile_controller.dart';
 import 'profile_screen_seed.dart';
 import 'profile_screen.dart';
+import '../../glass/glass.dart';
 
 /// Buka profil publik user lain (dari Chat Global, Chat Teman, layar Teman).
 /// Port rute `profile/{targetUid}` di Zenime.
@@ -140,7 +141,7 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
     final contentFailed =
         !_isMe && ref.watch(publicProfileContentProvider(uid)).hasError;
 
-    return Scaffold(
+    return GlassScaffold(
       backgroundColor: AppColors.backgroundDark,
       body: Stack(
         children: [

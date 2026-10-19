@@ -9,6 +9,7 @@ import '../../components/cards.dart';
 import '../../components/common_components.dart';
 import '../../components/shimmer.dart';
 import 'explore_controller.dart';
+import '../../glass/glass.dart';
 
 /// Port ExploreScreen.kt.
 class ExploreScreen extends ConsumerStatefulWidget {
@@ -55,7 +56,7 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
 
   void _openFilterSheet() {
     final maxHeight = MediaQuery.of(context).size.height * 0.88;
-    showModalBottomSheet<void>(
+    showGlassSheet<void>(
       context: context,
       backgroundColor: AppColors.surfaceDark,
       isScrollControlled: true,

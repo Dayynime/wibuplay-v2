@@ -8,6 +8,7 @@ import '../../../data/comic/comic_source.dart';
 import '../../../data/models/comic_models.dart';
 import 'comic_controller.dart';
 import 'comic_widgets.dart';
+import '../../glass/glass.dart';
 
 /// Port ComicScreen.kt: tab "Komik" di bottom bar. Pemilih sumber
 /// (Dayynime-v1 / v2), tab per sumber, cari, filter genre, grid dengan
@@ -77,7 +78,7 @@ class _ComicScreenState extends ConsumerState<ComicScreen> {
       );
     }
 
-    return Scaffold(
+    return GlassScaffold(
       backgroundColor: AppColors.backgroundDark,
       body: SafeArea(
         bottom: false,

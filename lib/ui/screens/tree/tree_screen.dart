@@ -16,6 +16,7 @@ import '../../components/friend_avatar.dart';
 import '../store/coin_screen.dart';
 import '../store/premium_screen.dart';
 import 'tree_scene.dart';
+import '../../glass/glass.dart';
 
 const Color _kGold = Color(0xFFFFC53D);
 const Color _kLeaf = Color(0xFF22C55E);
@@ -405,7 +406,7 @@ class _TreeScreenState extends ConsumerState<TreeScreen> with SingleTickerProvid
     if (tree == null || tree.isMaxLevel || _upgrading) return;
     final uid = _uid;
     final balance = _balance ?? (uid == null ? null : ref.read(coinBalanceProvider(uid)).valueOrNull);
-    final ok = await showModalBottomSheet<bool>(
+    final ok = await showGlassSheet<bool>(
       context: context,
       backgroundColor: _kSheet,
       shape: const RoundedRectangleBorder(
@@ -438,7 +439,7 @@ class _TreeScreenState extends ConsumerState<TreeScreen> with SingleTickerProvid
   Future<void> _openWater() async {
     final uid = _uid;
     if (uid == null || _tree == null) return;
-    await showModalBottomSheet<void>(
+    await showGlassSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: _kSheet,
@@ -453,7 +454,7 @@ class _TreeScreenState extends ConsumerState<TreeScreen> with SingleTickerProvid
   void _openInfo() {
     final tree = _tree;
     if (tree == null) return;
-    showModalBottomSheet<void>(
+    showGlassSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: _kSheet,

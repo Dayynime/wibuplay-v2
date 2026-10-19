@@ -6,6 +6,7 @@ import '../../../data/models/support_models.dart';
 import '../../../providers.dart';
 import '../../components/game_badges.dart';
 import '../profile/public_profile_screen.dart' show openPublicProfile;
+import '../../glass/glass.dart';
 
 const Color _teal = Color(0xFF2DD4BF);
 const Color _gold = Color(0xFFFFC107);
@@ -31,9 +32,9 @@ class TopGiverScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final async = ref.watch(topGiversProvider);
-    return Scaffold(
+    return GlassScaffold(
       backgroundColor: AppColors.backgroundDark,
-      appBar: AppBar(
+      appBar: GlassAppBar(
         backgroundColor: AppColors.backgroundDark,
         foregroundColor: AppColors.textWhite,
         surfaceTintColor: Colors.transparent,

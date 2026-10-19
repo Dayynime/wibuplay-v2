@@ -9,11 +9,12 @@ import '../../components/friend_avatar.dart';
 import '../../components/game_badges.dart';
 import '../../components/net_image.dart';
 import '../../components/role_badges.dart';
+import '../../glass/glass.dart';
 
 /// Profil ringkas user lain (dibuka dari Chat Global, Chat Teman, dan layar
 /// Teman) lengkap dengan tombol Tambah Teman, mengikuti alur Zenime.
 Future<void> showUserProfileSheet(BuildContext context, String uid) {
-  return showModalBottomSheet<void>(
+  return showGlassSheet<void>(
     context: context,
     useRootNavigator: true,
     isScrollControlled: true,

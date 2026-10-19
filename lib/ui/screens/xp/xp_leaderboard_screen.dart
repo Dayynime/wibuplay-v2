@@ -11,6 +11,7 @@ import '../../../providers.dart';
 import '../../components/game_badges.dart';
 import '../../components/role_badges.dart';
 import '../profile/public_profile_screen.dart';
+import '../../glass/glass.dart';
 
 /// Leaderboard XP: podium top-3 futuristik + daftar peringkat, lengkap dengan
 /// badge clan & level (setara tampilan Zenime). XP yang tampil adalah XP nonton
@@ -23,9 +24,9 @@ class XpLeaderboardScreen extends ConsumerWidget {
     final board = ref.watch(xpLeaderboardProvider);
     final myUid = ref.watch(authUserProvider).valueOrNull?.uid;
 
-    return Scaffold(
+    return GlassScaffold(
       backgroundColor: AppColors.backgroundDark,
-      appBar: AppBar(
+      appBar: GlassAppBar(
         backgroundColor: AppColors.backgroundDark,
         foregroundColor: AppColors.textWhite,
         elevation: 0,
