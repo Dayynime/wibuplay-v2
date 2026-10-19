@@ -28,7 +28,7 @@ import 'chat_controller.dart';
 import '../../components/avatar_frame.dart';
 import '../../glass/glass.dart';
 
-Color? _parseHex(String? hex) {
+Color? parseChatHex(String? hex) {
   if (hex == null) return null;
   var h = hex.trim().replaceFirst('#', '');
   if (h.length == 6) h = 'FF$h';
@@ -398,11 +398,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       itemCount: msgs.length,
       itemBuilder: (context, i) {
         final m = msgs[msgs.length - 1 - i];
-        final bubble = _MessageBubble(
+        final bubble = ChatMessageBubble(
           key: ValueKey(m.id),
           message: m,
           mine: m.firebaseUid == s.myUid,
-          nameColor: _parseHex(s.usernameColors[m.firebaseUid]),
+          nameColor: parseChatHex(s.usernameColors[m.firebaseUid]),
           userNumber: s.userNumbers[m.firebaseUid],
           level: s.levels[m.firebaseUid],
           clanTag: s.clanTags[m.firebaseUid],
@@ -423,7 +423,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               : () => openPublicProfile(context, m.firebaseUid),
         );
         if (!_live.contains(m.id)) return bubble;
-        return _EntryAnimation(
+        return ChatEntryAnimation(
           key: ValueKey('entry_${m.id}'),
           animate: !_played.contains(m.id),
           fromRight: m.firebaseUid == s.myUid,
@@ -565,8 +565,8 @@ double _bubbleWidth(BuildContext context) {
   return available < _kBubbleMaxWidth ? available : _kBubbleMaxWidth;
 }
 
-class _MessageBubble extends StatelessWidget {
-  const _MessageBubble({
+class ChatMessageBubble extends StatelessWidget {
+  const ChatMessageBubble({
     super.key,
     required this.message,
     required this.mine,
@@ -838,8 +838,8 @@ class _FooterAction extends StatelessWidget {
 /// Animasi pesan baru masuk: geser dari samping (kanan untuk pesan sendiri,
 /// kiri untuk pesan orang lain) + muncul perlahan + tinggi membuka dari
 /// bawah, jadi pesan lama naik dengan halus, tidak melompat.
-class _EntryAnimation extends StatefulWidget {
-  const _EntryAnimation({
+class ChatEntryAnimation extends StatefulWidget {
+  const ChatEntryAnimation({
     super.key,
     required this.child,
     required this.animate,
@@ -853,10 +853,10 @@ class _EntryAnimation extends StatefulWidget {
   final VoidCallback onPlayed;
 
   @override
-  State<_EntryAnimation> createState() => _EntryAnimationState();
+  State<ChatEntryAnimation> createState() => _ChatEntryAnimationState();
 }
 
-class _EntryAnimationState extends State<_EntryAnimation>
+class _ChatEntryAnimationState extends State<ChatEntryAnimation>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
   late final CurvedAnimation _curve;
@@ -1200,7 +1200,7 @@ class _ChatProfileDialogState extends ConsumerState<_ChatProfileDialog> {
                         width: 32,
                         height: 32,
                         decoration: BoxDecoration(
-                          color: _parseHex(hex),
+                          color: parseChatHex(hex),
                           shape: BoxShape.circle,
                           border: Border.all(
                             color: _color == hex ? Colors.white : const Color(0x33FFFFFF),

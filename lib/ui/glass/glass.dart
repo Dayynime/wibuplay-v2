@@ -58,7 +58,7 @@ class GlassSettings extends ChangeNotifier {
 
   static Future<GlassSettings> open() async {
     final prefs = await SharedPreferences.getInstance();
-    return GlassSettings._(prefs, prefs.getBool(_key) ?? true);
+    return GlassSettings._(prefs, prefs.getBool(_key) ?? false);
   }
 
   Future<void> setEnabled(bool value) async {

@@ -22,7 +22,7 @@ TextStyle _ts(FontWeight w, double size, double lineHeight, double spacing, Colo
 }
 
 /// Port Theme.kt + Type.kt. Zenime (Flutter) hanya punya tema gelap.
-ThemeData buildAppTheme({bool glass = true}) {
+ThemeData buildAppTheme({bool glass = false}) {
   const scheme = ColorScheme.dark(
     primary: AppColors.accentViolet,
     onPrimary: AppColors.textWhite,

@@ -3,11 +3,15 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../data/models/chat_models.dart';
 import '../../../data/models/clan_chat_models.dart';
 import '../../../data/models/clan_models.dart';
+import '../../../data/repository/safety_repository.dart' show ReportChannel;
 import '../../../providers.dart';
-import '../../components/game_badges.dart';
+import '../../glass/glass.dart';
+import '../chat/chat_screen.dart' show ChatMessageBubble, ChatEntryAnimation, parseChatHex;
 import '../profile/public_profile_screen.dart';
+import '../safety/safety_actions.dart';
 import 'clan_chat_controller.dart';
 
 /// Chat internal clan sebagai layar penuh (tombol Chat Clan di halaman Clan).
@@ -19,9 +23,9 @@ class ClanChatScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return GlassScaffold(
       backgroundColor: AppColors.backgroundDark,
-      appBar: AppBar(
+      appBar: GlassAppBar(
         backgroundColor: AppColors.backgroundDark,
         foregroundColor: AppColors.textWhite,
         elevation: 0,
@@ -47,6 +51,10 @@ class ClanChatScreen extends StatelessWidget {
 /// Isi chat clan tanpa Scaffold/AppBar, dipakai layar penuh di atas dan tab
 /// "Clan" di Chat Global. Hanya member clan yang bisa memakainya (server yang
 /// memverifikasi keanggotaan, bukan sekadar tombol disembunyikan).
+///
+/// Tampilannya memakai komponen yang sama dengan Chat Global (bubble, input,
+/// bar balasan, animasi pesan masuk), jadi kalau Chat Global diubah, chat clan
+/// ikut berubah.
 class ClanChatPane extends ConsumerStatefulWidget {
   const ClanChatPane({super.key, required this.myRole});
 
@@ -59,6 +67,10 @@ class ClanChatPane extends ConsumerStatefulWidget {
 class _ClanChatPaneState extends ConsumerState<ClanChatPane> with WidgetsBindingObserver {
   final _input = TextEditingController();
   final _focus = FocusNode();
+
+  /// Pesan yang masuk setelah muatan awal (dianimasikan, seperti Chat Global).
+  final Set<int> _live = {};
+  final Set<int> _played = {};
 
   bool get _canModerate => ClanRoles.rank(widget.myRole) >= 1;
 
@@ -88,17 +100,73 @@ class _ClanChatPaneState extends ConsumerState<ClanChatPane> with WidgetsBinding
     if (ok) _input.clear();
   }
 
-  void _openActions(ClanMessage m, bool own) {
-    HapticFeedback.selectionClick();
-    showModalBottomSheet<void>(
+  String _nameOf(ClanChatState s, String uid) {
+    final n = s.profiles[uid]?.username ?? '';
+    return n.isEmpty ? 'Pengguna' : n;
+  }
+
+  /// Ubah pesan clan ke ChatMessage supaya bisa dirender bubble Chat Global.
+  ChatMessage _toChat(ClanChatState s, ClanMessage m, ClanMessage? replied) {
+    final p = s.profiles[m.firebaseUid];
+    final hasReply = m.replyToId != null;
+    return ChatMessage(
+      id: m.id,
+      firebaseUid: m.firebaseUid,
+      username: _nameOf(s, m.firebaseUid),
+      avatarUrl: p?.avatarUrl,
+      message: m.message,
+      createdAt: m.createdAt.toIso8601String(),
+      replyToId: m.replyToId,
+      replyToUsername:
+          hasReply ? (replied == null ? 'Pesan' : _nameOf(s, replied.firebaseUid)) : null,
+      replyToMessage: hasReply ? (replied?.message ?? 'Pesan tidak tersedia') : null,
+    );
+  }
+
+  Future<void> _requestDelete(ClanMessage m, bool own) async {
+    if (own) {
+      await ref.read(clanChatControllerProvider.notifier).delete(m);
+      return;
+    }
+    // Pesan orang lain wajib konfirmasi dulu (aksi moderasi).
+    final ok = await showDialog<bool>(
       context: context,
-      backgroundColor: AppColors.backgroundDarkSecondary,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surfaceDark,
+        title: const Text('Hapus pesan?', style: TextStyle(color: AppColors.textWhite)),
+        content: const Text(
+          'Pesan ini akan dihapus untuk semua anggota clan.',
+          style: TextStyle(color: AppColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Batal', style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Hapus', style: TextStyle(color: AppColors.errorRed)),
+          ),
+        ],
+      ),
+    );
+    if (ok == true && mounted) {
+      await ref.read(clanChatControllerProvider.notifier).delete(m);
+    }
+  }
+
+  void _openActions(ClanChatState s, ClanMessage m, bool own, String myUid) {
+    HapticFeedback.selectionClick();
+    final name = _nameOf(s, m.firebaseUid);
+    showGlassSheet<void>(
+      context: context,
+      backgroundColor: AppColors.surfaceDark,
       builder: (ctx) => SafeArea(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.reply, color: AppColors.textWhite),
+              leading: const Icon(Icons.reply, color: AppColors.accentViolet),
               title: const Text('Balas', style: TextStyle(color: AppColors.textWhite)),
               onTap: () {
                 Navigator.pop(ctx);
@@ -107,20 +175,46 @@ class _ClanChatPaneState extends ConsumerState<ClanChatPane> with WidgetsBinding
               },
             ),
             ListTile(
-              leading: const Icon(Icons.copy, color: AppColors.textWhite),
+              leading: const Icon(Icons.copy, color: AppColors.accentViolet),
               title: const Text('Salin', style: TextStyle(color: AppColors.textWhite)),
               onTap: () {
                 Navigator.pop(ctx);
                 Clipboard.setData(ClipboardData(text: m.message));
               },
             ),
-            if (own || _canModerate)
+            if (!own && myUid.isNotEmpty) ...[
               ListTile(
-                leading: const Icon(Icons.delete_outline, color: Color(0xFFFF8A98)),
-                title: const Text('Hapus', style: TextStyle(color: Color(0xFFFF8A98))),
+                leading: const Icon(Icons.flag_outlined, color: AppColors.errorRed),
+                title: const Text('Laporkan pesan', style: TextStyle(color: AppColors.textWhite)),
                 onTap: () {
                   Navigator.pop(ctx);
-                  ref.read(clanChatControllerProvider.notifier).delete(m);
+                  showReportSheet(
+                    context,
+                    ref,
+                    targetUid: m.firebaseUid,
+                    targetName: name,
+                    channel: ReportChannel.clan,
+                    messageId: m.id,
+                    messageText: m.message,
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.block, color: AppColors.errorRed),
+                title: Text('Blokir $name', style: const TextStyle(color: AppColors.textWhite)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  confirmBlockUser(context, ref, uid: m.firebaseUid, name: name);
+                },
+              ),
+            ],
+            if (own || _canModerate)
+              ListTile(
+                leading: const Icon(Icons.delete_outline, color: AppColors.errorRed),
+                title: const Text('Hapus', style: TextStyle(color: AppColors.errorRed)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _requestDelete(m, own);
                 },
               ),
           ],
@@ -133,16 +227,43 @@ class _ClanChatPaneState extends ConsumerState<ClanChatPane> with WidgetsBinding
   Widget build(BuildContext context) {
     final s = ref.watch(clanChatControllerProvider);
     final myUid = ref.watch(authUserProvider.select((a) => a.valueOrNull?.uid)) ?? '';
-    final byId = {for (final m in s.messages) m.id: m};
-    final reversed = s.messages.reversed.toList();
 
-    Widget body;
+    ref.listen<ClanChatState>(clanChatControllerProvider, (prev, next) {
+      // Muatan awal (isLoading true -> false) tidak dianimasikan.
+      if (prev == null || prev.isLoading) return;
+      final maxPrev = prev.messages.fold<int>(0, (a, m) => m.id > a ? m.id : a);
+      for (final m in next.messages) {
+        if (m.id > maxPrev) _live.add(m.id);
+      }
+    });
+
+    return Column(
+      children: [
+        Expanded(child: _buildList(s, myUid)),
+        if (s.replyTarget != null) _buildReplyBar(s),
+        if (s.sendError != null)
+          Container(
+            width: double.infinity,
+            color: AppColors.backgroundDarkSecondary,
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+            child: Text(
+              s.sendError!,
+              style: const TextStyle(color: AppColors.errorRed, fontSize: 11.5),
+            ),
+          ),
+        _buildInput(s),
+      ],
+    );
+  }
+
+  Widget _buildList(ClanChatState s, String myUid) {
     if (s.isLoading && s.messages.isEmpty) {
-      body = const Center(
+      return const Center(
         child: CircularProgressIndicator(color: AppColors.accentViolet, strokeWidth: 3),
       );
-    } else if (s.error != null && s.messages.isEmpty) {
-      body = Center(
+    }
+    if (s.error != null && s.messages.isEmpty) {
+      return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -155,271 +276,154 @@ class _ClanChatPaneState extends ConsumerState<ClanChatPane> with WidgetsBinding
           ],
         ),
       );
-    } else if (s.messages.isEmpty) {
-      body = const Center(
+    }
+    // Pesan dari pengguna yang diblokir disembunyikan (sama dengan Chat Global).
+    final blocked = ref.watch(blockedUsersProvider);
+    final byId = {for (final m in s.messages) m.id: m};
+    final msgs = blocked.isEmpty
+        ? s.messages
+        : s.messages.where((m) => !blocked.contains(m.firebaseUid)).toList();
+    if (msgs.isEmpty) {
+      return const Center(
         child: Text(
           'Belum ada pesan. Sapa clan kamu duluan!',
-          style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+          style: TextStyle(color: AppColors.textMuted, fontSize: 13),
         ),
       );
-    } else {
-      body = ListView.builder(
-        reverse: true,
-        padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-        itemCount: reversed.length,
-        itemBuilder: (context, i) {
-          final m = reversed[i];
-          final own = m.firebaseUid == myUid;
-          // reversed: elemen sebelumnya di layar = index i + 1
-          final older = i + 1 < reversed.length ? reversed[i + 1] : null;
-          final showHeader = older == null || older.firebaseUid != m.firebaseUid;
-          final p = s.profiles[m.firebaseUid];
-          final replied = m.replyToId == null ? null : byId[m.replyToId];
-          return _Bubble(
-            key: ValueKey('cm-${m.id}'),
-            message: m,
-            own: own,
-            showHeader: showHeader,
-            username: (p?.username ?? '').isEmpty ? 'Pengguna' : p!.username,
-            avatarUrl: p?.avatarUrl,
-            replied: replied,
-            repliedName: replied == null
-                ? null
-                : ((s.profiles[replied.firebaseUid]?.username ?? '').isEmpty
-                    ? 'Pengguna'
-                    : s.profiles[replied.firebaseUid]!.username),
-            onLongPress: () => _openActions(m, own),
-            onAvatarTap: () => openPublicProfile(context, m.firebaseUid),
-          );
-        },
-      );
     }
+    // reverse: true -> pesan terbaru menempel di bawah dan list tetap di sana.
+    return ListView.builder(
+      reverse: true,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      itemCount: msgs.length,
+      itemBuilder: (context, i) {
+        final m = msgs[msgs.length - 1 - i];
+        final own = m.firebaseUid == myUid;
+        final p = s.profiles[m.firebaseUid];
+        final replied = m.replyToId == null ? null : byId[m.replyToId];
+        final bubble = ChatMessageBubble(
+          key: ValueKey('cm-${m.id}'),
+          message: _toChat(s, m, replied),
+          mine: own,
+          nameColor: parseChatHex(p?.usernameColor),
+          userNumber: p?.userNumber,
+          avatarUrl: p?.avatarUrl,
+          onLongPress: () => _openActions(s, m, own, myUid),
+          onReply: () {
+            ref.read(clanChatControllerProvider.notifier).setReplyTarget(m);
+            _focus.requestFocus();
+          },
+          onDelete: (own || _canModerate) ? () => _requestDelete(m, own) : null,
+          onProfileTap: own ? null : () => openPublicProfile(context, m.firebaseUid),
+        );
+        if (!_live.contains(m.id)) return bubble;
+        return ChatEntryAnimation(
+          key: ValueKey('entry_${m.id}'),
+          animate: !_played.contains(m.id),
+          fromRight: own,
+          onPlayed: () => _played.add(m.id),
+          child: bubble,
+        );
+      },
+    );
+  }
 
-    return Column(
-      children: [
-          Expanded(child: body),
-          if (s.replyTarget != null)
-            Container(
-              color: AppColors.backgroundDarkSecondary,
-              padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
-              child: Row(
-                children: [
-                  Container(width: 3, height: 30, color: AppColors.accentViolet),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'Membalas: ${s.replyTarget!.message}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () =>
-                        ref.read(clanChatControllerProvider.notifier).setReplyTarget(null),
-                    icon: const Icon(Icons.close, size: 18, color: AppColors.textSecondary),
-                  ),
-                ],
-              ),
-            ),
-          if (s.sendError != null)
-            Container(
-              width: double.infinity,
-              color: AppColors.backgroundDarkSecondary,
-              padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
-              child: Text(
-                s.sendError!,
-                style: const TextStyle(color: Color(0xFFFF6B6B), fontSize: 11.5),
-              ),
-            ),
-          Container(
-            color: AppColors.backgroundDarkSecondary,
-            padding: EdgeInsets.fromLTRB(
-              12,
-              8,
-              12,
-              8 + MediaQuery.viewPaddingOf(context).bottom,
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
+  Widget _buildReplyBar(ClanChatState s) {
+    final target = s.replyTarget!;
+    return Container(
+      color: AppColors.surfaceDark,
+      padding: const EdgeInsets.fromLTRB(14, 8, 6, 8),
+      child: Row(
+        children: [
+          Container(width: 3, height: 32, color: AppColors.accentViolet),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: TextField(
-                    controller: _input,
-                    focusNode: _focus,
-                    minLines: 1,
-                    maxLines: 4,
-                    maxLength: kClanChatMaxLength,
-                    inputFormatters: [LengthLimitingTextInputFormatter(kClanChatMaxLength)],
-                    textCapitalization: TextCapitalization.sentences,
-                    style: const TextStyle(color: AppColors.textWhite, fontSize: 14),
-                    decoration: InputDecoration(
-                      counterText: '',
-                      hintText: 'Tulis pesan...',
-                      hintStyle: const TextStyle(color: AppColors.textMuted),
-                      filled: true,
-                      fillColor: AppColors.surfaceDark,
-                      isDense: true,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(22),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
+                Text(
+                  'Membalas ${_nameOf(s, target.firebaseUid)}',
+                  style: const TextStyle(
+                    color: AppColors.accentVioletLight,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(width: 8),
-                SizedBox(
-                  width: 44,
-                  height: 44,
-                  child: IconButton.filled(
-                    style: IconButton.styleFrom(backgroundColor: AppColors.accentViolet),
-                    onPressed: s.isSending ? null : _send,
-                    icon: s.isSending
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                          )
-                        : const Icon(Icons.send_rounded, size: 20, color: Colors.white),
-                  ),
+                Text(
+                  target.message,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
                 ),
               ],
             ),
           ),
-      ],
+          IconButton(
+            icon: const Icon(Icons.close, size: 18, color: AppColors.textMuted),
+            onPressed: () =>
+                ref.read(clanChatControllerProvider.notifier).setReplyTarget(null),
+          ),
+        ],
+      ),
     );
   }
-}
 
-class _Bubble extends StatelessWidget {
-  const _Bubble({
-    super.key,
-    required this.message,
-    required this.own,
-    required this.showHeader,
-    required this.username,
-    required this.avatarUrl,
-    required this.replied,
-    required this.repliedName,
-    required this.onLongPress,
-    required this.onAvatarTap,
-  });
-
-  final ClanMessage message;
-  final bool own;
-  final bool showHeader;
-  final String username;
-  final String? avatarUrl;
-  final ClanMessage? replied;
-  final String? repliedName;
-  final VoidCallback onLongPress;
-  final VoidCallback onAvatarTap;
-
-  static String _hm(DateTime t) =>
-      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
-
-  @override
-  Widget build(BuildContext context) {
-    final maxW = MediaQuery.sizeOf(context).width * 0.74;
-    final bubble = GestureDetector(
-      onLongPress: onLongPress,
-      child: Container(
-        constraints: BoxConstraints(maxWidth: maxW),
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
-        decoration: BoxDecoration(
-          color: own ? AppColors.accentViolet : AppColors.surfaceDark,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
+  Widget _buildInput(ClanChatState s) {
+    return Container(
+      color: AppColors.backgroundDarkSecondary,
+      padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+      child: SafeArea(
+        top: false,
+        child: Row(
           children: [
-            if (!own && showHeader)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 3),
-                child: GestureDetector(
-                  onTap: onAvatarTap,
-                  child: Text(
-                    username,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: AppColors.accentVioletLight,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                    ),
+            Expanded(
+              child: TextField(
+                controller: _input,
+                focusNode: _focus,
+                maxLines: 4,
+                minLines: 1,
+                maxLength: kClanChatMaxLength,
+                textCapitalization: TextCapitalization.sentences,
+                style: const TextStyle(color: AppColors.textWhite, fontSize: 14),
+                cursorColor: AppColors.accentViolet,
+                decoration: InputDecoration(
+                  counterText: '',
+                  filled: true,
+                  fillColor: AppColors.surfaceDark,
+                  hintText: 'Tulis pesan...',
+                  hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 13),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(22),
+                    borderSide: BorderSide.none,
                   ),
                 ),
               ),
-            if (message.replyToId != null)
-              Container(
-                margin: const EdgeInsets.only(bottom: 6),
-                padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
-                decoration: const BoxDecoration(
-                  color: Color(0x26000000),
-                  border: Border(left: BorderSide(color: Colors.white54, width: 3)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      replied == null ? 'Pesan' : (repliedName ?? 'Pengguna'),
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    Text(
-                      replied?.message ?? 'Pesan tidak tersedia',
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Colors.white70, fontSize: 12),
-                    ),
-                  ],
-                ),
-              ),
-            Text(
-              message.message,
-              style: const TextStyle(color: AppColors.textWhite, fontSize: 14, height: 1.3),
             ),
-            const SizedBox(height: 2),
-            Align(
-              alignment: Alignment.centerRight,
-              child: Text(
-                _hm(message.createdAt),
-                style: const TextStyle(color: Colors.white54, fontSize: 10),
+            const SizedBox(width: 6),
+            SizedBox(
+              width: 46,
+              height: 46,
+              child: IconButton.filled(
+                onPressed: s.isSending ? null : _send,
+                style: IconButton.styleFrom(
+                  backgroundColor: AppColors.accentViolet,
+                  disabledBackgroundColor: AppColors.surfaceElevated,
+                ),
+                icon: s.isSending
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.textWhite,
+                        ),
+                      )
+                    : const Icon(Icons.send_rounded, size: 20, color: AppColors.textWhite),
               ),
             ),
           ],
         ),
-      ),
-    );
-
-    if (own) {
-      return Padding(
-        padding: EdgeInsets.only(top: showHeader ? 10 : 2),
-        child: Align(alignment: Alignment.centerRight, child: bubble),
-      );
-    }
-    return Padding(
-      padding: EdgeInsets.only(top: showHeader ? 10 : 2),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          SizedBox(
-            width: 34,
-            child: showHeader
-                ? GestureDetector(
-                    onTap: onAvatarTap,
-                    child: UserAvatar(username: username, url: avatarUrl, size: 30),
-                  )
-                : null,
-          ),
-          const SizedBox(width: 6),
-          Flexible(child: bubble),
-        ],
       ),
     );
   }
