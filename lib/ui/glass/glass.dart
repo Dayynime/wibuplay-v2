@@ -329,12 +329,16 @@ class GlassScaffold extends ConsumerWidget {
     this.body,
     this.floatingActionButton,
     this.backgroundColor,
+    this.resizeToAvoidBottomInset,
   });
 
   final PreferredSizeWidget? appBar;
   final Widget? body;
   final Widget? floatingActionButton;
   final Color? backgroundColor;
+
+  /// Diteruskan ke Scaffold (null = default Scaffold, yaitu true).
+  final bool? resizeToAvoidBottomInset;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -345,6 +349,7 @@ class GlassScaffold extends ConsumerWidget {
         appBar: appBar,
         body: body,
         floatingActionButton: floatingActionButton,
+        resizeToAvoidBottomInset: resizeToAvoidBottomInset,
       );
     }
     return Stack(
@@ -356,6 +361,7 @@ class GlassScaffold extends ConsumerWidget {
           appBar: appBar,
           body: body,
           floatingActionButton: floatingActionButton,
+          resizeToAvoidBottomInset: resizeToAvoidBottomInset,
         ),
       ],
     );

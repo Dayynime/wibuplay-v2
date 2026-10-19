@@ -22,6 +22,7 @@ import '../../components/swipe_to_reply.dart';
 import '../friends/friends_screen.dart';
 import '../profile/public_profile_screen.dart';
 import 'private_chat_controller.dart';
+import 'clan_chat_tab.dart';
 import 'private_chat_pane.dart';
 import 'chat_controller.dart';
 import '../../components/avatar_frame.dart';
@@ -54,7 +55,7 @@ class ChatScreen extends ConsumerStatefulWidget {
 class _ChatScreenState extends ConsumerState<ChatScreen> {
   final TextEditingController _input = TextEditingController();
 
-  /// 0 = Chat Global, 1 = Chat Teman (tab Teman ala Zenime).
+  /// 0 = Chat Global, 1 = Chat Teman (tab Teman ala Zenime), 2 = Chat Clan.
   int _tab = 0;
 
   /// Id pesan yang masuk SETELAH layar selesai memuat (kena animasi masuk).
@@ -278,7 +279,11 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         appBar: GlassAppBar(
           backgroundColor: AppColors.backgroundDark,
           elevation: 0,
-          title: Text(_tab == 0 ? 'Chat Global' : 'Chat Teman'),
+          title: Text(switch (_tab) {
+            0 => 'Chat Global',
+            1 => 'Chat Teman',
+            _ => 'Chat Clan',
+          }),
           actions: [
             if (_tab == 1)
               IconButton(
@@ -308,7 +313,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         _buildInput(s),
                       ],
                     )
-                  : PrivateChatPane(
+                  : _tab == 2
+                      ? const ClanChatTab()
+                      : PrivateChatPane(
                       myUid: s.myUid,
                       onFriendProfileClick: (uid) => openPublicProfile(context, uid),
                     ),
@@ -321,7 +328,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   /// Tab Global / Teman di bawah app bar (indikator pendek, gaya Zenime).
   Widget _buildChatTabs() {
-    const labels = ['Global', 'Teman'];
+    const labels = ['Global', 'Teman', 'Clan'];
     return Column(
       children: [
         Row(

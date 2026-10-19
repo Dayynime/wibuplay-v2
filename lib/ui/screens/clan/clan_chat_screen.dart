@@ -10,19 +10,53 @@ import '../../components/game_badges.dart';
 import '../profile/public_profile_screen.dart';
 import 'clan_chat_controller.dart';
 
-/// Chat internal clan. Hanya member clan yang bisa buka (server yang
-/// memverifikasi, bukan sekadar tombol disembunyikan).
-class ClanChatScreen extends ConsumerStatefulWidget {
+/// Chat internal clan sebagai layar penuh (tombol Chat Clan di halaman Clan).
+class ClanChatScreen extends StatelessWidget {
   const ClanChatScreen({super.key, required this.clanName, required this.myRole});
 
   final String clanName;
   final String myRole;
 
   @override
-  ConsumerState<ClanChatScreen> createState() => _ClanChatScreenState();
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppColors.backgroundDark,
+      appBar: AppBar(
+        backgroundColor: AppColors.backgroundDark,
+        foregroundColor: AppColors.textWhite,
+        elevation: 0,
+        titleSpacing: 0,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Chat Clan', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
+            Text(
+              clanName,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
+            ),
+          ],
+        ),
+      ),
+      body: ClanChatPane(myRole: myRole),
+    );
+  }
 }
 
-class _ClanChatScreenState extends ConsumerState<ClanChatScreen> with WidgetsBindingObserver {
+/// Isi chat clan tanpa Scaffold/AppBar, dipakai layar penuh di atas dan tab
+/// "Clan" di Chat Global. Hanya member clan yang bisa memakainya (server yang
+/// memverifikasi keanggotaan, bukan sekadar tombol disembunyikan).
+class ClanChatPane extends ConsumerStatefulWidget {
+  const ClanChatPane({super.key, required this.myRole});
+
+  final String myRole;
+
+  @override
+  ConsumerState<ClanChatPane> createState() => _ClanChatPaneState();
+}
+
+class _ClanChatPaneState extends ConsumerState<ClanChatPane> with WidgetsBindingObserver {
   final _input = TextEditingController();
   final _focus = FocusNode();
 
@@ -161,28 +195,8 @@ class _ClanChatScreenState extends ConsumerState<ClanChatScreen> with WidgetsBin
       );
     }
 
-    return Scaffold(
-      backgroundColor: AppColors.backgroundDark,
-      appBar: AppBar(
-        backgroundColor: AppColors.backgroundDark,
-        foregroundColor: AppColors.textWhite,
-        elevation: 0,
-        titleSpacing: 0,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Chat Clan', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 17)),
-            Text(
-              widget.clanName,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
-            ),
-          ],
-        ),
-      ),
-      body: Column(
-        children: [
+    return Column(
+      children: [
           Expanded(child: body),
           if (s.replyTarget != null)
             Container(
@@ -273,8 +287,7 @@ class _ClanChatScreenState extends ConsumerState<ClanChatScreen> with WidgetsBin
               ],
             ),
           ),
-        ],
-      ),
+      ],
     );
   }
 }
