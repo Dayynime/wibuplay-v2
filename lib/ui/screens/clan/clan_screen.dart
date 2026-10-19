@@ -10,6 +10,7 @@ import '../../components/game_badges.dart';
 import '../../components/role_badges.dart';
 import '../../app_routes.dart';
 import '../../components/hero_slides.dart' show heroGold;
+import 'clan_chat_screen.dart';
 import 'clan_manage_screen.dart';
 import 'clan_widgets.dart';
 import '../profile/public_profile_screen.dart';
@@ -228,6 +229,31 @@ class _ClanScreenState extends ConsumerState<ClanScreen> {
               ),
             ),
           ),
+          // Chat Clan: hanya tampil untuk member clan ini (server tetap
+          // memverifikasi keanggotaan di setiap request).
+          if (d.myRole != null)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                child: SizedBox(
+                  height: 46,
+                  child: FilledButton.icon(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.accentViolet,
+                      foregroundColor: Colors.white,
+                    ),
+                    onPressed: () => Navigator.of(context).push<void>(
+                      fadeRoute(ClanChatScreen(clanName: d.clan.name, myRole: d.myRole!)),
+                    ),
+                    icon: const Icon(Icons.forum_rounded, size: 20),
+                    label: const Text(
+                      'Chat Clan',
+                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.5),
+                    ),
+                  ),
+                ),
+              ),
+            ),
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),

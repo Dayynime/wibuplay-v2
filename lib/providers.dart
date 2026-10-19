@@ -17,6 +17,7 @@ import 'data/repository/anime_repository.dart';
 import 'data/repository/auth_repository.dart';
 import 'data/repository/chat_repository.dart';
 import 'data/repository/clan_repository.dart';
+import 'data/repository/clan_chat_repository.dart';
 import 'data/repository/public_profile_repository.dart';
 import 'data/repository/safety_repository.dart';
 import 'data/repository/comment_repository.dart';
@@ -610,6 +611,10 @@ final friendRepositoryProvider = Provider<FriendRepository>(
     ref.watch(supabaseDioProvider),
     ref.watch(chatRepositoryProvider),
   ),
+);
+
+final clanChatRepositoryProvider = Provider<ClanChatRepository>(
+  (ref) => ClanChatRepository(ref.watch(supabaseDioProvider)),
 );
 
 final privateChatRepositoryProvider = Provider<PrivateChatRepository>(
