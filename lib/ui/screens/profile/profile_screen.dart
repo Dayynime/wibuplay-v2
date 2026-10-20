@@ -21,6 +21,7 @@ import '../../components/game_badges.dart';
 import '../../components/net_image.dart';
 import '../../components/role_badges.dart';
 import '../../components/top_giver_badge.dart';
+import '../../components/top_xp_badge.dart';
 import '../auth/login_screen.dart';
 import '../clan/clan_browse_screen.dart';
 import 'image_crop_screen.dart';
@@ -225,6 +226,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   if (_has(clanTag)) ClanRainbowBadge(text: clanTag!, height: 20),
                   if (uid.isNotEmpty) RoleBadge(firebaseUid: uid, height: 20),
                   if (uid.isNotEmpty) TopGiverBadge(firebaseUid: uid, height: 20),
+                  if (uid.isNotEmpty) TopXpBadge(firebaseUid: uid, height: 20),
                 ],
               ),
               const SizedBox(height: 18),

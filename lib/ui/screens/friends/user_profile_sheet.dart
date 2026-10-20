@@ -10,6 +10,7 @@ import '../../components/game_badges.dart';
 import '../../components/net_image.dart';
 import '../../components/role_badges.dart';
 import '../../components/top_giver_badge.dart';
+import '../../components/top_xp_badge.dart';
 import '../../glass/glass.dart';
 
 /// Profil ringkas user lain (dibuka dari Chat Global, Chat Teman, dan layar
@@ -185,6 +186,7 @@ class _UserProfileSheetState extends ConsumerState<UserProfileSheet> {
               if (clanTag != null && clanTag.isNotEmpty) ClanRainbowBadge(text: clanTag, height: 20),
               RoleBadge(firebaseUid: uid, height: 20),
               TopGiverBadge(firebaseUid: uid, height: 20),
+              TopXpBadge(firebaseUid: uid, height: 20),
             ],
           ),
           const SizedBox(height: 18),

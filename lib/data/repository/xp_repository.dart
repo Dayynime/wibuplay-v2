@@ -154,6 +154,29 @@ class XpRepository {
     return list;
   }
 
+  /// Peringkat XP bulan ini (uid -> posisi, mulai 1) buat tag "TOP XP".
+  /// Ringan: cuma firebase_uid + xp dari user_xp_monthly, tanpa profil /
+  /// Premium / level. Melempar kalau gagal.
+  Future<Map<String, int>> getTopXpRanks({int limit = 10}) async {
+    final res = await _dio.get<dynamic>(
+      'rest/v1/user_xp_monthly',
+      queryParameters: {
+        'period': 'eq.${currentPeriod()}',
+        'select': 'firebase_uid,xp',
+        'order': 'xp.desc',
+        'limit': limit,
+      },
+    );
+    final out = <String, int>{};
+    var rank = 1;
+    for (final row in _rows(res.data)) {
+      final uid = (row['firebase_uid'] as String?) ?? '';
+      if (uid.isEmpty) continue;
+      out[uid] = rank++;
+    }
+    return out;
+  }
+
   /// Top Support (donatur) lewat Edge Function
   /// `zenime-top-supporters`, urut nominal terbesar. Melempar kalau gagal.
   Future<List<TopSupporter>> getTopSupporters() async {

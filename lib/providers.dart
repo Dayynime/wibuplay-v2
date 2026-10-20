@@ -154,6 +154,25 @@ final topGiverRankProvider = Provider.family<int?, String>((ref, uid) {
   return null;
 });
 
+/// Jumlah peringkat teratas XP bulanan yang dapat tag "TOP XP".
+const int kTopXpBadgeLimit = 10;
+
+/// Peta uid -> peringkat XP bulan [period] (format "yyyy-MM"). Di-key per
+/// periode supaya otomatis refetch begitu ganti bulan. Gagal = tidak ada tag.
+final topXpRanksProvider = FutureProvider.family<Map<String, int>, String>((ref, period) async {
+  try {
+    return await ref.watch(xpRepositoryProvider).getTopXpRanks(limit: kTopXpBadgeLimit);
+  } catch (_) {
+    return const <String, int>{};
+  }
+});
+
+/// Peringkat XP bulanan satu user (null = tidak masuk top). Dipakai tag "TOP XP".
+final topXpRankProvider = Provider.family<int?, String>((ref, uid) {
+  final data = ref.watch(topXpRanksProvider(XpRepository.currentPeriod())).valueOrNull;
+  return data?[uid];
+});
+
 /// Pohon ZCoin (mini game idle, Edge Function `tree-game`).
 final treeRepositoryProvider = Provider<TreeRepository>(
   (ref) => TreeRepository(ref.watch(supabaseDioProvider)),
