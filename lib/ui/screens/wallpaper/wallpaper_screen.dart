@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../components/rarity_chip.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/account_models.dart' show formatZCoin;
 import '../../../data/models/wallpaper_models.dart';
@@ -2309,18 +2310,7 @@ class _RarityPill extends StatelessWidget {
   final WallpaperRarity rarity;
 
   @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-        decoration: BoxDecoration(
-          color: rarity.gradient == null ? rarity.color : null,
-          gradient: rarity.gradient,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Text(
-          rarity.label,
-          style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w800),
-        ),
-      );
+  Widget build(BuildContext context) => RarityChip(rarity: rarity);
 }
 
 class _Tabs extends StatelessWidget {

@@ -11,7 +11,10 @@ enum WallpaperRarity {
   rare,
   epic,
   legendary,
-  mythic;
+  mythic,
+
+  /// Di atas Mythic: tag "Limited" silver mengkilap (chip pakai [RarityChip]).
+  limited;
 
   static WallpaperRarity from(Object? v) =>
       WallpaperRarity.values.firstWhere((e) => e.name == v, orElse: () => WallpaperRarity.common);
@@ -22,6 +25,7 @@ enum WallpaperRarity {
         WallpaperRarity.epic => 'Epic',
         WallpaperRarity.legendary => 'Legendary',
         WallpaperRarity.mythic => 'Mythic',
+        WallpaperRarity.limited => 'Limited',
       };
 
   Color get color => switch (this) {
@@ -30,12 +34,26 @@ enum WallpaperRarity {
         WallpaperRarity.epic => const Color(0xFFA855F7),
         WallpaperRarity.legendary => const Color(0xFFF59E0B),
         WallpaperRarity.mythic => const Color(0xFFFF2E63),
+        WallpaperRarity.limited => const Color(0xFFD7DCE4),
       };
 
-  /// Gradient khusus Mythic (rarity tertinggi); rarity lain warna polos.
-  Gradient? get gradient => this == WallpaperRarity.mythic
-      ? const LinearGradient(colors: [Color(0xFFFF2E63), Color(0xFFB026FF)])
-      : null;
+  /// Gradient khusus Mythic & Limited; rarity lain warna polos.
+  Gradient? get gradient => switch (this) {
+        WallpaperRarity.mythic => const LinearGradient(colors: [Color(0xFFFF2E63), Color(0xFFB026FF)]),
+        WallpaperRarity.limited => const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF8D95A3), Color(0xFFF5F7FA), Color(0xFFB4BCC8), Color(0xFFFFFFFF), Color(0xFF9AA3B1)],
+            stops: [0, 0.3, 0.55, 0.75, 1],
+          ),
+        _ => null,
+      };
+
+  /// Rarity silver mengkilap (chip dianimasikan kilau).
+  bool get isShiny => this == WallpaperRarity.limited;
+
+  /// Warna teks di atas chip rarity (silver terlalu terang buat teks putih).
+  Color get onColor => isShiny ? const Color(0xFF1C2230) : Colors.white;
 }
 
 // Nama file selalu uuid buatan server. URL HANYA dirakit dari nama yang lolos

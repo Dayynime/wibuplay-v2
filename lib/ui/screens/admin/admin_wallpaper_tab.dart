@@ -27,6 +27,7 @@ const Map<WallpaperRarity, int> _defaultWeight = {
   WallpaperRarity.epic: 80,
   WallpaperRarity.legendary: 20,
   WallpaperRarity.mythic: 5,
+  WallpaperRarity.limited: 1,
 };
 
 const List<(String, String)> _filters = [
@@ -689,7 +690,7 @@ class _ReviewDialogState extends State<_ReviewDialog> {
                     selectedColor: r.color,
                     backgroundColor: AppColors.surfaceDark,
                     labelStyle: TextStyle(
-                      color: _rarity == r ? Colors.white : r.color,
+                      color: _rarity == r ? r.onColor : r.color,
                       fontWeight: FontWeight.w700,
                       fontSize: 12,
                     ),

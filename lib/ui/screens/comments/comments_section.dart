@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../components/rarity_chip.dart';
 import '../../../data/repository/safety_repository.dart' show ReportChannel;
 import '../safety/safety_actions.dart';
 import '../../../core/theme/app_colors.dart';
@@ -951,22 +952,7 @@ class CommentWallpaperFrame extends StatelessWidget {
               right: 12,
               bottom: 10,
               child: IgnorePointer(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: rarity.gradient == null ? rarity.color.withValues(alpha: 0.9) : null,
-                    gradient: rarity.gradient,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    rarity.label,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
+                child: RarityChip(rarity: rarity, opacity: 0.9),
               ),
             ),
           ],
