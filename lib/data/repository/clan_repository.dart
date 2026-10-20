@@ -275,6 +275,19 @@ class ClanRepository {
         );
       });
 
+  /// Bubarkan clan permanen (khusus leader). Otorisasi sepenuhnya di server
+  /// (Edge Function `zenime-clan-delete`): token Firebase diverifikasi dan
+  /// role leader dicek di database. [confirmTag] dicocokkan server dengan tag
+  /// clan sebagai pengaman tambahan.
+  Future<void> deleteClan(String clanId, String confirmTag) =>
+      _guard('Gagal membubarkan clan', () async {
+        await _dio.post<dynamic>(
+          'functions/v1/zenime-clan-delete',
+          data: {'clan_id': clanId, 'confirm_tag': confirmTag},
+          options: Options(headers: {'Authorization': await _authHeader()}),
+        );
+      });
+
   /// Daftar request join yang menunggu; cuma bisa dibaca officer ke atas
   /// (dicek di Edge Function).
   Future<List<PendingJoinRequestDisplay>> getPendingJoinRequests(String clanId) =>

@@ -89,9 +89,18 @@ class _ClanScreenState extends ConsumerState<ClanScreen> {
   }
 
   Future<void> _openManage(ClanDetailData d) async {
-    await Navigator.of(context).push<void>(
+    final deleted = await Navigator.of(context).push<bool>(
       fadeRoute(ClanManageScreen(clanId: widget.clanId, myRole: d.myRole ?? ClanRoles.member)),
     );
+    if (deleted == true) {
+      // Clan sudah dibubarkan leader: jangan refetch clan yang sudah tidak ada.
+      ref.invalidate(allClansProvider);
+      ref.invalidate(myClanMembershipProvider);
+      if (!mounted) return;
+      _toast('Clan berhasil dibubarkan');
+      Navigator.of(context).maybePop();
+      return;
+    }
     // Balik dari Kelola Clan: member/kuota mungkin berubah.
     _refreshAll();
   }

@@ -55,6 +55,14 @@ class _ClanManageScreenState extends ConsumerState<ClanManageScreen> {
     ref.invalidate(allClansProvider);
   }
 
+  /// Clan sudah dibubarkan: tutup Kelola Clan dan kasih tahu layar clan lewat
+  /// hasil pop (true) supaya ikut menutup diri.
+  void _onClanDeleted() {
+    ref.invalidate(allClansProvider);
+    ref.invalidate(myClanMembershipProvider);
+    if (mounted) Navigator.of(context).pop(true);
+  }
+
   Future<void> _respond(PendingJoinRequestDisplay r, bool approve) async {
     setState(() => _busyId = r.requestId);
     try {
@@ -118,6 +126,7 @@ class _ClanManageScreenState extends ConsumerState<ClanManageScreen> {
                         key: ValueKey(clan.id),
                         clan: clan,
                         onChanged: _refreshClan,
+                        onDeleted: _onClanDeleted,
                       ),
           ),
         ],
@@ -330,10 +339,16 @@ class _RoundAction extends StatelessWidget {
 // ---------------------------------------------------------------- pengaturan
 
 class _SettingsTab extends ConsumerStatefulWidget {
-  const _SettingsTab({super.key, required this.clan, required this.onChanged});
+  const _SettingsTab({
+    super.key,
+    required this.clan,
+    required this.onChanged,
+    required this.onDeleted,
+  });
 
   final Clan clan;
   final VoidCallback onChanged;
+  final VoidCallback onDeleted;
 
   @override
   ConsumerState<_SettingsTab> createState() => _SettingsTabState();
@@ -352,6 +367,9 @@ class _SettingsTabState extends ConsumerState<_SettingsTab> {
   bool _buying = false;
   String? _slotsFeedback;
   bool _slotsError = false;
+
+  bool _deleting = false;
+  String? _deleteError;
 
   @override
   void dispose() {
@@ -485,6 +503,82 @@ class _SettingsTabState extends ConsumerState<_SettingsTab> {
       }
     } finally {
       if (mounted) setState(() => _buying = false);
+    }
+  }
+
+  /// Minta leader mengetik tag clan dulu; true = boleh lanjut hapus.
+  Future<bool> _confirmDelete() async {
+    final clan = widget.clan;
+    final ctrl = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setD) {
+          final match = ctrl.text.trim().toUpperCase() == clan.tag.toUpperCase();
+          return AlertDialog(
+            backgroundColor: AppColors.surfaceDark,
+            title: const Text('Bubarkan clan?', style: TextStyle(fontWeight: FontWeight.w800)),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Clan "${clan.name}" akan dihapus PERMANEN beserta seluruh member, '
+                  'chat, dan saldo donasinya (${_thousands(clan.treasuryBalance)} ZCoin, tidak dikembalikan). '
+                  'Aksi ini tidak bisa dibatalkan.',
+                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  'Ketik ${clan.tag} untuk konfirmasi',
+                  style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+                ),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: ctrl,
+                  autofocus: true,
+                  textCapitalization: TextCapitalization.characters,
+                  style: const TextStyle(color: Colors.white),
+                  cursorColor: AppColors.accentViolet,
+                  decoration: _decoration('Tag clan'),
+                  onChanged: (_) => setD(() {}),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Batal')),
+              TextButton(
+                onPressed: match ? () => Navigator.pop(ctx, true) : null,
+                child: Text(
+                  'Bubarkan',
+                  style: TextStyle(color: match ? const Color(0xFFFF8A98) : AppColors.textMuted),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    ctrl.dispose();
+    return ok == true;
+  }
+
+  Future<void> _deleteClan() async {
+    if (_deleting) return;
+    if (!await _confirmDelete()) return;
+    setState(() {
+      _deleting = true;
+      _deleteError = null;
+    });
+    try {
+      await ref.read(clanRepositoryProvider).deleteClan(widget.clan.id, widget.clan.tag);
+      if (!mounted) return;
+      widget.onDeleted();
+      return;
+    } on ClanException catch (e) {
+      if (mounted) setState(() => _deleteError = e.message);
+    } finally {
+      if (mounted) setState(() => _deleting = false);
     }
   }
 
@@ -661,6 +755,68 @@ class _SettingsTabState extends ConsumerState<_SettingsTab> {
                   ),
                 ),
               ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        // Zona bahaya: bubarkan clan (khusus leader, dicek lagi di server).
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0x14FF5468),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: const Color(0x55FF5468)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded, size: 18, color: Color(0xFFFF8A98)),
+                  SizedBox(width: 8),
+                  Text(
+                    'Zona Bahaya',
+                    style: TextStyle(
+                      color: Color(0xFFFF8A98),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Bubarkan clan menghapus clan, semua member, chat, dan saldo donasi secara permanen.',
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 12.5),
+              ),
+              if (_deleteError != null) ...[
+                const SizedBox(height: 10),
+                Text(
+                  _deleteError!,
+                  style: const TextStyle(color: Color(0xFFFF8A98), fontSize: 12.5),
+                ),
+              ],
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _deleting ? null : _deleteClan,
+                  icon: _deleting
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFFF8A98)),
+                        )
+                      : const Icon(Icons.delete_forever_rounded, size: 18),
+                  label: const Text('Bubarkan Clan'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFFFF8A98),
+                    side: const BorderSide(color: Color(0x88FF5468)),
+                    minimumSize: const Size.fromHeight(46),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                ),
+              ),
             ],
           ),
         ),
