@@ -211,7 +211,7 @@ class _PodiumEntry extends StatelessWidget {
             style: const TextStyle(color: AppColors.textWhite, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 4),
-          TopGiverChip(height: 16),
+          TopGiverChip(rank: giver.rank, height: 16),
           const SizedBox(height: 2),
           Text(
             _days(giver.days),
@@ -285,7 +285,7 @@ class _GiverTile extends StatelessWidget {
                         LevelBadge(level: level!),
                         const SizedBox(width: 6),
                       ],
-                      TopGiverChip(height: 16),
+                      TopGiverChip(rank: giver.rank, height: 16),
                     ],
                   ),
                 ],
