@@ -703,13 +703,6 @@ class _GuestHero extends StatelessWidget {
                         gradient: const LinearGradient(
                           colors: [AppColors.accentViolet, AppColors.accentVioletLight],
                         ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.accentViolet.withValues(alpha: 0.35),
-                            blurRadius: 18,
-                            offset: const Offset(0, 6),
-                          ),
-                        ],
                       ),
                       child: const Row(
                         mainAxisSize: MainAxisSize.min,
@@ -1310,13 +1303,6 @@ class _QualityRow extends StatelessWidget {
                           gradient: const LinearGradient(
                             colors: [AppColors.accentViolet, AppColors.accentVioletLight],
                           ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.accentViolet.withValues(alpha: 0.35),
-                              blurRadius: 10,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
                         ),
                       ),
                     ),
@@ -1447,15 +1433,6 @@ class _AnimatedToggle extends StatelessWidget {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(100),
             color: value ? AppColors.accentViolet : Colors.white.withValues(alpha: 0.10),
-            boxShadow: value
-                ? [
-                    BoxShadow(
-                      color: AppColors.accentViolet.withValues(alpha: 0.35),
-                      blurRadius: 10,
-                      offset: const Offset(0, 2),
-                    ),
-                  ]
-                : const [],
           ),
           child: AnimatedAlign(
             duration: const Duration(milliseconds: 260),
