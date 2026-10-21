@@ -107,8 +107,8 @@ class ProfileEffectOverlay extends ConsumerWidget {
   }
 }
 
-/// Memutar semua lapisan [effect] selebar area yang tersedia, rata atas.
-/// Bagian efek yang lebih tinggi dari area akan terpotong.
+/// Memutar semua lapisan [effect] memenuhi seluruh area (seperti BoxFit.cover):
+/// efek diperbesar sampai menutup lebar DAN tinggi, kelebihannya dipotong.
 class ProfileEffectView extends StatelessWidget {
   const ProfileEffectView({super.key, required this.effect});
 
@@ -124,10 +124,7 @@ class ProfileEffectView extends StatelessWidget {
           fit: StackFit.expand,
           children: [
             for (var i = 0; i < e.layers.length; i++)
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
+              Positioned.fill(
                 child: _EffectLayerPlayer(key: ValueKey('${e.id}#$i'), layer: e.layers[i]),
               ),
           ],
@@ -247,9 +244,11 @@ class _EffectLayerPlayerState extends State<_EffectLayerPlayer> {
   Widget build(BuildContext context) {
     final img = _image;
     if (img == null || img.width == 0) return const SizedBox.shrink();
-    return AspectRatio(
-      aspectRatio: img.width / img.height,
-      child: RawImage(image: img, fit: BoxFit.fill, filterQuality: FilterQuality.medium),
+    return RawImage(
+      image: img,
+      fit: BoxFit.cover,
+      alignment: Alignment.topCenter,
+      filterQuality: FilterQuality.medium,
     );
   }
 }
