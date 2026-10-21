@@ -13,6 +13,7 @@ import '../store/premium_screen.dart';
 import '../tree/tree_screen.dart';
 import '../wallpaper/wallpaper_screen.dart';
 import '../avatar_frame/avatar_frame_screen.dart';
+import '../profile_effect/profile_effect_screen.dart';
 import '../../glass/glass.dart';
 
 // Poster sama dengan slide onboarding (CDN publik MyAnimeList, tidak di-bundle).
@@ -164,6 +165,19 @@ class MenuScreen extends ConsumerWidget {
                 colors: [Color(0xFF0B2A4A), Color(0xFF7C3AED), Color(0xFF22D3EE)],
               ),
               onTap: () => Navigator.of(context).push<void>(fadeRoute(const AvatarFrameScreen())),
+            ),
+            const SizedBox(height: 14),
+            _MenuCard(
+              title: 'Efek Profil',
+              subtitle: 'Animasi keren di kartu profilmu',
+              icon: Icons.auto_awesome,
+              accent: const Color(0xFFF472B6),
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF2A0B3D), Color(0xFFDB2777), Color(0xFFF59E0B)],
+              ),
+              onTap: () => Navigator.of(context).push<void>(fadeRoute(const ProfileEffectScreen())),
             ),
           ],
         ),

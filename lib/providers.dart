@@ -37,6 +37,7 @@ import 'data/models/store_models.dart';
 import 'data/repository/xp_repository.dart';
 import 'data/repository/wallpaper_repository.dart';
 import 'data/repository/avatar_frame_repository.dart';
+import 'data/repository/profile_effect_repository.dart';
 import 'data/repository/gift_repository.dart';
 import 'data/repository/notification_repository.dart';
 import 'data/repository/home_bootstrap_repository.dart';
@@ -185,6 +186,10 @@ final wallpaperRepositoryProvider = Provider<WallpaperRepository>(
 
 final avatarFrameRepositoryProvider = Provider<AvatarFrameRepository>(
   (ref) => AvatarFrameRepository(ref.watch(supabaseDioProvider)),
+);
+
+final profileEffectRepositoryProvider = Provider<ProfileEffectRepository>(
+  (ref) => ProfileEffectRepository(ref.watch(supabaseDioProvider)),
 );
 
 final xpRepositoryProvider = Provider<XpRepository>(

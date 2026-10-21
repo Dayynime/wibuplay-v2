@@ -33,6 +33,7 @@ import '../comic/comic_profile_section.dart';
 import '../xp/xp_leaderboard_screen.dart';
 import 'profile_controller.dart';
 import '../../components/avatar_frame.dart';
+import '../../components/profile_effect.dart';
 import '../../components/join_date_stat.dart';
 import '../../../data/models/avatar_frame_models.dart';
 import '../../glass/glass.dart';
@@ -82,28 +83,37 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final avatarUrl = _resolvedAvatar(user, profile.data, profile.loading);
 
     // Material (bukan ColoredBox) supaya efek ripple InkWell tab terlihat.
+    final effectUid = user?.uid ?? '';
     return Material(
       color: AppColors.backgroundDark,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.only(bottom: 135),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _buildHero(
-              user: user,
-              profile: profile.data,
-              name: name,
-              avatarUrl: avatarUrl,
-              premium: premium,
-              favorites: favorites,
-              history: history,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          SingleChildScrollView(
+            padding: const EdgeInsets.only(bottom: 135),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildHero(
+                  user: user,
+                  profile: profile.data,
+                  name: name,
+                  avatarUrl: avatarUrl,
+                  premium: premium,
+                  favorites: favorites,
+                  history: history,
+                ),
+                const SizedBox(height: 8),
+                _buildTabs(),
+                const SizedBox(height: 16),
+                _buildTabContent(favorites, history, user, premium, name, avatarUrl),
+              ],
             ),
-            const SizedBox(height: 8),
-            _buildTabs(),
-            const SizedBox(height: 16),
-            _buildTabContent(favorites, history, user, premium, name, avatarUrl),
-          ],
-        ),
+          ),
+          // Efek profil menutupi seluruh layar dan tidak ikut scroll.
+          if (effectUid.isNotEmpty)
+            Positioned.fill(child: ProfileEffectOverlay(uid: effectUid)),
+        ],
       ),
     );
   }
