@@ -100,6 +100,7 @@ class WallpaperItem {
     required this.previewUrl,
     this.chancePercent,
     this.eventEndsAt,
+    this.eventId,
   });
 
   final String id;
@@ -111,6 +112,7 @@ class WallpaperItem {
 
   /// Diisi kalau wallpaper ini cuma bisa didapat selama event (Limited).
   final DateTime? eventEndsAt;
+  final int? eventId;
 
   static WallpaperItem? fromJson(Map<String, dynamic> j) {
     final url = wallpaperPublicUrl(j['file_name']);
@@ -125,6 +127,7 @@ class WallpaperItem {
       previewUrl: prev,
       chancePercent: (j['chance_percent'] as num?)?.toDouble(),
       eventEndsAt: _date(j['event_ends_at']),
+      eventId: (j['event_id'] as num?)?.toInt(),
     );
   }
 }

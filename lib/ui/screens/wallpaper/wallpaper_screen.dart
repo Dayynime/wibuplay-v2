@@ -7,7 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../components/rarity_chip.dart';
-import 'wallpaper_event_banner.dart';
+import 'gacha_widgets.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/account_models.dart' show formatZCoin;
 import '../../../data/models/wallpaper_models.dart';
@@ -53,9 +53,21 @@ class _WallpaperScreenState extends ConsumerState<WallpaperScreen> {
 
   WallpaperRepository get _repo => ref.read(wallpaperRepositoryProvider);
 
-  /// Wallpaper unggulan: rarity tertinggi dulu, maksimal 6.
+  /// Event yang sedang berjalan DAN wallpaper-nya ada di pool.
+  WallpaperEvent? _runningEvent(WallpaperState s, DateTime now) {
+    for (final e in s.events) {
+      if (e.isRunning(now) && s.pool.any((w) => w.eventId == e.id)) return e;
+    }
+    return null;
+  }
+
+  /// Wallpaper unggulan di banner: isi event Limited kalau ada event berjalan,
+  /// selain itu rarity tertinggi dulu. Maksimal 6.
   List<WallpaperItem> get _showcase {
-    final pool = [...?_state?.pool];
+    final s = _state;
+    if (s == null) return const [];
+    final ev = _runningEvent(s, s.serverNow);
+    final pool = ev == null ? [...s.pool] : s.pool.where((w) => w.eventId == ev.id).toList();
     pool.sort((a, b) => b.rarity.index.compareTo(a.rarity.index));
     return pool.take(6).toList();
   }
@@ -334,108 +346,162 @@ class _WallpaperScreenState extends ConsumerState<WallpaperScreen> {
         ),
       );
     }
-    return RefreshIndicator(
-      color: AppColors.accentViolet,
-      onRefresh: _spinning ? () async {} : _load,
-      child: ListView(
-        padding: const EdgeInsets.only(bottom: 40),
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-            child: _Tabs(
-              labels: ['Spin', 'Koleksiku (${s.inventory.length})'],
-              selected: _tab,
-              onChanged: _spinning ? null : (i) => setState(() => _tab = i),
-            ),
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+          child: _Tabs(
+            labels: ['Spin', 'Koleksiku (${s.inventory.length})'],
+            selected: _tab,
+            onChanged: _spinning ? null : (i) => setState(() => _tab = i),
           ),
-          AnimatedSwitcher(
+        ),
+        Expanded(
+          child: AnimatedSwitcher(
             duration: const Duration(milliseconds: 250),
             child: _tab == 0
-                ? Column(key: const ValueKey('spin'), children: _spinTab(s))
-                : KeyedSubtree(key: const ValueKey('koleksi'), child: _collectionTab(s)),
+                ? KeyedSubtree(key: const ValueKey('spin'), child: _spinTab(s))
+                : RefreshIndicator(
+                    key: const ValueKey('koleksi'),
+                    color: AppColors.accentViolet,
+                    onRefresh: _load,
+                    child: ListView(
+                      padding: const EdgeInsets.only(bottom: 40),
+                      children: [_collectionTab(s)],
+                    ),
+                  ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _spinTab(WallpaperState s) {
+    final showcase = _showcase;
+    final owned = s.inventory.map((w) => w.id).toSet();
+    final featured = [...s.pool]
+      ..sort((a, b) {
+        final r = b.rarity.index.compareTo(a.rarity.index);
+        return r != 0 ? r : (a.chancePercent ?? 0).compareTo(b.chancePercent ?? 0);
+      });
+    final boundaries = [for (final e in s.events) ...[e.startsAt, e.endsAt]];
+
+    return Stack(
+      children: [
+        RefreshIndicator(
+          color: AppColors.accentViolet,
+          onRefresh: _spinning ? () async {} : _load,
+          child: ListView(
+            padding: const EdgeInsets.only(bottom: 150),
+            children: [
+              ServerClock(
+                clockOffset: s.clockOffset,
+                boundaries: boundaries,
+                onBoundary: () {
+                  if (mounted && !_spinning) _load();
+                },
+                builder: (_, now) {
+                  final ev = _runningEvent(s, now);
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Column(
+                      children: [
+                        GachaBanner(
+                          now: now,
+                          event: ev,
+                          featured: showcase,
+                          index: showcase.isEmpty ? 0 : _hero % showcase.length,
+                          poolSize: s.pool.length,
+                          onOpen: s.pool.isEmpty ? null : () => _openCatalog(s),
+                        ),
+                        GachaUpcomingEvents(events: s.events, now: now),
+                      ],
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 24),
+              if (featured.isNotEmpty) ...[
+                GachaSectionTitle(
+                  title: 'Hadiah unggulan',
+                  action: 'Lihat semua',
+                  onAction: () => _openCatalog(s),
+                ),
+                GachaFeaturedRow(
+                  items: featured.take(10).toList(),
+                  ownedIds: owned,
+                  onTap: (_) => _openCatalog(s),
+                ),
+                const SizedBox(height: 24),
+              ],
+              const GachaSectionTitle(title: 'Peluang'),
+              GachaOddsPanel(state: s, onShowAll: () => _showOdds(s)),
+            ],
+          ),
+        ),
+        Positioned(left: 0, right: 0, bottom: 0, child: _spinBar(s)),
+      ],
+    );
+  }
+
+  /// Bar tombol Spin yang menempel di bawah.
+  Widget _spinBar(WallpaperState s) {
+    final full = s.spinCost * 10;
+    final save = full > 0 && s.spin10Cost < full ? ((full - s.spin10Cost) * 100 / full).round() : 0;
+    final bottom = MediaQuery.paddingOf(context).bottom;
+    return Container(
+      padding: EdgeInsets.fromLTRB(16, 18, 16, 12 + bottom),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0x000B0E14), Color(0xE60B0E14), Color(0xF50B0E14)],
+          stops: [0, 0.35, 1],
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _SpinButton(
+              label: 'Spin 1x',
+              cost: s.spinCost,
+              busy: _spinning,
+              enabled: !_spinning && s.pool.isNotEmpty,
+              primary: false,
+              onTap: () => _spin(1),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _SpinButton(
+              label: 'Spin 10x',
+              cost: s.spin10Cost,
+              busy: _spinning,
+              enabled: !_spinning && s.pool.isNotEmpty,
+              primary: true,
+              badge: save >= 5 ? 'HEMAT $save%' : null,
+              onTap: () => _spin(10),
+            ),
           ),
         ],
       ),
     );
   }
 
-  List<Widget> _spinTab(WallpaperState s) {
-    final showcase = _showcase;
-    final hero = showcase.isEmpty ? null : showcase[_hero % showcase.length];
-    return [
-      // ---- event Limited (hitung mundur)
-      if (s.events.isNotEmpty)
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
-          child: WallpaperEventBanner(
-            events: s.events,
-            clockOffset: s.clockOffset,
-            onBoundary: () {
-              if (mounted && !_spinning) _load();
-            },
-          ),
-        ),
-      // ---- panggung: wallpaper unggulan berganti tiap 5 detik
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: _HeroStage(
-          item: hero,
-          index: showcase.isEmpty ? 0 : _hero % showcase.length,
-          total: showcase.length,
-          poolSize: s.pool.length,
-          onTap: s.pool.isEmpty ? null : () => _openCatalog(s),
-        ),
+  void _showOdds(WallpaperState s) {
+    showGlassSheet<void>(
+      context: context,
+      backgroundColor: AppColors.backgroundDarkSecondary,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (ctx) => DraggableScrollableSheet(
+        expand: false,
+        initialChildSize: 0.7,
+        maxChildSize: 0.92,
+        minChildSize: 0.4,
+        builder: (_, controller) => GachaOddsList(pool: s.pool, controller: controller),
       ),
-      const SizedBox(height: 18),
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Row(
-          children: [
-            Expanded(
-              child: _SpinButton(
-                label: 'Spin 1x',
-                cost: s.spinCost,
-                busy: _spinning,
-                enabled: !_spinning && s.pool.isNotEmpty,
-                primary: false,
-                onTap: () => _spin(1),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _SpinButton(
-                label: 'Spin 10x',
-                cost: s.spin10Cost,
-                busy: _spinning,
-                enabled: !_spinning && s.pool.isNotEmpty,
-                primary: true,
-                onTap: () => _spin(10),
-              ),
-            ),
-          ],
-        ),
-      ),
-      if (s.dupRefundPercent > 0)
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.autorenew_rounded, size: 14, color: AppColors.textMuted),
-              const SizedBox(width: 6),
-              Text(
-                'Dapat yang sudah dimiliki? ${s.dupRefundPercent}% ZCoin kembali',
-                style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
-              ),
-            ],
-          ),
-        ),
-      const SizedBox(height: 22),
-      Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: _OddsCard(state: s),
-      ),
-    ];
+    );
   }
 
   Widget _collectionTab(WallpaperState s) {
@@ -914,172 +980,6 @@ class _BalancePill extends StatelessWidget {
   }
 }
 
-/// Panggung wallpaper unggulan (rarity tertinggi dulu), berganti pelan.
-class _HeroStage extends StatelessWidget {
-  const _HeroStage({
-    required this.item,
-    required this.index,
-    required this.total,
-    required this.poolSize,
-    this.onTap,
-  });
-
-  final WallpaperItem? item;
-  final int index;
-  final int total;
-  final int poolSize;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final w = item;
-    final glow = w?.rarity.color ?? AppColors.surfaceElevated;
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 700),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: glow.withValues(alpha: 0.55), width: 1.5),
-        boxShadow: [BoxShadow(color: glow.withValues(alpha: 0.28), blurRadius: 32, spreadRadius: -4)],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(23),
-        child: AspectRatio(
-          aspectRatio: 16 / 10,
-          child: w == null
-              ? const ColoredBox(
-                  color: AppColors.surfaceDark,
-                  child: Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(24),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.auto_awesome_outlined, color: AppColors.textMuted, size: 40),
-                          SizedBox(height: 10),
-                          Text(
-                            'Belum ada wallpaper yang bisa didapat.\nCek lagi nanti.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: AppColors.textSecondary, height: 1.4),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                )
-              : GestureDetector(
-                  onTap: onTap,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 900),
-                        switchInCurve: Curves.easeOut,
-                        child: CachedNetworkImage(
-                          key: ValueKey(w.id),
-                          imageUrl: w.url,
-                          fit: BoxFit.cover,
-                          width: double.infinity,
-                          height: double.infinity,
-                          placeholder: (_, __) => CachedNetworkImage(imageUrl: w.previewUrl, fit: BoxFit.cover),
-                          errorWidget: (_, __, ___) => const ColoredBox(color: AppColors.surfaceDark),
-                        ),
-                      ),
-                      const DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            colors: [Color(0x33000000), Colors.transparent, Color(0xE6070A10)],
-                            stops: [0, 0.4, 1],
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        top: 12,
-                        left: 12,
-                        child: Container(
-                          padding: const EdgeInsets.fromLTRB(10, 5, 6, 5),
-                          decoration: BoxDecoration(
-                            color: const Color(0x99000000),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: const Color(0x33FFFFFF)),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                'Lihat semua $poolSize wallpaper',
-                                style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w600),
-                              ),
-                              const Icon(Icons.chevron_right, color: Colors.white, size: 16),
-                            ],
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        left: 16,
-                        right: 16,
-                        bottom: 14,
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Expanded(
-                              child: AnimatedSwitcher(
-                                duration: const Duration(milliseconds: 400),
-                                layoutBuilder: (current, previous) => Stack(
-                                  alignment: Alignment.bottomLeft,
-                                  children: [...previous, if (current != null) current],
-                                ),
-                                child: Column(
-                                  key: ValueKey('t-${w.id}'),
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    _RarityPill(rarity: w.rarity),
-                                    const SizedBox(height: 6),
-                                    Text(
-                                      w.name,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.w800,
-                                        shadows: [Shadow(color: Colors.black54, blurRadius: 8)],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            if (total > 1)
-                              Row(
-                                children: [
-                                  for (var i = 0; i < total; i++)
-                                    AnimatedContainer(
-                                      duration: const Duration(milliseconds: 300),
-                                      margin: const EdgeInsets.only(left: 4),
-                                      width: i == index ? 16 : 6,
-                                      height: 6,
-                                      decoration: BoxDecoration(
-                                        color: i == index ? Colors.white : Colors.white38,
-                                        borderRadius: BorderRadius.circular(3),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-        ),
-      ),
-    );
-  }
-}
-
 class _SpinButton extends StatefulWidget {
   const _SpinButton({
     required this.label,
@@ -1088,6 +988,7 @@ class _SpinButton extends StatefulWidget {
     required this.enabled,
     required this.primary,
     required this.onTap,
+    this.badge,
   });
 
   final String label;
@@ -1096,6 +997,9 @@ class _SpinButton extends StatefulWidget {
   final bool enabled;
   final bool primary;
   final VoidCallback onTap;
+
+  /// Label kecil di pojok kanan atas, mis. "HEMAT 70%".
+  final String? badge;
 
   @override
   State<_SpinButton> createState() => _SpinButtonState();
@@ -1118,7 +1022,10 @@ class _SpinButtonState extends State<_SpinButton> {
         child: AnimatedOpacity(
           duration: const Duration(milliseconds: 200),
           opacity: widget.enabled || widget.busy ? 1 : 0.45,
-          child: Container(
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+          Container(
             height: 64,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(18),
@@ -1165,161 +1072,31 @@ class _SpinButtonState extends State<_SpinButton> {
                     ),
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Peluang per rarity: bar tersegmen + legenda, daftar lengkap bisa dibuka.
-class _OddsCard extends StatefulWidget {
-  const _OddsCard({required this.state});
-
-  final WallpaperState state;
-
-  @override
-  State<_OddsCard> createState() => _OddsCardState();
-}
-
-class _OddsCardState extends State<_OddsCard> {
-  bool _open = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final s = widget.state;
-    final by = s.chanceByRarity;
-    final rarities = WallpaperRarity.values.reversed.where((r) => (by[r] ?? 0) > 0).toList();
-    final pool = [...s.pool]..sort((a, b) => b.rarity.index.compareTo(a.rarity.index));
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceDark,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0x14FFFFFF)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Peluang', style: TextStyle(color: AppColors.textWhite, fontWeight: FontWeight.w800, fontSize: 16)),
-          const SizedBox(height: 12),
-          if (rarities.isNotEmpty)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(6),
-              child: SizedBox(
-                height: 10,
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    for (final r in rarities.reversed)
-                      Expanded(
-                        flex: math.max(1, ((by[r] ?? 0) * 100).round()),
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(color: r.gradient == null ? r.color : null, gradient: r.gradient),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-          const SizedBox(height: 12),
-          for (final r in rarities)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 5),
-              child: Row(
-                children: [
-                  Container(
-                    width: 10,
-                    height: 10,
+              if (widget.badge != null && !widget.busy)
+                Positioned(
+                  top: -8,
+                  right: 10,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                     decoration: BoxDecoration(
-                      color: r.gradient == null ? r.color : null,
-                      gradient: r.gradient,
-                      shape: BoxShape.circle,
+                      color: AppColors.warningAmber,
+                      borderRadius: BorderRadius.circular(6),
+                      boxShadow: const [BoxShadow(color: Color(0x66000000), blurRadius: 6)],
+                    ),
+                    child: Text(
+                      widget.badge!,
+                      style: const TextStyle(
+                        color: Color(0xFF1C1405),
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.4,
+                      ),
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  Text(r.label, style: const TextStyle(color: AppColors.textWhite, fontWeight: FontWeight.w600)),
-                  const Spacer(),
-                  Text(
-                    '${(by[r] ?? 0).toStringAsFixed(2)}%',
-                    style: TextStyle(color: r.color, fontWeight: FontWeight.w800),
-                  ),
-                ],
-              ),
-            ),
-          const SizedBox(height: 4),
-          InkWell(
-            borderRadius: BorderRadius.circular(10),
-            onTap: () => setState(() => _open = !_open),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              child: Row(
-                children: [
-                  Text(
-                    _open ? 'Sembunyikan daftar' : 'Lihat semua ${pool.length} wallpaper',
-                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
-                  ),
-                  const Spacer(),
-                  AnimatedRotation(
-                    turns: _open ? 0.5 : 0,
-                    duration: const Duration(milliseconds: 200),
-                    child: const Icon(Icons.expand_more, color: AppColors.textSecondary),
-                  ),
-                ],
-              ),
-            ),
+                ),
+            ],
           ),
-          AnimatedSize(
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.easeOutCubic,
-            alignment: Alignment.topCenter,
-            child: !_open
-                ? const SizedBox(width: double.infinity)
-                : Column(
-                    children: [
-                      for (final w in pool)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: Row(
-                            children: [
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: SizedBox(
-                                  width: 56,
-                                  height: 35,
-                                  child: CachedNetworkImage(
-                                    imageUrl: w.previewUrl,
-                                    fit: BoxFit.cover,
-                                    errorWidget: (_, __, ___) => const ColoredBox(color: AppColors.surfaceVariantDark),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      w.name,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(color: AppColors.textWhite, fontSize: 13),
-                                    ),
-                                    Text(w.rarity.label, style: TextStyle(color: w.rarity.color, fontSize: 11)),
-                                  ],
-                                ),
-                              ),
-                              Text(
-                                '${(w.chancePercent ?? 0).toStringAsFixed(2)}%',
-                                style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
-                              ),
-                            ],
-                          ),
-                        ),
-                    ],
-                  ),
-          ),
-        ],
+        ),
       ),
     );
   }
