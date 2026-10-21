@@ -17,6 +17,7 @@ class ChatMessage {
     this.giftRecipientUid,
     this.giftRecipientUsername,
     this.giveawayId,
+    this.wpEventId,
   });
 
   final int id;
@@ -44,6 +45,11 @@ class ChatMessage {
   final int? giveawayId;
   bool get isGiveaway => messageType == 'giveaway' && giveawayId != null;
 
+  /// Kartu Event Limited dari server (mulai / selesai).
+  final int? wpEventId;
+  bool get isWpEvent => messageType == 'wp_event' || messageType == 'wp_event_end';
+  bool get isWpEventEnd => messageType == 'wp_event_end';
+
   bool get isVoice => messageType == 'voice';
   bool get isGift => messageType == 'gift' && (giftDays ?? 0) > 0;
 
@@ -67,6 +73,7 @@ class ChatMessage {
       giftRecipientUid: j['gift_recipient_uid'] as String?,
       giftRecipientUsername: j['gift_recipient_username'] as String?,
       giveawayId: (j['giveaway_id'] as num?)?.toInt(),
+      wpEventId: (j['wp_event_id'] as num?)?.toInt(),
     );
   }
 }

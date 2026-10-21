@@ -24,6 +24,7 @@ import '../friends/friends_screen.dart';
 import '../profile/public_profile_screen.dart';
 import 'private_chat_controller.dart';
 import 'clan_chat_tab.dart';
+import 'wp_event_chat_card.dart';
 import 'private_chat_pane.dart';
 import 'chat_controller.dart';
 import '../../components/avatar_frame.dart';
@@ -399,6 +400,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       itemCount: msgs.length,
       itemBuilder: (context, i) {
         final m = msgs[msgs.length - 1 - i];
+        if (m.isWpEvent) return WpEventChatCard(key: ValueKey(m.id), message: m);
         final bubble = ChatMessageBubble(
           key: ValueKey(m.id),
           message: m,

@@ -238,4 +238,41 @@ class WallpaperRepository {
       'Aksi gagal, coba lagi',
     );
   }
+
+  // ------------------------------------------------------------ event Limited
+
+  Future<AdminEventPage> adminEvents() async => AdminEventPage.fromJson(
+        await _call('wibuplay-wallpaper-admin', {'action': 'event_list'}, 'Gagal memuat event'),
+      );
+
+  /// [eventId] null = bikin event baru.
+  Future<void> adminSaveEvent({
+    int? eventId,
+    required String name,
+    required DateTime startsAt,
+    required DateTime endsAt,
+    required List<String> wallpaperIds,
+  }) async {
+    await _call(
+      'wibuplay-wallpaper-admin',
+      {
+        'action': 'event_save',
+        if (eventId != null) 'event_id': eventId,
+        'name': name,
+        'starts_at': startsAt.toUtc().toIso8601String(),
+        'ends_at': endsAt.toUtc().toIso8601String(),
+        'wallpaper_ids': wallpaperIds,
+      },
+      'Gagal menyimpan event',
+    );
+  }
+
+  /// [action]: event_end | event_delete
+  Future<void> adminEventAction(int eventId, String action) async {
+    await _call(
+      'wibuplay-wallpaper-admin',
+      {'action': action, 'event_id': eventId},
+      'Aksi event gagal',
+    );
+  }
 }

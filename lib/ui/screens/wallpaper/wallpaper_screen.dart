@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../components/rarity_chip.dart';
+import 'wallpaper_event_banner.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/account_models.dart' show formatZCoin;
 import '../../../data/models/wallpaper_models.dart';
@@ -362,6 +363,18 @@ class _WallpaperScreenState extends ConsumerState<WallpaperScreen> {
     final showcase = _showcase;
     final hero = showcase.isEmpty ? null : showcase[_hero % showcase.length];
     return [
+      // ---- event Limited (hitung mundur)
+      if (s.events.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+          child: WallpaperEventBanner(
+            events: s.events,
+            clockOffset: s.clockOffset,
+            onBoundary: () {
+              if (mounted && !_spinning) _load();
+            },
+          ),
+        ),
       // ---- panggung: wallpaper unggulan berganti tiap 5 detik
       Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -2293,6 +2306,13 @@ class _CatalogCard extends StatelessWidget {
                       'Peluang ${(item.chancePercent ?? 0).toStringAsFixed(2)}%',
                       style: TextStyle(color: r.color, fontSize: 11.5, fontWeight: FontWeight.w600),
                     ),
+                    if (item.eventEndsAt != null)
+                      Text(
+                        'Event • sampai ${formatEventTime(item.eventEndsAt!)}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(color: AppColors.textMuted, fontSize: 10.5),
+                      ),
                   ],
                 ),
               ),

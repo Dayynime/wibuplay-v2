@@ -73,6 +73,8 @@ String? storageSignedUrl(Object? relative) {
 
 int _int(Object? v, [int fallback = 0]) => (v as num?)?.toInt() ?? fallback;
 
+DateTime? _date(Object? v) => v is String ? DateTime.tryParse(v)?.toUtc() : null;
+
 /// Wallpaper yang dipakai seseorang (untuk latar komentar).
 class CommentWallpaper {
   const CommentWallpaper({required this.id, required this.rarity, required this.url});
@@ -97,6 +99,7 @@ class WallpaperItem {
     required this.url,
     required this.previewUrl,
     this.chancePercent,
+    this.eventEndsAt,
   });
 
   final String id;
@@ -105,6 +108,9 @@ class WallpaperItem {
   final String url;
   final String previewUrl;
   final double? chancePercent;
+
+  /// Diisi kalau wallpaper ini cuma bisa didapat selama event (Limited).
+  final DateTime? eventEndsAt;
 
   static WallpaperItem? fromJson(Map<String, dynamic> j) {
     final url = wallpaperPublicUrl(j['file_name']);
@@ -118,6 +124,7 @@ class WallpaperItem {
       url: url,
       previewUrl: prev,
       chancePercent: (j['chance_percent'] as num?)?.toDouble(),
+      eventEndsAt: _date(j['event_ends_at']),
     );
   }
 }
@@ -139,6 +146,8 @@ class WallpaperState {
     required this.pool,
     required this.inventory,
     this.equippedId,
+    this.events = const [],
+    this.clockOffset = Duration.zero,
   });
 
   final int spinCost;
@@ -149,6 +158,14 @@ class WallpaperState {
   final List<WallpaperItem> inventory;
   final String? equippedId;
 
+  /// Event Limited yang sedang berjalan / akan datang (urut jam mulai).
+  final List<WallpaperEvent> events;
+
+  /// Jam server - jam HP, supaya hitung mundur event tidak ketipu jam HP.
+  final Duration clockOffset;
+
+  DateTime get serverNow => DateTime.now().toUtc().add(clockOffset);
+
   factory WallpaperState.fromJson(Map<String, dynamic> j) => WallpaperState(
         spinCost: _int(j['spin_cost']),
         spin10Cost: _int(j['spin10_cost'], _int(j['spin_cost']) * 10),
@@ -157,6 +174,14 @@ class WallpaperState {
         pool: _items(j['pool']),
         inventory: _items(j['inventory']),
         equippedId: j['equipped_id'] as String?,
+        events: j['events'] is List
+            ? (j['events'] as List)
+                .whereType<Map>()
+                .map((e) => WallpaperEvent.fromJson(Map<String, dynamic>.from(e)))
+                .whereType<WallpaperEvent>()
+                .toList()
+            : const [],
+        clockOffset: _date(j['server_now'])?.difference(DateTime.now().toUtc()) ?? Duration.zero,
       );
 
   WallpaperState copyWith({int? balance, String? Function()? equippedId, List<WallpaperItem>? inventory}) =>
@@ -168,6 +193,8 @@ class WallpaperState {
         pool: pool,
         inventory: inventory ?? this.inventory,
         equippedId: equippedId != null ? equippedId() : this.equippedId,
+        events: events,
+        clockOffset: clockOffset,
       );
 
   /// Total peluang per rarity (transparansi odds).
@@ -223,6 +250,63 @@ class SpinResult {
     if (entries.isEmpty) return null;
     return SpinResult(entries: entries, refund: _int(j['refund']), balance: _int(j['balance']));
   }
+}
+
+// ------------------------------------------------------------------ event
+
+/// Event Limited: wallpaper Limited-nya cuma ada di pool Spin selama event.
+class WallpaperEvent {
+  const WallpaperEvent({
+    required this.id,
+    required this.name,
+    required this.startsAt,
+    required this.endsAt,
+    this.itemCount = 0,
+  });
+
+  final int id;
+  final String name;
+  final DateTime startsAt;
+  final DateTime endsAt;
+  final int itemCount;
+
+  bool isRunning(DateTime now) => !now.isBefore(startsAt) && now.isBefore(endsAt);
+  bool isUpcoming(DateTime now) => now.isBefore(startsAt);
+
+  static WallpaperEvent? fromJson(Map<String, dynamic> j) {
+    final id = (j['id'] as num?)?.toInt();
+    final s = _date(j['starts_at']);
+    final e = _date(j['ends_at']);
+    if (id == null || s == null || e == null) return null;
+    return WallpaperEvent(
+      id: id,
+      name: (j['name'] as String?) ?? 'Event',
+      startsAt: s,
+      endsAt: e,
+      itemCount: _int(j['item_count']),
+    );
+  }
+}
+
+/// "2h 3j", "3j 05m", "12m 09d", "45d".
+String formatEventCountdown(Duration d) {
+  if (d.isNegative) d = Duration.zero;
+  final days = d.inDays;
+  final h = d.inHours % 24;
+  final m = d.inMinutes % 60;
+  final s = d.inSeconds % 60;
+  String two(int v) => v.toString().padLeft(2, '0');
+  if (days > 0) return '${days}h ${h}j';
+  if (d.inHours > 0) return '${d.inHours}j ${two(m)}m';
+  if (m > 0) return '${m}m ${two(s)}d';
+  return '${s}d';
+}
+
+/// Tanggal & jam lokal HP, mis. "31/10 19:00".
+String formatEventTime(DateTime utc) {
+  final t = utc.toLocal();
+  String two(int v) => v.toString().padLeft(2, '0');
+  return '${two(t.day)}/${two(t.month)} ${two(t.hour)}:${two(t.minute)}';
 }
 
 // ------------------------------------------------------------------ admin
@@ -309,4 +393,91 @@ class AdminWallpaperPage {
   final List<AdminWallpaper> items;
   final List<AdminUploadJob> jobs;
   final bool hasMore;
+}
+
+/// Event di Panel Admin.
+class AdminWallpaperEvent {
+  const AdminWallpaperEvent({
+    required this.id,
+    required this.name,
+    required this.startsAt,
+    required this.endsAt,
+    required this.wallpaperIds,
+    this.creatorName,
+  });
+
+  final int id;
+  final String name;
+  final DateTime startsAt;
+  final DateTime endsAt;
+  final List<String> wallpaperIds;
+  final String? creatorName;
+
+  bool isRunning(DateTime now) => !now.isBefore(startsAt) && now.isBefore(endsAt);
+  bool isUpcoming(DateTime now) => now.isBefore(startsAt);
+  bool isEnded(DateTime now) => !now.isBefore(endsAt);
+
+  static AdminWallpaperEvent? fromJson(Map<String, dynamic> j) {
+    final id = (j['id'] as num?)?.toInt();
+    final s = _date(j['starts_at']);
+    final e = _date(j['ends_at']);
+    if (id == null || s == null || e == null) return null;
+    final ids = j['wallpaper_ids'];
+    return AdminWallpaperEvent(
+      id: id,
+      name: (j['name'] as String?) ?? '',
+      startsAt: s,
+      endsAt: e,
+      wallpaperIds: ids is List ? ids.whereType<String>().toList() : const [],
+      creatorName: j['creator_name'] as String?,
+    );
+  }
+}
+
+/// Wallpaper Limited yang sudah disetujui (calon isi event).
+class AdminEventCandidate {
+  const AdminEventCandidate({
+    required this.id,
+    required this.name,
+    required this.isActive,
+    required this.weight,
+    this.previewUrl,
+    this.eventId,
+  });
+
+  final String id;
+  final String name;
+  final bool isActive;
+  final int weight;
+  final String? previewUrl;
+  final int? eventId;
+
+  factory AdminEventCandidate.fromJson(Map<String, dynamic> j) => AdminEventCandidate(
+        id: (j['id'] as String?) ?? '',
+        name: (j['name'] as String?) ?? '',
+        isActive: j['is_active'] == true,
+        weight: _int(j['weight'], 1),
+        previewUrl: wallpaperPublicUrl(j['preview_name']),
+        eventId: (j['event_id'] as num?)?.toInt(),
+      );
+}
+
+class AdminEventPage {
+  const AdminEventPage({required this.events, required this.candidates, required this.clockOffset});
+
+  final List<AdminWallpaperEvent> events;
+  final List<AdminEventCandidate> candidates;
+  final Duration clockOffset;
+
+  DateTime get serverNow => DateTime.now().toUtc().add(clockOffset);
+
+  factory AdminEventPage.fromJson(Map<String, dynamic> j) {
+    List<Map<String, dynamic>> rows(Object? v) =>
+        v is List ? v.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList() : const [];
+    return AdminEventPage(
+      events: rows(j['events']).map(AdminWallpaperEvent.fromJson).whereType<AdminWallpaperEvent>().toList(),
+      candidates: rows(j['candidates']).map(AdminEventCandidate.fromJson).where((c) => c.id.isNotEmpty).toList(),
+      clockOffset: _date(j['server_now'])?.difference(DateTime.now().toUtc()) ?? Duration.zero,
+    );
+  }
 }

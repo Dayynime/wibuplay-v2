@@ -11,6 +11,8 @@ import '../../../data/repository/admin_repository.dart' show AdminException;
 import '../../../data/repository/wallpaper_repository.dart';
 import '../../../providers.dart';
 import '../../components/role_badges.dart' show ZenimeRole;
+import '../../components/rarity_chip.dart';
+import 'admin_wallpaper_events.dart';
 
 /// Sama dengan AdminRun di admin_screen.dart (loading + banner + refresh).
 typedef WallpaperAdminRun = Future<void> Function(
@@ -266,6 +268,47 @@ class _AdminWallpaperTabState extends ConsumerState<AdminWallpaperTab> {
 
   // ------------------------------------------------------------ UI
 
+  /// Tombol ke layar Event Limited (semua role staf).
+  Widget _eventEntry() => Material(
+        color: AppColors.surfaceDark,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () => Navigator.of(context).push<void>(
+            MaterialPageRoute(builder: (_) => const AdminWallpaperEventsScreen()),
+          ),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0x55D7DCE4)),
+            ),
+            child: const Row(
+              children: [
+                RarityChip(rarity: WallpaperRarity.limited),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Event Limited',
+                        style: TextStyle(color: AppColors.textWhite, fontWeight: FontWeight.w800),
+                      ),
+                      Text(
+                        'Atur jam mulai & selesai wallpaper Limited',
+                        style: TextStyle(color: AppColors.textMuted, fontSize: 11.5),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
+              ],
+            ),
+          ),
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
     return RefreshIndicator(
@@ -274,6 +317,8 @@ class _AdminWallpaperTabState extends ConsumerState<AdminWallpaperTab> {
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
         children: [
+          _eventEntry(),
+          const SizedBox(height: 12),
           _uploadCard(),
           if (_jobs.isNotEmpty) ...[const SizedBox(height: 12), _jobsCard()],
           const SizedBox(height: 14),
