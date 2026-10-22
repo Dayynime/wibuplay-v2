@@ -7,10 +7,14 @@ import '../../../core/theme/app_colors.dart';
 import '../../../data/repository/gift_repository.dart';
 import '../../../providers.dart';
 import '../../app_routes.dart' show openPremium;
-import '../../glass/glass.dart';
 
 const Color _gold = Color(0xFFF5B73B);
 const Color _goldDeep = Color(0xFFE0892B);
+
+// Warna dialog Buat Giveaway (mengikuti referensi).
+const Color _cardBg = Color(0xFF161C28);
+const Color _pillBg = Color(0xFF232A38);
+const Color _sumBg = Color(0xFF0F141D);
 
 // =============================================================== store
 
@@ -248,15 +252,21 @@ class _GiveawayCardState extends ConsumerState<GiveawayCard> {
 // =============================================================== buat
 
 Future<void> showCreateGiveawaySheet(BuildContext context) {
-  return showGlassSheet<void>(
+  return showGeneralDialog<void>(
     context: context,
     useRootNavigator: true,
-    isScrollControlled: true,
-    backgroundColor: AppColors.surfaceDark,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-    ),
-    builder: (_) => const _CreateGiveawaySheet(),
+    barrierDismissible: true,
+    barrierLabel: 'Tutup',
+    barrierColor: Colors.black.withValues(alpha: 0.6),
+    transitionDuration: const Duration(milliseconds: 260),
+    pageBuilder: (_, __, ___) => const _CreateGiveawaySheet(),
+    transitionBuilder: (_, anim, __, child) {
+      final a = CurvedAnimation(parent: anim, curve: Curves.easeOutBack, reverseCurve: Curves.easeIn);
+      return FadeTransition(
+        opacity: anim,
+        child: ScaleTransition(scale: Tween(begin: 0.92, end: 1.0).animate(a), child: child),
+      );
+    },
   );
 }
 
@@ -360,34 +370,33 @@ class _CreateGiveawaySheetState extends ConsumerState<_CreateGiveawaySheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-      child: SafeArea(
+    return Dialog(
+      backgroundColor: _cardBg,
+      surfaceTintColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(30),
+        side: const BorderSide(color: Color(0x0FFFFFFF)),
+      ),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 440),
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(22, 12, 22, 16),
+          padding: const EdgeInsets.fromLTRB(24, 26, 24, 14),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
-                ),
-              ),
-              const SizedBox(height: 18),
               const Row(
                 children: [
-                  Icon(Icons.workspace_premium_rounded, color: _gold, size: 30),
-                  SizedBox(width: 10),
+                  _CrownIcon(size: 30),
+                  SizedBox(width: 12),
                   Text(
                     'Buat Giveaway',
-                    style: TextStyle(color: AppColors.textWhite, fontSize: 22, fontWeight: FontWeight.w800),
+                    style: TextStyle(color: AppColors.textWhite, fontSize: 25, fontWeight: FontWeight.w700),
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 22),
               AnimatedSize(
                 duration: const Duration(milliseconds: 220),
                 curve: Curves.easeOutCubic,
@@ -464,11 +473,12 @@ class _CreateGiveawaySheetState extends ConsumerState<_CreateGiveawaySheet> {
       _label('Durasi per hadiah'),
       const SizedBox(height: 12),
       Wrap(
-        spacing: 10,
+        spacing: 12,
         runSpacing: 10,
         children: [
           for (final d in dayOptions)
             _Pill(
+              width: 64,
               label: '${d}h',
               selected: _days == d,
               enabled: _ok(d, 1) && !_sending,
@@ -493,11 +503,12 @@ class _CreateGiveawaySheetState extends ConsumerState<_CreateGiveawaySheet> {
       ),
       const SizedBox(height: 12),
       Wrap(
-        spacing: 10,
+        spacing: 12,
         runSpacing: 10,
         children: [
           for (final n in slotOptions)
             _Pill(
+              width: 56,
               label: '$n',
               selected: _slots == n,
               enabled: _ok(_days, n) && !_sending,
@@ -529,7 +540,7 @@ class _CreateGiveawaySheetState extends ConsumerState<_CreateGiveawaySheet> {
           hintStyle: const TextStyle(color: AppColors.textMuted),
           counterStyle: const TextStyle(color: AppColors.textMuted),
           filled: true,
-          fillColor: AppColors.backgroundDark,
+          fillColor: Colors.transparent,
           contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(18),
@@ -549,7 +560,7 @@ class _CreateGiveawaySheetState extends ConsumerState<_CreateGiveawaySheet> {
       Container(
         padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
         decoration: BoxDecoration(
-          color: AppColors.backgroundDark,
+          color: _sumBg,
           borderRadius: BorderRadius.circular(18),
           border: Border.all(color: const Color(0x14FFFFFF)),
         ),
@@ -602,9 +613,9 @@ class _CreateGiveawaySheetState extends ConsumerState<_CreateGiveawaySheet> {
           style: FilledButton.styleFrom(
             backgroundColor: _goldDeep,
             foregroundColor: Colors.white,
-            disabledBackgroundColor: AppColors.surfaceElevated,
-            disabledForegroundColor: AppColors.textMuted,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+            disabledBackgroundColor: const Color(0xFF3A3F49),
+            disabledForegroundColor: const Color(0xFF9AA0AC),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           ),
           child: _sending
               ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
@@ -619,7 +630,8 @@ class _CreateGiveawaySheetState extends ConsumerState<_CreateGiveawaySheet> {
       const SizedBox(height: 6),
       TextButton(
         onPressed: _sending ? null : () => Navigator.pop(context),
-        child: const Text('Batal', style: TextStyle(fontWeight: FontWeight.w700)),
+        style: TextButton.styleFrom(foregroundColor: const Color(0xFF5AB4F5)),
+        child: const Text('Batal', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
       ),
     ];
   }
@@ -649,12 +661,19 @@ class _CreateGiveawaySheetState extends ConsumerState<_CreateGiveawaySheet> {
 }
 
 class _Pill extends StatelessWidget {
-  const _Pill({required this.label, required this.selected, required this.enabled, required this.onTap});
+  const _Pill({
+    required this.label,
+    required this.selected,
+    required this.enabled,
+    required this.onTap,
+    this.width = 60,
+  });
 
   final String label;
   final bool selected;
   final bool enabled;
   final VoidCallback onTap;
+  final double width;
 
   @override
   Widget build(BuildContext context) {
@@ -663,31 +682,80 @@ class _Pill extends StatelessWidget {
       opacity: enabled ? 1 : 0.35,
       child: GestureDetector(
         onTap: enabled ? onTap : null,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOutCubic,
-          constraints: const BoxConstraints(minWidth: 60),
-          height: 44,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: selected ? _gold : AppColors.backgroundDark,
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: selected ? _gold : const Color(0x14FFFFFF)),
-          ),
-          child: AnimatedDefaultTextStyle(
+        child: AnimatedScale(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutBack,
+          scale: selected ? 1.04 : 1,
+          child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
-            style: TextStyle(
-              color: selected ? Colors.black : AppColors.textWhite,
-              fontWeight: FontWeight.w800,
-              fontSize: 14,
+            curve: Curves.easeOutCubic,
+            width: width,
+            height: 44,
+            decoration: BoxDecoration(
+              color: selected ? _gold : _pillBg,
+              borderRadius: BorderRadius.circular(22),
             ),
-            child: Text(label),
+            child: Center(
+              child: AnimatedDefaultTextStyle(
+                duration: const Duration(milliseconds: 200),
+                style: TextStyle(
+                  color: selected ? const Color(0xFF1A1300) : const Color(0xFFD5D9E0),
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                ),
+                child: Text(label),
+              ),
+            ),
           ),
         ),
       ),
     );
   }
+}
+
+/// Ikon mahkota emas (judul dialog Buat Giveaway).
+class _CrownIcon extends StatelessWidget {
+  const _CrownIcon({this.size = 28});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) =>
+      CustomPaint(size: Size(size, size * 0.78), painter: _CrownPainter());
+}
+
+class _CrownPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size s) {
+    final w = s.width, h = s.height;
+    final body = Path()
+      ..moveTo(w * 0.06, h * 0.30)
+      ..lineTo(w * 0.30, h * 0.55)
+      ..lineTo(w * 0.50, h * 0.12)
+      ..lineTo(w * 0.70, h * 0.55)
+      ..lineTo(w * 0.94, h * 0.30)
+      ..lineTo(w * 0.84, h * 0.80)
+      ..lineTo(w * 0.16, h * 0.80)
+      ..close();
+    final paint = Paint()
+      ..shader = const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Color(0xFFFFD25A), _goldDeep],
+      ).createShader(Offset.zero & s);
+    canvas.drawPath(body, paint);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(Rect.fromLTWH(w * 0.16, h * 0.86, w * 0.68, h * 0.14), Radius.circular(h * 0.05)),
+      Paint()..color = _goldDeep,
+    );
+    final dot = Paint()..color = const Color(0xFFFFD25A);
+    for (final x in [0.06, 0.50, 0.94]) {
+      canvas.drawCircle(Offset(w * x, x == 0.50 ? h * 0.10 : h * 0.28), w * 0.065, dot);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 /// Tombol − angka + untuk mengatur jumlah hadiah satu per satu.
@@ -722,7 +790,7 @@ class _Stepper extends StatelessWidget {
       height: 50,
       padding: const EdgeInsets.symmetric(horizontal: 6),
       decoration: BoxDecoration(
-        color: AppColors.backgroundDark,
+        color: _sumBg,
         borderRadius: BorderRadius.circular(25),
         border: Border.all(color: const Color(0x1FFFFFFF)),
       ),
