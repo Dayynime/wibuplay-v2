@@ -646,20 +646,54 @@ class _CircleIconButton extends StatelessWidget {
       child: _Pressable(
         onTap: onTap,
         scale: 0.9,
-        child: Container(
+        // Lingkaran ikon dan badge dipisah: badge ditempel di pojok luar
+        // lingkaran (Stack), jadi ikon tetap pas di tengah.
+        child: SizedBox(
           width: 40,
           height: 40,
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.08),
-            shape: BoxShape.circle,
-            border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
-          ),
-          child: Badge(
-            isLabelVisible: badgeCount > 0,
-            backgroundColor: AppColors.errorRed,
-            textColor: Colors.white,
-            label: Text(badgeCount > 9 ? '9+' : '$badgeCount'),
-            child: Icon(icon, size: 19, color: AppColors.textWhite),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.08),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
+                  ),
+                  child: Center(child: Icon(icon, size: 19, color: AppColors.textWhite)),
+                ),
+              ),
+              Positioned(
+                top: -3,
+                right: -3,
+                child: AnimatedScale(
+                  scale: badgeCount > 0 ? 1 : 0,
+                  duration: const Duration(milliseconds: 220),
+                  curve: Curves.easeOutBack,
+                  child: Container(
+                    constraints: const BoxConstraints(minWidth: 18),
+                    height: 18,
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: AppColors.errorRed,
+                      borderRadius: BorderRadius.circular(9),
+                      border: Border.all(color: const Color(0xFF1A1D26), width: 2),
+                    ),
+                    child: Text(
+                      badgeCount > 9 ? '9+' : '$badgeCount',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        height: 1,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
