@@ -326,7 +326,13 @@ class _CreateGiveawaySheetState extends ConsumerState<_CreateGiveawaySheet> {
   static const List<int> _dayPresets = [1, 3, 7, 30];
   static const List<int> _slotPresets = [5, 10, 20, 30, 50];
 
-  bool _ok(int d, int s) => d * s <= (_status?.availableDays ?? 0);
+  /// Biaya giveaway dalam hari, termasuk pajak (dibayar pemberi).
+  double _cost(int d, int s) => d * s * (100 + (_status?.giveawayTaxPct ?? 0)) / 100;
+
+  bool _ok(int d, int s) => _cost(d, s) <= (_status?.availableDays ?? 0);
+
+  static String _fmtDays(double v) =>
+      v == v.roundToDouble() ? v.toInt().toString() : v.toStringAsFixed(1).replaceAll('.', ',');
 
   int get _maxSlots => _status?.giveawayMaxSlots ?? 1;
 
@@ -459,14 +465,17 @@ class _CreateGiveawaySheetState extends ConsumerState<_CreateGiveawaySheet> {
         if (n <= s.giveawayMaxSlots) n,
     ];
     final total = _days * _slots;
+    final taxPct = s.isPermanent ? 0 : s.giveawayTaxPct;
+    final tax = total * taxPct / 100;
+    final cost = total + tax;
     final enough = _ok(_days, _slots);
 
     // Sisa Premium pemberi setelah giveaway dibuat (khusus non-permanen).
-    int? remainAfter;
+    double? remainAfter;
     final exp = s.expiresAt;
     if (!s.isPermanent && exp != null) {
-      final left = (exp.difference(DateTime.now()).inHours / 24).ceil();
-      remainAfter = left - total;
+      final left = exp.difference(DateTime.now()).inMinutes / 1440;
+      remainAfter = left - cost;
     }
 
     return [
@@ -581,15 +590,19 @@ class _CreateGiveawaySheetState extends ConsumerState<_CreateGiveawaySheet> {
             const SizedBox(height: 10),
             _sumRow('Penerima', '$_days hari × $_slots orang', _gold),
             const Divider(color: Color(0x14FFFFFF), height: 20),
+            if (taxPct > 0) ...[
+              _sumRow('Hadiah', '$total hari', AppColors.textWhite),
+              _sumRow('Pajak $taxPct%', '+${_fmtDays(tax)} hari', _gold),
+            ],
             _sumRow(
               s.isPermanent ? 'Total hadiah' : 'Total Biaya',
-              '$total hari',
+              '${_fmtDays(cost)} hari',
               s.isPermanent ? AppColors.textWhite : AppColors.errorRed,
             ),
             if (remainAfter != null)
               _sumRow(
                 'Sisa Premium-mu',
-                remainAfter > 0 ? '$remainAfter hari' : 'Tidak cukup',
+                remainAfter > 0 ? '${remainAfter.floor()} hari' : 'Tidak cukup',
                 remainAfter > 0 ? AppColors.textSecondary : AppColors.errorRed,
               ),
           ],
@@ -597,7 +610,7 @@ class _CreateGiveawaySheetState extends ConsumerState<_CreateGiveawaySheet> {
       ),
       const SizedBox(height: 10),
       const Text(
-        'Siapa cepat dia dapat. Slot yang tidak diklaim dalam 24 jam dikembalikan ke kamu. '
+        'Siapa cepat dia dapat. Slot yang tidak diklaim dalam 24 jam dikembalikan ke kamu, beserta pajaknya. '
         'Tiap orang cuma bisa klaim sekali dari kamu, dan maksimal 30 hari dari semua giveaway.',
         style: TextStyle(color: AppColors.textMuted, fontSize: 12, height: 1.4),
       ),

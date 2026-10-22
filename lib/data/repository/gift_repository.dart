@@ -17,6 +17,7 @@ class GiftStatus {
     required this.monthMax,
     this.maxDaysPerGift = 3,
     this.giveawayMaxSlots = 3,
+    this.giveawayTaxPct = 0,
     this.openGiveawayId,
     this.expiresAt,
     this.windowUnlockAt,
@@ -34,6 +35,9 @@ class GiftStatus {
   final int monthMax;
   final int maxDaysPerGift;
   final int giveawayMaxSlots;
+
+  /// Pajak giveaway dalam persen, dibayar pemberi (50 = bayar 1,5x). 0 = tanpa pajak.
+  final int giveawayTaxPct;
 
   /// Giveaway milik sendiri yang masih berjalan (null = tidak ada).
   final int? openGiveawayId;
@@ -56,6 +60,7 @@ class GiftStatus {
         monthMax: _i(j['month_max']),
         maxDaysPerGift: j['max_days_per_gift'] == null ? 3 : _i(j['max_days_per_gift']),
         giveawayMaxSlots: j['giveaway_max_slots'] == null ? 3 : _i(j['giveaway_max_slots']),
+        giveawayTaxPct: _i(j['giveaway_tax_pct']),
         openGiveawayId: (j['open_giveaway_id'] as num?)?.toInt(),
         expiresAt: _d(j['expires_at']),
         windowUnlockAt: _d(j['window_unlock_at']),
