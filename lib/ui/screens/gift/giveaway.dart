@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
@@ -323,7 +324,7 @@ class _CreateGiveawaySheetState extends ConsumerState<_CreateGiveawaySheet> {
     }
   }
 
-  static const List<int> _dayPresets = [1, 3, 7, 30];
+  static const List<int> _dayPresets = [1, 3, 7, 14, 30];
   static const List<int> _slotPresets = [5, 10, 20, 30, 50];
 
   /// Biaya giveaway dalam hari, termasuk pajak (dibayar pemberi).
@@ -479,62 +480,26 @@ class _CreateGiveawaySheetState extends ConsumerState<_CreateGiveawaySheet> {
     }
 
     return [
-      _label('Durasi per hadiah'),
-      const SizedBox(height: 12),
-      Wrap(
-        spacing: 12,
-        runSpacing: 10,
-        children: [
-          for (final d in dayOptions)
-            _Pill(
-              width: 64,
-              label: '${d}h',
-              selected: _days == d,
-              enabled: _ok(d, 1) && !_sending,
-              onTap: () => setState(() => _days = d),
-            ),
-        ],
-      ),
-      const SizedBox(height: 22),
-      Row(
-        children: [
-          _label('Jumlah hadiah'),
-          const Spacer(),
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 200),
-            child: Text(
-              '$_slots hadiah',
-              key: ValueKey(_slots),
-              style: const TextStyle(color: _gold, fontWeight: FontWeight.w800),
-            ),
-          ),
-        ],
+      _ValuePicker(
+        label: 'Durasi per hadiah',
+        unit: 'hari',
+        value: _days,
+        max: s.maxDaysPerGift,
+        presets: dayOptions,
+        enabled: !_sending,
+        isAllowed: (v) => _ok(v, 1),
+        onChanged: (v) => setState(() => _days = v),
       ),
       const SizedBox(height: 12),
-      Wrap(
-        spacing: 12,
-        runSpacing: 10,
-        children: [
-          for (final n in slotOptions)
-            _Pill(
-              width: 56,
-              label: '$n',
-              selected: _slots == n,
-              enabled: _ok(_days, n) && !_sending,
-              onTap: () => _setSlots(n),
-            ),
-        ],
-      ),
-      const SizedBox(height: 12),
-      Align(
-        alignment: Alignment.centerRight,
-        child: _Stepper(
-          value: _slots,
-          canMinus: _slots > 1 && !_sending,
-          canPlus: _slots < s.giveawayMaxSlots && _ok(_days, _slots + 1) && !_sending,
-          onMinus: () => _setSlots(_slots - 1),
-          onPlus: () => _setSlots(_slots + 1),
-        ),
+      _ValuePicker(
+        label: 'Jumlah hadiah',
+        unit: 'orang',
+        value: _slots,
+        max: s.giveawayMaxSlots,
+        presets: slotOptions,
+        enabled: !_sending,
+        isAllowed: (v) => _ok(_days, v),
+        onChanged: _setSlots,
       ),
       const SizedBox(height: 20),
       _label('Isi pesan'),
@@ -673,59 +638,6 @@ class _CreateGiveawaySheetState extends ConsumerState<_CreateGiveawaySheet> {
       );
 }
 
-class _Pill extends StatelessWidget {
-  const _Pill({
-    required this.label,
-    required this.selected,
-    required this.enabled,
-    required this.onTap,
-    this.width = 60,
-  });
-
-  final String label;
-  final bool selected;
-  final bool enabled;
-  final VoidCallback onTap;
-  final double width;
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedOpacity(
-      duration: const Duration(milliseconds: 180),
-      opacity: enabled ? 1 : 0.35,
-      child: GestureDetector(
-        onTap: enabled ? onTap : null,
-        child: AnimatedScale(
-          duration: const Duration(milliseconds: 220),
-          curve: Curves.easeOutBack,
-          scale: selected ? 1.04 : 1,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            curve: Curves.easeOutCubic,
-            width: width,
-            height: 44,
-            decoration: BoxDecoration(
-              color: selected ? _gold : _pillBg,
-              borderRadius: BorderRadius.circular(22),
-            ),
-            child: Center(
-              child: AnimatedDefaultTextStyle(
-                duration: const Duration(milliseconds: 200),
-                style: TextStyle(
-                  color: selected ? const Color(0xFF1A1300) : const Color(0xFFD5D9E0),
-                  fontWeight: FontWeight.w700,
-                  fontSize: 14,
-                ),
-                child: Text(label),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 /// Ikon mahkota emas (judul dialog Buat Giveaway).
 class _CrownIcon extends StatelessWidget {
   const _CrownIcon({this.size = 28});
@@ -771,62 +683,204 @@ class _CrownPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
-/// Tombol − angka + untuk mengatur jumlah hadiah satu per satu.
-class _Stepper extends StatelessWidget {
-  const _Stepper({
+/// Pemilih angka ringkas: angka besar dengan tombol − / +, slider untuk geser
+/// cepat, dan beberapa chip pintasan. Nilai yang tidak terjangkau sisa Premium
+/// (isAllowed = false) dibuat redup dan slider berhenti di batas terjangkau.
+class _ValuePicker extends StatelessWidget {
+  const _ValuePicker({
+    required this.label,
+    required this.unit,
     required this.value,
-    required this.canMinus,
-    required this.canPlus,
-    required this.onMinus,
-    required this.onPlus,
+    required this.max,
+    required this.presets,
+    required this.isAllowed,
+    required this.onChanged,
+    this.enabled = true,
   });
 
+  final String label;
+  final String unit;
   final int value;
-  final bool canMinus;
-  final bool canPlus;
-  final VoidCallback onMinus;
-  final VoidCallback onPlus;
+  final int max;
+  final List<int> presets;
+  final bool Function(int) isAllowed;
+  final ValueChanged<int> onChanged;
+  final bool enabled;
+
+  int get _maxAllowed {
+    for (var v = max; v >= 1; v--) {
+      if (isAllowed(v)) return v;
+    }
+    return 1;
+  }
+
+  void _set(int v) {
+    final c = v.clamp(1, max).toInt();
+    if (c == value || !isAllowed(c)) return;
+    HapticFeedback.selectionClick();
+    onChanged(c);
+  }
 
   @override
   Widget build(BuildContext context) {
-    Widget btn(IconData icon, bool on, VoidCallback tap) => InkResponse(
-          onTap: on ? tap : null,
-          radius: 22,
-          child: SizedBox(
-            width: 40,
-            height: 44,
-            child: Icon(icon, size: 18, color: on ? AppColors.textWhite : AppColors.textMuted),
+    final cap = _maxAllowed;
+    final canMinus = enabled && value > 1;
+    final canPlus = enabled && value < max && isAllowed(value + 1);
+    final over = !isAllowed(value);
+
+    Widget roundBtn(IconData icon, bool on, VoidCallback tap) => Material(
+          color: on ? _pillBg : _pillBg.withValues(alpha: 0.4),
+          shape: const CircleBorder(),
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: on ? tap : null,
+            child: SizedBox(
+              width: 40,
+              height: 40,
+              child: Icon(icon, size: 20, color: on ? AppColors.textWhite : AppColors.textMuted),
+            ),
           ),
         );
 
     return Container(
-      height: 50,
-      padding: const EdgeInsets.symmetric(horizontal: 6),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       decoration: BoxDecoration(
         color: _sumBg,
-        borderRadius: BorderRadius.circular(25),
-        border: Border.all(color: const Color(0x1FFFFFFF)),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: over ? AppColors.errorRed.withValues(alpha: 0.5) : const Color(0x14FFFFFF)),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          btn(Icons.remove_rounded, canMinus, onMinus),
-          SizedBox(
-            width: 36,
-            child: Center(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 160),
-                transitionBuilder: (c, a) => ScaleTransition(scale: a, child: c),
-                child: Text(
-                  '$value',
-                  key: ValueKey(value),
-                  style: const TextStyle(color: AppColors.textWhite, fontWeight: FontWeight.w800, fontSize: 16),
+          Row(
+            children: [
+              Text(label,
+                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 13, fontWeight: FontWeight.w600)),
+              const Spacer(),
+              Text('maks $max',
+                  style: const TextStyle(color: AppColors.textMuted, fontSize: 11.5)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              roundBtn(Icons.remove_rounded, canMinus, () => _set(value - 1)),
+              Expanded(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 160),
+                      transitionBuilder: (c, a) => FadeTransition(
+                        opacity: a,
+                        child: ScaleTransition(scale: Tween(begin: 0.85, end: 1.0).animate(a), child: c),
+                      ),
+                      child: Text(
+                        '$value',
+                        key: ValueKey(value),
+                        style: TextStyle(
+                          color: over ? AppColors.errorRed : _gold,
+                          fontSize: 30,
+                          fontWeight: FontWeight.w800,
+                          height: 1.1,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(unit,
+                        style: const TextStyle(color: AppColors.textSecondary, fontSize: 14, fontWeight: FontWeight.w600)),
+                  ],
                 ),
               ),
+              roundBtn(Icons.add_rounded, canPlus, () => _set(value + 1)),
+            ],
+          ),
+          if (max > 1)
+            SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                trackHeight: 4,
+                activeTrackColor: _gold,
+                inactiveTrackColor: _pillBg,
+                thumbColor: _gold,
+                overlayColor: _gold.withValues(alpha: 0.15),
+                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
+                overlayShape: const RoundSliderOverlayShape(overlayRadius: 18),
+                showValueIndicator: ShowValueIndicator.never,
+                tickMarkShape: SliderTickMarkShape.noTickMark,
+              ),
+              child: Slider(
+                min: 1,
+                max: max.toDouble(),
+                divisions: max - 1,
+                value: value.clamp(1, max).toDouble(),
+                onChanged: enabled
+                    ? (v) {
+                        final n = v.round().clamp(1, cap).toInt();
+                        if (n != value) {
+                          HapticFeedback.selectionClick();
+                          onChanged(n);
+                        }
+                      }
+                    : null,
+              ),
+            ),
+          if (presets.isNotEmpty)
+            Row(
+              children: [
+                for (var i = 0; i < presets.length; i++) ...[
+                  if (i > 0) const SizedBox(width: 6),
+                  Expanded(
+                    child: _PresetChip(
+                      label: '${presets[i]}',
+                      selected: value == presets[i],
+                      enabled: enabled && isAllowed(presets[i]),
+                      onTap: () => _set(presets[i]),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PresetChip extends StatelessWidget {
+  const _PresetChip({required this.label, required this.selected, required this.enabled, required this.onTap});
+
+  final String label;
+  final bool selected;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 160),
+      opacity: enabled ? 1 : 0.35,
+      child: GestureDetector(
+        onTap: enabled ? onTap : null,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          height: 32,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: selected ? _gold : _pillBg,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: selected ? const Color(0xFF1A1300) : const Color(0xFFD5D9E0),
+              fontWeight: FontWeight.w700,
+              fontSize: 13,
             ),
           ),
-          btn(Icons.add_rounded, canPlus, onPlus),
-        ],
+        ),
       ),
     );
   }
