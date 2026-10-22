@@ -80,6 +80,10 @@ String _roleName(ZenimeRole r) {
       return 'Admin';
     case ZenimeRole.moderator:
       return 'Moderator';
+    case ZenimeRole.betaTester:
+      return 'Beta Tester';
+    case ZenimeRole.security:
+      return 'Security';
   }
 }
 
@@ -200,7 +204,8 @@ class _AdminScreenState extends ConsumerState<AdminScreen> {
       );
     }
     final role = _myRole;
-    if (role == null) {
+    // Role badge saja (Beta Tester / Security) tidak punya akses Panel Admin.
+    if (role == null || !role.isStaff) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -229,7 +234,7 @@ class _AdminScreenState extends ConsumerState<AdminScreen> {
       'Info',
     ];
     final tab = _tab < labels.length ? _tab : 0;
-    final info = roleInfoFrom(role.name, null);
+    final info = roleInfoFrom(role.value, null);
 
     return Column(
       children: [
@@ -569,7 +574,7 @@ class _UserListTabState extends ConsumerState<_UserListTab> {
       await widget.onAction(() => repo.removeRole(u.firebaseUid), 'Role dicabut');
     } else {
       await widget.onAction(
-        () => repo.setRole(u.firebaseUid, result.role!.name, badgeColor: result.badgeColor),
+        () => repo.setRole(u.firebaseUid, result.role!.value, badgeColor: result.badgeColor),
         'Role berhasil diset',
       );
     }

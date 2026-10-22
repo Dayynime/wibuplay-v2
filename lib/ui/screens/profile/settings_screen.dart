@@ -202,7 +202,7 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen>
     // Punya role (developer/admin/moderator)? Cuma buat memunculkan pintasan
     // Panel Admin; role dicek ulang di server saat panelnya dibuka.
     final isStaff =
-        user != null && ref.watch(roleInfoProvider(user.uid)).valueOrNull != null;
+        user != null && ref.watch(roleInfoProvider(user.uid)).valueOrNull?.role.isStaff == true;
     final downloadCount = ref.watch(localStoreProvider.select((s) => s.downloads.length));
     final incomingRequests =
         user == null ? 0 : (ref.watch(incomingFriendRequestsProvider).valueOrNull ?? 0);

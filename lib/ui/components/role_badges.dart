@@ -7,23 +7,30 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/screen_seed.dart';
 import '../../providers.dart';
 
-/// Role staff Zenime (tabel `user_roles`). Port ZenimeRole di Zenime.
+/// Role di tabel `user_roles`. developer/admin/moderator = STAFF (punya hak
+/// moderasi). betaTester & security = role badge saja (tanpa hak apa pun,
+/// tidak bisa membuka Panel Admin, dan tetap bisa di-ban).
 enum ZenimeRole {
-  developer,
-  admin,
-  moderator;
+  developer('developer'),
+  admin('admin'),
+  moderator('moderator'),
+  betaTester('beta_tester'),
+  security('security');
+
+  const ZenimeRole(this.value);
+
+  /// Nilai di kolom `user_roles.role`.
+  final String value;
+
+  /// Staff = boleh membuka Panel Admin. Hak per aksi tetap dicek di server.
+  bool get isStaff =>
+      this == ZenimeRole.developer || this == ZenimeRole.admin || this == ZenimeRole.moderator;
 
   static ZenimeRole? fromValue(String? v) {
-    switch (v) {
-      case 'developer':
-        return ZenimeRole.developer;
-      case 'admin':
-        return ZenimeRole.admin;
-      case 'moderator':
-        return ZenimeRole.moderator;
-      default:
-        return null;
+    for (final r in ZenimeRole.values) {
+      if (r.value == v) return r;
     }
+    return null;
   }
 }
 
@@ -63,6 +70,10 @@ Color _defaultCheck(ZenimeRole r) {
       return const Color(0xFF43A047);
     case ZenimeRole.moderator:
       return const Color(0xFF8E24AA);
+    case ZenimeRole.betaTester:
+      return const Color(0xFFFACC15);
+    case ZenimeRole.security:
+      return const Color(0xFF00E5FF);
   }
 }
 
@@ -98,6 +109,20 @@ RoleInfo? roleInfoFrom(String? roleValue, String? badgeColorHex) {
         role: role,
         primary: const Color(0xFFB26CFF),
         secondary: const Color(0xFF6C7BFF),
+        checkColor: _defaultCheck(role),
+      );
+    case ZenimeRole.betaTester:
+      return RoleInfo(
+        role: role,
+        primary: const Color(0xFFFACC15),
+        secondary: const Color(0xFFFFE680),
+        checkColor: _defaultCheck(role),
+      );
+    case ZenimeRole.security:
+      return RoleInfo(
+        role: role,
+        primary: const Color(0xFF00E5FF),
+        secondary: const Color(0xFF6BFFB8),
         checkColor: _defaultCheck(role),
       );
   }
@@ -212,6 +237,24 @@ ShapeBorder _roleShape(ZenimeRole role, Color outline) {
           bottomLeft: Radius.circular(5),
         ),
       );
+    // potong dua sudut kanan
+    case ZenimeRole.betaTester:
+      return BeveledRectangleBorder(
+        side: side,
+        borderRadius: const BorderRadius.only(
+          topRight: Radius.circular(5),
+          bottomRight: Radius.circular(5),
+        ),
+      );
+    // potong dua sudut kiri
+    case ZenimeRole.security:
+      return BeveledRectangleBorder(
+        side: side,
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(5),
+          bottomLeft: Radius.circular(5),
+        ),
+      );
   }
 }
 
@@ -223,6 +266,10 @@ IconData _roleIcon(ZenimeRole r) {
       return Icons.verified_user;
     case ZenimeRole.moderator:
       return Icons.visibility;
+    case ZenimeRole.betaTester:
+      return Icons.science_rounded;
+    case ZenimeRole.security:
+      return Icons.security_rounded;
   }
 }
 
@@ -234,6 +281,10 @@ String _roleLabel(ZenimeRole r) {
       return 'ADMIN';
     case ZenimeRole.moderator:
       return 'MODERATOR';
+    case ZenimeRole.betaTester:
+      return 'BETA TESTER';
+    case ZenimeRole.security:
+      return 'SECURITY';
   }
 }
 
