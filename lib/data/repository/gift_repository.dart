@@ -73,6 +73,8 @@ class GiveawayState {
     required this.claimed,
     required this.status,
     required this.claimedByMe,
+    this.claimedFromCreator = false,
+    this.myClaimLeft,
     this.expiresAt,
   });
 
@@ -85,6 +87,12 @@ class GiveawayState {
   /// 'open' | 'done' | 'expired'
   final String status;
   final bool claimedByMe;
+
+  /// Sudah pernah klaim giveaway lain dari pembuat yang sama (cuma boleh sekali).
+  final bool claimedFromCreator;
+
+  /// Sisa jatah klaim giveaway (maks 30 hari seumur akun). null = server lama.
+  final int? myClaimLeft;
   final DateTime? expiresAt;
 
   bool get isOpen => status == 'open' && claimed < slots;
@@ -97,6 +105,8 @@ class GiveawayState {
         claimed: GiftStatus._i(j['claimed']),
         status: (j['status'] as String?) ?? 'expired',
         claimedByMe: j['claimed_by_me'] == true,
+        claimedFromCreator: j['claimed_from_creator'] == true,
+        myClaimLeft: (j['my_claim_left'] as num?)?.toInt(),
         expiresAt: GiftStatus._d(j['expires_at']),
       );
 }

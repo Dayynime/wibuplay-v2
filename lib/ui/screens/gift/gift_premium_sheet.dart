@@ -34,18 +34,6 @@ Future<Map<String, dynamic>?> showGiftPremiumSheet(
   );
 }
 
-String _until(DateTime? t) {
-  if (t == null) return '';
-  final d = t.difference(DateTime.now());
-  if (d.isNegative) return 'sebentar lagi';
-  if (d.inDays >= 1) {
-    final h = d.inHours % 24;
-    return h > 0 ? '${d.inDays} hari $h jam' : '${d.inDays} hari';
-  }
-  if (d.inHours >= 1) return '${d.inHours} jam ${d.inMinutes % 60} menit';
-  return '${d.inMinutes < 1 ? 1 : d.inMinutes} menit';
-}
-
 class _GiftSheet extends ConsumerStatefulWidget {
   const _GiftSheet({required this.recipientUid, required this.recipientName, required this.channel});
 
@@ -223,24 +211,31 @@ class _GiftSheetState extends ConsumerState<_GiftSheet> {
     }
 
     final avail = s.availableDays;
-    final monthFull = s.monthUsed >= s.monthMax;
-    final windowFull = s.windowUsed >= s.windowMax;
+    final options = [
+      for (final d in const [1, 3, 7, 14, 30])
+        if (d <= s.maxDaysPerGift) d,
+    ];
+    int? remainAfter;
+    final exp = s.expiresAt;
+    if (!s.isPermanent && exp != null) {
+      remainAfter = (exp.difference(DateTime.now()).inHours / 24).ceil() - _days;
+    }
 
     return [
       const Text('Jumlah hari', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
       const SizedBox(height: 8),
       Row(
         children: [
-          for (final d in const [1, 2, 3]) ...[
+          for (var i = 0; i < options.length; i++) ...[
+            if (i > 0) const SizedBox(width: 8),
             Expanded(
               child: _DayChip(
-                days: d,
-                selected: _days == d && d <= avail,
-                enabled: d <= avail && !_sending,
-                onTap: () => setState(() => _days = d),
+                days: options[i],
+                selected: _days == options[i] && options[i] <= avail,
+                enabled: options[i] <= avail && !_sending,
+                onTap: () => setState(() => _days = options[i]),
               ),
             ),
-            if (d != 3) const SizedBox(width: 10),
           ],
         ],
       ),
@@ -254,13 +249,15 @@ class _GiftSheetState extends ConsumerState<_GiftSheet> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _infoRow(Icons.timelapse, 'Kuota 3 hari', '${s.windowMax - s.windowUsed < 0 ? 0 : s.windowMax - s.windowUsed} / ${s.windowMax} hari'),
-            _infoRow(Icons.calendar_month, 'Bulan ini', '${s.monthUsed} / ${s.monthMax} hari terpakai'),
-            if (avail == 0 && monthFull)
-              _note('Batas bulan ini tercapai. Reset dalam ${_until(s.monthResetAt)}.')
-            else if (avail == 0 && windowFull)
-              _note('Kuota habis. Bisa kirim lagi dalam ${_until(s.windowUnlockAt)}.')
-            else if (avail == 0)
+            if (s.isPermanent)
+              _infoRow(Icons.all_inclusive, 'Premium kamu', 'Permanen')
+            else if (remainAfter != null)
+              _infoRow(
+                Icons.hourglass_bottom,
+                'Sisa Premium setelah kirim',
+                remainAfter > 0 ? '$remainAfter hari' : 'Tidak cukup',
+              ),
+            if (avail == 0)
               _note('Sisa Premium kamu tidak cukup untuk memberi.')
             else if (!s.isPermanent)
               _note('Sisa Premium kamu akan berkurang $_days hari.'),

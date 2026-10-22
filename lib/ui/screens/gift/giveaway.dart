@@ -145,6 +145,7 @@ class _GiveawayCardState extends ConsumerState<GiveawayCard> {
     String subtitle;
     String button;
     VoidCallback? onTap;
+    var blocked = false;
     if (g == null) {
       subtitle = 'Memuat...';
       button = '...';
@@ -157,13 +158,23 @@ class _GiveawayCardState extends ConsumerState<GiveawayCard> {
     } else if (!g.isOpen) {
       subtitle = 'Slot sudah habis';
       button = 'Habis';
+    } else if (!mine && g.claimedFromCreator) {
+      subtitle = 'Kamu sudah pernah klaim dari dia';
+      button = 'Klaim';
+      blocked = true;
+    } else if (!mine && g.myClaimLeft != null && g.myClaimLeft! < days) {
+      subtitle = g.myClaimLeft! <= 0
+          ? 'Jatah klaim 30 hari kamu sudah habis'
+          : 'Sisa jatah klaim kamu ${g.myClaimLeft} hari';
+      button = 'Klaim';
+      blocked = true;
     } else {
       subtitle = '${g.claimed}/${g.slots} diklaim · ${_countdown(g.expiresAt)}';
       button = mine ? 'Punyamu' : 'Klaim';
       onTap = mine || _claiming ? null : _claim;
     }
 
-    final gradient = active && g != null && !g.claimedByMe
+    final gradient = active && g != null && !g.claimedByMe && !blocked
         ? const LinearGradient(colors: [Color(0xFF8A5A12), _goldDeep, _gold])
         : const LinearGradient(colors: [Color(0xFF6B6F78), Color(0xFFA3A7AF), Color(0xFF7D8189)]);
 
@@ -288,6 +299,10 @@ class _CreateGiveawaySheetState extends ConsumerState<_CreateGiveawaySheet> {
       setState(() {
         _status = s;
         _loading = false;
+        if (!_ok(_days, _slots)) {
+          _days = 1;
+          _slots = 1;
+        }
       });
     } catch (e) {
       if (!mounted) return;
@@ -298,10 +313,16 @@ class _CreateGiveawaySheetState extends ConsumerState<_CreateGiveawaySheet> {
     }
   }
 
+  static const List<int> _dayPresets = [1, 3, 7, 30];
+  static const List<int> _slotPresets = [5, 10, 20, 30, 50];
+
   bool _ok(int d, int s) => d * s <= (_status?.availableDays ?? 0);
+
+  int get _maxSlots => _status?.giveawayMaxSlots ?? 1;
 
   Future<void> _create() async {
     if (_sending || !_ok(_days, _slots)) return;
+    FocusScope.of(context).unfocus();
     setState(() {
       _sending = true;
       _error = null;
@@ -331,13 +352,19 @@ class _CreateGiveawaySheetState extends ConsumerState<_CreateGiveawaySheet> {
     }
   }
 
+  void _setSlots(int n) {
+    final v = n.clamp(1, _maxSlots).toInt();
+    if (v == _slots) return;
+    setState(() => _slots = v);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+          padding: const EdgeInsets.fromLTRB(22, 12, 22, 16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -349,10 +376,10 @@ class _CreateGiveawaySheetState extends ConsumerState<_CreateGiveawaySheet> {
                   decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 18),
               const Row(
                 children: [
-                  Icon(Icons.workspace_premium, color: _gold, size: 30),
+                  Icon(Icons.workspace_premium_rounded, color: _gold, size: 30),
                   SizedBox(width: 10),
                   Text(
                     'Buat Giveaway',
@@ -360,14 +387,21 @@ class _CreateGiveawaySheetState extends ConsumerState<_CreateGiveawaySheet> {
                   ),
                 ],
               ),
-              const SizedBox(height: 18),
-              if (_loading)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 30),
-                  child: Center(child: CircularProgressIndicator(color: _gold)),
-                )
-              else
-                ..._content(),
+              const SizedBox(height: 20),
+              AnimatedSize(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutCubic,
+                alignment: Alignment.topCenter,
+                child: _loading
+                    ? const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 30),
+                        child: Center(child: CircularProgressIndicator(color: _gold)),
+                      )
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: _content(),
+                      ),
+              ),
             ],
           ),
         ),
@@ -405,65 +439,86 @@ class _CreateGiveawaySheetState extends ConsumerState<_CreateGiveawaySheet> {
         ),
       ];
     }
-    if (s.openGiveawayId != null) {
-      return [
-        const Text(
-          'Giveaway kamu sebelumnya masih berjalan. Tunggu sampai slotnya habis atau berakhir (24 jam).',
-          style: TextStyle(color: AppColors.textSecondary, height: 1.4),
-        ),
-      ];
-    }
 
     final avail = s.availableDays;
-    if (!_ok(_days, _slots)) {
-      // Pilihan saat ini melebihi kuota -> turunkan otomatis.
-      _slots = 1;
-      if (!_ok(_days, 1)) _days = 1;
-    }
+    final dayOptions = [
+      for (final d in _dayPresets)
+        if (d <= s.maxDaysPerGift) d,
+    ];
+    final slotOptions = [
+      for (final n in _slotPresets)
+        if (n <= s.giveawayMaxSlots) n,
+    ];
     final total = _days * _slots;
+    final enough = _ok(_days, _slots);
+
+    // Sisa Premium pemberi setelah giveaway dibuat (khusus non-permanen).
+    int? remainAfter;
+    final exp = s.expiresAt;
+    if (!s.isPermanent && exp != null) {
+      final left = (exp.difference(DateTime.now()).inHours / 24).ceil();
+      remainAfter = left - total;
+    }
 
     return [
-      const Text('Durasi per hadiah', style: TextStyle(color: AppColors.textWhite, fontWeight: FontWeight.w700)),
-      const SizedBox(height: 10),
+      _label('Durasi per hadiah'),
+      const SizedBox(height: 12),
       Wrap(
         spacing: 10,
+        runSpacing: 10,
         children: [
-          for (var d = 1; d <= s.maxDaysPerGift; d++)
+          for (final d in dayOptions)
             _Pill(
               label: '${d}h',
               selected: _days == d,
               enabled: _ok(d, 1) && !_sending,
-              onTap: () => setState(() {
-                _days = d;
-                if (!_ok(_days, _slots)) _slots = 1;
-              }),
+              onTap: () => setState(() => _days = d),
             ),
         ],
       ),
-      const SizedBox(height: 18),
+      const SizedBox(height: 22),
       Row(
         children: [
-          const Text('Jumlah hadiah', style: TextStyle(color: AppColors.textWhite, fontWeight: FontWeight.w700)),
+          _label('Jumlah hadiah'),
           const Spacer(),
-          Text('$_slots hadiah', style: const TextStyle(color: _gold, fontWeight: FontWeight.w700)),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 200),
+            child: Text(
+              '$_slots hadiah',
+              key: ValueKey(_slots),
+              style: const TextStyle(color: _gold, fontWeight: FontWeight.w800),
+            ),
+          ),
         ],
       ),
-      const SizedBox(height: 10),
+      const SizedBox(height: 12),
       Wrap(
         spacing: 10,
+        runSpacing: 10,
         children: [
-          for (var n = 1; n <= s.giveawayMaxSlots; n++)
+          for (final n in slotOptions)
             _Pill(
               label: '$n',
               selected: _slots == n,
               enabled: _ok(_days, n) && !_sending,
-              onTap: () => setState(() => _slots = n),
+              onTap: () => _setSlots(n),
             ),
         ],
       ),
-      const SizedBox(height: 18),
-      const Text('Isi pesan', style: TextStyle(color: AppColors.textWhite, fontWeight: FontWeight.w700)),
-      const SizedBox(height: 10),
+      const SizedBox(height: 12),
+      Align(
+        alignment: Alignment.centerRight,
+        child: _Stepper(
+          value: _slots,
+          canMinus: _slots > 1 && !_sending,
+          canPlus: _slots < s.giveawayMaxSlots && _ok(_days, _slots + 1) && !_sending,
+          onMinus: () => _setSlots(_slots - 1),
+          onPlus: () => _setSlots(_slots + 1),
+        ),
+      ),
+      const SizedBox(height: 20),
+      _label('Isi pesan'),
+      const SizedBox(height: 12),
       TextField(
         controller: _note,
         maxLength: 150,
@@ -475,83 +530,119 @@ class _CreateGiveawaySheetState extends ConsumerState<_CreateGiveawaySheet> {
           counterStyle: const TextStyle(color: AppColors.textMuted),
           filled: true,
           fillColor: AppColors.backgroundDark,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(18),
+            borderSide: const BorderSide(color: Color(0x1FFFFFFF)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(18),
+            borderSide: const BorderSide(color: _gold, width: 1.2),
+          ),
+          disabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(18),
+            borderSide: const BorderSide(color: Color(0x14FFFFFF)),
+          ),
         ),
       ),
-      const SizedBox(height: 8),
+      const SizedBox(height: 6),
       Container(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
         decoration: BoxDecoration(
           color: AppColors.backgroundDark,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(18),
           border: Border.all(color: const Color(0x14FFFFFF)),
         ),
         child: Column(
           children: [
             const Align(
               alignment: Alignment.centerLeft,
-              child: Text('RINGKASAN',
-                  style: TextStyle(color: AppColors.textMuted, fontSize: 11, letterSpacing: 1, fontWeight: FontWeight.w700)),
+              child: Text(
+                'RINGKASAN',
+                style: TextStyle(
+                  color: AppColors.textMuted,
+                  fontSize: 11,
+                  letterSpacing: 1,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
             ),
             const SizedBox(height: 10),
             _sumRow('Penerima', '$_days hari × $_slots orang', _gold),
-            const Divider(color: Color(0x14FFFFFF), height: 18),
+            const Divider(color: Color(0x14FFFFFF), height: 20),
             _sumRow(
-              s.isPermanent ? 'Total hadiah' : 'Dipotong dari Premium-mu',
+              s.isPermanent ? 'Total hadiah' : 'Total Biaya',
               '$total hari',
               s.isPermanent ? AppColors.textWhite : AppColors.errorRed,
             ),
-            _sumRow('Sisa kuota', '${avail - total < 0 ? 0 : avail - total} hari', AppColors.textSecondary),
+            if (remainAfter != null)
+              _sumRow(
+                'Sisa Premium-mu',
+                remainAfter > 0 ? '$remainAfter hari' : 'Tidak cukup',
+                remainAfter > 0 ? AppColors.textSecondary : AppColors.errorRed,
+              ),
           ],
         ),
       ),
-      const SizedBox(height: 8),
+      const SizedBox(height: 10),
       const Text(
-        'Siapa cepat dia dapat. Slot yang tidak diklaim dalam 24 jam dikembalikan ke kamu.',
-        style: TextStyle(color: AppColors.textMuted, fontSize: 12, height: 1.35),
+        'Siapa cepat dia dapat. Slot yang tidak diklaim dalam 24 jam dikembalikan ke kamu. '
+        'Tiap orang cuma bisa klaim sekali dari kamu, dan maksimal 30 hari dari semua giveaway.',
+        style: TextStyle(color: AppColors.textMuted, fontSize: 12, height: 1.4),
       ),
-      if (avail < 1) ...[
-        const SizedBox(height: 8),
-        Text(
-          s.monthUsed >= s.monthMax
-              ? 'Batas bulan ini tercapai.'
-              : 'Kuota habis untuk sementara. Bisa lagi setelah 3 hari dari gift terakhir.',
-          style: const TextStyle(color: _gold, fontSize: 12),
-        ),
-      ],
       if (_error != null) ...[
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
         Text(_error!, style: const TextStyle(color: AppColors.errorRed, fontSize: 13)),
       ],
-      const SizedBox(height: 16),
+      const SizedBox(height: 18),
       SizedBox(
-        height: 52,
+        height: 54,
         child: FilledButton(
-          onPressed: avail < 1 || _sending ? null : _create,
+          onPressed: !enough || _sending ? null : _create,
           style: FilledButton.styleFrom(
             backgroundColor: _goldDeep,
+            foregroundColor: Colors.white,
             disabledBackgroundColor: AppColors.surfaceElevated,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            disabledForegroundColor: AppColors.textMuted,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
           ),
           child: _sending
               ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-              : const Text('Buat Giveaway', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+              : Text(
+                  avail < 1
+                      ? 'Sisa Premium tidak cukup'
+                      : (enough ? 'Buat Giveaway' : 'Kurangi durasi / jumlah'),
+                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+                ),
         ),
       ),
+      const SizedBox(height: 6),
       TextButton(
         onPressed: _sending ? null : () => Navigator.pop(context),
-        child: const Text('Batal'),
+        child: const Text('Batal', style: TextStyle(fontWeight: FontWeight.w700)),
       ),
     ];
   }
 
+  Widget _label(String text) => Text(
+        text,
+        style: const TextStyle(color: AppColors.textWhite, fontWeight: FontWeight.w700, fontSize: 15),
+      );
+
   Widget _sumRow(String label, String value, Color color) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 3),
+        padding: const EdgeInsets.symmetric(vertical: 4),
         child: Row(
           children: [
             Text(label, style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
             const Spacer(),
-            Text(value, style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 13)),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              child: Text(
+                value,
+                key: ValueKey(value),
+                style: TextStyle(color: color, fontWeight: FontWeight.w800, fontSize: 14),
+              ),
+            ),
           ],
         ),
       );
@@ -567,27 +658,94 @@ class _Pill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Opacity(
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 180),
       opacity: enabled ? 1 : 0.35,
       child: GestureDetector(
         onTap: enabled ? onTap : null,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          width: 62,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOutCubic,
+          constraints: const BoxConstraints(minWidth: 60),
           height: 44,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
           alignment: Alignment.center,
           decoration: BoxDecoration(
             color: selected ? _gold : AppColors.backgroundDark,
             borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: selected ? _gold : const Color(0x14FFFFFF)),
           ),
-          child: Text(
-            label,
+          child: AnimatedDefaultTextStyle(
+            duration: const Duration(milliseconds: 200),
             style: TextStyle(
               color: selected ? Colors.black : AppColors.textWhite,
               fontWeight: FontWeight.w800,
+              fontSize: 14,
             ),
+            child: Text(label),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Tombol − angka + untuk mengatur jumlah hadiah satu per satu.
+class _Stepper extends StatelessWidget {
+  const _Stepper({
+    required this.value,
+    required this.canMinus,
+    required this.canPlus,
+    required this.onMinus,
+    required this.onPlus,
+  });
+
+  final int value;
+  final bool canMinus;
+  final bool canPlus;
+  final VoidCallback onMinus;
+  final VoidCallback onPlus;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget btn(IconData icon, bool on, VoidCallback tap) => InkResponse(
+          onTap: on ? tap : null,
+          radius: 22,
+          child: SizedBox(
+            width: 40,
+            height: 44,
+            child: Icon(icon, size: 18, color: on ? AppColors.textWhite : AppColors.textMuted),
+          ),
+        );
+
+    return Container(
+      height: 50,
+      padding: const EdgeInsets.symmetric(horizontal: 6),
+      decoration: BoxDecoration(
+        color: AppColors.backgroundDark,
+        borderRadius: BorderRadius.circular(25),
+        border: Border.all(color: const Color(0x1FFFFFFF)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          btn(Icons.remove_rounded, canMinus, onMinus),
+          SizedBox(
+            width: 36,
+            child: Center(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 160),
+                transitionBuilder: (c, a) => ScaleTransition(scale: a, child: c),
+                child: Text(
+                  '$value',
+                  key: ValueKey(value),
+                  style: const TextStyle(color: AppColors.textWhite, fontWeight: FontWeight.w800, fontSize: 16),
+                ),
+              ),
+            ),
+          ),
+          btn(Icons.add_rounded, canPlus, onPlus),
+        ],
       ),
     );
   }
