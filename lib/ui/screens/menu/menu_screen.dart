@@ -130,11 +130,6 @@ class MenuScreen extends ConsumerWidget {
               subtitle: 'Gacha, Pohon ZCoin, Border Avatar & Efek Profil',
               icon: Icons.sports_esports_rounded,
               accent: const Color(0xFFA855F7),
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFF3B1A6B), Color(0xFF8B3DFF), Color(0xFF22D3EE)],
-              ),
               onTap: () => Navigator.of(context).push<void>(fadeRoute(const ZenimeGamesScreen())),
             ),
           ],
@@ -211,7 +206,7 @@ class _MenuCard extends StatelessWidget {
                   Positioned(
                     right: -14,
                     bottom: -18,
-                    child: Icon(icon, size: 130, color: Colors.white.withValues(alpha: 0.12)),
+                    child: Icon(icon, size: 130, color: accent.withValues(alpha: 0.10)),
                   ),
                 Padding(
                   padding: const EdgeInsets.all(18),
@@ -221,7 +216,7 @@ class _MenuCard extends StatelessWidget {
                         width: 50,
                         height: 50,
                         decoration: BoxDecoration(
-                          color: accent.withValues(alpha: imageUrl == null ? 0.35 : 0.18),
+                          color: accent.withValues(alpha: 0.18),
                           shape: BoxShape.circle,
                           border: Border.all(color: accent.withValues(alpha: 0.6)),
                         ),

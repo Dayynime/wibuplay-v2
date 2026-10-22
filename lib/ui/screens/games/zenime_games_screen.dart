@@ -12,6 +12,7 @@ import '../profile_effect/profile_effect_screen.dart';
 import '../store/coin_screen.dart';
 import '../tree/tree_screen.dart';
 import '../wallpaper/wallpaper_screen.dart';
+import 'game_previews.dart';
 
 /// Hub "Zenime Games": satu pintu ke Gacha, Pohon ZCoin, Border Avatar, dan
 /// Efek Profil (dulunya empat kartu terpisah di tab Menu).
@@ -29,6 +30,7 @@ class _GameItem {
     required this.icon,
     required this.colors,
     required this.page,
+    required this.preview,
   });
 
   final String title;
@@ -36,6 +38,9 @@ class _GameItem {
   final IconData icon;
   final List<Color> colors;
   final Widget Function() page;
+
+  /// Thumbnail halaman game (live, pakai data user).
+  final Widget Function() preview;
 }
 
 class _ZenimeGamesScreenState extends ConsumerState<ZenimeGamesScreen>
@@ -52,6 +57,7 @@ class _ZenimeGamesScreenState extends ConsumerState<ZenimeGamesScreen>
       icon: Icons.casino_rounded,
       colors: const [Color(0xFF3B1A6B), Color(0xFF8B3DFF), Color(0xFFFF2E63)],
       page: () => const WallpaperScreen(),
+      preview: () => const GachaPreview(),
     ),
     _GameItem(
       title: 'Pohon ZCoin',
@@ -59,6 +65,7 @@ class _ZenimeGamesScreenState extends ConsumerState<ZenimeGamesScreen>
       icon: Icons.park_rounded,
       colors: const [Color(0xFF0F3D2A), Color(0xFF1F8A4C), Color(0xFFF59E0B)],
       page: () => const TreeScreen(),
+      preview: () => const TreePreview(),
     ),
     _GameItem(
       title: 'Border Avatar',
@@ -66,6 +73,7 @@ class _ZenimeGamesScreenState extends ConsumerState<ZenimeGamesScreen>
       icon: Icons.blur_circular_rounded,
       colors: const [Color(0xFF0B2A4A), Color(0xFF7C3AED), Color(0xFF22D3EE)],
       page: () => const AvatarFrameScreen(),
+      preview: () => const FramePreview(),
     ),
     _GameItem(
       title: 'Efek Profil',
@@ -73,6 +81,7 @@ class _ZenimeGamesScreenState extends ConsumerState<ZenimeGamesScreen>
       icon: Icons.auto_awesome_rounded,
       colors: const [Color(0xFF2A0B3D), Color(0xFFDB2777), Color(0xFFF59E0B)],
       page: () => const ProfileEffectScreen(),
+      preview: () => const EffectPreview(),
     ),
   ];
 
@@ -116,6 +125,8 @@ class _ZenimeGamesScreenState extends ConsumerState<ZenimeGamesScreen>
     // Saldo bisa berubah (gacha / panen pohon / beli border & efek).
     final uid = ref.read(authUserProvider).valueOrNull?.uid;
     if (uid != null && mounted) ref.invalidate(coinBalanceProvider(uid));
+    // Thumbnail ikut update (border/efek baru dipasang, buah dipanen, dll).
+    if (mounted) refreshGamePreviews(ref);
   }
 
   @override
@@ -151,7 +162,7 @@ class _ZenimeGamesScreenState extends ConsumerState<ZenimeGamesScreen>
               crossAxisCount: 2,
               mainAxisSpacing: 12,
               crossAxisSpacing: 12,
-              childAspectRatio: 0.86,
+              childAspectRatio: 0.7,
             ),
             itemBuilder: (_, i) => _reveal(i + 1, _GameTile(item: _games[i], onTap: () => _open(_games[i]))),
           ),
@@ -235,69 +246,80 @@ class _GameTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return _Pressable(
       onTap: onTap,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(22),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(22),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: item.colors,
-            ),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(22),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: item.colors,
           ),
-          child: Stack(
-            children: [
-              Positioned(
-                right: -18,
-                bottom: -18,
-                child: Icon(item.icon, size: 110, color: Colors.white.withValues(alpha: 0.13)),
-              ),
-              Positioned.fill(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [Colors.black.withValues(alpha: 0), Colors.black.withValues(alpha: 0.35)],
-                    ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Thumbnail halaman game.
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(7, 7, 7, 0),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      const ColoredBox(color: Color(0x59000000)),
+                      RepaintBoundary(child: item.preview()),
+                      // Ikon game di pojok kiri atas thumbnail.
+                      Positioned(
+                        left: 7,
+                        top: 7,
+                        child: Container(
+                          width: 30,
+                          height: 30,
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.35),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+                          ),
+                          child: Icon(item.icon, color: Colors.white, size: 17),
+                        ),
+                      ),
+                      // Garis tepi tipis biar terlihat seperti "layar".
+                      IgnorePointer(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.all(14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.18),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
-                      ),
-                      child: Icon(item.icon, color: Colors.white, size: 22),
-                    ),
-                    const Spacer(),
-                    Text(
-                      item.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: Colors.white, fontSize: 16.5, fontWeight: FontWeight.w800),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      item.subtitle,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 11.5, height: 1.3),
-                    ),
-                  ],
-                ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 9, 12, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Colors.white, fontSize: 15.5, fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    item.subtitle,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 11, height: 1.3),
+                  ),
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
