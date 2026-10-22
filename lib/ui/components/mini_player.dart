@@ -5,11 +5,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wibuplay/core/wp_video.dart';
 
+import '../../core/premium_access.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/watch_xp_gate.dart';
+import '../../data/models/stream_data.dart';
 import '../../providers.dart';
 import '../app_routes.dart';
+import '../screens/player/player_controller.dart';
 import 'net_image.dart';
+
+/// Perkiraan intro/outro, sama dengan layar player penuh.
+const int _kMiniIntroSkipMs = 90000;
+const int _kMiniOutroWindowMs = 85000;
+const int _kMiniMinDurationForSkipMs = _kMiniIntroSkipMs * 3;
 
 /// Info episode yang sedang "diminimize" ke mini player.
 class MiniPlayerInfo {
@@ -21,6 +29,7 @@ class MiniPlayerInfo {
     required this.posterUrl,
     required this.link,
     required this.speed,
+    this.nextEpisodeId,
   });
 
   final String movieId;
@@ -32,6 +41,10 @@ class MiniPlayerInfo {
   /// Link stream yang sedang diputar (supaya kualitas tetap sama saat expand).
   final String link;
   final double speed;
+
+  /// Episode berikutnya (null = tidak ada / tidak diketahui). Dipakai untuk
+  /// auto-lanjut langsung di mini player.
+  final String? nextEpisodeId;
 }
 
 /// Menyimpan SATU WpVideoController yang dititipkan dari PlayerScreen saat
@@ -154,6 +167,17 @@ class _MiniPlayerOverlayState extends ConsumerState<MiniPlayerOverlay>
   Timer? _xpTick;
   bool _inForeground = true;
 
+  // ---- Auto-lanjut episode di mini player
+  WpVideoController? _watched;
+  int _lastDurMs = 0;
+  bool _outroDone = false;
+  bool _introPending = false;
+  ProviderSubscription<PlayerUiState>? _nextSub;
+  (String, String)? _nextArgs;
+  MiniPlayerInfo? _nextFrom;
+  Timer? _nextTimeout;
+  bool _starting = false;
+
   @override
   void initState() {
     super.initState();
@@ -179,7 +203,9 @@ class _MiniPlayerOverlayState extends ConsumerState<MiniPlayerOverlay>
   /// dobel dengan layar player: detik hanya dihitung kalau video playing,
   /// tidak buffering, dan app di depan.
   void _onXpTick(Timer _) {
-    if (!mounted || !_inForeground) return;
+    if (!mounted) return;
+    _checkAutoNext();
+    if (!_inForeground) return;
     final vc = MiniPlayerManager.instance.controller;
     if (vc == null || !vc.value.isPlaying || vc.value.isBuffering) return;
     if (!WatchXpGate.onActiveSecond(this)) return;
@@ -195,6 +221,7 @@ class _MiniPlayerOverlayState extends ConsumerState<MiniPlayerOverlay>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _xpTick?.cancel();
+    _cancelNext();
     WatchXpGate.release(this);
     _hideTimer?.cancel();
     _snapCtl.dispose();
@@ -202,6 +229,192 @@ class _MiniPlayerOverlayState extends ConsumerState<MiniPlayerOverlay>
     _dragging.dispose();
     _controlsVisible.dispose();
     super.dispose();
+  }
+
+  // ------------------------------------------------------------ auto-lanjut
+
+  /// Dicek tiap detik: skip intro episode baru, lalu auto-lanjut saat video
+  /// habis (selalu) atau masuk zona outro (kalau Auto-Lanjut nyala).
+  void _checkAutoNext() {
+    final m = MiniPlayerManager.instance;
+    final vc = m.controller;
+    final info = m.info;
+    if (vc == null || info == null) {
+      if (!_starting) _cancelNext();
+      _watched = null;
+      return;
+    }
+    if (!identical(vc, _watched)) {
+      _watched = vc;
+      _lastDurMs = 0;
+      _outroDone = false;
+    }
+    final v = vc.value;
+    final d = v.duration.inMilliseconds;
+    if (d > 0) _lastDurMs = d;
+    final store = ref.read(localStoreProvider);
+    final pos = v.position.inMilliseconds;
+
+    if (_introPending && _lastDurMs > 0 && v.isInitialized) {
+      _introPending = false;
+      if (store.autoSkipIntro &&
+          _lastDurMs > _kMiniMinDurationForSkipMs &&
+          pos < _kMiniIntroSkipMs - 5000) {
+        unawaited(vc.seekTo(const Duration(milliseconds: _kMiniIntroSkipMs)));
+      }
+    }
+
+    if (_nextSub != null) {
+      unawaited(_evalNext());
+      return;
+    }
+    final nextId = info.nextEpisodeId;
+    if (_starting || nextId == null || nextId.trim().isEmpty) return;
+
+    final ended = v.isInitialized &&
+        _lastDurMs > 0 &&
+        (v.isCompleted || pos >= _lastDurMs - 300);
+    final outro = !_outroDone &&
+        v.isPlaying &&
+        store.autoSkipOutro &&
+        _lastDurMs > _kMiniMinDurationForSkipMs &&
+        _lastDurMs - pos <= _kMiniOutroWindowMs;
+    // Sekali per episode (kalau gagal memuat, tidak dicoba terus-menerus).
+    if (!_outroDone && (ended || outro)) {
+      _outroDone = true;
+      _startNext(info, nextId);
+    }
+  }
+
+  void _startNext(MiniPlayerInfo info, String nextId) {
+    _cancelNext();
+    final args = (info.movieId, nextId);
+    _nextArgs = args;
+    _nextFrom = info;
+    // Batas waktu: kalau stream episode berikutnya tidak siap, berhenti saja.
+    _nextTimeout = Timer(const Duration(seconds: 30), _cancelNext);
+    _nextSub = ref.listenManual<PlayerUiState>(
+      playerControllerProvider(args),
+      (_, __) => unawaited(_evalNext()),
+      fireImmediately: true,
+    );
+  }
+
+  void _cancelNext() {
+    _nextSub?.close();
+    _nextSub = null;
+    _nextArgs = null;
+    _nextFrom = null;
+    _nextTimeout?.cancel();
+    _nextTimeout = null;
+  }
+
+  String? _indexOf(PlayerUiState ui) {
+    for (final e in ui.episodes) {
+      if (e.id == ui.currentEpisodeId) return e.index;
+    }
+    final se = ui.streamData?.episode;
+    if (se != null && se.id == ui.currentEpisodeId) return se.index;
+    return null;
+  }
+
+  StreamServer? _bestUnlocked(List<StreamServer> servers) {
+    StreamServer? best;
+    var bestValue = -1;
+    for (final sv in servers) {
+      final link = sv.link;
+      if (link == null || link.trim().isEmpty) continue;
+      if (isQualityLocked(sv.quality, false)) continue;
+      final val = qualityValueP(sv.quality) ?? 0;
+      if (val > bestValue) {
+        best = sv;
+        bestValue = val;
+      }
+    }
+    return best;
+  }
+
+  /// Aturan sama dengan layar player: episode terkunci Premium -> buka layar
+  /// penuh (menampilkan kunci); non-Premium dibatasi kualitas maksimal.
+  Future<void> _evalNext() async {
+    final sub = _nextSub;
+    final args = _nextArgs;
+    final from = _nextFrom;
+    if (sub == null || args == null || from == null || _starting || !mounted) return;
+    final ui = sub.read();
+
+    if (ui.streamError != null && !ui.isLoadingStream && ui.selectedServer == null) {
+      _cancelNext();
+      return;
+    }
+    if (!ui.episodesLoaded) return;
+
+    final premium = ref.read(myPremiumProvider);
+    final isPremium = premium.valueOrNull ?? false;
+    if (!isPremium) {
+      if (!(premium.hasValue || premium.hasError)) return;
+      final total = latestEpisodeIndex(ui.episodes.map((e) => e.index));
+      if (isEpisodeLocked(_indexOf(ui), total, false)) {
+        _cancelNext();
+        MiniPlayerManager.instance.close();
+        openPlayerFromMini(args.$1, args.$2);
+        return;
+      }
+    }
+
+    var sel = ui.selectedServer;
+    if (sel == null) return; // stream masih dimuat
+    if (!isPremium && isQualityLocked(sel.quality, false)) {
+      sel = _bestUnlocked(ui.streamData?.server ?? const []);
+      if (sel == null) {
+        _cancelNext();
+        return;
+      }
+    }
+    final link = sel.link;
+    if (link == null || link.trim().isEmpty) return;
+
+    _starting = true;
+    final nextNext = ref.read(playerControllerProvider(args).notifier).nextEpisodeId;
+    final idx = _indexOf(ui);
+    _cancelNext();
+
+    final WpVideoController vc;
+    try {
+      vc = WpVideoController.networkUrl(Uri.parse(link));
+      await vc.initialize();
+    } catch (_) {
+      _starting = false;
+      return;
+    }
+
+    // Mini player ditutup / dibuka ke layar penuh selama memuat: buang.
+    final cur = MiniPlayerManager.instance.info;
+    if (!mounted || cur == null || cur.episodeId != from.episodeId || cur.movieId != from.movieId) {
+      _starting = false;
+      await vc.dispose();
+      return;
+    }
+
+    _introPending = true;
+    MiniPlayerManager.instance.activate(
+      vc,
+      MiniPlayerInfo(
+        movieId: from.movieId,
+        episodeId: args.$2,
+        title: from.title,
+        episodeLabel: idx != null && idx.isNotEmpty ? 'Ep $idx' : from.episodeLabel,
+        posterUrl: from.posterUrl,
+        link: link,
+        speed: from.speed,
+        nextEpisodeId: nextNext,
+      ),
+    );
+    try {
+      await vc.play();
+      if (from.speed != 1.0) await vc.setPlaybackSpeed(from.speed);
+    } catch (_) {}
+    _starting = false;
   }
 
   void _showControlsBriefly() {

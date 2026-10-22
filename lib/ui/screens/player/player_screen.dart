@@ -137,6 +137,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
   final PlayerLevels _levels = PlayerLevels();
   double _speed = 1.0;
   bool _outroSkipped = false;
+  // media_kit melaporkan durasi belakangan (bisa setelah video dianggap siap)
+  // dan bisa sempat 0 saat video selesai. Durasi terakhir yang valid disimpan
+  // di sini, dan skip intro dicek begitu durasi pertama kali diketahui.
+  int _lastDurMs = 0;
+  bool _introChecked = true;
   bool _showEpisodeList = false;
   bool _flashVisible = false;
   bool _flashForward = true;
@@ -172,6 +177,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
       _loadedLink = mini.info.link;
       _adoptedLink = mini.info.link;
       _speed = mini.info.speed;
+      _introChecked = true;
+      _lastDurMs = vc.value.duration.inMilliseconds;
       vc.addListener(_onVideo);
       _onVideo();
       final sz = vc.value.size;
@@ -372,6 +379,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     _vc = vc;
     _endedHandled = false;
     _outroSkipped = false;
+    _lastDurMs = 0;
+    // Episode dilanjutkan dari posisi tersimpan: intro tidak di-skip.
+    _introChecked = resumeMs > 0;
     _wasPlaying = false;
     _playerError = false;
     _playerErrorDetail = null;
@@ -384,11 +394,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
       if (!mounted || _vc != vc) return;
       if (resumeMs > 0) {
         await vc.seekTo(Duration(milliseconds: resumeMs));
-      } else if (ref.read(localStoreProvider).autoSkipIntro &&
-          vc.value.duration.inMilliseconds > _kMinDurationForSkipMs) {
-        // Episode dibuka dari awal: lompati intro.
-        await vc.seekTo(const Duration(milliseconds: _kIntroSkipMs));
       }
+      // Skip intro tidak dilakukan di sini: durasi dari media_kit sering
+      // belum ada. Dicek di _onVideo begitu durasi pertama kali diketahui.
       if (!mounted || _vc != vc) return;
       final sz = vc.value.size;
       if (sz.width > 0 && sz.height > 0) {
@@ -426,6 +434,19 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
       });
     }
 
+    final durNow = v.duration.inMilliseconds;
+    if (durNow > 0) _lastDurMs = durNow;
+
+    // Skip intro: sekali per episode, begitu durasi diketahui.
+    if (!_introChecked && _lastDurMs > 0 && v.isInitialized) {
+      _introChecked = true;
+      if (ref.read(localStoreProvider).autoSkipIntro &&
+          _lastDurMs > _kMinDurationForSkipMs &&
+          v.position.inMilliseconds < _kIntroSkipMs - 5000) {
+        unawaited(vc.seekTo(const Duration(milliseconds: _kIntroSkipMs)));
+      }
+    }
+
     final snap = PlayerPlayback(
       isPlaying: v.isPlaying,
       isBuffering: v.hasError ? false : (v.isBuffering || !v.isInitialized),
@@ -444,8 +465,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
 
     if (!_endedHandled &&
         v.isInitialized &&
-        v.duration > Duration.zero &&
-        (v.isCompleted || v.position >= v.duration)) {
+        _lastDurMs > 0 &&
+        (v.isCompleted || v.position.inMilliseconds >= _lastDurMs - 300)) {
       _endedHandled = true;
       _notifier.startAutoNextCountdown();
     }
@@ -456,7 +477,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     final vc = _vc;
     if (vc == null || !vc.value.isPlaying) return;
     _tickCount++;
-    final dur = vc.value.duration.inMilliseconds;
+    final durNow = vc.value.duration.inMilliseconds;
+    final dur = durNow > 0 ? durNow : _lastDurMs;
 
     // Auto-lanjut saat masuk zona outro (mepet habis), kalau ada episode
     // berikutnya dan episodenya cukup panjang.
@@ -576,6 +598,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
           posterUrl: poster,
           link: link,
           speed: _speed,
+          nextEpisodeId: _notifier.nextEpisodeId,
         ),
       );
       WakelockPlus.disable();

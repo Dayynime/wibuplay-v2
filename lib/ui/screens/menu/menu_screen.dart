@@ -10,10 +10,7 @@ import '../library/library_screens.dart';
 import '../profile/profile_controller.dart';
 import '../store/coin_screen.dart';
 import '../store/premium_screen.dart';
-import '../tree/tree_screen.dart';
-import '../wallpaper/wallpaper_screen.dart';
-import '../avatar_frame/avatar_frame_screen.dart';
-import '../profile_effect/profile_effect_screen.dart';
+import '../games/zenime_games_screen.dart';
 import '../../glass/glass.dart';
 
 // Poster sama dengan slide onboarding (CDN publik MyAnimeList, tidak di-bundle).
@@ -21,7 +18,7 @@ const String _kDonghuaPoster = 'https://cdn.myanimelist.net/images/anime/1438/10
 const String _kComicPoster = 'https://cdn.myanimelist.net/images/manga/4/221353l.jpg';
 
 /// Tab "Menu" di bottom bar (menggantikan tab Komik): pintu masuk ke
-/// Donghua, Komik, Gacha (Wallpaper Komentar), ZCoin, dan Premium.
+/// Donghua, Komik, Zenime Games (Gacha, Pohon ZCoin, Border, Efek), ZCoin, dan Premium.
 class MenuScreen extends ConsumerWidget {
   const MenuScreen({super.key});
 
@@ -129,55 +126,16 @@ class MenuScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 14),
             _MenuCard(
-              title: 'Gacha',
-              subtitle: 'Spin wallpaper animasi untuk komentarmu',
-              icon: Icons.casino_outlined,
+              title: 'Zenime Games',
+              subtitle: 'Gacha, Pohon ZCoin, Border Avatar & Efek Profil',
+              icon: Icons.sports_esports_rounded,
               accent: const Color(0xFFA855F7),
               gradient: const LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [Color(0xFF3B1A6B), Color(0xFF8B3DFF), Color(0xFFFF2E63)],
+                colors: [Color(0xFF3B1A6B), Color(0xFF8B3DFF), Color(0xFF22D3EE)],
               ),
-              onTap: () => Navigator.of(context).push<void>(fadeRoute(const WallpaperScreen())),
-            ),
-            const SizedBox(height: 14),
-            _MenuCard(
-              title: 'Pohon ZCoin',
-              subtitle: 'Panen buahnya, dapat ZCoin tiap hari',
-              icon: Icons.park_outlined,
-              accent: const Color(0xFF22C55E),
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFF0F3D2A), Color(0xFF1F8A4C), Color(0xFFF59E0B)],
-              ),
-              onTap: () => Navigator.of(context).push<void>(fadeRoute(const TreeScreen())),
-            ),
-            const SizedBox(height: 14),
-            _MenuCard(
-              title: 'Border Avatar',
-              subtitle: 'Hias avatarmu dengan border animasi',
-              icon: Icons.blur_circular,
-              accent: const Color(0xFF22D3EE),
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFF0B2A4A), Color(0xFF7C3AED), Color(0xFF22D3EE)],
-              ),
-              onTap: () => Navigator.of(context).push<void>(fadeRoute(const AvatarFrameScreen())),
-            ),
-            const SizedBox(height: 14),
-            _MenuCard(
-              title: 'Efek Profil',
-              subtitle: 'Animasi keren di kartu profilmu',
-              icon: Icons.auto_awesome,
-              accent: const Color(0xFFF472B6),
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFF2A0B3D), Color(0xFFDB2777), Color(0xFFF59E0B)],
-              ),
-              onTap: () => Navigator.of(context).push<void>(fadeRoute(const ProfileEffectScreen())),
+              onTap: () => Navigator.of(context).push<void>(fadeRoute(const ZenimeGamesScreen())),
             ),
           ],
         ),
