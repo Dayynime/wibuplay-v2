@@ -5,6 +5,8 @@ import 'package:flutter/services.dart';
 
 import '../../../core/integrity_guard.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../app_routes.dart' show appNavigatorKey;
+import '../../components/mini_player.dart' show MiniPlayerManager;
 import '../../glass/glass.dart';
 
 /// Gerbang keamanan paling luar (port blockedTool di MainActivity.kt Zenime).
@@ -50,6 +52,13 @@ class _IntegrityGateState extends State<IntegrityGate> with WidgetsBindingObserv
   Future<void> _check() async {
     final tool = await IntegrityGuard.detectedTool();
     if (!mounted) return;
+    if (tool != null && _blocked == null) {
+      // Kedeteksi di tengah pemakaian: gerbang ini cuma membungkus halaman
+      // utama, jadi halaman yang di-push (player, chat, dll) dan mini player
+      // ditutup dulu supaya yang tersisa hanya layar blokir.
+      MiniPlayerManager.instance.close();
+      appNavigatorKey.currentState?.popUntil((r) => r.isFirst);
+    }
     setState(() => _blocked = tool);
     if (tool == null && !_initStarted) {
       _initStarted = true;
@@ -181,7 +190,11 @@ class _BlockedToolScreenState extends State<BlockedToolScreen> with TickerProvid
                     _terminal(),
                     const SizedBox(height: 14),
                     Text(
-                      'Nonton tinggal nonton aja... hapus atau matiin dulu "${widget.toolName}".',
+                      widget.toolName.startsWith('Sertifikat CA')
+                          ? 'Ada sertifikat CA buatan pengguna (${widget.toolName.replaceFirst('Sertifikat CA pengguna: ', '')}) '
+                              'yang bisa dipakai untuk menyadap koneksi. Hapus di Setelan › Keamanan › '
+                              'Enkripsi & kredensial › Kredensial pengguna.'
+                          : 'Nonton tinggal nonton aja... hapus atau matiin dulu "${widget.toolName}".',
                       textAlign: TextAlign.center,
                       style: const TextStyle(color: Color(0xFF8FA3A0), fontSize: 13, height: 1.4),
                     ),

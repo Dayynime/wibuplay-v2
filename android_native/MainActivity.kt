@@ -5,7 +5,9 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PictureInPictureParams
 import android.content.Intent
+import java.security.KeyStore
 import java.security.MessageDigest
+import java.security.cert.X509Certificate
 import android.content.Context
 import android.content.pm.PackageManager
 import android.content.res.Configuration
@@ -178,8 +180,49 @@ class MainActivity : FlutterActivity() {
 
     private val toolKeywords = listOf(
         "reqable", "httptoolkit", "httpcanary", "pcapdroid", "remote_capture",
-        "sslcapture", "mitm", "charles", "fiddler", "wireshark"
+        "sslcapture", "mitm", "charles", "fiddler", "wireshark",
+        "netcapture", "packet capture", "packetcapture", "proxyman",
+        "netbare", "proxymon"
     )
+
+    /** Paket app capture/MITM yang dikenal (dicocokkan persis). */
+    private val toolPackages = setOf(
+        "com.guoshi.httpcanary", "com.guoshi.httpcanary.premium",
+        "app.greyshirts.sslcapture",
+        "com.emanuelef.remote_capture",
+        "com.reqable.android",
+        "tech.httptoolkit.android.v1",
+        "com.minhui.networkcapture", "com.minhui.networkcapture.pro",
+        "jp.co.taosoftware.android.packetcapture",
+        "com.evbadroid.proxymon",
+        "com.github.megatronking.netbare.sample",
+        "com.packagesniffer.frtparlak"
+    )
+
+    /**
+     * Sertifikat CA yang dipasang USER (Setelan > Keamanan > Kredensial pengguna).
+     * App capture/MITM memasang sertifikat seperti ini untuk membaca HTTPS.
+     * Mengembalikan nama sertifikat pertama, atau null kalau tidak ada.
+     */
+    private fun userCaName(): String? {
+        return try {
+            val ks = KeyStore.getInstance("AndroidCAStore")
+            ks.load(null, null)
+            val aliases = ks.aliases()
+            while (aliases.hasMoreElements()) {
+                val alias = aliases.nextElement()
+                if (!alias.startsWith("user:")) continue
+                val cert = ks.getCertificate(alias) as? X509Certificate
+                val dn = cert?.subjectX500Principal?.name ?: ""
+                val cn = Regex("CN=([^,]+)").find(dn)?.groupValues?.get(1)
+                    ?: Regex("O=([^,]+)").find(dn)?.groupValues?.get(1)
+                return cn?.trim()?.takeIf { it.isNotEmpty() } ?: "tidak dikenal"
+            }
+            null
+        } catch (e: Exception) {
+            null
+        }
+    }
 
     /** Nama app terlarang yang terdeteksi, atau null kalau aman. */
     private fun detectedTool(extra: List<String>): String? {
@@ -196,9 +239,11 @@ class MainActivity : FlutterActivity() {
             val pkg = info.activityInfo.packageName
             if (pkg == packageName) continue
             val label = info.loadLabel(pm).toString()
+            if (pkg in toolPackages) return label
             val haystack = "$pkg $label".lowercase()
             if (keys.any { it in haystack }) return label
         }
+        userCaName()?.let { return "Sertifikat CA pengguna: $it" }
         return null
     }
 
