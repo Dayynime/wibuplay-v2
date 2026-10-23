@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../providers.dart' show episodeDownloadManagerProvider;
 import 'screens/comic/comic_detail_screen.dart';
 import 'screens/comic/comic_reader_controller.dart' show ComicReaderArgs;
 import 'screens/comic/comic_reader_screen.dart';
@@ -94,7 +96,13 @@ void openDetail(BuildContext context, String movieId) =>
 void openPlayer(BuildContext context, String movieId, String episodeId) {
   final nav = Navigator.of(context);
   if (episodeId.startsWith(kDonghuaDownloadPrefix)) {
-    _pushDonghuaPlayer(nav, episodeId.substring(kDonghuaDownloadPrefix.length), offline: true);
+    // Dari riwayat / daftar download. Sudah ada file offline -> tanpa gate
+    // Premium; kalau belum -> lewat gate seperti biasa.
+    final hasFile = ProviderScope.containerOf(context, listen: false)
+            .read(episodeDownloadManagerProvider)
+            .localFileFor(episodeId) !=
+        null;
+    _pushDonghuaPlayer(nav, episodeId.substring(kDonghuaDownloadPrefix.length), offline: hasFile);
     return;
   }
   _pushPlayer(nav, movieId, episodeId);

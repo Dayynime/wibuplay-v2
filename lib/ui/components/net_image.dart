@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/constants.dart';
 import '../../core/theme/app_colors.dart';
+import '../../data/api/anichin_network.dart';
 import 'shimmer.dart';
 
 /// Header yang sama dengan request API (Referer + User-Agent browser).
@@ -31,12 +32,23 @@ class NetImage extends StatelessWidget {
   final BoxFit fit;
   final Alignment alignment;
 
+  /// Poster donghua (riwayat / download) disimpan sebagai URL situs Anichin
+  /// dan butuh Referer situs itu, bukan Referer API anime.
+  static Map<String, String> _headersFor(String url) {
+    final host = Uri.tryParse(url)?.host ?? '';
+    final anichinHost = Uri.tryParse(AnichinNetwork.sourceBase)?.host ?? '';
+    if (host.isNotEmpty && (host == anichinHost || host.contains('anichin'))) {
+      return AnichinNetwork.imageHeaders;
+    }
+    return netImageHeaders;
+  }
+
   @override
   Widget build(BuildContext context) {
     if (url.isEmpty) return const SizedBox.expand();
     return CachedNetworkImage(
       imageUrl: url,
-      httpHeaders: netImageHeaders,
+      httpHeaders: _headersFor(url),
       fit: fit,
       alignment: alignment,
       fadeInDuration: const Duration(milliseconds: 200),

@@ -20,6 +20,7 @@ import '../../../data/models/anichin_models.dart';
 import '../../../data/models/comment_models.dart';
 import '../../../data/models/stream_data.dart';
 import '../../../data/repository/anichin_repository.dart';
+import '../../../data/repository/anime_repository.dart';
 import '../../../providers.dart';
 import '../../components/common_components.dart';
 import '../comments/comments_section.dart';
@@ -125,6 +126,16 @@ class _DonghuaPlayerScreenState extends ConsumerState<DonghuaPlayerScreen>
   bool _synopsisExpanded = false;
 
   String get _dlKey => '$kDonghuaDownloadPrefix${widget.slug}';
+
+  // ---- Riwayat tontonan (masuk ke Profil / Beranda seperti anime) ----
+  late final AnimeRepository _repo;
+  int _tickCount = 0;
+
+  /// Diisi tiap build dari info episode; null = belum cukup data untuk disimpan.
+  String? _histMovieId;
+  String _histTitle = 'Donghua';
+  String _histPoster = '';
+  String? _histEpNumber;
   final GlobalKey _commentsKey = GlobalKey();
 
   @override
@@ -132,6 +143,7 @@ class _DonghuaPlayerScreenState extends ConsumerState<DonghuaPlayerScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+    _repo = ref.read(repositoryProvider);
     _tick = Timer.periodic(const Duration(seconds: 1), _onTick);
     _levels.init();
     PipController.isInPip.addListener(_onPip);
@@ -144,6 +156,7 @@ class _DonghuaPlayerScreenState extends ConsumerState<DonghuaPlayerScreen>
 
   @override
   void dispose() {
+    _saveHistory();
     WidgetsBinding.instance.removeObserver(this);
     WatchXpGate.release(this);
     _hideTimer?.cancel();
@@ -174,7 +187,10 @@ class _DonghuaPlayerScreenState extends ConsumerState<DonghuaPlayerScreen>
     _pendingUrl = null;
 
     final old = _vc;
-    final resumeMs = old?.value.position.inMilliseconds ?? 0;
+    // Ganti kualitas: lanjut dari posisi sekarang. Pertama kali dibuka:
+    // lanjut dari riwayat tontonan episode ini.
+    final resumeMs = old?.value.position.inMilliseconds ??
+        (_repo.historyForEpisode(_dlKey)?.playbackPositionMs ?? 0);
     old?.removeListener(_onVideo);
 
     final WpVideoController vc;
@@ -199,7 +215,11 @@ class _DonghuaPlayerScreenState extends ConsumerState<DonghuaPlayerScreen>
     try {
       await vc.initialize();
       if (!mounted || _vc != vc) return;
-      if (resumeMs > 0) await vc.seekTo(Duration(milliseconds: resumeMs));
+      final total = vc.value.duration.inMilliseconds;
+      // Hampir selesai (sisa < 15 dtk) -> mulai dari awal lagi.
+      if (resumeMs > 0 && (total <= 0 || resumeMs < total - 15000)) {
+        await vc.seekTo(Duration(milliseconds: resumeMs));
+      }
       if (!mounted || _vc != vc) return;
       final sz = vc.value.size;
       if (sz.width > 0 && sz.height > 0) {
@@ -247,6 +267,8 @@ class _DonghuaPlayerScreenState extends ConsumerState<DonghuaPlayerScreen>
     if (!mounted) return;
     final vc = _vc;
     if (vc == null || !vc.value.isPlaying) return;
+    _tickCount++;
+    if (_tickCount % 5 == 0) _saveHistory();
     // XP nonton: hanya detik aktif (playing, tidak buffering, app di depan).
     // Hitungan XP global lewat WatchXpGate (bukan per player).
     if (_inForeground && !vc.value.isBuffering && WatchXpGate.onActiveSecond(this)) {
@@ -572,6 +594,27 @@ class _DonghuaPlayerScreenState extends ConsumerState<DonghuaPlayerScreen>
     }
   }
 
+  /// Simpan posisi tonton ke riwayat (sama dengan player anime). movieId
+  /// `donghua_<slug anime>`, episodeId `donghua:<slug episode>`.
+  void _saveHistory() {
+    final vc = _vc;
+    final movieId = _histMovieId;
+    if (vc == null || movieId == null || !vc.value.isInitialized || _playerError) return;
+    final dur = vc.value.duration.inMilliseconds;
+    if (dur <= 0) return;
+    final ep = _histEpNumber;
+    unawaited(_repo.saveWatchProgress(
+      movieId: movieId,
+      movieTitle: _histTitle,
+      moviePoster: _histPoster,
+      episodeId: _dlKey,
+      episodeIndex: ep ?? '1',
+      episodeTitle: ep == null ? 'Episode' : 'Episode $ep',
+      playbackPositionMs: vc.value.position.inMilliseconds,
+      durationMs: dur,
+    ));
+  }
+
   // --------------------------------------------------------------- download
 
   /// Sudah selesai -> tawarkan hapus; sedang jalan -> info; belum/gagal ->
@@ -748,6 +791,13 @@ class _DonghuaPlayerScreenState extends ConsumerState<DonghuaPlayerScreen>
     // Offline tanpa internet: info episode gagal dimuat, pakai data download.
     final animeTitle = _animeTitleOf(fullName) ?? fullName ?? dlEntry?.animeTitle;
     final epNumber = _episodeNumberOf(fullName, currentRef) ?? dlEntry?.episodeIndex;
+
+    // Data untuk riwayat tontonan (dipakai _saveHistory tiap 5 detik).
+    final root = episodeDetail?.root;
+    _histMovieId = (root != null && root.isNotEmpty) ? 'donghua_$root' : dlEntry?.animeId;
+    _histTitle = animeTitle ?? 'Donghua';
+    _histPoster = AnichinNetwork.imageUrl(episodeDetail?.thumbnail) ?? dlEntry?.posterUrl ?? '';
+    _histEpNumber = epNumber;
 
     final videoArea = _videoArea(
       videoAsync: videoAsync,
