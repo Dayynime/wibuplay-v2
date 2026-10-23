@@ -14,6 +14,8 @@ import '../support/top_support_screen.dart';
 import '../xp/xp_leaderboard_screen.dart';
 import '../clan/clan_browse_screen.dart';
 import '../download/offline_downloads_view.dart';
+import '../library/library_screens.dart' show HistoryScreen;
+import '../profile/profile_controller.dart' show profileHistoryProvider;
 import '../notifications/notifications_screen.dart';
 import '../../components/cards.dart';
 import '../../components/chat_ticker.dart';
@@ -24,6 +26,7 @@ import '../../components/hero_banner.dart';
 import '../../components/home_profile_header.dart';
 import '../../components/shimmer.dart';
 import '../../components/staggered_section.dart';
+import '../../components/watch_history_section.dart';
 import '../../components/home_section_cards.dart';
 import 'home_controller.dart';
 
@@ -36,7 +39,6 @@ class HomeScreen extends ConsumerWidget {
     required this.onSearchClick,
     required this.onSeeAllClick,
     required this.onProfileClick,
-    required this.onCuplixClick,
     required this.onComicSeeAllClick,
   });
 
@@ -44,9 +46,6 @@ class HomeScreen extends ConsumerWidget {
   final void Function(String movieId, String episodeId) onWatchEpisode;
   final VoidCallback onSearchClick;
   final ValueChanged<String> onSeeAllClick;
-
-  /// Ketuk klip / "Lihat semua" di section Cuplix: buka tab Cuplix.
-  final VoidCallback onCuplixClick;
 
   /// "Lihat semua" di section Komik: buka tab Komik.
   final VoidCallback onComicSeeAllClick;
@@ -97,7 +96,6 @@ class HomeScreen extends ConsumerWidget {
         onSearchClick: onSearchClick,
         onSeeAllClick: onSeeAllClick,
         onProfileClick: onProfileClick,
-        onCuplixClick: onCuplixClick,
         onComicSeeAllClick: onComicSeeAllClick,
       );
     }
@@ -126,7 +124,6 @@ class _HomeContent extends ConsumerStatefulWidget {
     required this.onSearchClick,
     required this.onSeeAllClick,
     required this.onProfileClick,
-    required this.onCuplixClick,
     required this.onComicSeeAllClick,
   });
 
@@ -136,7 +133,6 @@ class _HomeContent extends ConsumerStatefulWidget {
   final VoidCallback onSearchClick;
   final ValueChanged<String> onSeeAllClick;
   final VoidCallback onProfileClick;
-  final VoidCallback onCuplixClick;
 
   /// "Lihat semua" di section Komik: buka tab Komik.
   final VoidCallback onComicSeeAllClick;
@@ -212,7 +208,7 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
   @override
   Widget build(BuildContext context) {
     final sections = widget.sections;
-    final cuplixClips = ref.watch(homeCuplixProvider).valueOrNull ?? const [];
+    final watchHistory = ref.watch(profileHistoryProvider);
     final donghuaHot = ref.watch(donghuaHotProvider).valueOrNull ?? const [];
     final user = ref.watch(authUserProvider).valueOrNull;
     final showProfileHeader = user != null && FirebaseConfig.ready;
@@ -353,14 +349,13 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
 
         // Urutan section mengikuti Beranda Zenime.
 
-        // 2. Cuplix
-        if (cuplixClips.isNotEmpty)
-          section(
-            delayMs: 150,
-            title: 'Cuplix',
-            actionText: 'Lihat semua',
-            onAction: widget.onCuplixClick,
-            child: CuplixThumbRow(clips: cuplixClips, onClipClick: widget.onCuplixClick),
+        // 2. Riwayat Tontonan (Cuplix dipindah ke tab Menu)
+        if (watchHistory.isNotEmpty)
+          WatchHistorySection(
+            history: watchHistory,
+            onResume: (h) => widget.onWatchEpisode(h.movieId, h.episodeId),
+            onSeeAll: () => Navigator.of(context)
+                .push<void>(fadeRoute(const HistoryScreen())),
           ),
 
         // 3. Episode Baru (data/home/list -> update) + label nomor episode

@@ -40,8 +40,9 @@ class DownloadsTab extends ConsumerWidget {
         ),
         if (downloads.isEmpty)
           const ProfileEmptyBox(
-            text: 'Belum ada download. Ketuk ikon download di daftar episode '
-                'untuk menyimpan episode dan nonton offline (download khusus Premium).',
+            text: 'Belum ada download. Ketuk tombol Download di halaman player '
+                '(anime atau donghua) untuk menyimpan episode dan nonton offline '
+                '(download khusus Premium).',
           )
         else
           Padding(

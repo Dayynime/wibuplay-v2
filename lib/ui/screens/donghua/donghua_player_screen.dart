@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -14,6 +15,7 @@ import '../../../core/pip_controller.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/watch_xp_gate.dart';
 import '../../../data/api/anichin_network.dart';
+import '../../../data/local/entities.dart' show DownloadedEpisodeEntity;
 import '../../../data/models/anichin_models.dart';
 import '../../../data/models/comment_models.dart';
 import '../../../data/models/stream_data.dart';
@@ -21,6 +23,8 @@ import '../../../data/repository/anichin_repository.dart';
 import '../../../providers.dart';
 import '../../components/common_components.dart';
 import '../comments/comments_section.dart';
+import '../download/download_actions.dart'
+    show confirmDeleteDownload, downloadStateHighlight, downloadStateIcon, downloadStateLabel;
 import '../player/player_gestures.dart';
 import '../player/player_screen.dart';
 import '../player/quality_sheet.dart';
@@ -40,6 +44,10 @@ final donghuaEpisodeProvider =
     FutureProvider.autoDispose.family<AnichinEpisodeDetail, String>(
   (ref, slug) => ref.watch(anichinRepositoryProvider).getEpisode(slug),
 );
+
+/// Prefix id download episode donghua (`donghua:<slug>`) supaya tidak
+/// bentrok dengan id episode anime di daftar download.
+const String kDonghuaDownloadPrefix = 'donghua:';
 
 // Ambil "Episode 16" dari judul "Judul Anime Episode 16 Subtitle Indonesia".
 final RegExp _epTitle = RegExp(r'\s*[-–]?\s*Episode\s*(\d+).*$', caseSensitive: false);
@@ -110,7 +118,13 @@ class _DonghuaPlayerScreenState extends ConsumerState<DonghuaPlayerScreen>
 
   /// Pilihan kualitas dari user (kode mentah: sd/hd/...). null = otomatis.
   String? _selectedQuality;
+
+  /// true = putar file hasil download kalau ada. Jadi false begitu user
+  /// memilih kualitas online sendiri dari sheet Kualitas.
+  bool _preferOffline = true;
   bool _synopsisExpanded = false;
+
+  String get _dlKey => '$kDonghuaDownloadPrefix${widget.slug}';
   final GlobalKey _commentsKey = GlobalKey();
 
   @override
@@ -165,10 +179,12 @@ class _DonghuaPlayerScreenState extends ConsumerState<DonghuaPlayerScreen>
 
     final WpVideoController vc;
     try {
-      vc = WpVideoController.networkUrl(
-        Uri.parse(url),
-        httpHeaders: AnichinNetwork.videoHeaders,
-      );
+      vc = url.startsWith('file://')
+          ? WpVideoController.file(File.fromUri(Uri.parse(url)))
+          : WpVideoController.networkUrl(
+              Uri.parse(url),
+              httpHeaders: AnichinNetwork.videoHeaders,
+            );
     } catch (_) {
       if (mounted) setState(() => _playerError = true);
       return;
@@ -514,7 +530,10 @@ class _DonghuaPlayerScreenState extends ConsumerState<DonghuaPlayerScreen>
       servers: servers,
       selected: current,
       isPremium: isPremium,
-      onSelect: (s) => setState(() => _selectedQuality = s.name),
+      onSelect: (s) => setState(() {
+        _selectedQuality = s.name;
+        _preferOffline = false;
+      }),
       onLocked: widget.onUpgradeClick,
     );
   }
@@ -553,6 +572,119 @@ class _DonghuaPlayerScreenState extends ConsumerState<DonghuaPlayerScreen>
     }
   }
 
+  // --------------------------------------------------------------- download
+
+  /// Sudah selesai -> tawarkan hapus; sedang jalan -> info; belum/gagal ->
+  /// (khusus Premium) pilih kualitas lalu download lewat DownloadManager.
+  Future<void> _onDownloadTap({
+    required List<AnichinMedia> medias,
+    required bool? premium,
+    required String? animeTitle,
+    required String? epNumber,
+    required String? posterPath,
+    required String? root,
+  }) async {
+    final manager = ref.read(episodeDownloadManagerProvider);
+    final entry = ref.read(localStoreProvider).downloadFor(_dlKey);
+
+    if (entry != null && entry.isCompleted) {
+      final label = epNumber == null ? null : 'Episode $epNumber';
+      if (await confirmDeleteDownload(context, label: label) && mounted) {
+        await manager.deleteDownload(_dlKey);
+        if (mounted) setState(() => _preferOffline = false);
+      }
+      return;
+    }
+    if (entry != null && entry.isActive) {
+      _toast('Episode ini sedang didownload');
+      return;
+    }
+    if (premium != true) {
+      widget.onUpgradeClick();
+      return;
+    }
+    if (medias.isEmpty) {
+      _toast('Link video belum siap, coba lagi sebentar');
+      return;
+    }
+
+    final picked = await _pickDownloadQuality(medias);
+    final link = picked?.url;
+    if (picked == null || link == null || !mounted) return;
+
+    final err = await manager.startDownload(
+      episodeId: _dlKey,
+      animeId: 'donghua_${(root ?? '').isNotEmpty ? root : widget.slug}',
+      animeTitle: animeTitle ?? 'Donghua',
+      posterUrl: AnichinNetwork.imageUrl(posterPath),
+      episodeTitle: epNumber == null ? null : 'Episode $epNumber',
+      episodeIndex: epNumber,
+      quality: AnichinRepository.qualityLabel(picked.quality),
+      videoUrl: link,
+      headers: AnichinNetwork.videoHeaders,
+    );
+    if (mounted) _toast(err ?? 'Download dimulai');
+  }
+
+  /// Sheet pilih kualitas download (tertinggi di atas).
+  Future<AnichinMedia?> _pickDownloadQuality(List<AnichinMedia> medias) {
+    final options = medias.reversed.toList();
+    return showGlassSheet<AnichinMedia>(
+      context: context,
+      backgroundColor: AppColors.surfaceDark,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Pilih Kualitas Download',
+                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'File disimpan di perangkat dan bisa ditonton offline.',
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 12.5),
+              ),
+              const SizedBox(height: 12),
+              for (var i = 0; i < options.length; i++)
+                InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: () => Navigator.of(sheetContext).pop(options[i]),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 6),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.download_for_offline,
+                            size: 20, color: AppColors.accentViolet),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            AnichinRepository.qualityLabel(options[i].quality),
+                            style: const TextStyle(color: Colors.white, fontSize: 15),
+                          ),
+                        ),
+                        if (i == 0)
+                          const Text(
+                            'Terbaik',
+                            style: TextStyle(color: AppColors.accentViolet, fontSize: 11),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   // ------------------------------------------------------------------ build
 
   @override
@@ -584,8 +716,18 @@ class _DonghuaPlayerScreenState extends ConsumerState<DonghuaPlayerScreen>
     }
     final selectedMedia = medias.where((m) => m.quality == selectedQuality).firstOrNull;
 
-    final videoReady = video != null && medias.isNotEmpty && premium != null;
-    final url = selectedMedia?.url;
+    // ---- File hasil download (diputar tanpa internet / tanpa cek Premium) ----
+    final dlEntry = ref.watch(localStoreProvider.select((s) => s.downloadFor(_dlKey)));
+    final offlineFile = (dlEntry?.isCompleted ?? false)
+        ? ref.read(episodeDownloadManagerProvider).localFileFor(_dlKey)
+        : null;
+    final playOffline = offlineFile != null && _preferOffline;
+
+    final videoReady =
+        playOffline || (video != null && medias.isNotEmpty && premium != null);
+    final url = (offlineFile != null && _preferOffline)
+        ? Uri.file(offlineFile.path).toString()
+        : selectedMedia?.url;
     if (videoReady && url != null && url != _loadedUrl && url != _pendingUrl) {
       _pendingUrl = url;
       WidgetsBinding.instance.addPostFrameCallback((_) => _loadUrl(url));
@@ -603,12 +745,14 @@ class _DonghuaPlayerScreenState extends ConsumerState<DonghuaPlayerScreen>
     final nextSlug = currentIdx > 0 ? episodes[currentIdx - 1].slug : null;
 
     final fullName = episodeDetail?.name ?? video?.title;
-    final animeTitle = _animeTitleOf(fullName) ?? fullName;
-    final epNumber = _episodeNumberOf(fullName, currentRef);
+    // Offline tanpa internet: info episode gagal dimuat, pakai data download.
+    final animeTitle = _animeTitleOf(fullName) ?? fullName ?? dlEntry?.animeTitle;
+    final epNumber = _episodeNumberOf(fullName, currentRef) ?? dlEntry?.episodeIndex;
 
     final videoArea = _videoArea(
       videoAsync: videoAsync,
       videoReady: videoReady,
+      offline: playOffline,
       medias: medias,
       selectedQuality: selectedQuality,
       premium: premium ?? false,
@@ -652,6 +796,7 @@ class _DonghuaPlayerScreenState extends ConsumerState<DonghuaPlayerScreen>
                       medias: medias,
                       selectedQuality: selectedQuality,
                       premium: premium,
+                      download: dlEntry,
                     ),
                   ),
                 ],
@@ -668,6 +813,7 @@ class _DonghuaPlayerScreenState extends ConsumerState<DonghuaPlayerScreen>
   Widget _videoArea({
     required AsyncValue<AnichinVideoSource> videoAsync,
     required bool videoReady,
+    required bool offline,
     required List<AnichinMedia> medias,
     required String? selectedQuality,
     required bool premium,
@@ -680,7 +826,17 @@ class _DonghuaPlayerScreenState extends ConsumerState<DonghuaPlayerScreen>
     final is404 = err is DioException && err.response?.statusCode == 404;
 
     Widget body;
-    if (videoAsync.hasError && !videoAsync.isLoading) {
+    if (offline) {
+      body = _player(
+        medias: medias,
+        selectedQuality: null,
+        premium: premium,
+        title: title,
+        prevSlug: prevSlug,
+        nextSlug: nextSlug,
+        episodes: episodes,
+      );
+    } else if (videoAsync.hasError && !videoAsync.isLoading) {
       body = is404
           // 404 dari API = episode ini tidak punya mirror OK.ru (bukan masalah koneksi)
           ? const _CenterMessage('Video episode ini belum tersedia di sumber. Coba episode lain.')
@@ -1012,6 +1168,7 @@ class _DonghuaPlayerScreenState extends ConsumerState<DonghuaPlayerScreen>
     required List<AnichinMedia> medias,
     required String? selectedQuality,
     required bool? premium,
+    required DownloadedEpisodeEntity? download,
   }) {
     final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
     final synopsis = episodeDetail?.sinopsis ?? '';
@@ -1150,11 +1307,17 @@ class _DonghuaPlayerScreenState extends ConsumerState<DonghuaPlayerScreen>
                 ),
                 const SizedBox(width: 10),
                 _ActionChip(
-                  icon: Icons.download_for_offline,
-                  label: 'Download',
-                  onTap: () => premium == false
-                      ? widget.onUpgradeClick()
-                      : _toast('Download donghua segera hadir'),
+                  icon: downloadStateIcon(download),
+                  label: downloadStateLabel(download),
+                  highlight: downloadStateHighlight(download),
+                  onTap: () => _onDownloadTap(
+                    medias: medias,
+                    premium: premium,
+                    animeTitle: animeTitle,
+                    epNumber: epNumber,
+                    posterPath: posterPath,
+                    root: episodeDetail?.root,
+                  ),
                 ),
                 const SizedBox(width: 10),
                 _ActionChip(
@@ -1283,11 +1446,19 @@ class _CenterMessage extends StatelessWidget {
 }
 
 class _ActionChip extends StatelessWidget {
-  const _ActionChip({required this.icon, required this.label, required this.onTap});
+  const _ActionChip({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.highlight = false,
+  });
 
   final IconData icon;
   final String label;
   final VoidCallback onTap;
+
+  /// Warna aksen (mis. Download yang sedang jalan / sudah tersimpan).
+  final bool highlight;
 
   @override
   Widget build(BuildContext context) {
@@ -1296,19 +1467,21 @@ class _ActionChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
         decoration: BoxDecoration(
-          color: AppColors.surfaceDark,
+          color: highlight ? AppColors.accentVioletSubtle : AppColors.surfaceDark,
           borderRadius: BorderRadius.circular(100),
-          border: Border.all(color: AppColors.surfaceElevated),
+          border: Border.all(
+            color: highlight ? AppColors.accentViolet.withValues(alpha: 0.6) : AppColors.surfaceElevated,
+          ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 18, color: Colors.white),
+            Icon(icon, size: 18, color: highlight ? AppColors.accentVioletLight : Colors.white),
             const SizedBox(width: 6),
             Text(
               label,
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: highlight ? AppColors.accentVioletLight : Colors.white,
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
               ),

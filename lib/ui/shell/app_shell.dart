@@ -74,7 +74,6 @@ class _AppShellState extends ConsumerState<AppShell> {
                 onSearchClick: () => _goTab(1),
                 onSeeAllClick: (_) => _goTab(1),
                 onProfileClick: () => _goTab(4),
-                onCuplixClick: () => openCuplix(context),
                 onComicSeeAllClick: () => openComic(context),
               )),
               _tab(1, () => ExploreScreen(onAnimeClick: _openDetail)),

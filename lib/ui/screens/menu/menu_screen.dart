@@ -12,13 +12,14 @@ import '../store/coin_screen.dart';
 import '../store/premium_screen.dart';
 import '../games/zenime_games_screen.dart';
 import '../../glass/glass.dart';
+import '../../components/net_image.dart' show netImageHeaders;
 
 // Poster sama dengan slide onboarding (CDN publik MyAnimeList, tidak di-bundle).
 const String _kDonghuaPoster = 'https://cdn.myanimelist.net/images/anime/1438/101531l.jpg';
 const String _kComicPoster = 'https://cdn.myanimelist.net/images/manga/4/221353l.jpg';
 
 /// Tab "Menu" di bottom bar (menggantikan tab Komik): pintu masuk ke
-/// Donghua, Komik, Zenime Games (Gacha, Pohon ZCoin, Border, Efek), ZCoin, dan Premium.
+/// Cuplix, Donghua, Komik, Zenime Games (Gacha, Pohon ZCoin, Border, Efek), ZCoin, dan Premium.
 class MenuScreen extends ConsumerWidget {
   const MenuScreen({super.key});
 
@@ -29,6 +30,12 @@ class MenuScreen extends ConsumerWidget {
     final premium = uid == null ? null : ref.watch(premiumProvider(uid)).valueOrNull;
     final historyCount = ref.watch(profileHistoryProvider).length;
     final favoriteCount = ref.watch(profileFavoritesProvider).length;
+    // Thumbnail klip teratas jadi gambar kartu Cuplix (gagal -> pakai ikon).
+    final cuplixThumb = ref
+        .watch(homeCuplixProvider)
+        .valueOrNull
+        ?.map((c) => c.thumbnailUrl)
+        .firstWhere((u) => u.isNotEmpty, orElse: () => '');
 
     return GlassScaffold(
       backgroundColor: AppColors.backgroundDark,
@@ -108,6 +115,17 @@ class MenuScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 14),
             _MenuCard(
+              title: 'Cuplix',
+              subtitle: 'Klip pendek momen anime terbaik',
+              icon: Icons.slow_motion_video_rounded,
+              accent: const Color(0xFFF97316),
+              imageUrl: (cuplixThumb == null || cuplixThumb.isEmpty) ? null : cuplixThumb,
+              // CDN klip butuh Referer/User-Agent yang sama dengan API.
+              useApiHeaders: true,
+              onTap: () => openCuplix(context),
+            ),
+            const SizedBox(height: 14),
+            _MenuCard(
               title: 'Donghua',
               subtitle: 'Animasi China terbaru & ongoing',
               icon: Icons.movie_filter_outlined,
@@ -148,6 +166,7 @@ class _MenuCard extends StatelessWidget {
     required this.onTap,
     this.imageUrl,
     this.gradient,
+    this.useApiHeaders = false,
   });
 
   final String title;
@@ -157,6 +176,7 @@ class _MenuCard extends StatelessWidget {
   final VoidCallback onTap;
   final String? imageUrl;
   final Gradient? gradient;
+  final bool useApiHeaders;
 
   @override
   Widget build(BuildContext context) {
@@ -186,6 +206,7 @@ class _MenuCard extends StatelessWidget {
                     width: 170,
                     child: CachedNetworkImage(
                       imageUrl: imageUrl!,
+                      httpHeaders: useApiHeaders ? netImageHeaders : null,
                       fit: BoxFit.cover,
                       alignment: Alignment.topCenter,
                       errorWidget: (_, __, ___) => const SizedBox.shrink(),

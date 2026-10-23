@@ -87,8 +87,18 @@ void openDetail(BuildContext context, String movieId) =>
     _pushDetail(Navigator.of(context), movieId);
 
 /// Port Screen.Player: player/{movieId}/{episodeId}.
-void openPlayer(BuildContext context, String movieId, String episodeId) =>
-    _pushPlayer(Navigator.of(context), movieId, episodeId);
+///
+/// Episode donghua hasil download disimpan dengan id `donghua:<slug>`, jadi
+/// kalau dibuka dari daftar download diarahkan ke player donghua (tanpa gate
+/// Premium, karena menonton file offline tidak butuh Premium).
+void openPlayer(BuildContext context, String movieId, String episodeId) {
+  final nav = Navigator.of(context);
+  if (episodeId.startsWith(kDonghuaDownloadPrefix)) {
+    _pushDonghuaPlayer(nav, episodeId.substring(kDonghuaDownloadPrefix.length), offline: true);
+    return;
+  }
+  _pushPlayer(nav, movieId, episodeId);
+}
 
 /// Dari kartu mini player: buka player penuh untuk episode yang sama.
 void openPlayerFromMini(String movieId, String episodeId) {
@@ -125,19 +135,27 @@ void _pushDonghuaDetail(NavigatorState nav, String slug) {
 
 /// Player donghua dibungkus gate Premium. Ganti episode dari dalam player
 /// MENGGANTI layar player (bukan menumpuk), seperti popUpTo inclusive di Zenime.
-void _pushDonghuaPlayer(NavigatorState nav, String slug, {bool replace = false}) {
+void _pushDonghuaPlayer(
+  NavigatorState nav,
+  String slug, {
+  bool replace = false,
+  bool offline = false,
+}) {
   void upgrade() => nav.push(fadeRoute(const PremiumScreen()));
+  final player = DonghuaPlayerScreen(
+    slug: slug,
+    onBackClick: () => nav.maybePop(),
+    onEpisodeChange: (next) => _pushDonghuaPlayer(nav, next, replace: true),
+    onUpgradeClick: upgrade,
+  );
   final route = fadeRoute<void>(
-    DonghuaPremiumGate(
-      onBackClick: () => nav.maybePop(),
-      onUpgradeClick: upgrade,
-      child: DonghuaPlayerScreen(
-        slug: slug,
-        onBackClick: () => nav.maybePop(),
-        onEpisodeChange: (next) => _pushDonghuaPlayer(nav, next, replace: true),
-        onUpgradeClick: upgrade,
-      ),
-    ),
+    offline
+        ? player
+        : DonghuaPremiumGate(
+            onBackClick: () => nav.maybePop(),
+            onUpgradeClick: upgrade,
+            child: player,
+          ),
   );
   if (replace) {
     nav.pushReplacement(route);
@@ -230,7 +248,7 @@ void openComicReader(
   );
 }
 
-/// Cuplix tidak lagi punya tab sendiri; section Cuplix di Beranda membukanya
+/// Cuplix tidak lagi punya tab sendiri; kartu Cuplix di tab Menu membukanya
 /// sebagai halaman biasa (tombol back di kiri atas).
 void openCuplix(BuildContext context) {
   final nav = Navigator.of(context);

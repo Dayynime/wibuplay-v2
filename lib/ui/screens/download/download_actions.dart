@@ -69,6 +69,29 @@ Future<bool> confirmDeleteDownload(BuildContext context, {String? label}) async 
   return ok == true;
 }
 
+/// Ikon tombol Download di player sesuai status download episode.
+IconData downloadStateIcon(DownloadedEpisodeEntity? d) {
+  if (d == null || d.status == 'FAILED') return Icons.download_rounded;
+  if (d.isCompleted) return Icons.download_done_rounded;
+  return Icons.downloading_rounded;
+}
+
+/// Label tombol Download di player: Download / Mengunduh 42% / Tersimpan.
+String downloadStateLabel(DownloadedEpisodeEntity? d) {
+  if (d == null) return 'Download';
+  if (d.status == 'FAILED') return 'Ulangi Download';
+  if (d.isCompleted) return 'Tersimpan';
+  if (d.totalBytes > 0) {
+    final p = (d.downloadedBytes / d.totalBytes * 100).clamp(0, 100).round();
+    return 'Mengunduh $p%';
+  }
+  return 'Mengunduh…';
+}
+
+/// true = tombol Download diberi warna aksen (sedang jalan / sudah tersimpan).
+bool downloadStateHighlight(DownloadedEpisodeEntity? d) =>
+    d != null && d.status != 'FAILED';
+
 void _snack(BuildContext context, String msg) {
   ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()

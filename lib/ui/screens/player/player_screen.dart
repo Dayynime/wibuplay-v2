@@ -24,6 +24,7 @@ import '../../components/common_components.dart';
 import '../../components/mini_player.dart';
 import '../../components/net_image.dart';
 import '../comments/comments_section.dart';
+import '../download/download_actions.dart';
 import 'player_controller.dart';
 import 'player_gestures.dart';
 import 'player_settings_sheet.dart';
@@ -231,6 +232,21 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     final se = ui.streamData?.episode;
     if (se != null && se.id == ui.currentEpisodeId) return se.index;
     return null;
+  }
+
+  /// Episode yang sedang diputar untuk tombol Download (butuh id, index,
+  /// judul, dan thumbnail).
+  EpisodeItem _downloadEpisode(PlayerUiState ui) {
+    for (final e in ui.episodes) {
+      if (e.id == ui.currentEpisodeId) return e;
+    }
+    final se = ui.streamData?.episode;
+    return EpisodeItem(
+      id: ui.currentEpisodeId,
+      index: se?.index ?? _currentIndex(ui),
+      title: se?.title,
+      image: se?.image,
+    );
   }
 
   /// ready = sudah cukup data buat memutuskan (status premium + daftar episode).
@@ -1197,6 +1213,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     // Loading dianggap premium biar ikon gembok tidak berkedip.
     final chipPremium = ref.watch(myPremiumProvider).valueOrNull ?? true;
     final totalEps = latestEpisodeIndex(ui.episodes.map((e) => e.index));
+    final download = ref.watch(
+      localStoreProvider.select((s) => s.downloadFor(ui.currentEpisodeId)),
+    );
     // Layar edge-to-edge: tanpa ini konten paling bawah tertutup tombol
     // navigasi HP.
     final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
@@ -1402,6 +1421,23 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                             label: 'Kualitas',
                             tint: AppColors.textSecondary,
                             onTap: _openServerSheet,
+                          ),
+                          const SizedBox(width: 10),
+                          _ActionIconButton(
+                            icon: downloadStateIcon(download),
+                            label: downloadStateLabel(download),
+                            tint: downloadStateHighlight(download)
+                                ? AppColors.accentViolet
+                                : AppColors.textSecondary,
+                            onTap: () => gate.locked
+                                ? showDownloadPremiumDialog(context)
+                                : onEpisodeDownloadTap(
+                                    context,
+                                    ref,
+                                    movieId: ui.movieId,
+                                    anime: anime,
+                                    episode: _downloadEpisode(ui),
+                                  ),
                           ),
                           const SizedBox(width: 10),
                           _ActionIconButton(

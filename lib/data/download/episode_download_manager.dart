@@ -86,6 +86,9 @@ class EpisodeDownloadManager {
     String? quality,
     required String videoUrl,
     String? episodeThumbnailUrl,
+    /// Header request video. null = header API anime (Referer + User-Agent).
+    /// Donghua memakai header sumbernya sendiri (AnichinNetwork.videoHeaders).
+    Map<String, String>? headers,
   }) async {
     final existing = _store.downloadFor(episodeId);
     if (existing != null && (existing.isCompleted || existing.isActive)) {
@@ -107,7 +110,7 @@ class EpisodeDownloadManager {
         'description': (episodeTitle != null && episodeTitle.isNotEmpty)
             ? episodeTitle
             : 'Episode ${episodeIndex ?? ''}',
-        'headers': _headers,
+        'headers': headers ?? _headers,
       });
       if (id == null) return 'Gagal memulai download';
 
