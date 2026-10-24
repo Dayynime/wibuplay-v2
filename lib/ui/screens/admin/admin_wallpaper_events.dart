@@ -413,6 +413,7 @@ class _EventEditorState extends ConsumerState<_EventEditor> {
     final err = _validate();
     if (err != null) {
       setState(() => _error = err);
+      _snack(err);
       return;
     }
     setState(() {
@@ -435,7 +436,22 @@ class _EventEditorState extends ConsumerState<_EventEditor> {
         _saving = false;
         _error = e is WallpaperException ? e.message : 'Gagal menyimpan event';
       });
+      _snack(_error!);
     }
+  }
+
+  /// Pesan error ditampilkan juga sebagai SnackBar, karena teks error di
+  /// form ada di paling bawah (di bawah grid wallpaper) dan sering tidak
+  /// kelihatan -> tombol Simpan terasa "tidak terjadi apa-apa".
+  void _snack(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text(msg),
+        backgroundColor: AppColors.errorRed,
+        behavior: SnackBarBehavior.floating,
+      ));
   }
 
   @override
