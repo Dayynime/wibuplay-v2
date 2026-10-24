@@ -84,7 +84,7 @@ class _EffectBytes {
       // Gagal: jangan disimpan, supaya dicoba lagi lain kali.
       if (identical(_mem[url], f)) _mem.remove(url);
     });
-    while (_mem.length > 8) {
+    while (_mem.length > 16) {
       _mem.remove(_mem.keys.first);
     }
     return f;
@@ -208,36 +208,76 @@ class _EffectLayerPlayerState extends State<_EffectLayerPlayer> {
     old?.dispose();
   }
 
-  Future<void> _play(int gen) async {
-    final layer = widget.layer;
+  /// Buka codec untuk satu putaran. Varian dipilih acak (kalau ada).
+  Future<ui.Codec> _openCodec(ProfileEffectLayer layer) async {
     final files = layer.files;
     final file = files.length == 1 ? files.first : files[_rnd.nextInt(files.length)];
+    final bytes = await _EffectBytes.get(layer.url(file));
+    return ui.instantiateImageCodec(bytes);
+  }
+
+  Future<void> _play(int gen) async {
+    final layer = widget.layer;
     ui.Codec? codec;
+    Future<ui.Codec>? nextCodec;
+    Future<ui.FrameInfo>? pending;
+    bool alive() => gen == _gen && mounted;
     try {
-      final bytes = await _EffectBytes.get(layer.url(file));
-      if (gen != _gen || !mounted) return;
-      codec = await ui.instantiateImageCodec(bytes);
-      final frames = codec.frameCount;
-      for (var i = 0; i < frames; i++) {
-        final frame = await codec.getNextFrame();
-        if (gen != _gen || !mounted) {
-          frame.image.dispose();
+      codec = await _openCodec(layer);
+      while (true) {
+        if (!alive()) return;
+        // Putaran berikutnya disiapkan dari sekarang, supaya pas putaran ini
+        // selesai frame pertamanya udah siap -> nggak ada frame kosong.
+        if (layer.loop) nextCodec = _openCodec(layer);
+
+        final frames = codec!.frameCount;
+        final clock = Stopwatch()..start();
+        var due = 0;
+        pending = codec.getNextFrame();
+        for (var i = 0; i < frames; i++) {
+          final frame = await pending!;
+          pending = null;
+          if (!alive()) {
+            frame.image.dispose();
+            return;
+          }
+          _setImage(frame.image);
+          // Decode frame berikutnya SAMBIL frame ini tampil.
+          if (i + 1 < frames) pending = codec.getNextFrame();
+          final ms = frame.duration.inMilliseconds;
+          due += ms <= 0 ? 40 : ms;
+          // Tunggu berdasarkan jam, bukan per frame, biar waktu decode gak
+          // bikin animasi makin lama makin telat.
+          final wait = due - clock.elapsedMilliseconds;
+          if (wait > 0) await Future<void>.delayed(Duration(milliseconds: wait));
+          if (!alive()) return;
+        }
+        codec.dispose();
+        codec = null;
+
+        if (!layer.loop) {
+          _setImage(null);
           return;
         }
-        _setImage(frame.image);
-        final ms = frame.duration.inMilliseconds;
-        await Future<void>.delayed(Duration(milliseconds: ms <= 0 ? 40 : ms));
-        if (gen != _gen || !mounted) return;
+        // Sembunyikan cuma kalau memang ada jeda. Jeda 0 = frame terakhir
+        // tetap tampil sampai frame pertama putaran baru menggantikannya.
+        if (layer.delayMs > 0) {
+          _setImage(null);
+          await Future<void>.delayed(Duration(milliseconds: layer.delayMs));
+          if (!alive()) return;
+        }
+        final next = nextCodec!;
+        nextCodec = null;
+        codec = await next;
       }
     } catch (_) {
       // Gagal unduh / decode = lapisan ini tidak tampil.
-      return;
+      if (alive()) _setImage(null);
     } finally {
       codec?.dispose();
+      pending?.then((f) => f.image.dispose(), onError: (Object _) {});
+      nextCodec?.then((c) => c.dispose(), onError: (Object _) {});
     }
-    if (gen != _gen || !mounted) return;
-    _setImage(null);
-    if (layer.loop) _schedule(gen, layer.delayMs);
   }
 
   @override

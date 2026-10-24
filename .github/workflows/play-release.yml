@@ -20,7 +20,7 @@ on:
       version_name:
         description: 'Versi (format x.y atau x.y.z, contoh 2.8)'
         required: true
-        default: '2.8'
+        default: '2.8.4'
 
 permissions:
   contents: read
