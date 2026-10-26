@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:isolate';
 
 import 'package:dio/dio.dart';
 
@@ -22,8 +21,8 @@ class AnichinRepository {
   AnichinRepository(this._dio, {Dio? okruDio})
       : _okru = okruDio ??
             Dio(BaseOptions(
-              connectTimeout: const Duration(seconds: 15),
-              receiveTimeout: const Duration(seconds: 20),
+              connectTimeout: const Duration(seconds: 8),
+              receiveTimeout: const Duration(seconds: 15),
               responseType: ResponseType.plain,
             ));
 
@@ -91,13 +90,13 @@ class AnichinRepository {
 
   /// `<path>/__data.json` (path kosong = beranda).
   ///
-  /// Parsing JSON halaman (bisa ratusan KB) jalan di isolate terpisah supaya
-  /// UI / player tidak patah-patah. Redirect dari sumber diikuti sekali.
+  /// Data halaman kecil (< 50 KB), jadi diparse langsung (tanpa isolate).
+  /// Redirect dari sumber diikuti maks. 2x.
   Future<Map<String, dynamic>> _page(String path, {Map<String, dynamic>? query, int hops = 0}) async {
     final p = path.isEmpty ? '__data.json' : '$path/__data.json';
     final body = await _body(p, query);
     try {
-      return await _parsePageInBackground(body);
+      return parsePageData(body);
     } on SvelteRedirect catch (r) {
       final next = _redirectPath(r.location);
       if (hops >= 2 || next == null) throw Exception('Halaman tidak ditemukan di sumber.');
@@ -135,7 +134,7 @@ class AnichinRepository {
   Future<Object?> _api(String path, {Map<String, dynamic>? query}) async {
     final body = await _body(path, query);
     try {
-      return await _decodeJsonInBackground(body);
+      return jsonDecode(body);
     } on FormatException {
       throw Exception(_looksLikeHtml(body)
           ? 'Sumber sedang sibuk / memblokir. Coba lagi sebentar.'
@@ -537,15 +536,6 @@ class AnichinRepository {
     return best;
   }
 }
-
-// ============================ parsing di isolate =============================
-
-/// Top-level (bukan method) supaya closure yang dikirim ke isolate cuma
-/// membawa String body, bukan objek repository / Dio.
-Future<Map<String, dynamic>> _parsePageInBackground(String body) =>
-    Isolate.run(() => parsePageData(body));
-
-Future<Object?> _decodeJsonInBackground(String body) => Isolate.run(() => jsonDecode(body));
 
 // ======================= pemetaan data sumber -> model app ===================
 

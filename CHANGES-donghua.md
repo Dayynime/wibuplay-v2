@@ -43,7 +43,7 @@ Jalankan: `flutter pub get && flutter analyze && flutter test`
 
 - `svelte_data.dart`: dukung respons NDJSON (data di-stream SvelteKit), tipe khusus devalue
   (`Date`, `Promise`, `Set`, `Map`), dan `{"type":"redirect"}` (diikuti maks. 2x).
-- Parsing JSON halaman pindah ke isolate (`Isolate.run`) -> UI/player tidak patah-patah saat memuat.
+- (Dibatalkan) parsing di isolate; data cuma <50 KB, parse langsung.
 - Request halaman yang sama digabung: player tidak lagi download `watch/...` dua kali bersamaan.
 - Respons HTML (diblok/sibuk) -> pesan "Sumber sedang sibuk / memblokir".
 - Header video per host (`AnichinNetwork.headersFor`).

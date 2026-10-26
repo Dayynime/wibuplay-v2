@@ -157,8 +157,8 @@ Dio createAnichinDio(PremiumTokenManager tokens) {
   final dio = Dio(
     BaseOptions(
       baseUrl: AnichinNetwork.baseUrl,
-      connectTimeout: const Duration(seconds: 20),
-      receiveTimeout: const Duration(seconds: 45),
+      connectTimeout: const Duration(seconds: 8),
+      receiveTimeout: const Duration(seconds: 20),
       responseType: ResponseType.plain,
       headers: {
         'User-Agent': AnichinNetwork.userAgent,
