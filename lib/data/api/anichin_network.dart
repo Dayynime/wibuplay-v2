@@ -4,8 +4,8 @@ import 'package:dio/dio.dart';
 
 import 'premium_token_manager.dart';
 
-/// Klien HTTP donghua. Sumbernya langsung situs v1.anichin.space (sama dengan
-/// web anichin-web): halaman SvelteKit `.../__data.json` dan `/api/*`.
+/// Klien HTTP donghua. Data dari server cache sendiri (api.zenime.biz.id/app-api/)
+/// yang mencerminkan v1.anichin.space: halaman SvelteKit `.../__data.json` dan `/api/*`.
 ///
 /// TESTING: base URL ditulis langsung di [baseUrl], TIDAK dari Remote Config,
 /// supaya `anichin_base_url` milik app versi publik tidak tersentuh.
@@ -14,8 +14,10 @@ import 'premium_token_manager.dart';
 class AnichinNetwork {
   AnichinNetwork._();
 
-  /// Base URL sumber donghua (harus diakhiri "/").
-  static const String baseUrl = 'https://v1.anichin.space/';
+  /// Base URL donghua (harus diakhiri "/"). Server cache sendiri di VPS
+  /// (anichin-web/app_api.py) yang mencerminkan JSON v1.anichin.space dengan
+  /// path yang sama. Ganti ke 'https://v1.anichin.space/' untuk langsung ke sumber.
+  static const String baseUrl = 'https://api.zenime.biz.id/app-api/';
 
   // Link video OK.ru menolak (HTTP 400) kalau User-Agent bukan browser,
   // termasuk User-Agent bawaan player. Referer juga dibutuhkan.

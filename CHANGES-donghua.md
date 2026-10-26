@@ -47,3 +47,10 @@ Jalankan: `flutter pub get && flutter analyze && flutter test`
 - Request halaman yang sama digabung: player tidak lagi download `watch/...` dua kali bersamaan.
 - Respons HTML (diblok/sibuk) -> pesan "Sumber sedang sibuk / memblokir".
 - Header video per host (`AnichinNetwork.headersFor`).
+
+## Perbaikan 3 (lewat server cache VPS)
+
+- Base URL donghua: `https://api.zenime.biz.id/app-api/` (anichin-web/app_api.py di VPS,
+  service `anichin-api` port 8090, Caddy `handle /app-api/*`). Path & isi JSON sama dengan sumber.
+- Token Premium tetap dikirim ke `watch/...` (host VPS); server mengeceknya kalau env
+  `PREMIUM_TOKEN_SECRET` diisi.

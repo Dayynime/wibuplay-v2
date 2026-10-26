@@ -112,9 +112,11 @@ class AnichinRepository {
   /// Location redirect -> path relatif tanpa "/" depan & query (null kalau host lain).
   static String? _redirectPath(String location) {
     final base = Uri.parse(AnichinNetwork.baseUrl);
-    final u = Uri.parse(base.toString()).resolve(location);
-    if (u.host != base.host) return null;
+    final u = base.resolve(location);
+    if (u.host != base.host && u.host != 'v1.anichin.space') return null;
     var path = u.path;
+    // Location dari sumber relatif ke root situs (/watch/x), bukan ke /app-api/.
+    if (path.startsWith(base.path)) path = path.substring(base.path.length);
     while (path.startsWith('/')) {
       path = path.substring(1);
     }

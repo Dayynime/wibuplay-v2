@@ -274,7 +274,7 @@ void main() {
 
   test('createAnichinDio: base URL tetap, tanpa Authorization default', () {
     final d = createAnichinDio(PremiumTokenManager(Dio()));
-    expect(d.options.baseUrl, 'https://v1.anichin.space/');
+    expect(d.options.baseUrl, AnichinNetwork.baseUrl);
     expect(d.options.headers.containsKey('Authorization'), isFalse);
   });
 }
