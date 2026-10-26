@@ -2,16 +2,20 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 
-import '../../core/dio_client.dart';
-import '../../core/remote_config_manager.dart';
 import 'premium_token_manager.dart';
 
-/// Klien HTTP khusus API Anichin (donghua). Port AnichinNetwork.kt.
+/// Klien HTTP donghua. Sumbernya langsung situs v1.anichin.space (sama dengan
+/// web anichin-web): halaman SvelteKit `.../__data.json` dan `/api/*`.
 ///
-/// Terpisah dari [createDio] karena backend-nya lain: base URL dari parameter
-/// Remote Config `anichin_base_url`.
+/// TESTING: base URL ditulis langsung di [baseUrl], TIDAK dari Remote Config,
+/// supaya `anichin_base_url` milik app versi publik tidak tersentuh.
+/// Token Premium tetap ditempel ke request episode (`watch/...`), seperti
+/// versi lama yang menempel ke `episode/` dan `video-source/`.
 class AnichinNetwork {
   AnichinNetwork._();
+
+  /// Base URL sumber donghua (harus diakhiri "/").
+  static const String baseUrl = 'https://v1.anichin.space/';
 
   // Link video OK.ru menolak (HTTP 400) kalau User-Agent bukan browser,
   // termasuk User-Agent bawaan player. Referer juga dibutuhkan.
@@ -19,10 +23,9 @@ class AnichinNetwork {
       'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36';
   static const String videoReferer = 'https://ok.ru/';
 
-  /// Thumbnail dari API berbentuk path relatif ("/wp-content/uploads/...") dan
-  /// host-nya ikut situs sumber. Default di bawah, lalu otomatis diperbarui
-  /// dari field `source` di tiap response.
-  static String sourceBase = 'https://anichin.moe';
+  /// Host gambar relatif (kalau ada). Thumbnail dari sumber umumnya sudah
+  /// berupa URL absolut.
+  static String sourceBase = 'https://v1.anichin.space';
 
   static void updateSourceBase(String? source) {
     if (source == null) return;
@@ -31,7 +34,7 @@ class AnichinNetwork {
     sourceBase = '${uri.scheme}://${uri.host}';
   }
 
-  /// Ubah path relatif dari API jadi URL absolut yang bisa dimuat image loader.
+  /// Ubah path relatif jadi URL absolut yang bisa dimuat image loader.
   static String? imageUrl(String? path) {
     if (path == null || path.trim().isEmpty) return null;
     if (path.startsWith('http://') || path.startsWith('https://')) return path;
@@ -53,43 +56,20 @@ class AnichinNetwork {
       };
 }
 
-/// Ganti host di TIAP request dengan `anichin_base_url` terbaru. Kalau kosong,
-/// request digagalkan dengan pesan jelas (kill-switch), tanpa fallback.
-class _AnichinBaseUrlInterceptor extends Interceptor {
-  @override
-  void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
-    final base = RemoteConfigManager.anichinBaseUrl;
-    if (base == null) {
-      handler.reject(
-        DioException(
-          requestOptions: options,
-          type: DioExceptionType.unknown,
-          message: DynamicBaseUrlInterceptor.unavailableMessage,
-        ),
-        true,
-      );
-      return;
-    }
-    options.baseUrl = base;
-    handler.next(options);
-  }
-}
-
-/// Donghua khusus Premium. Endpoint `episode/` dan `video-source/` dijaga di
-/// SERVER; app cuma menempelkan token premium bertanda tangan server. Kalau
-/// tidak ada / ditolak, server yang menolak.
+/// Donghua khusus Premium. Request halaman episode (`watch/<slug>/...`) diberi
+/// token premium bertanda tangan server (edge function `zenime-premium-token`).
+/// Hanya dikirim ke host [AnichinNetwork.baseUrl], tidak ke OK.ru / host lain.
 class _PremiumTokenInterceptor extends Interceptor {
   _PremiumTokenInterceptor(this._dio, this._tokens);
 
   final Dio _dio;
   final PremiumTokenManager _tokens;
   static const String _retriedKey = 'anichin_token_retried';
-
   static bool _guarded(RequestOptions o) {
-    final segs = o.path.split('?').first.split('/').where((s) => s.isNotEmpty).toList();
-    if (segs.length < 2) return false;
-    final parent = segs[segs.length - 2];
-    return parent == 'episode' || parent == 'video-source';
+    final host = Uri.tryParse(o.baseUrl)?.host;
+    if (host == null || host.isEmpty || o.uri.host != host) return false;
+    final segs = o.uri.pathSegments.where((s) => s.isNotEmpty).toList();
+    return segs.length >= 2 && segs.first == 'watch';
   }
 
   @override
@@ -160,16 +140,17 @@ class _AnichinRetryInterceptor extends Interceptor {
 Dio createAnichinDio(PremiumTokenManager tokens) {
   final dio = Dio(
     BaseOptions(
-      // Placeholder; host sebenarnya diisi _AnichinBaseUrlInterceptor tiap request.
-      baseUrl: 'https://placeholder.invalid/',
+      baseUrl: AnichinNetwork.baseUrl,
       connectTimeout: const Duration(seconds: 20),
-      // Endpoint scraping bisa 5-8 detik, kasih napas panjang.
       receiveTimeout: const Duration(seconds: 45),
       responseType: ResponseType.plain,
+      headers: {
+        'User-Agent': AnichinNetwork.userAgent,
+        'Accept': 'application/json, text/plain, */*',
+      },
     ),
   );
   dio.interceptors.addAll([
-    _AnichinBaseUrlInterceptor(),
     _PremiumTokenInterceptor(dio, tokens),
     _AnichinRetryInterceptor(dio),
   ]);
