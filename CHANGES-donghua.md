@@ -61,3 +61,9 @@ Jalankan: `flutter pub get && flutter analyze && flutter test`
 - Master HLS (VIP / m3u8 / Dailymotion) dipecah per varian -> pilihan 360p/480p/720p/1080p,
   batas 480p non-premium tetap berlaku. Gagal dibaca -> "Auto".
 - HLS tidak bisa didownload (bukan file mp4).
+
+## Diagnosa sementara (X-App-Timing)
+
+- App mencatat lama tiap langkah donghua (token, jaringan, parse, OK.ru/HLS, total detail/video)
+  dan mengirimnya ke VPS lewat header `X-App-Timing` pada request `health` (3 dtk setelah langkah terakhir).
+  Terbaca di log Caddy. Hapus `AnichinTiming` & `_TimingInterceptor` setelah masalah ketemu.

@@ -96,7 +96,10 @@ class AnichinRepository {
     final p = path.isEmpty ? '__data.json' : '$path/__data.json';
     final body = await _body(p, query);
     try {
-      return parsePageData(body);
+      final sw = Stopwatch()..start();
+      final data = parsePageData(body);
+      AnichinTiming.add('parse $p ${sw.elapsedMilliseconds}ms');
+      return data;
     } on SvelteRedirect catch (r) {
       final next = _redirectPath(r.location);
       if (hops >= 2 || next == null) throw Exception('Halaman tidak ditemukan di sumber.');
@@ -245,6 +248,15 @@ class AnichinRepository {
 
   /// Detail anime (slug anime, TANPA kata "episode").
   Future<AnichinAnimeDetail> getDetail(String slug) async {
+    final sw = Stopwatch()..start();
+    try {
+      return await _getDetail(slug);
+    } finally {
+      AnichinTiming.add('DETAIL $slug total ${sw.elapsedMilliseconds}ms');
+    }
+  }
+
+  Future<AnichinAnimeDetail> _getDetail(String slug) async {
     final key = _slug(slug);
     final data = await _cached('series:$key', _ttlSeries, () => _page('series/$key'));
     final a = data['anime'];
@@ -314,6 +326,18 @@ class AnichinRepository {
   /// Embed lain (halaman HTML) dilewati. Tidak di-cache: link video ada masa
   /// berlakunya.
   Future<AnichinVideoSource> getVideoSource(String slug) async {
+    final sw = Stopwatch()..start();
+    try {
+      final v = await _getVideoSource(slug);
+      AnichinTiming.add('VIDEO $slug total ${sw.elapsedMilliseconds}ms ${v.medias.length}q');
+      return v;
+    } catch (e) {
+      AnichinTiming.add('VIDEO $slug GAGAL ${sw.elapsedMilliseconds}ms');
+      rethrow;
+    }
+  }
+
+  Future<AnichinVideoSource> _getVideoSource(String slug) async {
     final ep = await _episodeMap(slug);
     final players = _playable(ep['videos']);
     String? hls;
@@ -389,6 +413,8 @@ class AnichinRepository {
   /// Gagal / bukan master -> `[auto]` (master utuh).
   Future<List<AnichinMedia>> _hlsMedias(String masterUrl) async {
     final fallback = [AnichinMedia(quality: 'auto', url: masterUrl)];
+    final sw = Stopwatch()..start();
+    final host = Uri.tryParse(masterUrl)?.host ?? '?';
     try {
       final res = await _okru.get<dynamic>(
         masterUrl,
@@ -400,8 +426,10 @@ class AnichinRepository {
       final body = res.data;
       if (body is! String) return fallback;
       final variants = parseHlsMaster(body, Uri.parse(masterUrl));
+      AnichinTiming.add('hls $host ${sw.elapsedMilliseconds}ms ${variants.length}q');
       return variants.isEmpty ? fallback : variants;
     } catch (_) {
+      AnichinTiming.add('hls $host GAGAL ${sw.elapsedMilliseconds}ms');
       return fallback;
     }
   }
@@ -468,6 +496,18 @@ class AnichinRepository {
   }
 
   Future<({List<AnichinMedia> medias, String? hls})> _resolveOkru(String videoId) async {
+    final sw = Stopwatch()..start();
+    try {
+      final r = await _resolveOkruRaw(videoId);
+      AnichinTiming.add('okru ${sw.elapsedMilliseconds}ms ${r.medias.length}q');
+      return r;
+    } catch (e) {
+      AnichinTiming.add('okru GAGAL ${sw.elapsedMilliseconds}ms');
+      rethrow;
+    }
+  }
+
+  Future<({List<AnichinMedia> medias, String? hls})> _resolveOkruRaw(String videoId) async {
     final res = await _okru.post<dynamic>(
       'https://ok.ru/dk',
       data: {'cmd': 'videoPlayerMetadata', 'mid': videoId},

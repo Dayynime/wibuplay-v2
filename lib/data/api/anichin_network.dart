@@ -72,6 +72,68 @@ class AnichinNetwork {
       };
 }
 
+/// DIAGNOSA SEMENTARA: catat lama tiap langkah donghua di HP, lalu kirim ke
+/// VPS lewat header `X-App-Timing` pada request `health` (terbaca di log
+/// Caddy). Tidak berisi data pribadi: cuma path, durasi (ms), dan ukuran.
+class AnichinTiming {
+  AnichinTiming._();
+
+  static final List<String> _queue = [];
+  static Dio? _dio;
+  static Timer? _flush;
+
+  static void add(String entry) {
+    _queue.add(entry.replaceAll(RegExp(r'[^\x20-\x7E]'), '?'));
+    if (_queue.length > 12) _queue.removeAt(0);
+    _flush?.cancel();
+    _flush = Timer(const Duration(seconds: 3), _send);
+  }
+
+  static Future<void> _send() async {
+    final dio = _dio;
+    if (dio == null || _queue.isEmpty) return;
+    var value = _queue.join(' | ');
+    _queue.clear();
+    if (value.length > 1500) value = value.substring(value.length - 1500);
+    try {
+      await dio.get<dynamic>('health', options: Options(headers: {'X-App-Timing': value}));
+    } catch (_) {}
+  }
+}
+
+class _TimingInterceptor extends Interceptor {
+  static bool _skip(RequestOptions o) => o.path.startsWith('health');
+
+  @override
+  void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
+    options.extra['t0'] = DateTime.now().millisecondsSinceEpoch;
+    handler.next(options);
+  }
+
+  int _ms(RequestOptions o) =>
+      DateTime.now().millisecondsSinceEpoch - ((o.extra['t0'] as int?) ?? 0);
+
+  @override
+  void onResponse(Response<dynamic> response, ResponseInterceptorHandler handler) {
+    final o = response.requestOptions;
+    if (!_skip(o)) {
+      final d = response.data;
+      final size = d is String ? d.length : 0;
+      AnichinTiming.add('net ${o.uri.path.replaceFirst('/app-api/', '')} ${_ms(o)}ms ${size}B');
+    }
+    handler.next(response);
+  }
+
+  @override
+  void onError(DioException err, ErrorInterceptorHandler handler) {
+    final o = err.requestOptions;
+    if (!_skip(o)) {
+      AnichinTiming.add('ERR ${o.uri.path.replaceFirst('/app-api/', '')} ${_ms(o)}ms ${err.type.name}');
+    }
+    handler.next(err);
+  }
+}
+
 /// Donghua khusus Premium. Request halaman episode (`watch/<slug>/...`) diberi
 /// token premium bertanda tangan server (edge function `zenime-premium-token`).
 /// Hanya dikirim ke host [AnichinNetwork.baseUrl], tidak ke OK.ru / host lain.
@@ -91,7 +153,9 @@ class _PremiumTokenInterceptor extends Interceptor {
   @override
   Future<void> onRequest(RequestOptions options, RequestInterceptorHandler handler) async {
     if (_guarded(options)) {
+      final sw = Stopwatch()..start();
       final token = await _tokens.get();
+      AnichinTiming.add('token ${sw.elapsedMilliseconds}ms ${token == null ? "none" : "ok"}');
       if (token != null) options.headers['Authorization'] = 'Bearer $token';
     }
     handler.next(options);
@@ -168,7 +232,9 @@ Dio createAnichinDio(PremiumTokenManager tokens) {
   );
   dio.interceptors.addAll([
     _PremiumTokenInterceptor(dio, tokens),
+    _TimingInterceptor(),
     _AnichinRetryInterceptor(dio),
   ]);
+  AnichinTiming._dio = dio;
   return dio;
 }
