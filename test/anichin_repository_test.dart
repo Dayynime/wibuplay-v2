@@ -240,9 +240,31 @@ void main() {
     expect(AnichinRepository.pickMedia(v.medias, maxQuality: 'sd')!.quality, 'mobile');
   });
 
-  test('getVideoSource: tanpa OK.ru -> DioException 404 (pesan "belum tersedia")', () async {
+  test('getVideoSource: tanpa OK.ru -> Dailymotion HLS kualitas auto', () async {
+    final dm = Dio(BaseOptions(responseType: ResponseType.plain))
+      ..httpClientAdapter = FakeAdapter({
+        '/player/metadata/video/x1': {
+          'qualities': {
+            'auto': [
+              {'type': 'application/x-mpegURL', 'url': 'https://cdn.dailymotion.com/x1.m3u8'},
+            ],
+          },
+        },
+      });
+    final repo = AnichinRepository(
+      dioWith(watchRoute([
+        {'embed': 'https://www.dailymotion.com/embed/video/x1', 'host_name': 'Dailymotion'},
+      ])),
+      okruDio: dm,
+    );
+    final v = await repo.getVideoSource(epSlug);
+    expect(v.medias.single.quality, 'auto');
+    expect(v.medias.single.url, 'https://cdn.dailymotion.com/x1.m3u8');
+  });
+
+  test('getVideoSource: cuma embed HTML (VIP) -> DioException 404 (pesan "belum tersedia")', () async {
     final repo = AnichinRepository(dioWith(watchRoute([
-      {'embed': 'https://www.dailymotion.com/embed/video/x1', 'host_name': 'Dailymotion'},
+      {'embed': 'https://rmb.anichin.bio/e/abc', 'host_name': 'VIP'},
     ])));
     await expectLater(
       repo.getVideoSource(epSlug),

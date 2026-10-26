@@ -199,7 +199,7 @@ class _DonghuaPlayerScreenState extends ConsumerState<DonghuaPlayerScreen>
           ? WpVideoController.file(File.fromUri(Uri.parse(url)))
           : WpVideoController.networkUrl(
               Uri.parse(url),
-              httpHeaders: AnichinNetwork.videoHeaders,
+              httpHeaders: AnichinNetwork.headersFor(url),
             );
     } catch (_) {
       if (mounted) setState(() => _playerError = true);
@@ -650,8 +650,14 @@ class _DonghuaPlayerScreenState extends ConsumerState<DonghuaPlayerScreen>
       _toast('Link video belum siap, coba lagi sebentar');
       return;
     }
+    // HLS "auto" (Dailymotion / m3u8) berupa potongan stream, bukan 1 file mp4.
+    final downloadable = medias.where((m) => m.quality != 'auto').toList();
+    if (downloadable.isEmpty) {
+      _toast('Episode ini belum bisa didownload (sumber stream)');
+      return;
+    }
 
-    final picked = await _pickDownloadQuality(medias);
+    final picked = await _pickDownloadQuality(downloadable);
     final link = picked?.url;
     if (picked == null || link == null || !mounted) return;
 
@@ -664,7 +670,7 @@ class _DonghuaPlayerScreenState extends ConsumerState<DonghuaPlayerScreen>
       episodeIndex: epNumber,
       quality: AnichinRepository.qualityLabel(picked.quality),
       videoUrl: link,
-      headers: AnichinNetwork.videoHeaders,
+      headers: AnichinNetwork.headersFor(link),
     );
     if (mounted) _toast(err ?? 'Download dimulai');
   }

@@ -84,4 +84,43 @@ void main() {
       expect(() => parsePageData('{"type":"data","nodes":[]}'), throwsFormatException);
     });
   });
+
+  group('format tambahan', () {
+    test('tipe khusus devalue (Date) tidak merusak data', () {
+      final r = unpackSvelte([{'t': 1, 'd': 2}, 'judul', ['Date', '2026-10-25T00:00:00.000Z']]) as Map;
+      expect(r['t'], 'judul');
+      expect(r['d'], '2026-10-25T00:00:00.000Z');
+    });
+
+    test('NDJSON: promise di-stream diisi dari chunk', () {
+      final main = jsonEncode({
+        'type': 'data',
+        'nodes': [
+          {
+            'type': 'data',
+            'data': [{'title': 1, 'episode': 2}, 'Ep 1', ['Promise', 3], 7],
+          },
+        ],
+      });
+      final chunk = jsonEncode({
+        'type': 'chunk',
+        'id': 7,
+        'data': [{'videos': 1}, [2], {'embed': 3}, 'https://ok.ru/videoembed/1'],
+      });
+      final r = parsePageData('$main\n$chunk\n');
+      expect(r['title'], 'Ep 1');
+      expect(r['episode'], {
+        'videos': [
+          {'embed': 'https://ok.ru/videoembed/1'},
+        ],
+      });
+    });
+
+    test('redirect dilempar sebagai SvelteRedirect', () {
+      expect(
+        () => parsePageData(jsonEncode({'type': 'redirect', 'location': '/watch/abc'})),
+        throwsA(isA<SvelteRedirect>().having((e) => e.location, 'location', '/watch/abc')),
+      );
+    });
+  });
 }

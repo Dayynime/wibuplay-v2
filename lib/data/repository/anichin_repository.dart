@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:isolate';
 
 import 'package:dio/dio.dart';
 
@@ -38,12 +39,26 @@ class AnichinRepository {
   static const Duration _ttlWatch = Duration(minutes: 30);
 
   final Map<String, (DateTime, Object)> _cache = {};
+  final Map<String, Future<Object>> _inflight = {};
 
   /// Cache memori per TTL. Kalau sumber gagal tapi ada data lama, pakai data lama.
-  Future<T> _cached<T extends Object>(String key, Duration ttl, Future<T> Function() load) async {
+  /// Request yang sama dan sedang berjalan digabung (misal player memanggil
+  /// getEpisode + getVideoSource bersamaan -> cuma SATU download halaman watch).
+  Future<T> _cached<T extends Object>(String key, Duration ttl, Future<T> Function() load) {
     final hit = _cache[key];
-    final now = DateTime.now();
-    if (hit != null && now.difference(hit.$1) < ttl) return hit.$2 as T;
+    if (hit != null && DateTime.now().difference(hit.$1) < ttl) return Future.value(hit.$2 as T);
+    final running = _inflight[key];
+    if (running != null) return running.then((v) => v as T);
+    final f = _load<T>(key, hit, load).whenComplete(() => _inflight.remove(key));
+    _inflight[key] = f;
+    return f;
+  }
+
+  Future<T> _load<T extends Object>(
+    String key,
+    (DateTime, Object)? hit,
+    Future<T> Function() load,
+  ) async {
     try {
       final value = await load();
       _cache[key] = (DateTime.now(), value);
@@ -75,21 +90,54 @@ class AnichinRepository {
   }
 
   /// `<path>/__data.json` (path kosong = beranda).
-  Future<Map<String, dynamic>> _page(String path, {Map<String, dynamic>? query}) async {
+  ///
+  /// Parsing JSON halaman (bisa ratusan KB) jalan di isolate terpisah supaya
+  /// UI / player tidak patah-patah. Redirect dari sumber diikuti sekali.
+  Future<Map<String, dynamic>> _page(String path, {Map<String, dynamic>? query, int hops = 0}) async {
     final p = path.isEmpty ? '__data.json' : '$path/__data.json';
+    final body = await _body(p, query);
     try {
-      return parsePageData(await _body(p, query));
+      return await _parsePageInBackground(body);
+    } on SvelteRedirect catch (r) {
+      final next = _redirectPath(r.location);
+      if (hops >= 2 || next == null) throw Exception('Halaman tidak ditemukan di sumber.');
+      return _page(next, hops: hops + 1);
     } on FormatException {
-      throw Exception('Respons server tidak dikenali.');
+      throw Exception(_looksLikeHtml(body)
+          ? 'Sumber sedang sibuk / memblokir. Coba lagi sebentar.'
+          : 'Respons server tidak dikenali.');
     }
+  }
+
+  /// Location redirect -> path relatif tanpa "/" depan & query (null kalau host lain).
+  static String? _redirectPath(String location) {
+    final base = Uri.parse(AnichinNetwork.baseUrl);
+    final u = Uri.parse(base.toString()).resolve(location);
+    if (u.host != base.host) return null;
+    var path = u.path;
+    while (path.startsWith('/')) {
+      path = path.substring(1);
+    }
+    while (path.endsWith('/')) {
+      path = path.substring(0, path.length - 1);
+    }
+    return path;
+  }
+
+  static bool _looksLikeHtml(String body) {
+    final head = body.trimLeft();
+    return head.startsWith('<');
   }
 
   /// Endpoint JSON biasa (`api/search`, `api/trending`).
   Future<Object?> _api(String path, {Map<String, dynamic>? query}) async {
+    final body = await _body(path, query);
     try {
-      return jsonDecode(await _body(path, query));
+      return await _decodeJsonInBackground(body);
     } on FormatException {
-      throw Exception('Respons server tidak dikenali.');
+      throw Exception(_looksLikeHtml(body)
+          ? 'Sumber sedang sibuk / memblokir. Coba lagi sebentar.'
+          : 'Respons server tidak dikenali.');
     }
   }
 
@@ -241,32 +289,61 @@ class AnichinRepository {
   // ----------------------------------------------------------- link video
 
   static final RegExp _okruId = RegExp(r'/videoembed/(\d+)');
+  static final RegExp _dmId = RegExp(r'(?:video[=/]|/video/)([a-zA-Z0-9]+)');
 
-  /// Link video langsung untuk pemutar app. Sumber hanya memberi embed; yang
-  /// bisa dijadikan link langsung cuma embed OK.ru (metadata OK.ru -> mp4 per
-  /// kualitas). Dailymotion dan "VIP" berupa halaman HTML jadi dilewati.
-  /// Tidak di-cache: link video ada masa berlakunya.
+  /// Link video langsung untuk pemutar app. Urutan prioritas:
+  /// 1. OK.ru  -> mp4 per kualitas (144p..1080p).
+  /// 2. Link `.m3u8` langsung dari sumber -> HLS kualitas "auto".
+  /// 3. Dailymotion -> HLS "auto" dari metadata player Dailymotion.
+  /// Embed lain (halaman HTML) dilewati. Tidak di-cache: link video ada masa
+  /// berlakunya.
   Future<AnichinVideoSource> getVideoSource(String slug) async {
     final ep = await _episodeMap(slug);
+    final players = _playable(ep['videos']);
     String? hls;
     var medias = <AnichinMedia>[];
-    for (final p in _playable(ep['videos'])) {
-      final path = p.url.split('?').first;
-      if (path.endsWith('.m3u8')) {
-        hls ??= p.url;
-        continue;
-      }
+
+    for (final p in players) {
+      if (medias.isNotEmpty) break;
       final id = _okruId.firstMatch(p.url)?.group(1);
-      if (id != null && medias.isEmpty) {
-        try {
-          final r = await _resolveOkru(id);
-          medias = r.medias;
-          hls ??= r.hls;
-        } catch (_) {
-          // mirror ini gagal -> coba yang lain
+      if (id == null) continue;
+      try {
+        final r = await _resolveOkru(id);
+        medias = r.medias;
+        hls ??= r.hls;
+      } catch (_) {
+        // mirror ini gagal -> coba yang lain
+      }
+    }
+
+    if (medias.isEmpty) {
+      for (final p in players) {
+        if (p.url.split('?').first.endsWith('.m3u8')) {
+          hls ??= p.url;
+          medias = [AnichinMedia(quality: 'auto', url: p.url)];
+          break;
         }
       }
     }
+
+    if (medias.isEmpty) {
+      for (final p in players) {
+        if (!p.url.contains('dailymotion.com')) continue;
+        final id = _dmId.firstMatch(p.url)?.group(1);
+        if (id == null) continue;
+        try {
+          final url = await _resolveDailymotion(id);
+          if (url != null) {
+            hls ??= url;
+            medias = [AnichinMedia(quality: 'auto', url: url)];
+            break;
+          }
+        } catch (_) {
+          // coba mirror berikutnya
+        }
+      }
+    }
+
     if (medias.isEmpty) {
       // UI memakai 404 untuk pesan "episode ini belum punya video di sumber".
       final ro = RequestOptions(path: 'video-source/$slug');
@@ -278,6 +355,26 @@ class AnichinRepository {
       );
     }
     return AnichinVideoSource(title: _s(ep['title']), hls: hls, medias: medias);
+  }
+
+  /// Metadata player Dailymotion -> URL HLS (m3u8) kualitas auto.
+  Future<String?> _resolveDailymotion(String videoId) async {
+    final res = await _okru.get<dynamic>(
+      'https://www.dailymotion.com/player/metadata/video/$videoId',
+      options: Options(headers: {'User-Agent': AnichinNetwork.userAgent}),
+    );
+    var data = res.data;
+    if (data is String) data = jsonDecode(data);
+    if (data is! Map) return null;
+    final q = data['qualities'];
+    if (q is! Map) return null;
+    for (final key in ['auto', ...q.keys.map((k) => '$k')]) {
+      for (final v in _maps(q[key])) {
+        final url = _s(v['url']);
+        if (url != null && '${v['type']}'.contains('mpegURL')) return url;
+      }
+    }
+    return null;
   }
 
   Future<({List<AnichinMedia> medias, String? hls})> _resolveOkru(String videoId) async {
@@ -302,13 +399,16 @@ class AnichinRepository {
 
   // ---------------------------------------------------------------- kualitas
 
+  /// "auto" = HLS adaptif (Dailymotion / m3u8 sumber), satu-satunya pilihan
+  /// kalau OK.ru tidak ada.
   /// Urutan kualitas OK.ru dari terendah ke tertinggi:
   /// mobile=144p, lowest=240p, low=360p, sd=480p, hd=720p, full=1080p.
   static const List<String> qualityOrder = [
-    'mobile', 'lowest', 'low', 'sd', 'hd', 'full', 'quad', 'ultra',
+    'auto', 'mobile', 'lowest', 'low', 'sd', 'hd', 'full', 'quad', 'ultra',
   ];
 
   static const Map<String, String> _qualityLabels = {
+    'auto': 'Auto',
     'mobile': '144p',
     'lowest': '240p',
     'low': '360p',
@@ -346,6 +446,15 @@ class AnichinRepository {
     return best;
   }
 }
+
+// ============================ parsing di isolate =============================
+
+/// Top-level (bukan method) supaya closure yang dikirim ke isolate cuma
+/// membawa String body, bukan objek repository / Dio.
+Future<Map<String, dynamic>> _parsePageInBackground(String body) =>
+    Isolate.run(() => parsePageData(body));
+
+Future<Object?> _decodeJsonInBackground(String body) => Isolate.run(() => jsonDecode(body));
 
 // ======================= pemetaan data sumber -> model app ===================
 

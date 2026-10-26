@@ -33,7 +33,17 @@ Jalankan: `flutter pub get && flutter analyze && flutter test`
 - Token Premium dikembalikan: ditempel (header `Authorization: Bearer`) ke request `watch/<slug>/...`
   ke host v1.anichin.space saja, tidak ke OK.ru. 401 -> token diambil ulang lalu coba sekali lagi.
   Token hanya berguna kalau server di host itu memang memeriksanya.
-- Hanya embed OK.ru yang jadi link video langsung. Embed Dailymotion/VIP berupa halaman HTML,
-  jadi episode yang hanya punya itu tampil "Video episode ini belum tersedia di sumber".
+- Link video: OK.ru (mp4 per kualitas) -> link .m3u8 langsung -> Dailymotion (HLS "Auto").
+  Embed VIP (halaman HTML) belum didukung; episode yang cuma punya VIP tetap "belum tersedia".
+  HLS "Auto" tidak bisa didownload.
 - `/series?page=` (tab "Semua") dan `type`/`order` diasumsikan/diabaikan: sumber tidak mendokumentasikannya.
 - `/schedule/__data.json` belum dipakai UI donghua.
+
+## Perbaikan 2 (error "Respons server tidak dikenali" + lag)
+
+- `svelte_data.dart`: dukung respons NDJSON (data di-stream SvelteKit), tipe khusus devalue
+  (`Date`, `Promise`, `Set`, `Map`), dan `{"type":"redirect"}` (diikuti maks. 2x).
+- Parsing JSON halaman pindah ke isolate (`Isolate.run`) -> UI/player tidak patah-patah saat memuat.
+- Request halaman yang sama digabung: player tidak lagi download `watch/...` dua kali bersamaan.
+- Respons HTML (diblok/sibuk) -> pesan "Sumber sedang sibuk / memblokir".
+- Header video per host (`AnichinNetwork.headersFor`).
