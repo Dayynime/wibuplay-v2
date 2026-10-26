@@ -56,6 +56,9 @@ class AnichinNetwork {
   static Map<String, String> headersFor(String url) {
     final host = Uri.tryParse(url)?.host ?? '';
     if (host.contains('ok.ru') || host.contains('okcdn')) return videoHeaders;
+    if (host == 'rmb.anichin.bio' || host.endsWith('rumble.cloud') || host.endsWith('rumble.com')) {
+      return {'User-Agent': userAgent, 'Referer': 'https://rmb.anichin.bio/'};
+    }
     if (host.contains('dailymotion') || host.contains('dmcdn')) {
       return {'User-Agent': userAgent, 'Referer': 'https://www.dailymotion.com/'};
     }

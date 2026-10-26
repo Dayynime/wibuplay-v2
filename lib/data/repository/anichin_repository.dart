@@ -292,11 +292,26 @@ class AnichinRepository {
 
   static final RegExp _okruId = RegExp(r'/videoembed/(\d+)');
   static final RegExp _dmId = RegExp(r'(?:video[=/]|/video/)([a-zA-Z0-9]+)');
+  static final RegExp _vipId = RegExp(r'^[A-Za-z0-9_-]{3,64}$');
+
+  /// Embed VIP `https://rmb.anichin.bio/?id=<id>` -> HLS `https://rmb.anichin.bio/hls/<id>.m3u8`
+  /// (dari script JW Player di halaman embed). null kalau bukan embed VIP.
+  static String? vipHls(String embed) {
+    final u = Uri.tryParse(embed);
+    if (u == null || u.host != 'rmb.anichin.bio') return null;
+    final id = u.queryParameters['id'];
+    if (id == null || !_vipId.hasMatch(id)) return null;
+    return 'https://rmb.anichin.bio/hls/$id.m3u8';
+  }
 
   /// Link video langsung untuk pemutar app. Urutan prioritas:
   /// 1. OK.ru  -> mp4 per kualitas (144p..1080p).
-  /// 2. Link `.m3u8` langsung dari sumber -> HLS kualitas "auto".
-  /// 3. Dailymotion -> HLS "auto" dari metadata player Dailymotion.
+  /// 2. VIP (rmb.anichin.bio) -> HLS `/hls/<id>.m3u8`.
+  /// 3. Link `.m3u8` langsung dari sumber.
+  /// 4. Dailymotion -> HLS dari metadata player Dailymotion.
+  /// HLS master dipecah per varian (360p/480p/...) lewat [_hlsMedias] supaya
+  /// pilihan kualitas & batas 480p non-premium tetap berlaku. Kalau gagal
+  /// dibaca, dipakai utuh sebagai kualitas "auto".
   /// Embed lain (halaman HTML) dilewati. Tidak di-cache: link video ada masa
   /// berlakunya.
   Future<AnichinVideoSource> getVideoSource(String slug) async {
@@ -320,9 +335,20 @@ class AnichinRepository {
 
     if (medias.isEmpty) {
       for (final p in players) {
+        final url = vipHls(p.url);
+        if (url != null) {
+          hls ??= url;
+          medias = await _hlsMedias(url);
+          break;
+        }
+      }
+    }
+
+    if (medias.isEmpty) {
+      for (final p in players) {
         if (p.url.split('?').first.endsWith('.m3u8')) {
           hls ??= p.url;
-          medias = [AnichinMedia(quality: 'auto', url: p.url)];
+          medias = await _hlsMedias(p.url);
           break;
         }
       }
@@ -337,7 +363,7 @@ class AnichinRepository {
           final url = await _resolveDailymotion(id);
           if (url != null) {
             hls ??= url;
-            medias = [AnichinMedia(quality: 'auto', url: url)];
+            medias = await _hlsMedias(url);
             break;
           }
         } catch (_) {
@@ -357,6 +383,69 @@ class AnichinRepository {
       );
     }
     return AnichinVideoSource(title: _s(ep['title']), hls: hls, medias: medias);
+  }
+
+  /// HLS master -> satu media per varian, kualitas dipetakan dari tinggi
+  /// resolusi ke kunci yang sama dengan OK.ru (360p = "low", 480p = "sd", ...).
+  /// Gagal / bukan master -> `[auto]` (master utuh).
+  Future<List<AnichinMedia>> _hlsMedias(String masterUrl) async {
+    final fallback = [AnichinMedia(quality: 'auto', url: masterUrl)];
+    try {
+      final res = await _okru.get<dynamic>(
+        masterUrl,
+        options: Options(
+          headers: AnichinNetwork.headersFor(masterUrl),
+          responseType: ResponseType.plain,
+        ),
+      );
+      final body = res.data;
+      if (body is! String) return fallback;
+      final variants = parseHlsMaster(body, Uri.parse(masterUrl));
+      return variants.isEmpty ? fallback : variants;
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  /// Baca master playlist HLS -> media per kualitas (urut rendah -> tinggi).
+  /// Varian dengan kunci kualitas sama: ambil bandwidth terbesar.
+  static List<AnichinMedia> parseHlsMaster(String body, Uri base) {
+    final lines = const LineSplitter().convert(body).map((l) => l.trim()).toList();
+    if (lines.isEmpty || !lines.first.startsWith('#EXTM3U')) return const [];
+    final best = <String, (int, String)>{};
+    for (var i = 0; i < lines.length; i++) {
+      final l = lines[i];
+      if (!l.startsWith('#EXT-X-STREAM-INF:')) continue;
+      String? uri;
+      for (var j = i + 1; j < lines.length; j++) {
+        if (lines[j].isEmpty) continue;
+        if (!lines[j].startsWith('#')) uri = lines[j];
+        break;
+      }
+      if (uri == null) continue;
+      final h = int.tryParse(RegExp(r'RESOLUTION=\d+x(\d+)').firstMatch(l)?.group(1) ?? '');
+      final bw = int.tryParse(RegExp(r'(?:^|[:,])BANDWIDTH=(\d+)').firstMatch(l)?.group(1) ?? '') ?? 0;
+      if (h == null) continue;
+      final key = _qualityForHeight(h);
+      final url = base.resolve(uri).toString();
+      final prev = best[key];
+      if (prev == null || bw > prev.$1) best[key] = (bw, url);
+    }
+    final out = [
+      for (final e in best.entries) AnichinMedia(quality: e.key, url: e.value.$2),
+    ]..sort((a, b) => qualityRank(a.quality).compareTo(qualityRank(b.quality)));
+    return out;
+  }
+
+  static String _qualityForHeight(int h) {
+    if (h <= 144) return 'mobile';
+    if (h <= 240) return 'lowest';
+    if (h <= 360) return 'low';
+    if (h <= 480) return 'sd';
+    if (h <= 720) return 'hd';
+    if (h <= 1080) return 'full';
+    if (h <= 1440) return 'quad';
+    return 'ultra';
   }
 
   /// Metadata player Dailymotion -> URL HLS (m3u8) kualitas auto.

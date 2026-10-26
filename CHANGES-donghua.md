@@ -33,8 +33,8 @@ Jalankan: `flutter pub get && flutter analyze && flutter test`
 - Token Premium dikembalikan: ditempel (header `Authorization: Bearer`) ke request `watch/<slug>/...`
   ke host v1.anichin.space saja, tidak ke OK.ru. 401 -> token diambil ulang lalu coba sekali lagi.
   Token hanya berguna kalau server di host itu memang memeriksanya.
-- Link video: OK.ru (mp4 per kualitas) -> link .m3u8 langsung -> Dailymotion (HLS "Auto").
-  Embed VIP (halaman HTML) belum didukung; episode yang cuma punya VIP tetap "belum tersedia".
+- Link video: OK.ru (mp4 per kualitas) -> VIP `rmb.anichin.bio/hls/<id>.m3u8` -> link .m3u8 langsung
+  -> Dailymotion (HLS "Auto"). Header Referer disesuaikan per host.
   HLS "Auto" tidak bisa didownload.
 - `/series?page=` (tab "Semua") dan `type`/`order` diasumsikan/diabaikan: sumber tidak mendokumentasikannya.
 - `/schedule/__data.json` belum dipakai UI donghua.
@@ -54,3 +54,10 @@ Jalankan: `flutter pub get && flutter analyze && flutter test`
   service `anichin-api` port 8090, Caddy `handle /app-api/*`). Path & isi JSON sama dengan sumber.
 - Token Premium tetap dikirim ke `watch/...` (host VPS); server mengeceknya kalau env
   `PREMIUM_TOKEN_SECRET` diisi.
+
+## Perbaikan 4 (server VIP)
+
+- Embed VIP `rmb.anichin.bio/?id=<id>` -> `https://rmb.anichin.bio/hls/<id>.m3u8` (master HLS, video di CDN Rumble).
+- Master HLS (VIP / m3u8 / Dailymotion) dipecah per varian -> pilihan 360p/480p/720p/1080p,
+  batas 480p non-premium tetap berlaku. Gagal dibaca -> "Auto".
+- HLS tidak bisa didownload (bukan file mp4).

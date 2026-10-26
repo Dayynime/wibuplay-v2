@@ -650,8 +650,10 @@ class _DonghuaPlayerScreenState extends ConsumerState<DonghuaPlayerScreen>
       _toast('Link video belum siap, coba lagi sebentar');
       return;
     }
-    // HLS "auto" (Dailymotion / m3u8) berupa potongan stream, bukan 1 file mp4.
-    final downloadable = medias.where((m) => m.quality != 'auto').toList();
+    // HLS (VIP / Dailymotion / m3u8) berupa potongan stream, bukan 1 file mp4.
+    final downloadable = medias
+        .where((m) => m.quality != 'auto' && !(m.url ?? '').toLowerCase().contains('m3u8'))
+        .toList();
     if (downloadable.isEmpty) {
       _toast('Episode ini belum bisa didownload (sumber stream)');
       return;

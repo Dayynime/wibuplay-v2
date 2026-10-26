@@ -262,7 +262,55 @@ void main() {
     expect(v.medias.single.url, 'https://cdn.dailymotion.com/x1.m3u8');
   });
 
-  test('getVideoSource: cuma embed HTML (VIP) -> DioException 404 (pesan "belum tersedia")', () async {
+  test('getVideoSource: VIP -> HLS rmb.anichin.bio/hls/<id>.m3u8', () async {
+    final cdn = Dio(BaseOptions(responseType: ResponseType.plain))
+      ..httpClientAdapter = FakeAdapter({
+        '/hls/v7eut5y.m3u8': '#EXTM3U\n'
+            '#EXT-X-STREAM-INF:BANDWIDTH=676000,RESOLUTION=640x360\n'
+            'https://hugh.cdn.rumble.cloud/v/a.baa.tar?r_file=chunklist.m3u8\n'
+            '#EXT-X-STREAM-INF:BANDWIDTH=4096000,RESOLUTION=1920x1080\n'
+            'https://hugh.cdn.rumble.cloud/v/a.haa.tar?r_file=chunklist.m3u8\n',
+      });
+    final repo = AnichinRepository(
+      dioWith(watchRoute([
+        {'embed': 'https://rmb.anichin.bio/?id=v7eut5y', 'host_name': 'VIP'},
+        {'embed': 'https://ok.ru/videoembed/#', 'host_name': 'OK.ru'},
+      ])),
+      okruDio: cdn,
+    );
+    final v = await repo.getVideoSource(epSlug);
+    expect(v.hls, 'https://rmb.anichin.bio/hls/v7eut5y.m3u8');
+    expect(v.medias.map((m) => m.quality), ['low', 'full']);
+  });
+
+  test('parseHlsMaster: varian VIP -> kualitas 360p..1080p', () {
+    const master = '''#EXTM3U
+#EXT-X-VERSION:3
+#EXT-X-STREAM-INF:BANDWIDTH=676000,RESOLUTION=640x360
+https://hugh.cdn.rumble.cloud/v/a.baa.tar?r_file=chunklist.m3u8
+#EXT-X-STREAM-INF:BANDWIDTH=1052000,RESOLUTION=854x480
+https://hugh.cdn.rumble.cloud/v/a.caa.tar?r_file=chunklist.m3u8
+#EXT-X-STREAM-INF:BANDWIDTH=2137000,RESOLUTION=1280x720
+https://hugh.cdn.rumble.cloud/v/a.gaa.tar?r_file=chunklist.m3u8
+#EXT-X-STREAM-INF:BANDWIDTH=4096000,RESOLUTION=1920x1080
+rel/1080.m3u8
+''';
+    final m = AnichinRepository.parseHlsMaster(master, Uri.parse('https://rmb.anichin.bio/hls/x.m3u8'));
+    expect(m.map((e) => e.quality), ['low', 'sd', 'hd', 'full']);
+    expect(m.last.url, 'https://rmb.anichin.bio/hls/rel/1080.m3u8');
+    expect(AnichinRepository.pickMedia(m, maxQuality: 'sd')!.quality, 'sd');
+    expect(AnichinRepository.parseHlsMaster('bukan m3u8', Uri.parse('https://x/')), isEmpty);
+  });
+
+  test('vipHls: hanya embed VIP dengan id valid', () {
+    expect(AnichinRepository.vipHls('https://rmb.anichin.bio/?id=abc_12'),
+        'https://rmb.anichin.bio/hls/abc_12.m3u8');
+    expect(AnichinRepository.vipHls('https://rmb.anichin.bio/e/abc'), isNull);
+    expect(AnichinRepository.vipHls('https://evil.example/?id=abc'), isNull);
+    expect(AnichinRepository.vipHls('https://rmb.anichin.bio/?id=../x'), isNull);
+  });
+
+  test('getVideoSource: tidak ada server yang bisa diputar -> DioException 404 (pesan "belum tersedia")', () async {
     final repo = AnichinRepository(dioWith(watchRoute([
       {'embed': 'https://rmb.anichin.bio/e/abc', 'host_name': 'VIP'},
     ])));
