@@ -93,7 +93,8 @@ final premiumTokenManagerProvider = Provider<PremiumTokenManager>(
   (ref) => PremiumTokenManager(ref.watch(supabaseDioProvider)),
 );
 
-/// Dio khusus API Anichin (donghua), base URL dari Remote Config `anichin_base_url`.
+/// Dio donghua: base URL tetap https://v1.anichin.space/ (bukan Remote Config,
+/// untuk testing), token Premium ditempel ke request episode.
 final anichinDioProvider = Provider<Dio>(
   (ref) => createAnichinDio(ref.watch(premiumTokenManagerProvider)),
 );

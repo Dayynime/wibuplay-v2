@@ -193,6 +193,21 @@ jobs:
 
       # Firebase Zenime (project yang sama dengan app Kotlin) dikirim lewat
       # secret FIREBASE_API_KEY dan FIREBASE_APP_ID (dari google-services.json).
+      # CMake untuk modul native (jni). Dipasang duluan dengan retry karena
+      # download dari server Google kadang rusak ("Archive is not a ZIP archive").
+      - name: Pasang CMake 3.22.1 (retry)
+        run: |
+          SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          for i in 1 2 3; do
+            if yes | "$SDKM" --install "cmake;3.22.1" > /tmp/cmake.log 2>&1 && [ -x "$ANDROID_HOME/cmake/3.22.1/bin/cmake" ]; then
+              echo "CMake 3.22.1 terpasang"; exit 0
+            fi
+            echo "Gagal pasang CMake (percobaan $i), ulangi..."; tail -5 /tmp/cmake.log
+            rm -rf "$ANDROID_HOME/cmake/3.22.1" "$ANDROID_HOME/.temp"
+            sleep 10
+          done
+          echo "::error::CMake 3.22.1 gagal dipasang 3x"; exit 1
+
       - name: Build Debug APK
         run: >
           flutter build apk --debug --build-number=$APP_VERSION_CODE

@@ -4,6 +4,7 @@ import '../../../core/error_message.dart';
 import '../../../data/models/anichin_models.dart';
 import '../../../data/repository/anichin_repository.dart';
 import '../../../providers.dart';
+import '../../../data/api/anichin_network.dart';
 
 class DonghuaDetailState {
   const DonghuaDetailState({this.detail, this.isLoading = true, this.error});
@@ -13,9 +14,10 @@ class DonghuaDetailState {
   final String? error;
 }
 
-// Slug episode: "...-episode-12-subtitle-indonesia" (juga typo "epsiode").
-final RegExp _episodeSlug = RegExp(r'-ep[a-z]*sode-\d+');
-final RegExp _episodeTail = RegExp(r'-ep[a-z]*sode-\d+.*$');
+// Slug episode: "...-episode-12-subtitle-indonesia" (juga typo "epsiode")
+// dan "...-s5-ep-216-sub-indo".
+final RegExp _episodeSlug = RegExp(r'-(?:episode|epsiode|eps|ep)-\d+');
+final RegExp _episodeTail = RegExp(r'-(?:episode|epsiode|eps|ep)-\d+.*$');
 // Sisa judul tanpa kata episode: "...-subtitle-indonesia".
 final RegExp _subtitleTail =
     RegExp(r'-(subtitle|sub)-?(indonesia|indo|indonesa).*$', caseSensitive: false);
@@ -64,6 +66,8 @@ class DonghuaDetailController
   }
 
   Future<void> load() async {
+    final sw = Stopwatch()..start();
+    AnichinTiming.add('OPEN detail $arg');
     _update(const DonghuaDetailState(isLoading: true));
     final slug = arg;
     _Fetch result;
@@ -103,6 +107,7 @@ class DonghuaDetailController
     }
 
     final data = result.data;
+    AnichinTiming.add('DETAIL-UI $arg tampil ${sw.elapsedMilliseconds}ms ok=${data != null} alive=$_alive');
     if (data != null) {
       _update(DonghuaDetailState(detail: data, isLoading: false));
     } else {

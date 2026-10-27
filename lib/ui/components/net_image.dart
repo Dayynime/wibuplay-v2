@@ -16,20 +16,6 @@ Map<String, String> get netImageHeaders => {
       'Accept': 'image/webp,image/png,image/jpeg,image/*;q=0.8,*/*;q=0.5',
     };
 
-/// Ukuran decode gambar sesuai kotak tampilnya. Tanpa ini poster didecode
-/// resolusi penuh (sering 600-1500px) untuk kotak ~120dp, jadi tiap kartu baru
-/// yang muncul saat scroll bikin frame patah dan memori cepat penuh.
-/// Yang dibatasi sisi terpanjang kotak (aman untuk BoxFit.cover), dikali 1.25
-/// sebagai cadangan ketajaman, maksimal 1080px.
-({int? width, int? height}) netImageCacheSize(BoxConstraints c, double dpr) {
-  final w = c.hasBoundedWidth ? c.maxWidth : double.infinity;
-  final h = c.hasBoundedHeight ? c.maxHeight : double.infinity;
-  if (!w.isFinite && !h.isFinite) return (width: null, height: null);
-  int px(double v) => (v * dpr * 1.25).round().clamp(1, 1080);
-  if (!h.isFinite || (w.isFinite && w >= h)) return (width: px(w), height: null);
-  return (width: null, height: px(h));
-}
-
 /// Gambar jaringan dengan cache. Pakai di tempat yang ukurannya sudah pasti
 /// (Positioned.fill / SizedBox / AspectRatio). URL kosong -> area kosong.
 /// Saat memuat tampil shimmer; kalau gagal tampil ikon + sisa pesan error
@@ -60,18 +46,9 @@ class NetImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (url.isEmpty) return const SizedBox.expand();
-    final dpr = MediaQuery.devicePixelRatioOf(context);
-    return LayoutBuilder(
-      builder: (context, c) => _image(netImageCacheSize(c, dpr)),
-    );
-  }
-
-  Widget _image(({int? width, int? height}) cache) {
     return CachedNetworkImage(
       imageUrl: url,
       httpHeaders: _headersFor(url),
-      memCacheWidth: cache.width,
-      memCacheHeight: cache.height,
       fit: fit,
       alignment: alignment,
       fadeInDuration: const Duration(milliseconds: 200),
