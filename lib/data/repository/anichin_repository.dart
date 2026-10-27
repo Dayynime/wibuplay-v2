@@ -3,547 +3,144 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 
 import '../api/anichin_network.dart';
-import '../api/svelte_data.dart';
 import '../models/anichin_models.dart';
 
-/// Repository donghua yang membaca LANGSUNG situs v1.anichin.space, meniru
-/// web anichin-web (anichin_scraper.py + app.py). Hasilnya dipetakan ke model
-/// lama (AnichinCard, AnichinAnimeDetail, ...) supaya UI tidak berubah.
-///
-/// Endpoint sumber (GET, relatif ke AnichinNetwork.baseUrl):
-///   api/trending                 api/search?q=
-///   __data.json                  beranda (latestEpisodes, popularSeries)
-///   ongoing|completed/__data.json?page=
-///   series/__data.json?page=[&genre=]
-///   genres/__data.json           schedule/__data.json
-///   series/<slug>/__data.json    watch/<slug>/__data.json
+/// Port AnichinRepository.kt. Method melempar exception kalau gagal
+/// (setara Result.Error); pemanggil yang menangkapnya.
 class AnichinRepository {
-  AnichinRepository(this._dio, {Dio? okruDio})
-      : _okru = okruDio ??
-            Dio(BaseOptions(
-              connectTimeout: const Duration(seconds: 8),
-              receiveTimeout: const Duration(seconds: 15),
-              responseType: ResponseType.plain,
-            ));
+  AnichinRepository(this._dio);
 
   final Dio _dio;
-  final Dio _okru;
 
-  // ------------------------------------------------------------------ cache
-
-  static const Duration _ttlHome = Duration(minutes: 5);
-  static const Duration _ttlList = Duration(minutes: 10);
-  static const Duration _ttlGenres = Duration(days: 1);
-  static const Duration _ttlSeries = Duration(minutes: 10);
-  static const Duration _ttlWatch = Duration(minutes: 30);
-
-  final Map<String, (DateTime, Object)> _cache = {};
-  final Map<String, Future<Object>> _inflight = {};
-
-  /// Cache memori per TTL. Kalau sumber gagal tapi ada data lama, pakai data lama.
-  /// Request yang sama dan sedang berjalan digabung (misal player memanggil
-  /// getEpisode + getVideoSource bersamaan -> cuma SATU download halaman watch).
-  Future<T> _cached<T extends Object>(String key, Duration ttl, Future<T> Function() load) {
-    final hit = _cache[key];
-    if (hit != null && DateTime.now().difference(hit.$1) < ttl) return Future.value(hit.$2 as T);
-    final running = _inflight[key];
-    if (running != null) return running.then((v) => v as T);
-    // PENTING: callback whenComplete TIDAK boleh mengembalikan Future.
-    // `_inflight.remove(key)` mengembalikan `f` sendiri -> whenComplete akan
-    // menunggu dirinya sendiri (deadlock). Makanya pakai blok `{ ...; }`.
-    final f = _load<T>(key, hit, load).whenComplete(() {
-      _inflight.remove(key);
-    });
-    _inflight[key] = f;
-    return f;
-  }
-
-  Future<T> _load<T extends Object>(
-    String key,
-    (DateTime, Object)? hit,
-    Future<T> Function() load,
-  ) async {
-    try {
-      final value = await load();
-      _cache[key] = (DateTime.now(), value);
-      if (_cache.length > 300) _cache.remove(_cache.keys.first);
-      return value;
-    } catch (_) {
-      if (hit != null) return hit.$2 as T;
-      rethrow;
-    }
-  }
-
-  // ------------------------------------------------------------------- HTTP
-
-  static final RegExp _slugOk = RegExp(r'^[a-z0-9][a-z0-9-]*$');
-
-  static String _slug(String s) {
-    final v = s.trim();
-    if (!_slugOk.hasMatch(v)) throw Exception('Slug tidak valid.');
-    return v;
-  }
-
-  Future<String> _body(String path, Map<String, dynamic>? query) async {
+  Future<Map<String, dynamic>> _getMap(String path, {Map<String, dynamic>? query}) async {
     final res = await _dio.get<dynamic>(path, queryParameters: query);
-    final data = res.data;
-    if (data is! String || data.trim().isEmpty) {
-      throw Exception('Respons server tidak dikenali.');
-    }
-    return data;
+    var data = res.data;
+    if (data is String) data = data.trim().isEmpty ? null : jsonDecode(data);
+    if (data is Map) return Map<String, dynamic>.from(data);
+    throw Exception('Respons server tidak dikenali.');
   }
 
-  /// `<path>/__data.json` (path kosong = beranda).
-  ///
-  /// Data halaman kecil (< 50 KB), jadi diparse langsung (tanpa isolate).
-  /// Redirect dari sumber diikuti maks. 2x.
-  Future<Map<String, dynamic>> _page(String path, {Map<String, dynamic>? query, int hops = 0}) async {
-    final p = path.isEmpty ? '__data.json' : '$path/__data.json';
-    final body = await _body(p, query);
-    try {
-      final sw = Stopwatch()..start();
-      final data = parsePageData(body);
-      AnichinTiming.add('parse $p ${sw.elapsedMilliseconds}ms');
-      return data;
-    } on SvelteRedirect catch (r) {
-      final next = _redirectPath(r.location);
-      if (hops >= 2 || next == null) throw Exception('Halaman tidak ditemukan di sumber.');
-      return _page(next, hops: hops + 1);
-    } on FormatException {
-      throw Exception(_looksLikeHtml(body)
-          ? 'Sumber sedang sibuk / memblokir. Coba lagi sebentar.'
-          : 'Respons server tidak dikenali.');
-    }
-  }
-
-  /// Location redirect -> path relatif tanpa "/" depan & query (null kalau host lain).
-  static String? _redirectPath(String location) {
-    final base = Uri.parse(AnichinNetwork.baseUrl);
-    final u = base.resolve(location);
-    if (u.host != base.host && u.host != 'v1.anichin.space') return null;
-    var path = u.path;
-    // Location dari sumber relatif ke root situs (/watch/x), bukan ke /app-api/.
-    if (path.startsWith(base.path)) path = path.substring(base.path.length);
-    while (path.startsWith('/')) {
-      path = path.substring(1);
-    }
-    while (path.endsWith('/')) {
-      path = path.substring(0, path.length - 1);
-    }
-    return path;
-  }
-
-  static bool _looksLikeHtml(String body) {
-    final head = body.trimLeft();
-    return head.startsWith('<');
-  }
-
-  /// Endpoint JSON biasa (`api/search`, `api/trending`).
-  Future<Object?> _api(String path, {Map<String, dynamic>? query}) async {
-    final body = await _body(path, query);
-    try {
-      return jsonDecode(body);
-    } on FormatException {
-      throw Exception(_looksLikeHtml(body)
-          ? 'Sumber sedang sibuk / memblokir. Coba lagi sebentar.'
-          : 'Respons server tidak dikenali.');
-    }
-  }
-
-  // --------------------------------------------------------------- endpoint
+  static String _enc(String s) => Uri.encodeComponent(s);
 
   Future<AnichinHomeResponse> getHome({int page = 1}) async {
-    if (page > 1) {
-      return AnichinHomeResponse(page: page, total: 1, source: AnichinNetwork.sourceBase);
-    }
-    return _cached('home', _ttlHome, () async {
-      final home = await _page('');
-      Object? trending;
-      try {
-        trending = await _api('api/trending');
-      } catch (_) {
-        trending = home['trendingSlider'];
-      }
-      final latest = <AnichinCard>[
-        for (final e in _maps(home['latestEpisodes']))
-          if (_card(e, eps: _int(e['latest_episode']), headline: _s(e['series'])) case final c?) c,
-      ];
-      return AnichinHomeResponse(
-        results: [
-          AnichinHomeSection(section: 'Rilis Terbaru', cards: latest),
-          AnichinHomeSection(section: 'Trending', cards: _cards(trending)),
-          AnichinHomeSection(section: 'Populer', cards: _cards(home['popularSeries'])),
-        ],
-        page: 1,
-        total: 1,
-        source: AnichinNetwork.sourceBase,
-      );
-    });
+    final res = AnichinHomeResponse.fromJson(
+      await _getMap('', query: page > 1 ? {'page': page} : null),
+    );
+    AnichinNetwork.updateSourceBase(res.source);
+    return _throwIfError(res, res.error);
   }
 
   Future<AnichinListResponse> search(String query) async {
-    final q = query.trim();
-    if (q.isEmpty) {
-      return AnichinListResponse(query: q, source: AnichinNetwork.sourceBase);
-    }
-    final key = 'search:${q.toLowerCase()}';
-    return _cached(key, _ttlList, () async {
-      final raw = await _api('api/search', query: {'q': q.length > 100 ? q.substring(0, 100) : q});
-      return AnichinListResponse(
-        results: _cards(raw),
-        query: q,
-        source: AnichinNetwork.sourceBase,
-      );
-    });
+    // "/" di path kena 404 di server, jadi diganti spasi.
+    final q = query.trim().replaceAll('/', ' ');
+    final res = AnichinListResponse.fromJson(await _getMap('search/${_enc(q)}'));
+    AnichinNetwork.updateSourceBase(res.source);
+    return _throwIfError(res, res.error);
   }
 
-  /// Daftar berhalaman. `status: 'Ongoing'|'Completed'` memakai /ongoing atau
-  /// /completed; tanpa status = /series (semua). `type` dan `order` tidak
-  /// dipakai sumber, jadi diabaikan.
+  /// Daftar dengan filter bebas (status, type, order, dll), mis.
+  /// `status: 'Ongoing', order: 'update'`.
   Future<AnichinListResponse> getAnimeList({
     String? status,
     String? type,
     String? order,
     Map<String, String> extra = const {},
-  }) {
-    final n = int.tryParse(extra['page'] ?? '') ?? 1;
-    final st = (status ?? '').toLowerCase();
-    if (st == 'ongoing' || st == 'completed') {
-      return _listPage('$st:$n', st, {'page': n}, '${st}Series');
-    }
-    return _listPage('all:$n', 'series', {'page': n}, 'seriesData');
+  }) async {
+    final params = <String, dynamic>{
+      if (status != null) 'status': status,
+      if (type != null) 'type': type,
+      if (order != null) 'order': order,
+      ...extra,
+    };
+    final res = AnichinListResponse.fromJson(
+      await _getMap('anime', query: params.isEmpty ? null : params),
+    );
+    AnichinNetwork.updateSourceBase(res.source);
+    return _throwIfError(res, res.error);
   }
 
-  Future<List<AnichinGenre>> getGenres() {
-    return _cached('genres', _ttlGenres, () async {
-      final data = await _page('genres');
-      final seen = <String>{};
-      return <AnichinGenre>[
-        for (final o in _maps(data['dataList']))
-          if (_s(o['key']) case final key? when seen.add(key))
-            AnichinGenre(name: _unescape(_s(o['label']) ?? key), slug: key),
-      ];
-    });
+  Future<List<AnichinGenre>> getGenres() async {
+    final map = await _getMap('genres');
+    _throwIfError(map, _str(map, 'error'));
+    final list = (map['genres'] is List ? map['genres'] as List : const [])
+        .whereType<Map>()
+        .map((m) => AnichinGenre.fromJson(Map<String, dynamic>.from(m)));
+    // Server kadang mengirim daftar genre kedobel.
+    final seen = <String?>{};
+    return list.where((g) => seen.add(g.slug)).toList();
   }
 
   Future<AnichinListResponse> getByGenre(String slug, {int page = 1}) async {
-    final key = _slug(slug);
-    return _listPage('genre:$key:$page', 'series', {'genre': key, 'page': page}, 'seriesData',
-        slug: key);
-  }
-
-  Future<AnichinListResponse> _listPage(
-    String cacheKey,
-    String path,
-    Map<String, dynamic> query,
-    String listKey, {
-    String? slug,
-  }) {
-    return _cached(cacheKey, _ttlList, () async {
-      final data = await _page(path, query: query);
-      return AnichinListResponse(
-        results: _cards(data[listKey]),
-        slug: slug,
-        page: _int(data['currentPage']) ?? _int(query['page']) ?? 1,
-        total: _int(data['totalPages']) ?? 1,
-        source: AnichinNetwork.sourceBase,
-      );
-    });
+    final res = AnichinListResponse.fromJson(
+      await _getMap('genre/${_enc(slug)}', query: page > 1 ? {'page': page} : null),
+    );
+    AnichinNetwork.updateSourceBase(res.source);
+    return _throwIfError(res, res.error);
   }
 
   /// Detail anime (slug anime, TANPA kata "episode").
   Future<AnichinAnimeDetail> getDetail(String slug) async {
-    final sw = Stopwatch()..start();
-    try {
-      return await _getDetail(slug);
-    } finally {
-      AnichinTiming.add('DETAIL $slug total ${sw.elapsedMilliseconds}ms');
+    final env = await _getMap(_enc(slug));
+    AnichinNetwork.updateSourceBase(_str(env, 'source'));
+    final map = env['result'];
+    if (map is! Map) {
+      throw Exception(_str(env, 'error') ?? 'Anime tidak ditemukan');
     }
-  }
-
-  Future<AnichinAnimeDetail> _getDetail(String slug) async {
-    final key = _slug(slug);
-    final data = await _cached('series:$key', _ttlSeries, () => _page('series/$key'));
-    final a = data['anime'];
-    if (a is! Map) throw Exception('Anime tidak ditemukan');
-    final m = Map<String, dynamic>.from(a);
-    final thumb = _img(m);
+    final m = Map<String, dynamic>.from(map);
     return AnichinAnimeDetail(
-      name: _s(m['title']) ?? 'Unknown',
-      thumbnail: thumb,
-      genres: _genreNames(m['genres']),
-      rating: _sv(m['rating']),
-      sinopsis: _paragraphs(m['description']).join('\n\n'),
-      episodes: _episodeRefs(m['all_episodes'], thumb),
-      info: _info(m),
+      name: _str(m, 'name') ?? 'Unknown',
+      thumbnail: _str(m, 'thumbnail'),
+      genres: _strList(m, 'genre'),
+      rating: _str(m, 'rating'),
+      sinopsis: _sinopsis(m),
+      episodes: _episodes(m),
+      info: _info(m, _detailKeys),
     );
   }
 
   Future<AnichinEpisodeDetail> getEpisode(String slug) async {
-    final m = await _episodeMap(slug);
-    final anime = m['anime'] is Map ? Map<String, dynamic>.from(m['anime'] as Map) : <String, dynamic>{};
-    final thumb = _img(anime) ?? _img(m);
+    final env = await _getMap('episode/${_enc(slug)}');
+    AnichinNetwork.updateSourceBase(_str(env, 'source'));
+    final map = env['result'];
+    if (map is! Map) {
+      throw Exception(_str(env, 'error') ?? 'Episode tidak ditemukan');
+    }
+    final m = Map<String, dynamic>.from(map);
+    final root = _str(m, 'root');
     return AnichinEpisodeDetail(
-      name: _s(m['title']) ?? 'Unknown',
-      root: _s(anime['slug']),
-      thumbnail: thumb,
-      genres: _genreNames(anime['genres']),
-      rating: _sv(anime['rating']),
-      sinopsis: _paragraphs(anime['description'] ?? m['description']).join('\n\n'),
-      episodes: _episodeRefs(anime['episodes'], thumb),
-      players: _playable(m['videos']),
-      info: _info(anime),
+      name: _str(m, 'name') ?? 'Unknown',
+      root: root == 'unknown' ? null : root,
+      thumbnail: _str(m, 'thumbnail'),
+      genres: _strList(m, 'genre'),
+      rating: _str(m, 'rating'),
+      sinopsis: _sinopsis(m),
+      episodes: _episodes(m),
+      players: _players(m),
+      info: _info(m, _episodeKeys),
     );
   }
 
-  Future<Map<String, dynamic>> _episodeMap(String slug) async {
-    final key = _slug(slug);
-    final data = await _cached('watch:$key', _ttlWatch, () => _page('watch/$key'));
-    final e = data['episode'];
-    if (e is! Map) throw Exception('Episode tidak ditemukan');
-    return Map<String, dynamic>.from(e);
-  }
-
-  // ----------------------------------------------------------- link video
-
-  static final RegExp _okruId = RegExp(r'/videoembed/(\d+)');
-  static final RegExp _dmId = RegExp(r'(?:video[=/]|/video/)([a-zA-Z0-9]+)');
-  static final RegExp _vipId = RegExp(r'^[A-Za-z0-9_-]{3,64}$');
-
-  /// Embed VIP `https://rmb.anichin.bio/?id=<id>` -> HLS `https://rmb.anichin.bio/hls/<id>.m3u8`
-  /// (dari script JW Player di halaman embed). null kalau bukan embed VIP.
-  static String? vipHls(String embed) {
-    final u = Uri.tryParse(embed);
-    if (u == null || u.host != 'rmb.anichin.bio') return null;
-    final id = u.queryParameters['id'];
-    if (id == null || !_vipId.hasMatch(id)) return null;
-    return 'https://rmb.anichin.bio/hls/$id.m3u8';
-  }
-
-  /// Link video langsung untuk pemutar app. Urutan prioritas:
-  /// 1. OK.ru  -> mp4 per kualitas (144p..1080p).
-  /// 2. VIP (rmb.anichin.bio) -> HLS `/hls/<id>.m3u8`.
-  /// 3. Link `.m3u8` langsung dari sumber.
-  /// 4. Dailymotion -> HLS dari metadata player Dailymotion.
-  /// HLS master dipecah per varian (360p/480p/...) lewat [_hlsMedias] supaya
-  /// pilihan kualitas & batas 480p non-premium tetap berlaku. Kalau gagal
-  /// dibaca, dipakai utuh sebagai kualitas "auto".
-  /// Embed lain (halaman HTML) dilewati. Tidak di-cache: link video ada masa
-  /// berlakunya.
+  /// Link video langsung. Panggil fresh tiap mau nonton (link ada masa
+  /// berlakunya). Pilih dari [AnichinVideoSource.medias], putar dengan header
+  /// [AnichinNetwork.videoHeaders].
   Future<AnichinVideoSource> getVideoSource(String slug) async {
-    final sw = Stopwatch()..start();
-    try {
-      final v = await _getVideoSource(slug);
-      AnichinTiming.add('VIDEO $slug total ${sw.elapsedMilliseconds}ms ${v.medias.length}q');
-      return v;
-    } catch (e) {
-      AnichinTiming.add('VIDEO $slug GAGAL ${sw.elapsedMilliseconds}ms');
-      rethrow;
-    }
-  }
-
-  Future<AnichinVideoSource> _getVideoSource(String slug) async {
-    final ep = await _episodeMap(slug);
-    final players = _playable(ep['videos']);
-    String? hls;
-    var medias = <AnichinMedia>[];
-
-    for (final p in players) {
-      if (medias.isNotEmpty) break;
-      final id = _okruId.firstMatch(p.url)?.group(1);
-      if (id == null) continue;
-      try {
-        final r = await _resolveOkru(id);
-        medias = r.medias;
-        hls ??= r.hls;
-      } catch (_) {
-        // mirror ini gagal -> coba yang lain
-      }
-    }
-
-    if (medias.isEmpty) {
-      for (final p in players) {
-        final url = vipHls(p.url);
-        if (url != null) {
-          hls ??= url;
-          medias = await _hlsMedias(url);
-          break;
-        }
-      }
-    }
-
-    if (medias.isEmpty) {
-      for (final p in players) {
-        if (p.url.split('?').first.endsWith('.m3u8')) {
-          hls ??= p.url;
-          medias = await _hlsMedias(p.url);
-          break;
-        }
-      }
-    }
-
-    if (medias.isEmpty) {
-      for (final p in players) {
-        if (!p.url.contains('dailymotion.com')) continue;
-        final id = _dmId.firstMatch(p.url)?.group(1);
-        if (id == null) continue;
-        try {
-          final url = await _resolveDailymotion(id);
-          if (url != null) {
-            hls ??= url;
-            medias = await _hlsMedias(url);
-            break;
-          }
-        } catch (_) {
-          // coba mirror berikutnya
-        }
-      }
-    }
-
-    if (medias.isEmpty) {
-      // UI memakai 404 untuk pesan "episode ini belum punya video di sumber".
-      final ro = RequestOptions(path: 'video-source/$slug');
-      throw DioException(
-        requestOptions: ro,
-        response: Response<dynamic>(requestOptions: ro, statusCode: 404),
-        type: DioExceptionType.badResponse,
-        message: 'Video belum tersedia untuk episode ini.',
-      );
-    }
-    return AnichinVideoSource(title: _s(ep['title']), hls: hls, medias: medias);
-  }
-
-  /// HLS master -> satu media per varian, kualitas dipetakan dari tinggi
-  /// resolusi ke kunci yang sama dengan OK.ru (360p = "low", 480p = "sd", ...).
-  /// Gagal / bukan master -> `[auto]` (master utuh).
-  Future<List<AnichinMedia>> _hlsMedias(String masterUrl) async {
-    final fallback = [AnichinMedia(quality: 'auto', url: masterUrl)];
-    final sw = Stopwatch()..start();
-    final host = Uri.tryParse(masterUrl)?.host ?? '?';
-    try {
-      final res = await _okru.get<dynamic>(
-        masterUrl,
-        options: Options(
-          headers: AnichinNetwork.headersFor(masterUrl),
-          responseType: ResponseType.plain,
-        ),
-      );
-      final body = res.data;
-      if (body is! String) return fallback;
-      final variants = parseHlsMaster(body, Uri.parse(masterUrl));
-      AnichinTiming.add('hls $host ${sw.elapsedMilliseconds}ms ${variants.length}q');
-      return variants.isEmpty ? fallback : variants;
-    } catch (_) {
-      AnichinTiming.add('hls $host GAGAL ${sw.elapsedMilliseconds}ms');
-      return fallback;
-    }
-  }
-
-  /// Baca master playlist HLS -> media per kualitas (urut rendah -> tinggi).
-  /// Varian dengan kunci kualitas sama: ambil bandwidth terbesar.
-  static List<AnichinMedia> parseHlsMaster(String body, Uri base) {
-    final lines = const LineSplitter().convert(body).map((l) => l.trim()).toList();
-    if (lines.isEmpty || !lines.first.startsWith('#EXTM3U')) return const [];
-    final best = <String, (int, String)>{};
-    for (var i = 0; i < lines.length; i++) {
-      final l = lines[i];
-      if (!l.startsWith('#EXT-X-STREAM-INF:')) continue;
-      String? uri;
-      for (var j = i + 1; j < lines.length; j++) {
-        if (lines[j].isEmpty) continue;
-        if (!lines[j].startsWith('#')) uri = lines[j];
-        break;
-      }
-      if (uri == null) continue;
-      final h = int.tryParse(RegExp(r'RESOLUTION=\d+x(\d+)').firstMatch(l)?.group(1) ?? '');
-      final bw = int.tryParse(RegExp(r'(?:^|[:,])BANDWIDTH=(\d+)').firstMatch(l)?.group(1) ?? '') ?? 0;
-      if (h == null) continue;
-      final key = _qualityForHeight(h);
-      final url = base.resolve(uri).toString();
-      final prev = best[key];
-      if (prev == null || bw > prev.$1) best[key] = (bw, url);
-    }
-    final out = [
-      for (final e in best.entries) AnichinMedia(quality: e.key, url: e.value.$2),
-    ]..sort((a, b) => qualityRank(a.quality).compareTo(qualityRank(b.quality)));
-    return out;
-  }
-
-  static String _qualityForHeight(int h) {
-    if (h <= 144) return 'mobile';
-    if (h <= 240) return 'lowest';
-    if (h <= 360) return 'low';
-    if (h <= 480) return 'sd';
-    if (h <= 720) return 'hd';
-    if (h <= 1080) return 'full';
-    if (h <= 1440) return 'quad';
-    return 'ultra';
-  }
-
-  /// Metadata player Dailymotion -> URL HLS (m3u8) kualitas auto.
-  Future<String?> _resolveDailymotion(String videoId) async {
-    final res = await _okru.get<dynamic>(
-      'https://www.dailymotion.com/player/metadata/video/$videoId',
-      options: Options(headers: {'User-Agent': AnichinNetwork.userAgent}),
-    );
-    var data = res.data;
-    if (data is String) data = jsonDecode(data);
-    if (data is! Map) return null;
-    final q = data['qualities'];
-    if (q is! Map) return null;
-    for (final key in ['auto', ...q.keys.map((k) => '$k')]) {
-      for (final v in _maps(q[key])) {
-        final url = _s(v['url']);
-        if (url != null && '${v['type']}'.contains('mpegURL')) return url;
-      }
-    }
-    return null;
-  }
-
-  Future<({List<AnichinMedia> medias, String? hls})> _resolveOkru(String videoId) async {
-    final sw = Stopwatch()..start();
-    try {
-      final r = await _resolveOkruRaw(videoId);
-      AnichinTiming.add('okru ${sw.elapsedMilliseconds}ms ${r.medias.length}q');
-      return r;
-    } catch (e) {
-      AnichinTiming.add('okru GAGAL ${sw.elapsedMilliseconds}ms');
-      rethrow;
-    }
-  }
-
-  Future<({List<AnichinMedia> medias, String? hls})> _resolveOkruRaw(String videoId) async {
-    final res = await _okru.post<dynamic>(
-      'https://ok.ru/dk',
-      data: {'cmd': 'videoPlayerMetadata', 'mid': videoId},
-      options: Options(
-        contentType: Headers.formUrlEncodedContentType,
-        headers: AnichinNetwork.videoHeaders,
-      ),
-    );
-    var data = res.data;
-    if (data is String) data = jsonDecode(data);
-    if (data is! Map) throw Exception('Metadata OK.ru tidak dikenali.');
-    final medias = <AnichinMedia>[
-      for (final v in _maps(data['videos']))
-        if (_s(v['name']) != null && _s(v['url']) != null)
-          AnichinMedia(quality: v['name'] as String, url: v['url'] as String),
-    ]..sort((a, b) => qualityRank(a.quality).compareTo(qualityRank(b.quality)));
-    return (medias: medias, hls: _s(data['hlsManifestUrl']));
+    return AnichinVideoSource.fromJson(await _getMap('video-source/${_enc(slug)}'));
   }
 
   // ---------------------------------------------------------------- kualitas
 
-  /// "auto" = HLS adaptif (Dailymotion / m3u8 sumber), satu-satunya pilihan
-  /// kalau OK.ru tidak ada.
+  static const Set<String> _detailKeys = {
+    'name', 'thumbnail', 'genre', 'rating', 'sinopsis', 'episode',
+  };
+  static const Set<String> _episodeKeys = {..._detailKeys, 'players', 'root'};
+
   /// Urutan kualitas OK.ru dari terendah ke tertinggi:
   /// mobile=144p, lowest=240p, low=360p, sd=480p, hd=720p, full=1080p.
   static const List<String> qualityOrder = [
-    'auto', 'mobile', 'lowest', 'low', 'sd', 'hd', 'full', 'quad', 'ultra',
+    'mobile', 'lowest', 'low', 'sd', 'hd', 'full', 'quad', 'ultra',
   ];
 
   static const Map<String, String> _qualityLabels = {
-    'auto': 'Auto',
     'mobile': '144p',
     'lowest': '240p',
     'low': '360p',
@@ -568,6 +165,7 @@ class AnichinRepository {
   static const String nonPremiumMaxQuality = 'sd';
 
   /// Pilih media mp4 dengan kualitas tertinggi yang masih <= [maxQuality].
+  /// Non-premium (max 480p) -> maxQuality = [nonPremiumMaxQuality].
   static AnichinMedia? pickMedia(List<AnichinMedia> medias, {String maxQuality = 'ultra'}) {
     final r = qualityRank(maxQuality);
     final limit = r < 0 ? qualityOrder.length - 1 : r;
@@ -582,147 +180,78 @@ class AnichinRepository {
   }
 }
 
-// ======================= pemetaan data sumber -> model app ===================
+// ---------- helper parsing Map dinamis ----------
 
-String? _s(Object? v) => v is String && v.trim().isNotEmpty ? v : null;
-
-/// Nilai apa pun (angka/teks) -> String tidak kosong.
-String? _sv(Object? v) => v == null ? null : _s(v.toString());
-
-int? _int(Object? v) {
-  if (v is int) return v;
-  if (v is num) return v.toInt();
-  if (v is String) return int.tryParse(v.trim()) ?? double.tryParse(v.trim())?.toInt();
-  return null;
+T _throwIfError<T>(T value, String? error) {
+  if (error != null && error.isNotEmpty) throw Exception(error);
+  return value;
 }
 
-Iterable<Map<String, dynamic>> _maps(Object? v) =>
-    (v is List ? v : const []).whereType<Map>().map((m) => Map<String, dynamic>.from(m));
+String? _str(Map<String, dynamic> m, String key) {
+  final v = m[key];
+  return v is String && v.trim().isNotEmpty ? v : null;
+}
 
-String? _img(Map<String, dynamic> m) {
-  for (final k in const ['thumbnail', 'image', 'image_url', 'poster', 'cover']) {
-    final v = m[k];
-    if (v is String && v.startsWith('http')) return v;
+List<String> _strList(Map<String, dynamic> m, String key) {
+  final v = m[key];
+  return v is List ? v.whereType<String>().toList() : const [];
+}
+
+/// "sinopsis" bisa string (halaman episode) atau {paragraphs:[..], title:".."}
+/// (halaman detail).
+String _sinopsis(Map<String, dynamic> m) {
+  final s = m['sinopsis'];
+  if (s is String) return s;
+  if (s is Map) {
+    final p = s['paragraphs'];
+    if (p is List) {
+      return p.whereType<String>().where((e) => e.trim().isNotEmpty).join('\n\n');
+    }
   }
-  return null;
+  return '';
 }
 
-AnichinCard? _card(Map<String, dynamic> m, {int? eps, String? headline}) {
-  final slug = _s(m['slug']);
-  if (slug == null) return null;
-  return AnichinCard(
-    title: _s(m['title']) ?? _s(m['series']),
-    type: _s(m['type']),
-    headline: headline ?? _s(m['series']),
-    eps: eps,
-    status: _s(m['status']),
-    thumbnail: _img(m),
-    slug: slug,
-  );
-}
-
-List<AnichinCard> _cards(Object? items) {
-  final seen = <String>{};
-  return [
-    for (final m in _maps(items))
-      if (_card(m) case final c? when seen.add(c.slug!)) c,
-  ];
-}
-
-List<String> _genreNames(Object? genres) {
-  final out = <String>[];
-  for (final g in (genres is List ? genres : const [])) {
-    final name = g is Map ? (_s(g['name']) ?? _s(g['label'])) : _s(g);
-    if (name != null) out.add(_unescape(name.trim()));
-  }
-  return out;
-}
-
-List<AnichinEpisodeRef> _episodeRefs(Object? episodes, String? fallbackThumb) {
+List<AnichinEpisodeRef> _episodes(Map<String, dynamic> m) {
+  final list = m['episode'];
+  if (list is! List) return const [];
   final seen = <String>{};
   final out = <AnichinEpisodeRef>[];
-  for (final e in _maps(episodes)) {
-    final slug = _s(e['slug']);
-    if (slug == null || !seen.add(slug)) continue;
+  for (final item in list) {
+    if (item is! Map) continue;
+    final slug = item['slug'];
+    if (slug is! String || !seen.add(slug)) continue;
     out.add(AnichinEpisodeRef(
       slug: slug,
-      name: _s(e['title']),
-      episode: e['episode']?.toString(),
-      date: _s(e['publish_date']) ?? _s(e['date']),
-      thumbnail: _img(e) ?? fallbackThumb,
+      name: item['name'] is String ? item['name'] as String : null,
+      subtitle: item['subtitle'] is String ? item['subtitle'] as String : null,
+      date: item['date'] is String ? item['date'] as String : null,
+      episode: item['episode']?.toString(),
+      thumbnail: item['thumbnail'] is String ? item['thumbnail'] as String : null,
     ));
   }
   return out;
 }
 
-/// Field tambahan layar detail (key lowercase_underscore, sama dengan daftar
-/// `_preferredInfo` di donghua_detail_screen.dart).
-Map<String, String> _info(Map<String, dynamic> a) {
-  final info = <String, String>{};
-  void put(String key, Object? val) {
-    final v = val is List ? val.where((x) => x != null).join(', ') : val;
-    if (v is String && v.trim().isNotEmpty) info[key] = v.trim();
-  }
-
-  put('status', a['status']);
-  put('type', a['type']);
-  put('studio', a['studio']);
-  put('durasi', a['duration']);
-  put('network', a['network']);
-  final season = a['season'];
-  put('season', season is List && season.isNotEmpty ? season.first : season);
-  put('tanggal_rilis', a['release_date']);
-  return info;
-}
-
-/// Embed yang boleh diteruskan (whitelist yang sama dengan app.py).
-const Set<String> _embedHosts = {
-  'rmb.anichin.bio',
-  'geo.dailymotion.com',
-  'www.dailymotion.com',
-  'ok.ru',
-};
-
-List<AnichinPlayer> _playable(Object? videos) {
+/// "players" berisi list {name,url}, atau {"error": "..."} kalau gagal.
+List<AnichinPlayer> _players(Map<String, dynamic> m) {
+  final list = m['players'];
+  if (list is! List) return const [];
   final out = <AnichinPlayer>[];
-  for (final v in _maps(videos)) {
-    final embed = _s(v['embed']) ?? '';
-    final u = Uri.tryParse(embed);
-    if (u == null || u.scheme != 'https' || !_embedHosts.contains(u.host)) continue;
-    if (embed.endsWith('#') || embed.endsWith('/videoembed/')) continue; // OK.ru kosong
-    out.add(AnichinPlayer(name: _s(v['host_name']) ?? u.host, url: embed));
+  for (final item in list) {
+    if (item is! Map || item['url'] is! String) continue;
+    out.add(AnichinPlayer(
+      name: item['name'] is String ? item['name'] as String : '',
+      url: item['url'] as String,
+    ));
   }
-  // VIP (HLS sumber) biasanya paling stabil -> paling depan (sort stabil).
-  final vip = out.where((p) => p.name.toLowerCase() == 'vip').toList();
-  return [...vip, ...out.where((p) => p.name.toLowerCase() != 'vip')];
+  return out;
 }
 
-// ------------------------------------------------------------- HTML -> teks
-
-final RegExp _breaks = RegExp(r'</p>|<br\s*/?>', caseSensitive: false);
-final RegExp _tags = RegExp(r'<[^>]+>');
-final RegExp _spaces = RegExp(r'\s+');
-
-/// HTML sumber -> daftar paragraf teks biasa (tidak pernah dirender sebagai HTML).
-List<String> _paragraphs(Object? html) {
-  final raw = (html ?? '').toString().replaceAll(_breaks, '\n').replaceAll(_tags, ' ');
-  return [
-    for (final line in _unescape(raw).split('\n'))
-      if (line.replaceAll(_spaces, ' ').trim().isNotEmpty) line.replaceAll(_spaces, ' ').trim(),
-  ];
-}
-
-final RegExp _entity = RegExp(r'&(#[xX][0-9a-fA-F]+|#[0-9]+|[a-zA-Z]+);');
-
-String _unescape(String s) {
-  const named = {'amp': '&', 'lt': '<', 'gt': '>', 'quot': '"', 'apos': "'", 'nbsp': ' '};
-  return s.replaceAllMapped(_entity, (m) {
-    final e = m.group(1)!;
-    if (e.startsWith('#')) {
-      final hex = e.startsWith('#x') || e.startsWith('#X');
-      final code = int.tryParse(e.substring(hex ? 2 : 1), radix: hex ? 16 : 10);
-      return code == null ? m.group(0)! : String.fromCharCode(code);
-    }
-    return named[e] ?? m.group(0)!;
+Map<String, String> _info(Map<String, dynamic> m, Set<String> exclude) {
+  final out = <String, String>{};
+  m.forEach((k, v) {
+    if (exclude.contains(k)) return;
+    if (v is String && v.trim().isNotEmpty) out[k] = v;
   });
+  return out;
 }

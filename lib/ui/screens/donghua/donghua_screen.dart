@@ -8,7 +8,6 @@ import '../../components/shimmer.dart';
 import 'donghua_controller.dart';
 import 'donghua_widgets.dart';
 import '../../glass/glass.dart';
-import '../../../data/api/anichin_network.dart';
 
 /// Port DonghuaScreen.kt: daftar donghua (Terbaru / Ongoing / Semua), cari,
 /// dan filter genre. Dibuka dari section "Donghua" di Beranda, bukan dari
@@ -48,7 +47,6 @@ class _DonghuaScreenState extends ConsumerState<DonghuaScreen> {
 
   void _selectTab(DonghuaTab tab) {
     if (tab == _tab) return;
-    AnichinTiming.add('TAP ${tab.name}');
     setState(() => _tab = tab);
     _ctrl.onTabSelected(tab);
   }

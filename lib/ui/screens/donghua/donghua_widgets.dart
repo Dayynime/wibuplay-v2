@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/api/anichin_network.dart';
 import '../../../data/models/anichin_models.dart';
+import '../../components/net_image.dart';
 import '../../components/shimmer.dart';
 
 /// Gambar dari situs sumber donghua. Butuh User-Agent + Referer, kalau tidak
@@ -24,9 +25,19 @@ class DonghuaImage extends StatelessWidget {
   Widget build(BuildContext context) {
     final url = AnichinNetwork.imageUrl(path);
     if (url == null) return const SizedBox.expand();
+    final dpr = MediaQuery.devicePixelRatioOf(context);
+    return LayoutBuilder(builder: (context, c) {
+      final cache = netImageCacheSize(c, dpr);
+      return _image(url, cache.width, cache.height);
+    });
+  }
+
+  Widget _image(String url, int? cacheW, int? cacheH) {
     return CachedNetworkImage(
       imageUrl: url,
       httpHeaders: AnichinNetwork.imageHeaders,
+      memCacheWidth: cacheW,
+      memCacheHeight: cacheH,
       fit: fit,
       alignment: alignment,
       fadeInDuration: const Duration(milliseconds: 200),

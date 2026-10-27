@@ -6,7 +6,6 @@ import '../../../core/error_message.dart';
 import '../../../data/models/anichin_models.dart';
 import '../../../data/repository/anichin_repository.dart';
 import '../../../providers.dart';
-import '../../../data/api/anichin_network.dart';
 
 enum DonghuaTab {
   latest('Terbaru'),
@@ -166,7 +165,6 @@ class DonghuaController extends AutoDisposeNotifier<DonghuaUiState> {
   // ---------- Tab Ongoing / Semua (GET /anime) ----------
 
   void onTabSelected(DonghuaTab tab) {
-    AnichinTiming.add('TAB ${tab.name} started=${tab == DonghuaTab.ongoing ? _ongoingStarted : _allStarted}');
     switch (tab) {
       case DonghuaTab.ongoing:
         if (!_ongoingStarted) {
@@ -316,8 +314,6 @@ class DonghuaController extends AutoDisposeNotifier<DonghuaUiState> {
   ) async {
     final req = slot == _Slot.filter ? ++_filterRequest : 0;
     final before = _grid(slot);
-    final sw = Stopwatch()..start();
-    AnichinTiming.add('LOAD ${slot.name} p$page mulai');
     _setGrid(
       slot,
       page == 1
@@ -342,9 +338,7 @@ class DonghuaController extends AutoDisposeNotifier<DonghuaUiState> {
           page: page,
         ),
       );
-      AnichinTiming.add('LOAD ${slot.name} p$page tampil ${sw.elapsedMilliseconds}ms ${fresh.length}item alive=$_alive');
     } catch (e) {
-      AnichinTiming.add('LOAD ${slot.name} p$page ERROR ${sw.elapsedMilliseconds}ms');
       if (slot == _Slot.filter && req != _filterRequest) return;
       _setGrid(
         slot,

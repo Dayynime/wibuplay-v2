@@ -39,12 +39,10 @@ class _ShimmerBoxState extends State<ShimmerBox> with SingleTickerProviderStateM
       child: SizedBox(
         width: widget.width,
         height: widget.height,
-        child: AnimatedBuilder(
-          animation: _c,
-          builder: (context, _) {
-            final t = Curves.fastOutSlowIn.transform(_c.value) * 1000 / dpr;
-            return CustomPaint(painter: _ShimmerPainter(t));
-          },
+        // RepaintBoundary + repaint: animasi cuma menggambar ulang kotak ini,
+        // bukan membangun ulang widget atau ikut menggambar ulang kartu di sekitarnya.
+        child: RepaintBoundary(
+          child: CustomPaint(painter: _ShimmerPainter.animated(_c, dpr)),
         ),
       ),
     );
@@ -52,12 +50,14 @@ class _ShimmerBoxState extends State<ShimmerBox> with SingleTickerProviderStateM
 }
 
 class _ShimmerPainter extends CustomPainter {
-  _ShimmerPainter(this.t);
+  _ShimmerPainter.animated(this.anim, this.dpr) : super(repaint: anim);
 
-  final double t;
+  final Animation<double> anim;
+  final double dpr;
 
   @override
   void paint(Canvas canvas, Size size) {
+    final t = Curves.fastOutSlowIn.transform(anim.value) * 1000 / dpr;
     final paint = Paint()
       ..shader = ui.Gradient.linear(
         Offset.zero,
@@ -74,7 +74,7 @@ class _ShimmerPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_ShimmerPainter old) => old.t != t;
+  bool shouldRepaint(_ShimmerPainter old) => old.anim != anim || old.dpr != dpr;
 }
 
 class AnimeCardSkeleton extends StatelessWidget {
