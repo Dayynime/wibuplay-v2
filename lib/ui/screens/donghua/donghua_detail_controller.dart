@@ -4,6 +4,7 @@ import '../../../core/error_message.dart';
 import '../../../data/models/anichin_models.dart';
 import '../../../data/repository/anichin_repository.dart';
 import '../../../providers.dart';
+import '../../../data/api/anichin_network.dart';
 
 class DonghuaDetailState {
   const DonghuaDetailState({this.detail, this.isLoading = true, this.error});
@@ -64,6 +65,8 @@ class DonghuaDetailController
   }
 
   Future<void> load() async {
+    final sw = Stopwatch()..start();
+    AnichinTiming.add('OPEN detail $arg');
     _update(const DonghuaDetailState(isLoading: true));
     final slug = arg;
     _Fetch result;
@@ -103,6 +106,7 @@ class DonghuaDetailController
     }
 
     final data = result.data;
+    AnichinTiming.add('DETAIL-UI $arg tampil ${sw.elapsedMilliseconds}ms ok=${data != null} alive=$_alive');
     if (data != null) {
       _update(DonghuaDetailState(detail: data, isLoading: false));
     } else {

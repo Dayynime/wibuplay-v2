@@ -213,7 +213,9 @@ class _DonghuaPlayerScreenState extends ConsumerState<DonghuaPlayerScreen>
     await old?.dispose();
 
     try {
+      final swInit = Stopwatch()..start();
       await vc.initialize();
+      AnichinTiming.add('PLAYER init ${swInit.elapsedMilliseconds}ms ${Uri.tryParse(url)?.host ?? "?"}');
       if (!mounted || _vc != vc) return;
       final total = vc.value.duration.inMilliseconds;
       // Hampir selesai (sisa < 15 dtk) -> mulai dari awal lagi.

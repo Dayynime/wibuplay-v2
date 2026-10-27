@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:ui' show FrameTiming;
 
 import 'package:dio/dio.dart';
+import 'package:flutter/scheduler.dart';
 
 import 'premium_token_manager.dart';
 
@@ -81,17 +83,64 @@ class AnichinTiming {
   static final List<String> _queue = [];
   static Dio? _dio;
   static Timer? _flush;
+  static final Stopwatch _clock = Stopwatch()..start();
+  static bool _framesHooked = false;
+  static int _slowFrames = 0;
+  static int _worstBuild = 0;
+  static int _worstRaster = 0;
+
+  /// Detik sejak app dibuka, supaya urutan & jeda antar langkah kelihatan.
+  static String get _t => '+${(_clock.elapsedMilliseconds / 1000).toStringAsFixed(2)}s';
 
   static void add(String entry) {
-    _queue.add(entry.replaceAll(RegExp(r'[^\x20-\x7E]'), '?'));
-    if (_queue.length > 12) _queue.removeAt(0);
+    _queue.add('$_t ${entry.replaceAll(RegExp(r'[^\x20-\x7E]'), '?')}');
+    if (_queue.length > 20) _queue.removeAt(0);
+    _schedule();
+  }
+
+  static void _schedule() {
     _flush?.cancel();
     _flush = Timer(const Duration(seconds: 3), _send);
   }
 
+  /// Catat frame yang lambat (> 100 ms build atau raster) = app terasa macet.
+  static void hookFrames() {
+    if (_framesHooked) return;
+    _framesHooked = true;
+    try {
+      SchedulerBinding.instance.addTimingsCallback(_onTimings);
+    } catch (_) {
+      // belum ada binding (mis. unit test) -> lewati
+    }
+  }
+
+  static void _onTimings(List<FrameTiming> timings) {
+      for (final f in timings) {
+        final b = f.buildDuration.inMilliseconds;
+        final r = f.rasterDuration.inMilliseconds;
+        if (b > 100 || r > 100) {
+          _slowFrames++;
+          if (b > _worstBuild) _worstBuild = b;
+          if (r > _worstRaster) _worstRaster = r;
+          if (_slowFrames <= 3 || b > 500 || r > 500) {
+            _queue.add('$_t FRAME build=${b}ms raster=${r}ms');
+            if (_queue.length > 20) _queue.removeAt(0);
+          }
+          _schedule();
+        }
+      }
+  }
+
   static Future<void> _send() async {
     final dio = _dio;
-    if (dio == null || _queue.isEmpty) return;
+    if (dio == null) return;
+    if (_slowFrames > 0) {
+      _queue.add('$_t FRAMES lambat=$_slowFrames terburuk build=${_worstBuild}ms raster=${_worstRaster}ms');
+      _slowFrames = 0;
+      _worstBuild = 0;
+      _worstRaster = 0;
+    }
+    if (_queue.isEmpty) return;
     var value = _queue.join(' | ');
     _queue.clear();
     if (value.length > 1500) value = value.substring(value.length - 1500);
@@ -236,5 +285,6 @@ Dio createAnichinDio(PremiumTokenManager tokens) {
     _AnichinRetryInterceptor(dio),
   ]);
   AnichinTiming._dio = dio;
+  AnichinTiming.hookFrames();
   return dio;
 }
