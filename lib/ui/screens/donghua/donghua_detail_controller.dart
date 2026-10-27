@@ -14,9 +14,10 @@ class DonghuaDetailState {
   final String? error;
 }
 
-// Slug episode: "...-episode-12-subtitle-indonesia" (juga typo "epsiode").
-final RegExp _episodeSlug = RegExp(r'-ep[a-z]*sode-\d+');
-final RegExp _episodeTail = RegExp(r'-ep[a-z]*sode-\d+.*$');
+// Slug episode: "...-episode-12-subtitle-indonesia" (juga typo "epsiode")
+// dan "...-s5-ep-216-sub-indo".
+final RegExp _episodeSlug = RegExp(r'-(?:episode|epsiode|eps|ep)-\d+');
+final RegExp _episodeTail = RegExp(r'-(?:episode|epsiode|eps|ep)-\d+.*$');
 // Sisa judul tanpa kata episode: "...-subtitle-indonesia".
 final RegExp _subtitleTail =
     RegExp(r'-(subtitle|sub)-?(indonesia|indo|indonesa).*$', caseSensitive: false);

@@ -55,6 +55,22 @@ const series = {
 };
 
 void main() {
+  test('cache: request dari jaringan selesai (tidak deadlock) & request bersamaan digabung', () async {
+    final adapter = FakeAdapter({
+      '/series/renegade-immortal/__data.json': envelope({'anime': series}),
+    });
+    final repo = AnichinRepository(dioWith(const {}, adapter));
+    final both = await Future.wait([
+      repo.getDetail('renegade-immortal'),
+      repo.getDetail('renegade-immortal'),
+    ]).timeout(const Duration(seconds: 5));
+    expect(both.map((d) => d.name), ['Renegade Immortal', 'Renegade Immortal']);
+    expect(adapter.calls.where((c) => c.contains('renegade-immortal')).length, 1);
+    // panggilan berikutnya dari cache memori, tetap selesai
+    final again = await repo.getDetail('renegade-immortal').timeout(const Duration(seconds: 5));
+    expect(again.name, 'Renegade Immortal');
+  });
+
   test('getHome: 3 section, eps int, duplikat dibuang', () async {
     final repo = AnichinRepository(dioWith({
       '/__data.json': envelope({

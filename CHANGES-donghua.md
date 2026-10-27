@@ -67,3 +67,11 @@ Jalankan: `flutter pub get && flutter analyze && flutter test`
 - App mencatat lama tiap langkah donghua (token, jaringan, parse, OK.ru/HLS, total detail/video)
   dan mengirimnya ke VPS lewat header `X-App-Timing` pada request `health` (3 dtk setelah langkah terakhir).
   Terbaca di log Caddy. Hapus `AnichinTiming` & `_TimingInterceptor` setelah masalah ketemu.
+
+## Perbaikan 5 (PENYEBAB loading terus-menerus)
+
+- `_cached`: callback `whenComplete(() => _inflight.remove(key))` mengembalikan Future dirinya
+  sendiri -> deadlock. Semua data yang diambil dari jaringan (detail, Ongoing, Semua, episode)
+  tidak pernah selesai di layar; cuma yang sudah ada di cache memori yang tampil. Sudah diperbaiki.
+- Slug episode format `-ep-216` / `epsiode` dikenali di halaman detail.
+- Token Premium sekarang benar-benar dikirim ke `watch/...` (awalan `/app-api/` diperhitungkan).

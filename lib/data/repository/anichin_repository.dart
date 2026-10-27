@@ -48,7 +48,12 @@ class AnichinRepository {
     if (hit != null && DateTime.now().difference(hit.$1) < ttl) return Future.value(hit.$2 as T);
     final running = _inflight[key];
     if (running != null) return running.then((v) => v as T);
-    final f = _load<T>(key, hit, load).whenComplete(() => _inflight.remove(key));
+    // PENTING: callback whenComplete TIDAK boleh mengembalikan Future.
+    // `_inflight.remove(key)` mengembalikan `f` sendiri -> whenComplete akan
+    // menunggu dirinya sendiri (deadlock). Makanya pakai blok `{ ...; }`.
+    final f = _load<T>(key, hit, load).whenComplete(() {
+      _inflight.remove(key);
+    });
     _inflight[key] = f;
     return f;
   }

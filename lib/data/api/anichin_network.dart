@@ -193,9 +193,12 @@ class _PremiumTokenInterceptor extends Interceptor {
   final PremiumTokenManager _tokens;
   static const String _retriedKey = 'anichin_token_retried';
   static bool _guarded(RequestOptions o) {
-    final host = Uri.tryParse(o.baseUrl)?.host;
-    if (host == null || host.isEmpty || o.uri.host != host) return false;
-    final segs = o.uri.pathSegments.where((s) => s.isNotEmpty).toList();
+    final base = Uri.tryParse(o.baseUrl);
+    if (base == null || base.host.isEmpty || o.uri.host != base.host) return false;
+    // Path relatif terhadap base URL (mis. buang awalan "/app-api/").
+    var path = o.uri.path;
+    if (path.startsWith(base.path)) path = path.substring(base.path.length);
+    final segs = path.split('/').where((s) => s.isNotEmpty).toList();
     return segs.length >= 2 && segs.first == 'watch';
   }
 
