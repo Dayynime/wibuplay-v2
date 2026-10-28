@@ -57,40 +57,18 @@ class AnnouncementHost extends ConsumerStatefulWidget {
 }
 
 class _AnnouncementHostState extends ConsumerState<AnnouncementHost>
-    with TickerProviderStateMixin {
-  // Masuk 900ms (berurutan), keluar 240ms.
+    with SingleTickerProviderStateMixin {
+  // Masuk 320ms, keluar 200ms. Sederhana: fade + geser halus.
   late final AnimationController _c = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 900),
-    reverseDuration: const Duration(milliseconds: 240),
+    duration: const Duration(milliseconds: 320),
+    reverseDuration: const Duration(milliseconds: 200),
   );
-  // Cincin berdenyut di belakang lencana lonceng.
-  late final AnimationController _pulse =
-      AnimationController(vsync: this, duration: const Duration(milliseconds: 2800));
-  // Lonceng goyang sekali.
-  late final AnimationController _wiggle =
-      AnimationController(vsync: this, duration: const Duration(milliseconds: 700));
-
-  Animation<double> _curve(double a, double b, Curve c) => CurvedAnimation(
-        parent: _c,
-        curve: Interval(a, b, curve: c),
-        reverseCurve: Curves.easeInCubic,
-      );
-
-  late final Animation<double> _scrim = _curve(0.0, 0.35, Curves.easeOut);
-  late final Animation<double> _card = _curve(0.0, 0.62, Curves.easeOutBack);
-  late final Animation<double> _badge = _curve(0.14, 0.68, Curves.easeOutBack);
-  late final List<Animation<double>> _items = [
-    for (var i = 0; i < 4; i++)
-      _curve(0.3 + i * 0.07, 0.78 + i * 0.07, Curves.easeOutCubic),
-  ];
-  late final Animation<double> _bellAngle = TweenSequence<double>([
-    TweenSequenceItem(tween: Tween(begin: 0.0, end: 0.30), weight: 1),
-    TweenSequenceItem(tween: Tween(begin: 0.30, end: -0.26), weight: 2),
-    TweenSequenceItem(tween: Tween(begin: -0.26, end: 0.18), weight: 2),
-    TweenSequenceItem(tween: Tween(begin: 0.18, end: -0.09), weight: 2),
-    TweenSequenceItem(tween: Tween(begin: -0.09, end: 0.0), weight: 1),
-  ]).animate(CurvedAnimation(parent: _wiggle, curve: Curves.easeInOut));
+  late final Animation<double> _t = CurvedAnimation(
+    parent: _c,
+    curve: Curves.easeOutCubic,
+    reverseCurve: Curves.easeInCubic,
+  );
 
   AnnouncementData? _displayed; // yang sedang dirender (ditahan sampai animasi keluar selesai)
   bool _visible = false; // target animasi
@@ -98,8 +76,6 @@ class _AnnouncementHostState extends ConsumerState<AnnouncementHost>
   @override
   void dispose() {
     _c.dispose();
-    _pulse.dispose();
-    _wiggle.dispose();
     super.dispose();
   }
 
@@ -108,10 +84,6 @@ class _AnnouncementHostState extends ConsumerState<AnnouncementHost>
     setState(() => _displayed = d);
     HapticFeedback.selectionClick();
     _c.forward();
-    _pulse.repeat();
-    Future<void>.delayed(const Duration(milliseconds: 520), () {
-      if (mounted && _visible) _wiggle.forward(from: 0);
-    });
   }
 
   void _hide() {
@@ -119,7 +91,6 @@ class _AnnouncementHostState extends ConsumerState<AnnouncementHost>
     setState(() => _visible = false);
     _c.reverse().whenComplete(() {
       if (!mounted || _visible) return;
-      _pulse.stop();
       setState(() => _displayed = null);
     });
   }
@@ -189,279 +160,151 @@ class _AnnouncementHostState extends ConsumerState<AnnouncementHost>
   // ------------------------------------------------------------- overlay
 
   Widget _buildOverlay(AnnouncementData d) {
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        // Scrim: gelap + blur yang naik bertahap. Menyerap tap supaya tidak
-        // tembus ke konten di belakang.
-        AnimatedBuilder(
-          animation: _scrim,
-          builder: (context, _) {
-            final s = _scrim.value.clamp(0.0, 1.0);
-            return GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () {},
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 0.01 + 7 * s, sigmaY: 0.01 + 7 * s),
-                child: ColoredBox(color: Colors.black.withValues(alpha: 0.6 * s)),
-              ),
-            );
-          },
-        ),
-        SafeArea(
-          child: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-              child: AnimatedBuilder(
-                animation: _card,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 380),
-                  child: _buildCard(d),
+    // Overlay ini di luar Scaffold: tanpa Material, Text tampil bergaris
+    // kuning dengan font debug. Material transparan memperbaikinya.
+    return Material(
+      type: MaterialType.transparency,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Scrim gelap + blur ringan; menyerap tap supaya tidak tembus.
+          AnimatedBuilder(
+            animation: _t,
+            builder: (context, _) {
+              final s = _t.value.clamp(0.0, 1.0);
+              return GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () {},
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 0.01 + 4 * s, sigmaY: 0.01 + 4 * s),
+                  child: ColoredBox(color: Colors.black.withValues(alpha: 0.55 * s)),
                 ),
-                builder: (context, child) {
-                  final p = _card.value;
-                  final o = p.clamp(0.0, 1.0);
-                  return Opacity(
-                    opacity: o,
-                    child: Transform.translate(
-                      offset: Offset(0, (1 - o) * 34),
-                      child: Transform.scale(scale: 0.86 + 0.14 * p, child: child),
-                    ),
-                  );
-                },
+              );
+            },
+          ),
+          SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                child: AnimatedBuilder(
+                  animation: _t,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 400),
+                    child: _buildCard(d),
+                  ),
+                  builder: (context, child) {
+                    final v = _t.value.clamp(0.0, 1.0);
+                    return Opacity(
+                      opacity: v,
+                      child: Transform.translate(
+                        offset: Offset(0, (1 - v) * 16),
+                        child: Transform.scale(scale: 0.97 + 0.03 * v, child: child),
+                      ),
+                    );
+                  },
+                ),
               ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
-
-  Widget _reveal(int i, Widget child) => FadeTransition(
-        opacity: _items[i],
-        child: SlideTransition(
-          position: Tween<Offset>(begin: const Offset(0, 0.28), end: Offset.zero)
-              .animate(_items[i]),
-          child: child,
-        ),
-      );
 
   Widget _buildCard(AnnouncementData d) {
-    const radius = 30.0;
-    return Stack(
-      clipBehavior: Clip.none,
-      alignment: Alignment.topCenter,
-      children: [
-        // Kartu dengan border gradien + glow ungu.
-        Padding(
-          padding: const EdgeInsets.only(top: 42),
-          child: Container(
-            padding: const EdgeInsets.all(1.3),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(radius),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  AppColors.accentVioletLight.withValues(alpha: 0.9),
-                  AppColors.accentViolet.withValues(alpha: 0.18),
-                  const Color(0xFFFFA38F).withValues(alpha: 0.45),
-                ],
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.accentViolet.withValues(alpha: 0.30),
-                  blurRadius: 56,
-                  offset: const Offset(0, 20),
-                ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(radius - 1.3),
-              child: ColoredBox(
-                color: const Color(0xFF151A23),
-                child: Stack(
-                  children: [
-                    // Cahaya lembut di bagian atas kartu.
-                    Positioned(
-                      top: -70,
-                      left: 0,
-                      right: 0,
-                      height: 220,
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: RadialGradient(
-                            center: Alignment.topCenter,
-                            radius: 0.9,
-                            colors: [
-                              AppColors.accentViolet.withValues(alpha: 0.30),
-                              AppColors.accentViolet.withValues(alpha: 0),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(22, 62, 22, 22),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (d.title.isNotEmpty)
-                            _reveal(
-                              0,
-                              Text(
-                                d.title,
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 21,
-                                  height: 1.25,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: -0.3,
-                                ),
-                              ),
-                            ),
-                          if (d.message.isNotEmpty) ...[
-                            const SizedBox(height: 10),
-                            _reveal(
-                              1,
-                              ConstrainedBox(
-                                constraints: const BoxConstraints(maxHeight: 240),
-                                child: SingleChildScrollView(
-                                  child: Text(
-                                    d.message,
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      color: Colors.white.withValues(alpha: 0.86),
-                                      fontSize: 14.5,
-                                      height: 1.55,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                          if (d.footnote.isNotEmpty) ...[
-                            const SizedBox(height: 14),
-                            _reveal(2, _FootnoteChip(text: d.footnote)),
-                          ],
-                          const SizedBox(height: 22),
-                          _reveal(
-                            3,
-                            Column(
-                              children: [
-                                _PrimaryButton(
-                                  label: d.hasAction ? d.buttonText : 'Oke, mengerti',
-                                  icon: d.hasAction ? Icons.arrow_outward_rounded : null,
-                                  onTap: d.hasAction ? _openAction : _dismiss,
-                                ),
-                                if (d.hasAction) ...[
-                                  const SizedBox(height: 4),
-                                  TextButton(
-                                    onPressed: _dismiss,
-                                    child: Text(
-                                      'Nanti saja',
-                                      style: TextStyle(
-                                        color: Colors.white.withValues(alpha: 0.6),
-                                        fontSize: 13.5,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+    return Container(
+      decoration: BoxDecoration(
+        color: _kCardBg,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.45),
+            blurRadius: 32,
+            offset: const Offset(0, 14),
           ),
-        ),
-        // Tombol X.
-        Positioned(
-          top: 56,
-          right: 14,
-          child: FadeTransition(
-            opacity: _items[0],
-            child: _CloseButton(onTap: _dismiss),
-          ),
-        ),
-        // Lencana lonceng yang menjuntai di atas kartu.
-        Positioned(top: 0, child: _buildBadge()),
-      ],
-    );
-  }
-
-  Widget _buildBadge() {
-    return ScaleTransition(
-      scale: _badge,
-      child: SizedBox(
-        width: 104,
-        height: 84,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            // Dua cincin yang memuai dan memudar bergantian.
-            AnimatedBuilder(
-              animation: _pulse,
-              builder: (context, _) => Stack(
-                alignment: Alignment.center,
-                children: [
-                  for (final k in [0.0, 0.5])
-                    () {
-                      final t = (_pulse.value + k) % 1.0;
-                      final size = 60 + t * 44;
-                      return Container(
-                        width: size,
-                        height: size,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: AppColors.accentVioletLight
-                                .withValues(alpha: (1 - t) * 0.42),
-                            width: 1.6,
-                          ),
-                        ),
-                      );
-                    }(),
-                ],
-              ),
-            ),
-            Container(
-              width: 62,
-              height: 62,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [Color(0xFFFF8896), Color(0xFFC42A3E)],
+        ],
+      ),
+      padding: const EdgeInsets.fromLTRB(20, 18, 14, 18),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Header: ikon kecil + judul (rata kiri) + tombol tutup.
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: AppColors.accentViolet.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.28), width: 1.2),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.accentViolet.withValues(alpha: 0.6),
-                    blurRadius: 26,
-                    spreadRadius: 1,
+                child: const Icon(Icons.campaign_rounded,
+                    size: 20, color: AppColors.accentVioletLight),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  d.title.isNotEmpty ? d.title : 'Pengumuman',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 17,
+                    height: 1.25,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.2,
                   ),
-                ],
-              ),
-              child: AnimatedBuilder(
-                animation: _bellAngle,
-                builder: (context, child) => Transform.rotate(
-                  angle: _bellAngle.value,
-                  alignment: Alignment.topCenter,
-                  child: child,
                 ),
-                child: const Icon(Icons.notifications_rounded, color: Colors.white, size: 30),
+              ),
+              _CloseButton(onTap: _dismiss),
+            ],
+          ),
+          if (d.message.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxHeight: 280),
+                child: SingleChildScrollView(child: _MessageBody(text: d.message)),
               ),
             ),
           ],
-        ),
+          if (d.footnote.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: _Footnote(text: d.footnote),
+            ),
+          ],
+          const SizedBox(height: 20),
+          Padding(
+            padding: const EdgeInsets.only(right: 6),
+            child: d.hasAction
+                ? Row(
+                    children: [
+                      Expanded(
+                        child: _Button(
+                          label: 'Nanti saja',
+                          onTap: _dismiss,
+                          primary: false,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _Button(
+                          label: d.buttonText,
+                          icon: Icons.arrow_outward_rounded,
+                          onTap: _openAction,
+                        ),
+                      ),
+                    ],
+                  )
+                : _Button(label: 'Oke, mengerti', onTap: _dismiss),
+          ),
+        ],
       ),
     );
   }
@@ -469,38 +312,110 @@ class _AnnouncementHostState extends ConsumerState<AnnouncementHost>
 
 // ============================================================== widgets
 
-class _FootnoteChip extends StatelessWidget {
-  const _FootnoteChip({required this.text});
+const Color _kCardBg = Color(0xFF161B24);
+
+/// Isi pesan rata kiri. Baris "- teks" / "• teks" jadi daftar berpoin,
+/// baris yang diakhiri ":" jadi label bagian kecil, sisanya paragraf.
+class _MessageBody extends StatelessWidget {
+  const _MessageBody({required this.text});
+
+  final String text;
+
+  static final _bullet = RegExp(r'^\s*[-•*]\s+');
+
+  @override
+  Widget build(BuildContext context) {
+    final body = TextStyle(
+      color: Colors.white.withValues(alpha: 0.78),
+      fontSize: 14,
+      height: 1.5,
+    );
+    final children = <Widget>[];
+    var lastBlank = false;
+    for (final raw in text.split('\n')) {
+      final line = raw.trimRight();
+      if (line.trim().isEmpty) {
+        if (children.isNotEmpty && !lastBlank) children.add(const SizedBox(height: 10));
+        lastBlank = true;
+        continue;
+      }
+      lastBlank = false;
+      if (_bullet.hasMatch(line)) {
+        children.add(Padding(
+          padding: const EdgeInsets.only(bottom: 6),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                margin: const EdgeInsets.only(top: 8, right: 10),
+                width: 5,
+                height: 5,
+                decoration: const BoxDecoration(
+                  color: AppColors.accentVioletLight,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              Expanded(child: Text(line.replaceFirst(_bullet, ''), style: body)),
+            ],
+          ),
+        ));
+      } else if (line.trim().endsWith(':')) {
+        children.add(Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Text(
+            line.trim().substring(0, line.trim().length - 1).toUpperCase(),
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.45),
+              fontSize: 11.5,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.8,
+            ),
+          ),
+        ));
+      } else {
+        children.add(Padding(
+          padding: const EdgeInsets.only(bottom: 4),
+          child: Text(line.trim(), style: body.copyWith(color: Colors.white.withValues(alpha: 0.9))),
+        ));
+      }
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: children,
+    );
+  }
+}
+
+class _Footnote extends StatelessWidget {
+  const _Footnote({required this.text});
 
   final String text;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
       decoration: BoxDecoration(
-        color: AppColors.accentViolet.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.accentVioletLight.withValues(alpha: 0.28)),
+        color: Colors.white.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
-        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.only(top: 1),
+          Padding(
+            padding: const EdgeInsets.only(top: 1),
             child: Icon(Icons.info_outline_rounded,
-                size: 16, color: AppColors.accentVioletLight),
+                size: 15, color: Colors.white.withValues(alpha: 0.5)),
           ),
           const SizedBox(width: 8),
-          Flexible(
+          Expanded(
             child: Text(
               text,
-              style: const TextStyle(
-                color: Color(0xFFFFD3D8),
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.6),
                 fontSize: 12.5,
                 height: 1.4,
-                fontWeight: FontWeight.w600,
               ),
             ),
           ),
@@ -519,47 +434,40 @@ class _CloseButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return _PressScale(
       onTap: onTap,
-      child: Container(
-        width: 34,
-        height: 34,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          color: Colors.white.withValues(alpha: 0.08),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.10)),
-        ),
-        child: Icon(Icons.close_rounded, size: 18, color: Colors.white.withValues(alpha: 0.85)),
+      child: SizedBox(
+        width: 36,
+        height: 36,
+        child: Icon(Icons.close_rounded, size: 20, color: Colors.white.withValues(alpha: 0.5)),
       ),
     );
   }
 }
 
-class _PrimaryButton extends StatelessWidget {
-  const _PrimaryButton({required this.label, required this.onTap, this.icon});
+class _Button extends StatelessWidget {
+  const _Button({
+    required this.label,
+    required this.onTap,
+    this.icon,
+    this.primary = true,
+  });
 
   final String label;
   final IconData? icon;
   final VoidCallback onTap;
+  final bool primary;
 
   @override
   Widget build(BuildContext context) {
+    final fg = primary ? Colors.white : Colors.white.withValues(alpha: 0.75);
     return _PressScale(
       onTap: onTap,
       child: Container(
-        width: double.infinity,
-        height: 52,
+        height: 46,
         alignment: Alignment.center,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(100),
-          gradient: const LinearGradient(
-            colors: [Color(0xFFEE5B6D), Color(0xFFC42A3E)],
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.accentViolet.withValues(alpha: 0.42),
-              blurRadius: 22,
-              offset: const Offset(0, 9),
-            ),
-          ],
+          color: primary ? AppColors.accentViolet : Colors.white.withValues(alpha: 0.06),
+          borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -569,16 +477,12 @@ class _PrimaryButton extends StatelessWidget {
                 label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                ),
+                style: TextStyle(color: fg, fontSize: 14, fontWeight: FontWeight.w600),
               ),
             ),
             if (icon != null) ...[
-              const SizedBox(width: 8),
-              Icon(icon, size: 18, color: Colors.white),
+              const SizedBox(width: 6),
+              Icon(icon, size: 16, color: fg),
             ],
           ],
         ),
@@ -587,7 +491,7 @@ class _PrimaryButton extends StatelessWidget {
   }
 }
 
-/// Efek tekan: mengecil sedikit dengan pantulan halus + haptic ringan.
+/// Efek tekan: mengecil sedikit + haptic ringan.
 class _PressScale extends StatefulWidget {
   const _PressScale({required this.child, required this.onTap});
 
@@ -617,9 +521,9 @@ class _PressScaleState extends State<_PressScale> {
         widget.onTap();
       },
       child: AnimatedScale(
-        scale: _down ? 0.95 : 1,
-        duration: Duration(milliseconds: _down ? 110 : 260),
-        curve: _down ? Curves.easeOut : Curves.easeOutBack,
+        scale: _down ? 0.97 : 1,
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOut,
         child: widget.child,
       ),
     );
