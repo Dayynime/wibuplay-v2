@@ -292,24 +292,38 @@ String _roleLabel(ZenimeRole r) {
 /// role, gradient neon, ikon + label. Developer punya kilau yang geser terus.
 /// Tidak render apa-apa kalau user tidak punya role.
 class RoleBadge extends ConsumerWidget {
-  const RoleBadge({super.key, required this.firebaseUid, this.height = 20});
+  const RoleBadge({
+    super.key,
+    required this.firebaseUid,
+    this.height = 20,
+    this.rounded = false,
+  });
 
   final String firebaseUid;
   final double height;
+
+  /// true = kapsul sudut membulat (header Profil gaya baru), false = cyber cut.
+  final bool rounded;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final info = ref.watch(roleInfoProvider(firebaseUid)).valueOrNull;
     if (info == null) return const SizedBox.shrink();
-    return RoleBadgeChip(info: info, height: height);
+    return RoleBadgeChip(info: info, height: height, rounded: rounded);
   }
 }
 
 class RoleBadgeChip extends StatefulWidget {
-  const RoleBadgeChip({super.key, required this.info, this.height = 20});
+  const RoleBadgeChip({
+    super.key,
+    required this.info,
+    this.height = 20,
+    this.rounded = false,
+  });
 
   final RoleInfo info;
   final double height;
+  final bool rounded;
 
   @override
   State<RoleBadgeChip> createState() => _RoleBadgeChipState();
@@ -339,14 +353,17 @@ class _RoleBadgeChipState extends State<RoleBadgeChip>
   @override
   Widget build(BuildContext context) {
     final info = widget.info;
-    final shape = _roleShape(info.role, Colors.black.withValues(alpha: 0.65));
+    final rounded = widget.rounded;
+    final ShapeBorder shape = rounded
+        ? RoundedRectangleBorder(borderRadius: BorderRadius.circular(6))
+        : _roleShape(info.role, Colors.black.withValues(alpha: 0.65));
     // Teks gelap di warna neon terang; kalau badge_color custom-nya gelap, putih.
     final lum = (info.primary.computeLuminance() + info.secondary.computeLuminance()) / 2;
     final content = lum > 0.2 ? const Color(0xFF0B0B0F) : Colors.white;
 
     final body = Container(
       height: widget.height,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      padding: EdgeInsets.symmetric(horizontal: rounded ? 10 : 8),
       decoration: ShapeDecoration(
         shape: shape,
         gradient: LinearGradient(colors: [info.primary, info.secondary]),
@@ -355,15 +372,15 @@ class _RoleBadgeChipState extends State<RoleBadgeChip>
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Icon(_roleIcon(info.role), size: 10, color: content),
-          const SizedBox(width: 3),
+          Icon(_roleIcon(info.role), size: rounded ? 12 : 10, color: content),
+          SizedBox(width: rounded ? 5 : 3),
           Text(
             _roleLabel(info.role),
             style: TextStyle(
               color: content,
-              fontSize: 9,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.8,
+              fontSize: rounded ? 10 : 9,
+              fontWeight: rounded ? FontWeight.w900 : FontWeight.w800,
+              letterSpacing: rounded ? 1.0 : 0.8,
               height: 1.2,
             ),
           ),

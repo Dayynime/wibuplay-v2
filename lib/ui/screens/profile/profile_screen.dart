@@ -17,11 +17,9 @@ import '../../../providers.dart';
 import '../../app_routes.dart';
 import '../../components/cards.dart';
 import '../../components/common_components.dart';
-import '../../components/game_badges.dart';
+import '../../components/profile_badges.dart';
 import '../../components/net_image.dart';
 import '../../components/role_badges.dart';
-import '../../components/top_giver_badge.dart';
-import '../../components/top_xp_badge.dart';
 import '../auth/login_screen.dart';
 import '../clan/clan_browse_screen.dart';
 import 'image_crop_screen.dart';
@@ -39,7 +37,7 @@ import '../../../data/models/avatar_frame_models.dart';
 import '../../glass/glass.dart';
 
 /// Profil Saya ala Zenime: banner full-bleed menyatu dengan avatar, identitas
-/// + badge (level, clan, role) di bawah avatar, stat row 4 kolom, tombol pill
+/// + cincin XP & pin level di avatar, tag clan di depan nama, role + pencapaian di bawahnya, stat row 4 kolom, tombol pill
 /// Clan / Leaderboard, CTA Edit Profil, lalu tab Semua / Favorit / Komentar /
 /// Riwayat / Pengaturan.
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -146,7 +144,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       backdrop = history.first.moviePoster;
     }
 
-    final level = uid.isEmpty ? 1 : (ref.watch(myXpProvider(uid)).valueOrNull?.level ?? 1);
     final clanTag = uid.isEmpty ? null : ref.watch(userClanTagProvider(uid)).valueOrNull;
     final commentCount =
         uid.isEmpty ? 0 : (ref.watch(myCommentCountProvider(uid)).valueOrNull ?? 0);
@@ -179,7 +176,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           padding: EdgeInsets.only(top: topPad + 28, bottom: 20),
           child: Column(
             children: [
-              ProfileHeroAvatar(uid: uid, url: avatarUrl, seed: uid.isEmpty ? name : uid, label: name),
+              ProfileHeroAvatar(
+                uid: uid,
+                url: avatarUrl,
+                seed: uid.isEmpty ? name : uid,
+                label: name,
+                showXpRing: true,
+              ),
               const SizedBox(height: 10),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -187,6 +190,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
+                    if (_has(clanTag)) ...[
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: ClanNameTag(text: clanTag!),
+                      ),
+                      const SizedBox(width: 6),
+                    ],
                     Flexible(
                       child: Text(
                         name,
@@ -226,19 +236,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ),
               ),
               const SizedBox(height: 10),
-              Wrap(
-                alignment: WrapAlignment.center,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: 8,
-                runSpacing: 6,
-                children: [
-                  if (uid.isNotEmpty) LevelBadge(level: level, height: 20),
-                  if (_has(clanTag)) ClanRainbowBadge(text: clanTag!, height: 20),
-                  if (uid.isNotEmpty) RoleBadge(firebaseUid: uid, height: 20),
-                  if (uid.isNotEmpty) TopGiverBadge(firebaseUid: uid, height: 20),
-                  if (uid.isNotEmpty) TopXpBadge(firebaseUid: uid, height: 20),
-                ],
-              ),
+              // Level ada di cincin avatar & clan di depan nama; di sini
+              // tinggal role + pencapaian (Top Giver / Top XP).
+              if (uid.isNotEmpty)
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    RoleBadge(firebaseUid: uid, height: 22, rounded: true),
+                    ...ProfileAchievementBadges.chips(ref, uid),
+                  ],
+                ),
               const SizedBox(height: 18),
               // Stat row flat: angka besar, label kecil, garis pemisah tipis.
               Padding(
@@ -898,6 +908,7 @@ class ProfileHeroAvatar extends ConsumerWidget {
     required this.url,
     required this.seed,
     required this.label,
+    this.showXpRing = false,
   });
 
   static const double size = 96;
@@ -907,6 +918,9 @@ class ProfileHeroAvatar extends ConsumerWidget {
   final String seed;
   final String label;
 
+  /// Tampilkan cincin XP + pin level di sekeliling avatar (header Profil).
+  final bool showXpRing;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     String? frame;
@@ -915,13 +929,24 @@ class ProfileHeroAvatar extends ConsumerWidget {
       frame = ref.watch(avatarFrameCacheProvider.select((m) => m[uid]));
     }
     final ext = frame == null ? 0.0 : size * (avatarFrameScale(frame) - 1) / 2;
+    final avatar = FramedAvatar(
+      uid: uid,
+      size: size,
+      child: ProfileAvatar(url: url, seed: seed, label: label, size: size),
+    );
+    if (!showXpRing || uid.isEmpty) {
+      return Padding(padding: EdgeInsets.symmetric(vertical: ext), child: avatar);
+    }
+    // Kotak cincin sudah menambah ringExtent di tiap sisi; sisa ruang frame
+    // (kalau frame lebih besar dari cincin) + pin level ditambah di sini.
+    const ring = ProfileXpRing.ringExtent;
+    final top = ext > ring ? ext - ring : 0.0;
+    final bottom = ext - ring > ProfileXpRing.pinOverhang
+        ? ext - ring
+        : ProfileXpRing.pinOverhang;
     return Padding(
-      padding: EdgeInsets.symmetric(vertical: ext),
-      child: FramedAvatar(
-        uid: uid,
-        size: size,
-        child: ProfileAvatar(url: url, seed: seed, label: label, size: size),
-      ),
+      padding: EdgeInsets.only(top: top, bottom: bottom),
+      child: ProfileXpRing(uid: uid, avatarSize: size, child: avatar),
     );
   }
 }

@@ -12,12 +12,10 @@ import '../../../data/models/friend_models.dart';
 import '../../../providers.dart';
 import '../../app_routes.dart';
 import '../../components/cards.dart';
-import '../../components/game_badges.dart';
+import '../../components/profile_badges.dart';
 import '../../components/net_image.dart';
 import '../../components/profile_effect.dart';
 import '../../components/role_badges.dart';
-import '../../components/top_giver_badge.dart';
-import '../../components/top_xp_badge.dart';
 import '../../components/join_date_stat.dart';
 import '../clan/clan_browse_screen.dart';
 import '../comments/comments_section.dart' show openCommentThreadFromProfile;
@@ -257,7 +255,6 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
       backdrop = history.first.moviePoster;
     }
 
-    final level = ref.watch(myXpProvider(uid)).valueOrNull?.level ?? 1;
     final clanTag = ref.watch(userClanTagProvider(uid)).valueOrNull;
     final commentCount = ref.watch(myCommentCountProvider(uid)).valueOrNull ?? 0;
     final uniqueAnime = history.map((h) => h.movieId).toSet().length;
@@ -289,7 +286,13 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
           padding: EdgeInsets.only(top: topPad + 28, bottom: 20),
           child: Column(
             children: [
-              ProfileHeroAvatar(uid: uid, url: avatarUrl, seed: uid, label: name),
+              ProfileHeroAvatar(
+                uid: uid,
+                url: avatarUrl,
+                seed: uid,
+                label: name,
+                showXpRing: true,
+              ),
               const SizedBox(height: 10),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -297,6 +300,13 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
+                    if (_has(clanTag)) ...[
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: ClanNameTag(text: clanTag!),
+                      ),
+                      const SizedBox(width: 6),
+                    ],
                     Flexible(
                       child: Text(
                         name,
@@ -330,17 +340,15 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
                 ),
               ),
               const SizedBox(height: 10),
+              // Level ada di cincin avatar & clan di depan nama.
               Wrap(
                 alignment: WrapAlignment.center,
                 crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: 8,
+                spacing: 6,
                 runSpacing: 6,
                 children: [
-                  LevelBadge(level: level, height: 20),
-                  if (_has(clanTag)) ClanRainbowBadge(text: clanTag!, height: 20),
-                  RoleBadge(firebaseUid: uid, height: 20),
-                  TopGiverBadge(firebaseUid: uid, height: 20),
-                  TopXpBadge(firebaseUid: uid, height: 20),
+                  RoleBadge(firebaseUid: uid, height: 22, rounded: true),
+                  ...ProfileAchievementBadges.chips(ref, uid),
                 ],
               ),
               const SizedBox(height: 18),
