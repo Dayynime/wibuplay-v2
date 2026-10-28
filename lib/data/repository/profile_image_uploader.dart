@@ -7,7 +7,7 @@ import 'package:dio/dio.dart';
 class ProfileImageUploader {
   ProfileImageUploader._();
 
-  static const String _cloudName = 'jbtwhnrb';
+  static const String _cloudName = 'xguzml1n';
   static const String _uploadPreset = 'Zenime';
   static const String _url = 'https://api.cloudinary.com/v1_1/$_cloudName/image/upload';
 

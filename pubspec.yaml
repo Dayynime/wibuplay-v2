@@ -1,7 +1,7 @@
 name: wibuplay
 description: Zenime - port Flutter dari aplikasi Kotlin/Compose (com.dayynime.wibuplay).
 publish_to: "none"
-version: 2.8.4+20804
+version: 2.8.5+20805
 
 environment:
   sdk: ">=3.10.0 <4.0.0"

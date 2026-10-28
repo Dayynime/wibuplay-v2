@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
 
+import 'core/wp_video.dart';
 import 'core/firebase_config.dart';
 import 'core/remote_config_manager.dart';
 import 'core/theme/app_colors.dart';
@@ -67,6 +68,8 @@ Future<void> _initBackend() async {
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   MediaKit.ensureInitialized();
+  // Mode decoder yang pernah terbukti jalan di HP ini (anti layar hitam).
+  await WpDecoder.load();
 
   // Port MainActivity: edge-to-edge, status/nav bar warna BackgroundDark, ikon terang.
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);

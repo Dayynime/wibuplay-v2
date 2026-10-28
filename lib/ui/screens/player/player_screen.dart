@@ -113,6 +113,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
   WpVideoController? _vc;
   String? _loadedLink;
   int _decoderRetries = 0;
+  // Level decoder yang sedang dipakai (lihat WpDecoder). Naik otomatis kalau
+  // terdeteksi layar hitam / error decoder.
+  int _decoderLevel = WpDecoder.savedLevel;
+  // Detik video jalan tanpa satu frame pun tergambar (gejala layar hitam).
+  int _noFrameSecs = 0;
+  // Posisi lanjut sekali pakai saat memuat ulang dengan decoder lain.
+  int? _resumeOverrideMs;
   final ValueNotifier<PlayerPlayback> _pb = ValueNotifier<PlayerPlayback>(const PlayerPlayback());
 
   bool _showControls = true;
@@ -327,11 +334,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
   /// decoder masih dipakai / belum dilepas. Retry otomatis max 2x.
   bool _retryDecoder(String? desc) {
     final d = desc ?? '';
-    final isDecoder = d.contains('MediaCodec') || d.contains('Decoder');
+    final isDecoder = d.contains('MediaCodec') ||
+        d.contains('Decoder') ||
+        d.contains('decoder') ||
+        d.contains('hwdec');
     if (!isDecoder || _decoderRetries >= 2 || _currentLink == null) {
       return false;
     }
     _decoderRetries++;
+    if (_decoderLevel < WpDecoder.maxLevel) _decoderLevel++;
     final link = _currentLink;
     final vc = _vc;
     _vc = null;
@@ -376,13 +387,25 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
 
     final old = _vc;
     old?.removeListener(_onVideo);
-    final resumeMs = ref.read(playerControllerProvider(_args)).resumePositionMs;
+    final override = _resumeOverrideMs;
+    _resumeOverrideMs = null;
+    final resumeMs =
+        override ?? ref.read(playerControllerProvider(_args)).resumePositionMs;
+    final startAt = resumeMs > 0 ? Duration(milliseconds: resumeMs) : null;
 
     final WpVideoController vc;
     try {
       vc = link.startsWith('file://')
-          ? WpVideoController.file(File.fromUri(Uri.parse(link)))
-          : WpVideoController.networkUrl(Uri.parse(link));
+          ? WpVideoController.file(
+              File.fromUri(Uri.parse(link)),
+              startAt: startAt,
+              decoderLevel: _decoderLevel,
+            )
+          : WpVideoController.networkUrl(
+              Uri.parse(link),
+              startAt: startAt,
+              decoderLevel: _decoderLevel,
+            );
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -393,6 +416,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
       return;
     }
     _vc = vc;
+    _noFrameSecs = 0;
     _endedHandled = false;
     _outroSkipped = false;
     _lastDurMs = 0;
@@ -406,11 +430,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     await old?.dispose();
 
     try {
+      // Lanjut tontonan sudah ditangani di initialize() lewat startAt
+      // (opsi start mpv + seek yang dijaga), jadi tidak ketimpa ke 00:00.
       await vc.initialize();
-      if (!mounted || _vc != vc) return;
-      if (resumeMs > 0) {
-        await vc.seekTo(Duration(milliseconds: resumeMs));
-      }
       // Skip intro tidak dilakukan di sini: durasi dari media_kit sering
       // belum ada. Dicek di _onVideo begitu durasi pertama kali diketahui.
       if (!mounted || _vc != vc) return;
@@ -508,7 +530,26 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
       return;
     }
 
-    if (_tickCount % 5 == 0 && dur > 0) {
+    // Layar hitam: video jalan (posisi maju) tapi tidak ada frame yang
+    // tergambar. Setelah 5 detik, muat ulang dengan decoder yang lebih aman
+    // dari posisi sekarang. Hanya dicek saat video benar-benar tampil.
+    if (!vc.firstFrameRendered &&
+        !vc.value.isBuffering &&
+        _inForeground &&
+        !_inPip &&
+        _decoderLevel < WpDecoder.maxLevel) {
+      _noFrameSecs++;
+      if (_noFrameSecs >= 5) {
+        _escalateDecoder();
+        return;
+      }
+    } else {
+      _noFrameSecs = 0;
+    }
+
+    // Jangan simpan riwayat selama seek (lanjut tontonan / skip intro) belum
+    // sampai, supaya posisi terakhir tidak tertimpa 00:0x.
+    if (_tickCount % 5 == 0 && dur > 0 && !vc.isSeekPending) {
       _notifier.saveProgress(vc.value.position.inMilliseconds, dur);
     }
 
@@ -521,6 +562,29 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
         }),
       );
     }
+  }
+
+  /// Muat ulang link yang sama dengan level decoder berikutnya, lanjut dari
+  /// posisi sekarang (dipakai saat layar hitam terdeteksi).
+  void _escalateDecoder() {
+    final vc = _vc;
+    final link = _currentLink;
+    if (vc == null || link == null || _decoderLevel >= WpDecoder.maxLevel) return;
+    _decoderLevel++;
+    _noFrameSecs = 0;
+    final pos = vc.value.position.inMilliseconds;
+    _resumeOverrideMs = pos > 0 ? pos : null;
+    _introChecked = true;
+    _vc = null;
+    vc.removeListener(_onVideo);
+    _loadedLink = null;
+    unawaited(() async {
+      try {
+        await vc.dispose();
+      } catch (_) {}
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+      if (mounted) await _loadLink(link);
+    }());
   }
 
   void _seekMs(int ms) {
@@ -595,7 +659,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
         !gate.locked &&
         !_endedHandled) {
       final dur = vc.value.duration.inMilliseconds;
-      if (dur > 0) _notifier.saveProgress(vc.value.position.inMilliseconds, dur);
+      if (dur > 0 && !vc.isSeekPending) {
+        _notifier.saveProgress(vc.value.position.inMilliseconds, dur);
+      }
       vc.removeListener(_onVideo);
       _vc = null; // kepemilikan pindah ke mini player, jangan di-dispose di sini
       _loadedLink = null;
