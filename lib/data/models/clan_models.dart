@@ -230,7 +230,7 @@ class ClanSlotShop {
 
   static const int slotsPerPack = 5;
   static const int pricePerPack = 5000;
-  static const int maxMemberLimit = 150;
+  static const int maxMemberLimit = 5000;
 
   /// Berapa paket maksimal yang masih muat sampai batas [maxMemberLimit].
   static int maxPacksFor(int memberLimit) {
