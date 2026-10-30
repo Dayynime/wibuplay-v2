@@ -164,6 +164,10 @@ class ChessVoiceCall extends ChangeNotifier {
   Future<void> toggleSpeaker() async {
     _speaker = !_speaker;
     _notify();
+    await _applySpeaker();
+  }
+
+  Future<void> _applySpeaker() async {
     try {
       await Helper.setSpeakerphoneOn(_speaker);
     } catch (_) {}
@@ -182,6 +186,12 @@ class ChessVoiceCall extends ChangeNotifier {
         'urls': ['stun:stun.l.google.com:19302'],
       },
     ];
+
+    // Mode audio panggilan (bukan media) supaya suara lawan keluar di jalur
+    // telepon dan echo cancellation HP aktif.
+    try {
+      await Helper.setAndroidAudioConfiguration(AndroidAudioConfiguration.communication);
+    } catch (_) {}
 
     final local = await navigator.mediaDevices.getUserMedia(<String, dynamic>{
       'audio': <String, dynamic>{
@@ -257,6 +267,13 @@ class ChessVoiceCall extends ChangeNotifier {
           _connectedAt ??= DateTime.now();
           HapticFeedback.mediumImpact();
           _setState(ChessVoiceState.connected);
+          // Sebagian HP (mis. Itel/Transsion) mengembalikan jalur suara ke
+          // earpiece begitu audio lawan mulai diputar. Pasang ulang pilihan
+          // speaker setelah tersambung, sekali lagi sesaat kemudian.
+          unawaited(_applySpeaker());
+          Future<void>.delayed(const Duration(milliseconds: 1200), () {
+            if (_state == ChessVoiceState.connected) unawaited(_applySpeaker());
+          });
         }
       case RTCPeerConnectionState.RTCPeerConnectionStateDisconnected:
         // Jaringan goyang sebentar: tunggu dulu sebelum menutup.
