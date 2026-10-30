@@ -110,6 +110,12 @@ class ChessRepository {
     return _game(await _call({'action': 'draw', 'id': id, 'op': op}, f), f);
   }
 
+  /// Server ICE untuk panggilan suara (hanya untuk kedua pemain).
+  Future<ChessVoiceIce> voiceIce(String id) async {
+    final d = await _call({'action': 'voice_ice', 'id': id}, 'Gagal menyiapkan panggilan suara');
+    return ChessVoiceIce.fromJson(d);
+  }
+
   Future<ChessGame> rematch(String id) async {
     const f = 'Gagal mengajak main lagi';
     return _game(await _call({'action': 'rematch', 'id': id}, f), f);

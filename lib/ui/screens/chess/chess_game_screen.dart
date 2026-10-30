@@ -10,11 +10,13 @@ import '../../../core/theme/app_colors.dart';
 import '../../../data/models/chess_models.dart';
 import '../../../data/realtime/chess_realtime_client.dart';
 import '../../../data/repository/chess_repository.dart';
+import '../../../data/voice/chess_voice_call.dart';
 import '../../../providers.dart';
 import '../../app_routes.dart';
 import '../../components/friend_avatar.dart';
 import '../../glass/glass.dart';
 import 'chess_board.dart';
+import 'chess_voice_bar.dart';
 
 /// Satu permainan catur: menunggu lawan, bermain, dan hasil akhir.
 ///
@@ -37,6 +39,9 @@ class _ChessGameScreenState extends ConsumerState<ChessGameScreen> with WidgetsB
   late final ChessRepository _repo;
   ChessRealtimeClient? _rt;
   StreamSubscription<Map<String, dynamic>>? _rtSub;
+
+  /// Panggilan suara dengan lawan; dibuat begitu kedua pemain sudah ada.
+  ChessVoiceCall? _voice;
 
   ChessGame? _game;
   String? _error;
@@ -74,6 +79,7 @@ class _ChessGameScreenState extends ConsumerState<ChessGameScreen> with WidgetsB
     _rt = ChessRealtimeClient('chess-game-${widget.gameId}', onJoined: _scheduleLoad);
     _rtSub = _rt!.pings.listen((_) => _scheduleLoad());
     _rt!.start();
+    _ensureVoice();
 
     _ticker = Timer.periodic(const Duration(milliseconds: 250), (_) => _onTick());
     _poll = Timer.periodic(const Duration(seconds: 4), (_) => _onPoll());
@@ -86,6 +92,7 @@ class _ChessGameScreenState extends ConsumerState<ChessGameScreen> with WidgetsB
     _poll?.cancel();
     _debounce?.cancel();
     _rtSub?.cancel();
+    _voice?.dispose(); // menutup panggilan + memberi tahu lawan
     unawaited(_rt?.stop());
     _tick.dispose();
     _movesScroll.dispose();
@@ -172,6 +179,7 @@ class _ChessGameScreenState extends ConsumerState<ChessGameScreen> with WidgetsB
 
     setState(() {
       _game = g;
+      _ensureVoice();
       _error = null;
       _pieces = chessPiecesFromFen(g.fen);
       if (!g.isMyTurn || (_selected != null && !_targetsFor(g, _selected!).isNotEmpty)) {
@@ -179,6 +187,23 @@ class _ChessGameScreenState extends ConsumerState<ChessGameScreen> with WidgetsB
       }
     });
     if (newMove) _scrollMovesToEnd();
+  }
+
+  /// Siapkan panggilan suara kalau aku pemain dan lawan sudah ada.
+  void _ensureVoice() {
+    if (_voice != null) return;
+    final g = _game;
+    final rt = _rt;
+    final uid = _uid;
+    if (g == null || rt == null || uid == null || g.myColor == null) return;
+    final opp = g.myColor == 'w' ? g.black : g.white;
+    if (opp == null || opp.uid == uid) return;
+    _voice = ChessVoiceCall(
+      myUid: uid,
+      opponentUid: opp.uid,
+      rt: rt,
+      fetchIce: () => _repo.voiceIce(widget.gameId),
+    );
   }
 
   void _scrollMovesToEnd() {
@@ -523,6 +548,10 @@ class _ChessGameScreenState extends ConsumerState<ChessGameScreen> with WidgetsB
           const SizedBox(height: 8),
           _PlayerBar(player: me, color: myColor, game: g, tick: _tick, placeholder: 'Kamu', isMe: true),
           const SizedBox(height: 12),
+          if (_voice != null) ...[
+            ChessVoiceBar(call: _voice!, opponentName: opp?.username ?? 'Lawan', tick: _tick),
+            const SizedBox(height: 12),
+          ],
           if (g.isWaiting) _waitingCard(g, uid),
           if (g.isActive) ..._activeExtras(g),
           if (g.isOver) _resultCard(g),

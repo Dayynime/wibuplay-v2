@@ -1,1 +1,9 @@
 /supabase/
+
+# File lokal (jangan di-commit)
+/android/
+.dart_tool/
+.idea/
+.metadata
+.flutter-plugins-dependencies
+setup_android_local.py

@@ -43,6 +43,8 @@ dependencies:
   open_filex: ^4.5.0
   in_app_update: ^4.2.3
   lottie: ^3.1.2
+  # Panggilan suara di catur mabar (WebRTC, audio saja).
+  flutter_webrtc: ^1.6.2
 
 dependency_overrides:
   shared_preferences_android: 2.3.4

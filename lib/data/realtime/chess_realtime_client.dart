@@ -7,6 +7,13 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 
 import '../../core/supabase_config.dart';
 
+/// Pesan broadcast: [event] (mis. `ping` dari server, `voice` antar-app).
+class ChessRtMessage {
+  const ChessRtMessage(this.event, this.payload);
+  final String event;
+  final Map<String, dynamic> payload;
+}
+
 /// Supabase Realtime **Broadcast** untuk catur: mendengarkan satu topik
 /// (`chess-game-<id>` atau `chess-user-<uid>`). Edge Function `chess-game`
 /// mengirim "ping" ke topik ini setiap ada perubahan; isi ping TIDAK dipercaya,
@@ -24,8 +31,7 @@ class ChessRealtimeClient {
   /// Dipanggil tiap (re)join berhasil, buat memuat ulang yang mungkin kelewat.
   final VoidCallback? onJoined;
 
-  final StreamController<Map<String, dynamic>> _pings =
-      StreamController<Map<String, dynamic>>.broadcast();
+  final StreamController<ChessRtMessage> _messages = StreamController<ChessRtMessage>.broadcast();
 
   WebSocketChannel? _channel;
   StreamSubscription<dynamic>? _sub;
@@ -41,7 +47,29 @@ class ChessRealtimeClient {
   String get _fullTopic => 'realtime:$topic';
 
   /// Ping dari server (payload hanya petunjuk, jangan dipercaya).
-  Stream<Map<String, dynamic>> get pings => _pings.stream;
+  Stream<Map<String, dynamic>> get pings =>
+      _messages.stream.where((m) => m.event == 'ping').map((m) => m.payload);
+
+  /// Semua pesan broadcast di topik ini (termasuk sinyal panggilan suara).
+  Stream<ChessRtMessage> get messages => _messages.stream;
+
+  /// Kirim pesan broadcast ke pendengar lain di topik ini (bukan ke diri
+  /// sendiri). Return false kalau channel belum tersambung.
+  bool send(String event, Map<String, dynamic> payload) {
+    final ch = _channel;
+    if (!_joined || ch == null) return false;
+    try {
+      ch.sink.add(jsonEncode({
+        'topic': _fullTopic,
+        'event': 'broadcast',
+        'payload': {'type': 'broadcast', 'event': event, 'payload': payload},
+        'ref': _nextRef(),
+      }));
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
 
   /// True selama channel sudah join; kalau false, pemakai sebaiknya polling.
   bool get isJoined => _joined;
@@ -67,7 +95,7 @@ class ChessRealtimeClient {
       await _channel?.sink.close();
     } catch (_) {}
     _channel = null;
-    if (!_pings.isClosed) await _pings.close();
+    if (!_messages.isClosed) await _messages.close();
   }
 
   void _connect() {
@@ -163,9 +191,13 @@ class ChessRealtimeClient {
       }
       if (event != 'broadcast') return;
       final payload = json['payload'];
+      final name = payload is Map ? payload['event'] : null;
       final inner = payload is Map ? payload['payload'] : null;
-      if (!_pings.isClosed) {
-        _pings.add(inner is Map ? Map<String, dynamic>.from(inner) : const <String, dynamic>{});
+      if (!_messages.isClosed) {
+        _messages.add(ChessRtMessage(
+          name is String ? name : '',
+          inner is Map ? Map<String, dynamic>.from(inner) : const <String, dynamic>{},
+        ));
       }
     } catch (e) {
       if (kDebugMode) debugPrint('Chess RT frame error: $e');

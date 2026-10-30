@@ -291,3 +291,26 @@ String chessEndText(ChessGame g) {
   }
   return g.status == ChessStatus.aborted ? 'Dibatalkan' : '';
 }
+
+/// Server ICE (STUN/TURN) untuk panggilan suara di satu permainan.
+class ChessVoiceIce {
+  const ChessVoiceIce({required this.iceServers, required this.opponentUid, required this.turnReady});
+
+  /// Format WebRTC: [{'urls': [...], 'username': ..., 'credential': ...}]
+  final List<Map<String, dynamic>> iceServers;
+  final String? opponentUid;
+
+  /// False = server TURN belum diatur; panggilan di data seluler bisa gagal.
+  final bool turnReady;
+
+  factory ChessVoiceIce.fromJson(Map<String, dynamic> j) {
+    final list = j['ice_servers'];
+    return ChessVoiceIce(
+      iceServers: list is List
+          ? list.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
+          : const <Map<String, dynamic>>[],
+      opponentUid: j['opponent_uid'] as String?,
+      turnReady: j['turn_ready'] == true,
+    );
+  }
+}

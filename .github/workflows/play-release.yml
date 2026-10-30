@@ -126,6 +126,10 @@ jobs:
                        'WRITE_EXTERNAL_STORAGE', 'MANAGE_EXTERNAL_STORAGE']:
               s = re.sub(r'\s*<uses-permission android:name="android.permission.%s"[^>]*/>' % perm, '', s)
               s = s.replace('<application', '<uses-permission android:name="android.permission.%s" tools:node="remove"/>\n    <application' % perm, 1)
+          # Panggilan suara catur (flutter_webrtc): mikrofon + atur jalur audio.
+          for perm in ['RECORD_AUDIO', 'MODIFY_AUDIO_SETTINGS']:
+              if 'android.permission.%s"' % perm not in s:
+                  s = s.replace('<application', '<uses-permission android:name="android.permission.%s"/>\n    <application' % perm, 1)
           if 'supportsPictureInPicture' not in s:
               s = s.replace('<activity', '<activity android:supportsPictureInPicture="true"', 1)
           if 'networkSecurityConfig' not in s:
