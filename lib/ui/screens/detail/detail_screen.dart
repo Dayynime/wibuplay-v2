@@ -21,6 +21,58 @@ import '../../glass/glass.dart';
 
 bool _blank(String? s) => s == null || s.trim().isEmpty;
 
+/// Kurva keluar cepat lalu mendarat halus (koreografi masuk halaman).
+const Curve _outExpo = Cubic(0.16, 1, 0.3, 1);
+
+/// Kurva pegas: melewati target sedikit lalu kembali.
+const Curve _springy = Cubic(0.34, 1.56, 0.64, 1);
+
+/// Potongan [a]..[b] dari timeline [t] (0..1), dilewatkan [curve].
+double _iv(double t, double a, double b, [Curve curve = _outExpo]) {
+  if (t <= a) return 0;
+  if (t >= b) return 1;
+  return curve.transform((t - a) / (b - a));
+}
+
+/// Klip hero yang mengembang dari ukuran kartu poster (sudut membulat) menjadi
+/// penuh selebar layar, seperti kartu yang diketuk "membesar" jadi halaman.
+class _ExpandClipper extends CustomClipper<Path> {
+  const _ExpandClipper(this.p);
+
+  final double p;
+
+  @override
+  Path getClip(Size size) {
+    double lerp(double a, double b) => a + (b - a) * p;
+    final w = size.width;
+    final h = size.height;
+    final rect = Rect.fromLTRB(
+      lerp(w * 0.2, 0),
+      lerp(h * 0.16, 0),
+      lerp(w * 0.8, w),
+      lerp(h * 0.94, h),
+    );
+    return Path()..addRRect(RRect.fromRectAndRadius(rect, Radius.circular(lerp(24, 0))));
+  }
+
+  @override
+  bool shouldReclip(_ExpandClipper old) => old.p != p;
+}
+
+/// Klip "tirai": memperlihatkan anak dari atas ke bawah sebanyak [p] tanpa
+/// mengubah ukuran layout (jadi isi di bawahnya tidak ikut melompat).
+class _CurtainClipper extends CustomClipper<Rect> {
+  const _CurtainClipper(this.p);
+
+  final double p;
+
+  @override
+  Rect getClip(Size size) => Rect.fromLTWH(0, 0, size.width, size.height * p);
+
+  @override
+  bool shouldReclip(_CurtainClipper old) => old.p != p;
+}
+
 /// Garis pemisah / outline kartu Zenime (CardOutlineBorder).
 const Color _kOutline = Color(0xFF2A2F3A);
 
@@ -44,7 +96,7 @@ class DetailScreen extends ConsumerStatefulWidget {
 }
 
 class _DetailScreenState extends ConsumerState<DetailScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   // Urutan = indeks selectedTab di DetailUiState (sama dengan DetailTab Zenime).
   static const List<String> _tabs = ['Info', 'Episode', 'Season', 'Cuplix', 'Cover', 'Poster'];
 
@@ -64,6 +116,146 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
 
   bool _synopsisExpanded = false;
 
+  // ------------------------------------------------------- koreografi masuk
+  //
+  // 1. Hero (_heroIn, jalan begitu halaman dibuka, termasuk saat loading):
+  //    poster mengembang dari ukuran kartu jadi penuh, gambarnya "mendarat"
+  //    dari zoom 1.16 lebih lambat dari klipnya (dua kecepatan = kesan dalam).
+  // 2. Isi (_contentIn, jalan saat data pertama kali tampil): tombol atas
+  //    memantul masuk, bar merah menyapu lalu membuka judul (title card),
+  //    metadata menyusul, tombol play memegas masuk, baris tab terbuka seperti
+  //    tirai, lalu isi tab masuk dengan animasi tab yang sudah ada.
+  late final AnimationController _heroIn = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1300),
+  );
+  late final AnimationController _contentIn = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1500),
+  );
+  bool _motionReady = false;
+  bool _reduceMotion = false;
+  bool _contentStarted = false;
+  bool _tabKicked = false;
+
+  void _onContentTick() {
+    if (!_tabKicked && _contentIn.value >= 0.55) {
+      _tabKicked = true;
+      _tabAnim.forward(from: 0);
+    }
+  }
+
+  /// Dipanggil saat isi halaman pertama kali dibangun (sebelum widget yang
+  /// mendengarkan animasi ini dibuat, jadi aman diubah di tengah build).
+  void _startContentIn() {
+    if (_contentStarted) return;
+    _contentStarted = true;
+    if (_reduceMotion) {
+      _tabKicked = true;
+      _contentIn.value = 1;
+      return;
+    }
+    _tabAnim.value = 0;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _contentIn.forward(from: 0);
+    });
+  }
+
+  /// Gambar hero + scrim: klip mengembang dari ukuran kartu, gambar mendarat
+  /// dari zoom (lebih lambat dari klipnya).
+  Widget _heroArt(String url) {
+    return AnimatedBuilder(
+      animation: _heroIn,
+      builder: (context, child) {
+        final t = _heroIn.value;
+        return ClipPath(
+          clipper: _ExpandClipper(_iv(t, 0, 0.6)),
+          child: Transform.scale(scale: 1.16 - 0.16 * _iv(t, 0, 1), child: child),
+        );
+      },
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          if (url.isNotEmpty) NetImage(url, alignment: Alignment.topCenter),
+          _heroGradient(),
+        ],
+      ),
+    );
+  }
+
+  /// Muncul memantul (skala + fade) pada potongan [a] dari animasi isi.
+  Widget _pop(double a, Widget child) {
+    return AnimatedBuilder(
+      animation: _contentIn,
+      child: child,
+      builder: (context, child) {
+        final v = _iv(_contentIn.value, a, a + 0.3, _springy);
+        return Opacity(
+          opacity: v.clamp(0.0, 1.0).toDouble(),
+          child: Transform.scale(scale: 0.5 + 0.5 * v, child: child),
+        );
+      },
+    );
+  }
+
+  /// Fade + geser pada potongan [a]..[b] dari animasi isi.
+  Widget _fadeIn(double a, double b, Widget child, {double dx = 0, double dy = 8}) {
+    return AnimatedBuilder(
+      animation: _contentIn,
+      child: child,
+      builder: (context, child) {
+        final v = _iv(_contentIn.value, a, b);
+        return Opacity(
+          opacity: v,
+          child: Transform.translate(offset: Offset(dx * (1 - v), dy * (1 - v)), child: child),
+        );
+      },
+    );
+  }
+
+  /// Kartu judul: bar merah menyapu masuk dari kiri, lalu keluar ke kanan
+  /// sambil membuka judul (gaya title card episode anime).
+  Widget _titleWipe(Widget title) {
+    return AnimatedBuilder(
+      animation: _contentIn,
+      child: title,
+      builder: (context, child) {
+        final t = _contentIn.value;
+        final grow = _iv(t, 0.05, 0.22, Curves.easeInOutCubic);
+        final shrink = _iv(t, 0.22, 0.40, Curves.easeInOutCubic);
+        final leaving = t >= 0.22;
+        return Stack(
+          children: [
+            Opacity(opacity: leaving ? 1.0 : 0.0, child: child),
+            Positioned.fill(
+              child: Align(
+                alignment: leaving ? Alignment.centerRight : Alignment.centerLeft,
+                child: FractionallySizedBox(
+                  widthFactor: leaving ? 1 - shrink : grow,
+                  heightFactor: 1,
+                  child: const ColoredBox(color: AppColors.accentViolet),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_motionReady) return;
+    _motionReady = true;
+    _reduceMotion = MediaQuery.disableAnimationsOf(context);
+    if (_reduceMotion) {
+      _heroIn.value = 1;
+    } else {
+      _heroIn.forward();
+    }
+  }
+
   /// Satu pintu ganti tab (tap maupun swipe) supaya animasinya selalu jalan.
   void _selectTab(int index) {
     final current = ref.read(detailControllerProvider(widget.movieId)).selectedTab;
@@ -82,6 +274,7 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
   void initState() {
     super.initState();
     _scroll.addListener(_onScroll);
+    _contentIn.addListener(_onContentTick);
   }
 
   /// Swipe kiri = tab berikutnya, kanan = tab sebelumnya (lewat kecepatan lepas
@@ -127,6 +320,9 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
     _scroll.dispose();
     _tabCurve.dispose();
     _tabAnim.dispose();
+    _contentIn.removeListener(_onContentTick);
+    _contentIn.dispose();
+    _heroIn.dispose();
     super.dispose();
   }
 
@@ -154,8 +350,7 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  if (holder.isNotEmpty) NetImage(holder, alignment: Alignment.topCenter),
-                  _heroGradient(),
+                  _heroArt(holder),
                 ],
               ),
             ),
@@ -223,6 +418,7 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
   // ------------------------------------------------------------------ loaded
 
   Widget _loaded(DetailUiState ui) {
+    _startContentIn();
     final anime = ui.anime;
     final topInset = MediaQuery.paddingOf(context).top;
     final isFavorite =
@@ -259,7 +455,20 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
                   targetEpisodeId: targetEpisodeId,
                 ),
               ),
-              SliverToBoxAdapter(child: _tabRow(ui)),
+              // Baris tab terbuka seperti tirai (layout tetap, cuma klipnya).
+              SliverToBoxAdapter(
+                child: AnimatedBuilder(
+                  animation: _contentIn,
+                  child: _tabRow(ui),
+                  builder: (context, child) {
+                    final v = _iv(_contentIn.value, 0.4, 0.75);
+                    return ClipRect(
+                      clipper: _CurtainClipper(v),
+                      child: Transform.translate(offset: Offset(0, 8 * (1 - v)), child: child),
+                    );
+                  },
+                ),
+              ),
               const SliverToBoxAdapter(child: SizedBox(height: 16)),
               // Isi tab: fade + geser sedikit dari arah tab (sesuai TabSlide Zenime).
               AnimatedBuilder(
@@ -302,10 +511,9 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
       child: Stack(
         fit: StackFit.expand,
         children: [
-          if (heroUrl.isNotEmpty) NetImage(heroUrl, alignment: Alignment.topCenter),
-          _heroGradient(),
+          _heroArt(heroUrl),
 
-          // Atas: kembali + favorit (bookmark).
+          // Atas: kembali + favorit (bookmark), memantul masuk bergantian.
           Positioned(
             top: topInset + 12,
             left: 16,
@@ -313,18 +521,24 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _circleButton(
-                  onTap: widget.onBackClick,
-                  tooltip: 'Kembali',
-                  child: const Icon(Icons.arrow_back, color: Colors.white, size: 22),
+                _pop(
+                  0.0,
+                  _circleButton(
+                    onTap: widget.onBackClick,
+                    tooltip: 'Kembali',
+                    child: const Icon(Icons.arrow_back, color: Colors.white, size: 22),
+                  ),
                 ),
-                _circleButton(
-                  onTap: () => _notifier.toggleFavorite(),
-                  tooltip: 'Favorit',
-                  child: Icon(
-                    isFavorite ? Icons.bookmark : Icons.bookmark_border,
-                    color: isFavorite ? AppColors.accentViolet : Colors.white,
-                    size: 22,
+                _pop(
+                  0.08,
+                  _circleButton(
+                    onTap: () => _notifier.toggleFavorite(),
+                    tooltip: 'Favorit',
+                    child: Icon(
+                      isFavorite ? Icons.bookmark : Icons.bookmark_border,
+                      color: isFavorite ? AppColors.accentViolet : Colors.white,
+                      size: 22,
+                    ),
                   ),
                 ),
               ],
@@ -340,20 +554,22 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  anime?.title ?? 'Tanpa Judul',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 26,
-                    fontWeight: FontWeight.w800,
-                    height: 32 / 26,
+                _titleWipe(
+                  Text(
+                    anime?.title ?? 'Tanpa Judul',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 26,
+                      fontWeight: FontWeight.w800,
+                      height: 32 / 26,
+                    ),
                   ),
                 ),
                 if (meta.isNotEmpty || !_blank(anime?.views)) ...[
                   const SizedBox(height: 6),
-                  Row(
+                  _fadeIn(0.3, 0.6, dx: -12, dy: 0, Row(
                     children: [
                       if (meta.isNotEmpty)
                         Flexible(
@@ -379,29 +595,40 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
                         ),
                       ],
                     ],
-                  ),
+                  )),
                 ],
               ],
             ),
           ),
 
-          // Tombol play crimson bulat besar di kanan bawah.
+          // Tombol play crimson bulat besar di kanan bawah: memegas masuk
+          // sambil ikon play berputar ke posisinya.
           if (targetEpisodeId.isNotEmpty)
             Positioned(
               right: 20,
               bottom: 12,
-              child: Material(
-                color: AppColors.accentViolet,
-                shape: const CircleBorder(),
-                elevation: 14,
-                shadowColor: AppColors.accentViolet,
-                child: InkWell(
-                  customBorder: const CircleBorder(),
-                  onTap: () => widget.onWatchEpisode(widget.movieId, targetEpisodeId),
-                  child: const SizedBox(
-                    width: 64,
-                    height: 64,
-                    child: Icon(Icons.play_arrow, color: Colors.white, size: 36),
+              child: AnimatedBuilder(
+                animation: _contentIn,
+                builder: (context, child) {
+                  final v = _iv(_contentIn.value, 0.2, 0.55, _springy);
+                  return Transform.scale(
+                    scale: v,
+                    child: Transform.rotate(angle: (1 - v) * -0.8, child: child),
+                  );
+                },
+                child: Material(
+                  color: AppColors.accentViolet,
+                  shape: const CircleBorder(),
+                  elevation: 14,
+                  shadowColor: AppColors.accentViolet,
+                  child: InkWell(
+                    customBorder: const CircleBorder(),
+                    onTap: () => widget.onWatchEpisode(widget.movieId, targetEpisodeId),
+                    child: const SizedBox(
+                      width: 64,
+                      height: 64,
+                      child: Icon(Icons.play_arrow, color: Colors.white, size: 36),
+                    ),
                   ),
                 ),
               ),
