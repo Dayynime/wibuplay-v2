@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
@@ -65,17 +63,28 @@ class HeroBanner extends StatefulWidget {
   State<HeroBanner> createState() => _HeroBannerState();
 }
 
-class _HeroBannerState extends State<HeroBanner> {
+class _HeroBannerState extends State<HeroBanner> with SingleTickerProviderStateMixin {
   final PageController _pager = PageController();
-  Timer? _timer;
   int _page = 0;
   int _animeIndex = 0;
   bool _scrolling = false;
 
+  /// Jam rotasi poster anime. Nilainya (0..1) sekaligus mengisi bar progres
+  /// pertama, jadi indikator selalu sinkron dengan pergantian poster.
+  late final AnimationController _rotation =
+      AnimationController(vsync: this, duration: _rotateEvery)
+        ..addStatusListener(_onRotationDone);
+
   @override
   void initState() {
     super.initState();
-    _timer = Timer.periodic(_rotateEvery, (_) => _tick());
+    _rotation.forward();
+  }
+
+  void _onRotationDone(AnimationStatus status) {
+    if (status != AnimationStatus.completed || !mounted) return;
+    _tick();
+    if (_page == 0) _rotation.forward(from: 0);
   }
 
   void _tick() {
@@ -83,6 +92,15 @@ class _HeroBannerState extends State<HeroBanner> {
     if (!mounted || n <= 1 || _page != 0 || _scrolling) return;
     setState(() => _animeIndex = (_animeIndex + 1) % n);
     _preloadNext();
+  }
+
+  void _onPageChanged(int i) {
+    setState(() => _page = i);
+    if (i == 0) {
+      _rotation.forward(from: 0);
+    } else {
+      _rotation.stop();
+    }
   }
 
   /// Preload gambar berikutnya supaya crossfade-nya tidak muncul kosong dulu.
@@ -108,7 +126,7 @@ class _HeroBannerState extends State<HeroBanner> {
 
   @override
   void dispose() {
-    _timer?.cancel();
+    _rotation.dispose();
     _pager.dispose();
     super.dispose();
   }
@@ -152,7 +170,7 @@ class _HeroBannerState extends State<HeroBanner> {
                       ? const PageScrollPhysics()
                       : const NeverScrollableScrollPhysics(),
                   itemCount: pageCount,
-                  onPageChanged: (i) => setState(() => _page = i),
+                  onPageChanged: _onPageChanged,
                   itemBuilder: (context, page) {
                     if (page == lbPage) {
                       return _SlideHost(
@@ -205,43 +223,38 @@ class _HeroBannerState extends State<HeroBanner> {
           ),
         ),
         if (pageCount > 1) ...[
-          const SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              for (var i = 0; i < pageCount; i++)
-                GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => _pager.animateToPage(
-                    i,
-                    duration: const Duration(milliseconds: 350),
-                    curve: Curves.easeOut,
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 3),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 350),
-                      curve: Curves.easeOutBack,
-                      width: i == _page ? 22 : 6,
-                      height: 5,
-                      decoration: BoxDecoration(
-                        color: i == _page
-                            ? (i == lbPage
-                                ? heroGold
-                                : i == supportPage
-                                    ? heroPink
-                                    : i == giverPage
-                                        ? heroTeal
-                                        : AppColors.accentViolet)
-                            : (i == supportPage
-                                ? heroPink.withValues(alpha: 0.4)
-                                : AppColors.surfaceDark),
-                        borderRadius: AppShapes.pill,
+          const SizedBox(height: 4),
+          // Indikator ala Stories: satu bar per slide. Bar slide poster anime
+          // terisi mengikuti jam rotasi poster; slide lain penuh saat aktif.
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 28),
+            child: Row(
+              children: [
+                for (var i = 0; i < pageCount; i++)
+                  Expanded(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => _pager.animateToPage(
+                        i,
+                        duration: const Duration(milliseconds: 420),
+                        curve: Curves.easeOutCubic,
+                      ),
+                      child: SizedBox(
+                        height: 22,
+                        child: Center(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 3),
+                            child: _ProgressSegment(
+                              active: i == _page,
+                              progress: (i == 0 && items.length > 1) ? _rotation : null,
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
         ],
       ],
@@ -584,6 +597,51 @@ class _Caption extends StatelessWidget {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// Satu bar indikator slide (gaya Stories). [progress] diisi untuk slide yang
+/// punya jam sendiri (poster anime); tanpa itu bar penuh saat [active].
+class _ProgressSegment extends StatelessWidget {
+  const _ProgressSegment({required this.active, this.progress});
+
+  final bool active;
+  final Animation<double>? progress;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = progress;
+    Widget fill(double v) => FractionallySizedBox(
+          alignment: Alignment.centerLeft,
+          widthFactor: v.clamp(0.0, 1.0).toDouble(),
+          heightFactor: 1,
+          child: const DecoratedBox(
+            decoration: BoxDecoration(
+              color: Color(0xEBFFFFFF),
+              borderRadius: BorderRadius.all(Radius.circular(2)),
+            ),
+          ),
+        );
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(2),
+      child: SizedBox(
+        width: double.infinity,
+        height: 3,
+        child: ColoredBox(
+          color: const Color(0x24FFFFFF),
+          child: !active
+              ? const SizedBox.expand()
+              : p == null
+                  ? TweenAnimationBuilder<double>(
+                      tween: Tween<double>(begin: 0, end: 1),
+                      duration: const Duration(milliseconds: 450),
+                      curve: Curves.easeOutCubic,
+                      builder: (context, v, _) => fill(v),
+                    )
+                  : AnimatedBuilder(animation: p, builder: (context, _) => fill(p.value)),
+        ),
       ),
     );
   }
