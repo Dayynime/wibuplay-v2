@@ -12,6 +12,7 @@ import '../../components/game_badges.dart';
 import '../../components/shimmer.dart';
 import '../profile/public_profile_screen.dart';
 import '../../glass/glass.dart';
+import '../../components/user_level_badge.dart';
 
 /// Layar Cari Teman: menampilkan semua user, bisa dicari lewat username atau
 /// ID (angka di "ID #123"), dan langsung bisa Tambah / Batalkan / Terima.
@@ -476,7 +477,7 @@ class _UserTile extends StatelessWidget {
                       const SizedBox(height: 5),
                       Row(
                         children: [
-                          if (item.level != null) LevelBadge(level: item.level!, height: 16),
+                          if (item.level != null) UserLevelBadge(uid: item.firebaseUid, level: item.level!, height: 16),
                           if (item.level != null && item.userNumber != null) const SizedBox(width: 6),
                           if (item.userNumber != null) _IdChip(number: item.userNumber!),
                         ],

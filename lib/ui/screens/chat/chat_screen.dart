@@ -30,6 +30,7 @@ import 'chat_controller.dart';
 import '../../components/avatar_frame.dart';
 import '../../glass/glass.dart';
 import '../../components/clan_tag_badge.dart';
+import '../../components/user_level_badge.dart';
 
 Color? parseChatHex(String? hex) {
   if (hex == null) return null;
@@ -687,7 +688,7 @@ class ChatMessageBubble extends StatelessWidget {
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   if (clanTag != null) ClanTagBadge(text: clanTag!),
-                  if (level != null) LevelBadge(level: level!),
+                  if (level != null) UserLevelBadge(uid: m.firebaseUid, level: level!),
                   TopGiverBadge(firebaseUid: m.firebaseUid, height: 16),
                 ],
               ),

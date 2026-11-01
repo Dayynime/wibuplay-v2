@@ -16,6 +16,7 @@ import '../profile/public_profile_screen.dart';
 import '../../components/avatar_frame.dart';
 import '../../glass/glass.dart';
 import '../../components/clan_tag_badge.dart';
+import '../../components/user_level_badge.dart';
 
 const Color _kPinnedGold = Color(0xFFE8A317);
 const Color _kSheetColor = AppColors.backgroundDarkSecondary;
@@ -760,7 +761,7 @@ class CommentItem extends StatelessWidget {
                     children: [
                       if (clanTag?.isNotEmpty ?? false) ClanTagBadge(text: clanTag!),
                       if ((clanTag?.isNotEmpty ?? false) && level != null) const SizedBox(width: 5),
-                      if (level != null) LevelBadge(level: level!),
+                      if (level != null) UserLevelBadge(uid: comment.firebaseUid, level: level!),
                     ],
                   ),
                 ],

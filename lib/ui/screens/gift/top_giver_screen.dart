@@ -9,6 +9,7 @@ import '../../components/top_giver_badge.dart';
 import '../profile/public_profile_screen.dart' show openPublicProfile;
 import '../../glass/glass.dart';
 import '../../components/clan_tag_badge.dart';
+import '../../components/user_level_badge.dart';
 
 const Color _teal = Color(0xFF2DD4BF);
 const Color _gold = Color(0xFFFFC107);
@@ -283,7 +284,7 @@ class _GiverTile extends StatelessWidget {
                         const SizedBox(width: 6),
                       ],
                       if (level != null) ...[
-                        LevelBadge(level: level!),
+                        UserLevelBadge(uid: giver.firebaseUid, level: level!),
                         const SizedBox(width: 6),
                       ],
                       TopGiverChip(rank: giver.rank, height: 16),

@@ -13,6 +13,7 @@ import '../../components/role_badges.dart';
 import '../profile/public_profile_screen.dart';
 import '../../glass/glass.dart';
 import '../../components/clan_tag_badge.dart';
+import '../../components/user_level_badge.dart';
 
 /// Leaderboard XP: podium top-3 futuristik + daftar peringkat, lengkap dengan
 /// badge clan & level (setara tampilan Zenime). XP yang tampil adalah XP nonton
@@ -770,7 +771,7 @@ class _RankRow extends StatelessWidget {
                   runSpacing: 4,
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    LevelBadge(level: entry.level),
+                    UserLevelBadge(uid: entry.firebaseUid, level: entry.level),
                     if (hasClan) ClanTagBadge(text: entry.clanTag!),
                   ],
                 ),

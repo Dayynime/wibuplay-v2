@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/models/xp_models.dart';
 import '../../providers.dart';
+import 'user_level_badge.dart';
 
 /// Komponen badge header Profil gaya "Level di Avatar":
 /// - [ProfileXpRing]: cincin progress XP emas di sekeliling avatar + pin "LV N".
@@ -86,7 +87,7 @@ class ProfileXpRing extends ConsumerWidget {
               child: Tooltip(
                 message: 'Level $level · ${p.xpIntoLevel} / ${p.xpNeededForLevel} XP',
                 triggerMode: TooltipTriggerMode.tap,
-                child: LevelPin(level: level, height: pinHeight),
+                child: UserLevelBadge(uid: uid, level: level, height: pinHeight, progress: p.fraction, pin: true),
               ),
             ),
         ],

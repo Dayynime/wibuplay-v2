@@ -10,6 +10,7 @@ import '../../glass/glass.dart';
 import '../avatar_frame/avatar_frame_screen.dart';
 import '../chess/chess_board.dart';
 import '../chess/chess_lobby_screen.dart';
+import '../level_badge/level_badge_shop_screen.dart';
 import '../profile_effect/profile_effect_screen.dart';
 import '../store/coin_screen.dart';
 import '../tree/tree_screen.dart';
@@ -84,6 +85,14 @@ class _ZenimeGamesScreenState extends ConsumerState<ZenimeGamesScreen>
       colors: const [Color(0xFF0B2A4A), Color(0xFF7C3AED), Color(0xFF22D3EE)],
       page: () => const AvatarFrameScreen(),
       preview: () => const FramePreview(),
+    ),
+    _GameItem(
+      title: 'Badge Level',
+      subtitle: 'Gaya badge LV beranimasi, ikut tier levelmu',
+      icon: Icons.military_tech_rounded,
+      colors: const [Color(0xFF1A1033), Color(0xFF6D28D9), Color(0xFFE8A317)],
+      page: () => const LevelBadgeShopScreen(),
+      preview: () => const LevelBadgePreview(),
     ),
     _GameItem(
       title: 'Efek Profil',

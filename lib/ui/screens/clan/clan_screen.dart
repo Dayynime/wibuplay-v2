@@ -16,6 +16,7 @@ import 'clan_widgets.dart';
 import '../profile/public_profile_screen.dart';
 import '../../glass/glass.dart';
 import '../../components/clan_tag_badge.dart';
+import '../../components/user_level_badge.dart';
 
 String _thousands(int v) {
   final s = v.abs().toString();
@@ -979,7 +980,7 @@ class _MemberRow extends StatelessWidget {
                     ClanTagBadge(text: clanTag),
                     if (level != null) ...[
                       const SizedBox(width: 6),
-                      LevelBadge(level: level!),
+                      UserLevelBadge(uid: member.firebaseUid, level: level!),
                     ],
                   ],
                 ),

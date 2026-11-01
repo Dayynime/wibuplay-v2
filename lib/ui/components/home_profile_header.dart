@@ -10,6 +10,7 @@ import '../../providers.dart';
 import 'game_badges.dart';
 import 'avatar_frame.dart';
 import 'net_image.dart';
+import 'user_level_badge.dart';
 
 /// Warna tombol pill Premium, sama dengan ZenimeInfoBlue di Zenime.
 const Color _kPremiumBlue = Color(0xFF3B82F6);
@@ -233,7 +234,7 @@ class _ProfileCard extends StatelessWidget {
                                           ),
                                         ),
                                         const SizedBox(width: 6),
-                                        LevelBadge(level: level),
+                                        UserLevelBadge(uid: uid, level: level),
                                       ],
                                     ),
                                     if (userNumber != null) ...[

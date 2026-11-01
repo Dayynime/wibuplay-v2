@@ -45,6 +45,7 @@ import 'data/repository/screen_data_repository.dart';
 import 'core/screen_seed.dart';
 import 'data/models/home_bootstrap.dart';
 import 'data/repository/tree_repository.dart';
+import 'data/repository/level_badge_repository.dart';
 import 'data/repository/chess_repository.dart';
 import 'data/supabase/supabase_client.dart';
 
@@ -179,6 +180,11 @@ final topXpRankProvider = Provider.family<int?, String>((ref, uid) {
 /// Pohon ZCoin (mini game idle, Edge Function `tree-game`).
 final treeRepositoryProvider = Provider<TreeRepository>(
   (ref) => TreeRepository(ref.watch(supabaseDioProvider)),
+);
+
+/// Shop badge level (Edge Function `zenime-level-badge`).
+final levelBadgeRepositoryProvider = Provider<LevelBadgeRepository>(
+  (ref) => LevelBadgeRepository(ref.watch(supabaseDioProvider)),
 );
 
 /// Catur mabar (Edge Function `chess-game`).

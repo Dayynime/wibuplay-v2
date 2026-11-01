@@ -13,6 +13,7 @@ import '../../components/shimmer.dart';
 import '../profile/public_profile_screen.dart';
 import 'add_friend_screen.dart';
 import '../../glass/glass.dart';
+import '../../components/user_level_badge.dart';
 
 /// Layar Teman: permintaan masuk (terima/tolak), daftar teman (tap buka
 /// profil, menu ⋮ buat salin ID / hapus), dan permintaan terkirim (batalkan).
@@ -569,7 +570,7 @@ class _FriendTile extends StatelessWidget {
                         const SizedBox(height: 5),
                         Row(
                           children: [
-                            if (item.level != null) LevelBadge(level: item.level!, height: 16),
+                            if (item.level != null) UserLevelBadge(uid: item.firebaseUid, level: item.level!, height: 16),
                             if (item.level != null && item.userNumber != null)
                               const SizedBox(width: 6),
                             if (item.userNumber != null) _IdChip(number: item.userNumber!),
