@@ -87,7 +87,7 @@ class ProfileXpRing extends ConsumerWidget {
               child: Tooltip(
                 message: 'Level $level · ${p.xpIntoLevel} / ${p.xpNeededForLevel} XP',
                 triggerMode: TooltipTriggerMode.tap,
-                child: UserLevelBadge(uid: uid, level: level, height: pinHeight, progress: p.fraction, pin: true),
+                child: UserLevelBadge(uid: uid, level: level, height: pinHeight, progress: p.fraction, pin: true, animate: true),
               ),
             ),
         ],

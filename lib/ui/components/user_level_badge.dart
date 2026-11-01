@@ -16,6 +16,10 @@ LevelBadgeStyle? levelBadgeStyleOrNull(String? id) {
 
 /// Badge level milik user [uid]: pakai gaya yang dibeli user itu di shop
 /// ([LevelStyledBadge]), atau badge level bawaan kalau belum memasang.
+///
+/// Di daftar (chat, komentar, leaderboard, teman) badge digambar diam supaya
+/// tidak ngelag saat banyak user memasang badge; animasi hanya di profil
+/// ([animate] = true).
 class UserLevelBadge extends StatelessWidget {
   const UserLevelBadge({
     super.key,
@@ -24,6 +28,7 @@ class UserLevelBadge extends StatelessWidget {
     this.height,
     this.progress,
     this.pin = false,
+    this.animate = false,
   });
 
   final String uid;
@@ -38,6 +43,9 @@ class UserLevelBadge extends StatelessWidget {
   /// Tampilan bawaan pakai [LevelPin] (pin di bawah avatar profil).
   final bool pin;
 
+  /// Badge dari shop bergerak (profil). false = gambar diam (daftar/chat).
+  final bool animate;
+
   @override
   Widget build(BuildContext context) {
     final cache = LevelBadgeCache.instance;
@@ -46,12 +54,18 @@ class UserLevelBadge extends StatelessWidget {
       builder: (context, _) {
         final style = uid.isEmpty ? null : levelBadgeStyleOrNull(cache.styleFor(uid));
         if (style != null) {
-          return LevelStyledBadge(
+          final badge = LevelStyledBadge(
             key: ValueKey(style),
             level: level,
             style: style,
             height: height ?? 16,
             progress: progress,
+          );
+          if (animate) return badge;
+          // Mode "kurangi animasi" bawaan badge: pose diam, tanpa ticker.
+          return MediaQuery(
+            data: MediaQuery.of(context).copyWith(disableAnimations: true),
+            child: badge,
           );
         }
         if (pin) return LevelPin(level: level, height: height ?? 22);

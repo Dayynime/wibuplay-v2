@@ -203,6 +203,8 @@ class _LevelBadgeShopScreenState extends ConsumerState<LevelBadgeShopScreen> {
       },
       child: ListView(
         physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
+        // Kartu di luar layar tidak dibangun (dan tidak animasi) dulu.
+        cacheExtent: 120,
         padding: EdgeInsets.fromLTRB(16, 6, 16, 28 + MediaQuery.paddingOf(context).bottom),
         children: [
           // Saldo + ajakan top up.
@@ -359,13 +361,19 @@ class _Card extends StatelessWidget {
           ),
           if (tiers != null) ...[
             const SizedBox(height: 12),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                for (final lv in _sample) LevelStyledBadge(level: lv, style: tiers!, height: 18, progress: 0.65),
-              ],
+            // Contoh tier digambar diam (mode "kurangi animasi" bawaan badge).
+            // 8 kartu x 7 contoh = 56 badge; kalau semuanya animasi tiap frame,
+            // halaman ini ngelag. Yang bergerak cukup badge "Punyamu".
+            MediaQuery(
+              data: MediaQuery.of(context).copyWith(disableAnimations: true),
+              child: Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  for (final lv in _sample) LevelStyledBadge(level: lv, style: tiers!, height: 18, progress: 0.65),
+                ],
+              ),
             ),
           ],
         ],

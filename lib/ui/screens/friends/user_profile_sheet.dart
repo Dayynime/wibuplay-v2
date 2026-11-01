@@ -184,7 +184,7 @@ class _UserProfileSheetState extends ConsumerState<UserProfileSheet> {
             spacing: 8,
             runSpacing: 6,
             children: [
-              if (level != null) UserLevelBadge(uid: uid, level: level, height: 20),
+              if (level != null) UserLevelBadge(uid: uid, level: level, height: 20, animate: true),
               if (clanTag != null && clanTag.isNotEmpty) ClanTagBadge(text: clanTag, height: 20),
               RoleBadge(firebaseUid: uid, height: 20),
               TopGiverBadge(firebaseUid: uid, height: 20),

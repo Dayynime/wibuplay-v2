@@ -234,7 +234,7 @@ class _ProfileCard extends StatelessWidget {
                                           ),
                                         ),
                                         const SizedBox(width: 6),
-                                        UserLevelBadge(uid: uid, level: level),
+                                        UserLevelBadge(uid: uid, level: level, animate: true),
                                       ],
                                     ),
                                     if (userNumber != null) ...[
