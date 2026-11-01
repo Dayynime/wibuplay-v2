@@ -335,6 +335,17 @@ class ClanRepository {
         );
       });
 
+  /// Pindahkan jabatan Leader ke [targetUid] (khusus leader, dicek di server).
+  /// Leader lama otomatis turun jadi Vice Leader.
+  Future<void> transferLeader(String clanId, String targetUid) =>
+      _guard('Gagal memindahkan leader', () async {
+        await _dio.post<dynamic>(
+          'functions/v1/zenime-clan-transfer-leader',
+          data: {'clan_id': clanId, 'target_uid': targetUid},
+          options: Options(headers: {'Authorization': await _authHeader()}),
+        );
+      });
+
   /// [role]: salah satu dari [ClanRoles] (vice_leader / admiral / co_leader / member).
   Future<void> setMemberRole(String clanId, String targetUid, String role) =>
       _guard('Gagal ubah role member', () async {
