@@ -38,6 +38,7 @@ class Clan {
     this.memberCount = 1,
     this.memberLimit = 30,
     this.treasuryBalance = 0,
+    this.badgeStyle,
   });
 
   final String id;
@@ -55,6 +56,9 @@ class Clan {
   /// Terpisah dari totalXp (cuma buat level, tidak pernah berkurang).
   final int treasuryBalance;
 
+  /// Id badge tag yang dipasang (lihat ClanBadgeStyle); null = pelangi bawaan.
+  final String? badgeStyle;
+
   factory Clan.fromJson(Map<String, dynamic> j) => Clan(
         id: (j['id'] as String?) ?? '',
         tag: (j['tag'] as String?) ?? '',
@@ -67,6 +71,7 @@ class Clan {
         memberCount: (j['member_count'] as num?)?.toInt() ?? 1,
         memberLimit: (j['member_limit'] as num?)?.toInt() ?? 30,
         treasuryBalance: (j['treasury_balance'] as num?)?.toInt() ?? 0,
+        badgeStyle: j['badge_style'] as String?,
       );
 }
 
@@ -243,3 +248,22 @@ class ClanSlotShop {
 /// ada di server (fungsi donate_to_clan), ini cuma menyocokkan data yang ada.
 int clanXpFloor(int level) => 500 * level * (level - 1);
 
+
+/// Satu badge di toko badge clan (harga dari tabel `clan_badge_catalog`).
+class ClanBadgeOffer {
+  const ClanBadgeOffer({
+    required this.id,
+    required this.label,
+    required this.price,
+    required this.owned,
+    required this.active,
+  });
+
+  final String id;
+  final String label;
+  final int price;
+  final bool owned;
+
+  /// false = sudah tidak dijual (yang sudah memiliki tetap bisa pakai).
+  final bool active;
+}

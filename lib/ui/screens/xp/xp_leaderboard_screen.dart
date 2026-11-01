@@ -12,6 +12,7 @@ import '../../components/game_badges.dart';
 import '../../components/role_badges.dart';
 import '../profile/public_profile_screen.dart';
 import '../../glass/glass.dart';
+import '../../components/clan_tag_badge.dart';
 
 /// Leaderboard XP: podium top-3 futuristik + daftar peringkat, lengkap dengan
 /// badge clan & level (setara tampilan Zenime). XP yang tampil adalah XP nonton
@@ -427,7 +428,7 @@ class _PodiumSlot extends StatelessWidget {
           ),
           if (entry.clanTag != null && entry.clanTag!.isNotEmpty) ...[
             const SizedBox(height: 5),
-            FittedBox(fit: BoxFit.scaleDown, child: ClanRainbowBadge(text: entry.clanTag!)),
+            FittedBox(fit: BoxFit.scaleDown, child: ClanTagBadge(text: entry.clanTag!)),
           ],
           const SizedBox(height: 6),
           Container(
@@ -770,7 +771,7 @@ class _RankRow extends StatelessWidget {
                   crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     LevelBadge(level: entry.level),
-                    if (hasClan) ClanRainbowBadge(text: entry.clanTag!),
+                    if (hasClan) ClanTagBadge(text: entry.clanTag!),
                   ],
                 ),
               ],

@@ -11,6 +11,7 @@ import 'clan_screen.dart';
 import 'create_clan_screen.dart';
 import 'clan_widgets.dart';
 import '../../glass/glass.dart';
+import '../../components/clan_tag_badge.dart';
 
 enum ClanBrowseMode { all, leaderboard, mine }
 
@@ -314,7 +315,7 @@ class _ClanCard extends StatelessWidget {
                     const SizedBox(height: 6),
                     Row(
                       children: [
-                        ClanRainbowBadge(text: clan.tag),
+                        ClanTagBadge.known(text: clan.tag, styleId: clan.badgeStyle),
                         const SizedBox(width: 8),
                         Flexible(
                           child: Text(

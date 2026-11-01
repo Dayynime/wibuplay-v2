@@ -15,6 +15,7 @@ import 'clan_manage_screen.dart';
 import 'clan_widgets.dart';
 import '../profile/public_profile_screen.dart';
 import '../../glass/glass.dart';
+import '../../components/clan_tag_badge.dart';
 
 String _thousands(int v) {
   final s = v.abs().toString();
@@ -417,7 +418,7 @@ class _HeaderCard extends StatelessWidget {
                           const SizedBox(height: 8),
                           Row(
                             children: [
-                              ClanRainbowBadge(text: c.tag),
+                              ClanTagBadge.known(text: c.tag, styleId: c.badgeStyle),
                               const SizedBox(width: 8),
                               LevelBadge(level: c.level),
                             ],
@@ -975,7 +976,7 @@ class _MemberRow extends StatelessWidget {
                 const SizedBox(height: 6),
                 Row(
                   children: [
-                    ClanRainbowBadge(text: clanTag),
+                    ClanTagBadge(text: clanTag),
                     if (level != null) ...[
                       const SizedBox(width: 6),
                       LevelBadge(level: level!),

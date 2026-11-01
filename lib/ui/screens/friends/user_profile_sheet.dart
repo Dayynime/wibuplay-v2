@@ -12,6 +12,7 @@ import '../../components/role_badges.dart';
 import '../../components/top_giver_badge.dart';
 import '../../components/top_xp_badge.dart';
 import '../../glass/glass.dart';
+import '../../components/clan_tag_badge.dart';
 
 /// Profil ringkas user lain (dibuka dari Chat Global, Chat Teman, dan layar
 /// Teman) lengkap dengan tombol Tambah Teman, mengikuti alur Zenime.
@@ -183,7 +184,7 @@ class _UserProfileSheetState extends ConsumerState<UserProfileSheet> {
             runSpacing: 6,
             children: [
               if (level != null) LevelBadge(level: level, height: 20),
-              if (clanTag != null && clanTag.isNotEmpty) ClanRainbowBadge(text: clanTag, height: 20),
+              if (clanTag != null && clanTag.isNotEmpty) ClanTagBadge(text: clanTag, height: 20),
               RoleBadge(firebaseUid: uid, height: 20),
               TopGiverBadge(firebaseUid: uid, height: 20),
               TopXpBadge(firebaseUid: uid, height: 20),

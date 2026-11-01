@@ -376,6 +376,56 @@ class ClanRepository {
         );
       });
 
+  // ------------------------------------------------------------ badge clan
+
+  /// Toko badge: semua badge di katalog + tanda mana yang sudah dimiliki clan.
+  Future<List<ClanBadgeOffer>> getBadgeShop(String clanId) =>
+      _guard('Gagal memuat badge clan', () async {
+        final results = await Future.wait([
+          _dio.get<dynamic>('rest/v1/clan_badge_catalog', queryParameters: {
+            'select': 'id,label,price,active,sort',
+            'order': 'sort.asc',
+          }),
+          _dio.get<dynamic>('rest/v1/clan_badges_owned', queryParameters: {
+            'clan_id': 'eq.$clanId',
+            'select': 'badge_id',
+          }),
+        ]);
+        final owned = {
+          for (final r in _rows(results[1].data)) (r['badge_id'] as String?) ?? '',
+        };
+        return [
+          for (final r in _rows(results[0].data))
+            ClanBadgeOffer(
+              id: (r['id'] as String?) ?? '',
+              label: (r['label'] as String?) ?? '',
+              price: (r['price'] as num?)?.toInt() ?? 0,
+              active: r['active'] != false,
+              owned: owned.contains(r['id']),
+            ),
+        ];
+      });
+
+  /// Beli badge pakai saldo donasi clan dan langsung dipasang (khusus leader,
+  /// dicek di server).
+  Future<void> buyBadge(String clanId, String badgeId) => _guard('Gagal membeli badge', () async {
+        await _dio.post<dynamic>(
+          'functions/v1/zenime-clan-badge',
+          data: {'action': 'buy', 'clan_id': clanId, 'badge_id': badgeId},
+          options: Options(headers: {'Authorization': await _authHeader()}),
+        );
+      });
+
+  /// Pasang badge yang sudah dimiliki; [badgeId] null = kembali ke pelangi bawaan.
+  Future<void> equipBadge(String clanId, String? badgeId) =>
+      _guard('Gagal memasang badge', () async {
+        await _dio.post<dynamic>(
+          'functions/v1/zenime-clan-badge',
+          data: {'action': 'equip', 'clan_id': clanId, 'badge_id': badgeId},
+          options: Options(headers: {'Authorization': await _authHeader()}),
+        );
+      });
+
   /// Beli [packs] paket kuota member pakai saldo donasi clan (khusus leader,
   /// dicek di server).
   Future<void> buyMemberSlots(String clanId, int packs) =>

@@ -24,6 +24,7 @@ import 'profile_controller.dart';
 import 'profile_screen_seed.dart';
 import 'profile_screen.dart';
 import '../../glass/glass.dart';
+import '../../components/clan_tag_badge.dart';
 
 /// Buka profil publik user lain (dari Chat Global, Chat Teman, layar Teman).
 /// Port rute `profile/{targetUid}` di Zenime.
@@ -303,7 +304,7 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
                     if (_has(clanTag)) ...[
                       Padding(
                         padding: const EdgeInsets.only(bottom: 4),
-                        child: ClanNameTag(text: clanTag!),
+                        child: ClanTagBadge(text: clanTag!, nameTag: true, height: 20),
                       ),
                       const SizedBox(width: 6),
                     ],

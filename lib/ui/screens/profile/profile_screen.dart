@@ -35,6 +35,7 @@ import '../../components/profile_effect.dart';
 import '../../components/join_date_stat.dart';
 import '../../../data/models/avatar_frame_models.dart';
 import '../../glass/glass.dart';
+import '../../components/clan_tag_badge.dart';
 
 /// Profil Saya ala Zenime: banner full-bleed menyatu dengan avatar, identitas
 /// + cincin XP & pin level di avatar, tag clan di depan nama, role + pencapaian di bawahnya, stat row 4 kolom, tombol pill
@@ -193,7 +194,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     if (_has(clanTag)) ...[
                       Padding(
                         padding: const EdgeInsets.only(bottom: 4),
-                        child: ClanNameTag(text: clanTag!),
+                        child: ClanTagBadge(text: clanTag!, nameTag: true, height: 20),
                       ),
                       const SizedBox(width: 6),
                     ],

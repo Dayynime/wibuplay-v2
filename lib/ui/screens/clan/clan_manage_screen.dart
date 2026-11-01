@@ -8,7 +8,11 @@ import '../../../data/models/clan_models.dart';
 import '../../../data/repository/clan_photo_uploader.dart';
 import '../../../data/repository/clan_repository.dart';
 import '../../../providers.dart';
+import '../../app_routes.dart';
+import '../../components/clan_badge_styles.dart';
+import '../../components/clan_tag_badge.dart';
 import '../../components/game_badges.dart';
+import 'clan_badge_shop_screen.dart';
 import 'clan_widgets.dart';
 import '../../glass/glass.dart';
 
@@ -759,6 +763,9 @@ class _SettingsTabState extends ConsumerState<_SettingsTab> {
           ),
         ),
         const SizedBox(height: 16),
+        // Kartu Badge Clan
+        _BadgeEntry(clan: clan),
+        const SizedBox(height: 16),
         // Zona bahaya: bubarkan clan (khusus leader, dicek lagi di server).
         Container(
           padding: const EdgeInsets.all(16),
@@ -905,6 +912,75 @@ class _Stepper extends StatelessWidget {
           customBorder: const CircleBorder(),
           onTap: onTap,
           child: SizedBox(width: 40, height: 40, child: Icon(icon, color: Colors.white)),
+        ),
+      ),
+    );
+  }
+}
+
+/// Kartu "Badge Clan" di Pengaturan: pratinjau badge terpasang + buka toko.
+class _BadgeEntry extends StatelessWidget {
+  const _BadgeEntry({required this.clan});
+
+  final Clan clan;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = clanBadgeStyleOrNull(clan.badgeStyle);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: () => Navigator.of(context).push<void>(fadeRoute(ClanBadgeShopScreen(clanId: clan.id))),
+        child: Ink(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: clanSurface,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: clanBorder),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.workspace_premium_rounded, size: 18, color: AppColors.accentVioletLight),
+                        SizedBox(width: 8),
+                        Text(
+                          'Badge Clan',
+                          style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w800),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        ClanTagBadge.known(text: clan.tag, styleId: clan.badgeStyle, height: 22),
+                        const SizedBox(width: 10),
+                        Flexible(
+                          child: Text(
+                            style?.label ?? 'Pelangi (bawaan)',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: AppColors.textSecondary, fontSize: 12.5),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      'Beli dan pasang badge pakai saldo donasi clan.',
+                      style: TextStyle(color: AppColors.textMuted, fontSize: 11),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
+            ],
+          ),
         ),
       ),
     );

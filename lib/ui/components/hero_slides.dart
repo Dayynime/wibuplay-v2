@@ -11,6 +11,7 @@ import '../../data/models/support_models.dart';
 import '../../data/models/xp_models.dart';
 import 'game_badges.dart';
 import '../screens/profile/public_profile_screen.dart';
+import 'clan_tag_badge.dart';
 
 // =============================================================================
 // Slide leaderboard di carousel Beranda (Top XP / Top Clan, Top Support,
@@ -1457,7 +1458,7 @@ class HeroGiverSlide extends StatelessWidget {
                     ),
                     if ((clan ?? '').isNotEmpty) ...[
                       const SizedBox(width: 5),
-                      ClanRainbowBadge(text: clan!, height: 14),
+                      ClanTagBadge(text: clan!, height: 14),
                     ],
                   ],
                 ),

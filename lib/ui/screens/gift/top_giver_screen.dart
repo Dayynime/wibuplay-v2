@@ -8,6 +8,7 @@ import '../../components/game_badges.dart';
 import '../../components/top_giver_badge.dart';
 import '../profile/public_profile_screen.dart' show openPublicProfile;
 import '../../glass/glass.dart';
+import '../../components/clan_tag_badge.dart';
 
 const Color _teal = Color(0xFF2DD4BF);
 const Color _gold = Color(0xFFFFC107);
@@ -161,7 +162,7 @@ class _PodiumEntry extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           if ((clan ?? '').isNotEmpty) ...[
-            ClanRainbowBadge(text: clan!, height: 18),
+            ClanTagBadge(text: clan!, height: 18),
             const SizedBox(height: 4),
           ],
           Stack(
@@ -278,7 +279,7 @@ class _GiverTile extends StatelessWidget {
                   Row(
                     children: [
                       if ((clan ?? '').isNotEmpty) ...[
-                        ClanRainbowBadge(text: clan!),
+                        ClanTagBadge(text: clan!),
                         const SizedBox(width: 6),
                       ],
                       if (level != null) ...[
