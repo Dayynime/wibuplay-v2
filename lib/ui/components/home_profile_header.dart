@@ -76,7 +76,11 @@ class HomeProfileHeader extends ConsumerWidget {
             uid: uid,
             username: username,
             avatarUrl: avatarUrl,
-            bannerUrl: premium.isPremium ? chat?.bannerUrl : null,
+            bannerUrl: resolveProfileBanner(
+              wallpaper: ref.watch(bannerWallpaperProvider(uid)).valueOrNull,
+              premium: premium.isPremium,
+              customUrl: chat?.bannerUrl,
+            ),
             level: level,
             userNumber: userNumber,
             zenimeCode: code,

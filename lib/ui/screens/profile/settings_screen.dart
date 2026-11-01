@@ -238,7 +238,11 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen>
                 name: name,
                 email: user.email ?? '',
                 avatarUrl: avatar,
-                bannerUrl: isPremium ? profile?.bannerUrl : null,
+                bannerUrl: resolveProfileBanner(
+                  wallpaper: ref.watch(bannerWallpaperProvider(user.uid)).valueOrNull,
+                  premium: isPremium,
+                  customUrl: profile?.bannerUrl,
+                ),
                 premium: isPremium,
                 onEdit: editProfile,
                 stats: [

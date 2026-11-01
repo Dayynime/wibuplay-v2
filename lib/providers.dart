@@ -29,6 +29,7 @@ import 'data/models/account_models.dart';
 import 'data/models/chat_models.dart';
 import 'data/models/clan_models.dart';
 import 'data/models/comment_models.dart';
+import 'data/models/wallpaper_models.dart' show CommentWallpaper;
 import 'data/models/cuplix_item.dart';
 import 'data/models/support_models.dart';
 import 'data/models/xp_models.dart';
@@ -275,6 +276,26 @@ final premiumPackagesProvider = FutureProvider.autoDispose<List<PremiumPackage>>
 final coinPackagesProvider = FutureProvider.autoDispose<List<CoinPackage>>(
   (ref) => ref.watch(storeRepositoryProvider).getCoinPackages(),
 );
+
+/// Wallpaper yang dipasang user [uid] sebagai banner profil. Semua user boleh
+/// (tidak khusus Premium); kalau ada, menang atas foto banner upload.
+/// Gagal / belum dipasang = null.
+final bannerWallpaperProvider = FutureProvider.family<CommentWallpaper?, String>((ref, uid) async {
+  if (uid.isEmpty) return null;
+  try {
+    final m = await ref.watch(wallpaperRepositoryProvider).getBannerForUids([uid]);
+    return m[uid];
+  } catch (_) {
+    return null;
+  }
+});
+
+/// Banner profil yang tampil: wallpaper banner -> foto banner (Premium) -> null.
+String? resolveProfileBanner({CommentWallpaper? wallpaper, required bool premium, String? customUrl}) {
+  if (wallpaper != null) return wallpaper.url;
+  if (premium && customUrl != null && customUrl.isNotEmpty) return customUrl;
+  return null;
+}
 
 /// Profil chat (username/avatar) per uid. Gagal = null.
 final chatProfileProvider = FutureProvider.family<ChatProfile?, String>((ref, uid) async {

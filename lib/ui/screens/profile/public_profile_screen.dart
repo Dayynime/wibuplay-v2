@@ -245,11 +245,12 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
   }) {
     final uid = widget.uid;
 
-    // Banner: foto custom (khusus Premium) -> poster favorit pertama ->
-    // poster riwayat pertama -> warna solid. Sama dengan Profil Saya.
-    String? backdrop;
-    if (premium && _has(profile?.bannerUrl)) {
-      backdrop = profile!.bannerUrl;
+    // Banner: wallpaper banner -> foto custom (khusus Premium) -> poster
+    // favorit pertama -> poster riwayat pertama -> warna solid. Sama dengan Profil Saya.
+    final wpBanner = ref.watch(bannerWallpaperProvider(uid)).valueOrNull;
+    String? backdrop = resolveProfileBanner(wallpaper: wpBanner, premium: premium, customUrl: profile?.bannerUrl);
+    if (backdrop != null) {
+      // sudah dipilih
     } else if (favorites.isNotEmpty && _has(favorites.first.posterUrl)) {
       backdrop = favorites.first.posterUrl;
     } else if (history.isNotEmpty && _has(history.first.moviePoster)) {

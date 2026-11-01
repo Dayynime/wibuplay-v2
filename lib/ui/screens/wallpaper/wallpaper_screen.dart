@@ -47,6 +47,9 @@ class _WallpaperScreenState extends ConsumerState<WallpaperScreen> {
   bool _spinning = false;
   bool _equipping = false;
 
+  /// Wallpaper yang dipasang sebagai banner profil (terpisah dari komentar).
+  String? _bannerId;
+
   /// Indeks wallpaper unggulan yang sedang tampil di panggung.
   int _hero = 0;
   Timer? _heroTimer;
@@ -109,6 +112,7 @@ class _WallpaperScreenState extends ConsumerState<WallpaperScreen> {
         _hero = 0;
       });
       _startHeroTimer();
+      _loadBanner();
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -211,6 +215,36 @@ class _WallpaperScreenState extends ConsumerState<WallpaperScreen> {
 
   // ------------------------------------------------------------ equip
 
+  String get _uid => ref.read(authUserProvider).valueOrNull?.uid ?? '';
+
+  Future<void> _loadBanner() async {
+    final uid = _uid;
+    if (uid.isEmpty) return;
+    try {
+      final w = await ref.read(bannerWallpaperProvider(uid).future);
+      if (mounted) setState(() => _bannerId = w?.id);
+    } catch (_) {}
+  }
+
+  /// Pasang / lepas wallpaper sebagai banner profil. Menggantikan foto banner
+  /// yang tampil; upload foto banner baru nanti melepasnya lagi.
+  Future<void> _equipBanner(String? id) async {
+    if (_equipping) return;
+    setState(() => _equipping = true);
+    try {
+      await _repo.equipBanner(id);
+      if (!mounted) return;
+      setState(() => _bannerId = id);
+      final uid = _uid;
+      if (uid.isNotEmpty) ref.invalidate(bannerWallpaperProvider(uid));
+      _snack(id == null ? 'Banner profil dilepas' : 'Wallpaper terpasang jadi banner profilmu');
+    } catch (e) {
+      if (mounted) _snack(e is WallpaperException ? e.message : 'Gagal, coba lagi');
+    } finally {
+      if (mounted) setState(() => _equipping = false);
+    }
+  }
+
   Future<void> _equip(String? id) async {
     if (_equipping) return;
     setState(() => _equipping = true);
@@ -228,6 +262,7 @@ class _WallpaperScreenState extends ConsumerState<WallpaperScreen> {
 
   void _openItem(WallpaperItem w) {
     final equipped = _state?.equippedId == w.id;
+    final asBanner = _bannerId == w.id;
     showGlassSheet<void>(
       context: context,
       backgroundColor: AppColors.backgroundDarkSecondary,
@@ -282,6 +317,32 @@ class _WallpaperScreenState extends ConsumerState<WallpaperScreen> {
                       _equip(equipped ? null : w.id);
                     },
                     child: Text(equipped ? 'Lepas wallpaper' : 'Pakai wallpaper ini'),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 46,
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: Colors.white,
+                      side: BorderSide(
+                        color: asBanner ? const Color(0x59FFFFFF) : AppColors.accentViolet.withValues(alpha: 0.8),
+                      ),
+                      shape: const StadiumBorder(),
+                    ),
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _equipBanner(asBanner ? null : w.id);
+                    },
+                    icon: Icon(asBanner ? Icons.hide_image_outlined : Icons.panorama_outlined, size: 18),
+                    label: Text(
+                      asBanner ? 'Lepas dari banner profil' : 'Jadikan banner profil',
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
                   ),
                 ),
               ),

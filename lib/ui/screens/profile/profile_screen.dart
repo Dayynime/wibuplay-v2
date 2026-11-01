@@ -134,11 +134,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }) {
     final uid = user?.uid ?? '';
 
-    // Banner: foto custom (khusus Premium) -> poster favorit pertama ->
-    // poster riwayat pertama -> warna solid.
-    String? backdrop;
-    if (premium && _has(profile?.bannerUrl)) {
-      backdrop = profile!.bannerUrl;
+    // Banner: wallpaper banner (semua user) -> foto custom (khusus Premium)
+    // -> poster favorit pertama -> poster riwayat pertama -> warna solid.
+    final wpBanner = uid.isEmpty ? null : ref.watch(bannerWallpaperProvider(uid)).valueOrNull;
+    String? backdrop = resolveProfileBanner(wallpaper: wpBanner, premium: premium, customUrl: profile?.bannerUrl);
+    if (backdrop != null) {
+      // sudah dipilih
     } else if (favorites.isNotEmpty && _has(favorites.first.posterUrl)) {
       backdrop = favorites.first.posterUrl;
     } else if (history.isNotEmpty && _has(history.first.moviePoster)) {
@@ -1497,6 +1498,13 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
       final url = await ProfileImageUploader.uploadBanner(path, widget.uid);
       await _persist(banner: url);
       if (isGif) await GifQuota.consume(widget.uid);
+      // Foto banner baru = yang terakhir dipilih, jadi wallpaper banner dilepas.
+      if (ref.read(bannerWallpaperProvider(widget.uid)).valueOrNull != null) {
+        try {
+          await ref.read(wallpaperRepositoryProvider).equipBanner(null);
+        } catch (_) {}
+        ref.invalidate(bannerWallpaperProvider(widget.uid));
+      }
       if (!mounted) return;
       setState(() {
         _bannerUrl = url;
@@ -1535,7 +1543,12 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
-    final hasBanner = _bannerUrl != null && _bannerUrl!.isNotEmpty;
+    // Wallpaper banner (kalau dipasang) yang tampil di profil, jadi pratinjau ikut.
+    final shownBanner = resolveProfileBanner(
+      wallpaper: ref.watch(bannerWallpaperProvider(widget.uid)).valueOrNull,
+      premium: true,
+      customUrl: _bannerUrl,
+    );
     return Padding(
       padding: EdgeInsets.only(bottom: bottomInset),
       child: SingleChildScrollView(
@@ -1588,8 +1601,8 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
                         child: Stack(
                           fit: StackFit.expand,
                           children: [
-                            hasBanner
-                                ? NetImage(_bannerUrl!)
+                            shownBanner != null
+                                ? NetImage(shownBanner)
                                 : const ColoredBox(color: AppColors.surfaceVariantDark),
                             Container(
                               color: Colors.black38,

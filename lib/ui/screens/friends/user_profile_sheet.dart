@@ -101,7 +101,11 @@ class _UserProfileSheetState extends ConsumerState<UserProfileSheet> {
     final clanTag = ref.watch(userClanTagProvider(uid)).valueOrNull;
 
     final name = (profile?.username.trim().isNotEmpty ?? false) ? profile!.username : 'Pengguna Zenime';
-    final banner = premium && (profile?.bannerUrl?.isNotEmpty ?? false) ? profile!.bannerUrl : null;
+    final banner = resolveProfileBanner(
+      wallpaper: ref.watch(bannerWallpaperProvider(uid)).valueOrNull,
+      premium: premium,
+      customUrl: profile?.bannerUrl,
+    );
     final bottom = MediaQuery.viewPaddingOf(context).bottom;
 
     return SingleChildScrollView(

@@ -89,6 +89,32 @@ class WallpaperRepository {
     return out;
   }
 
+  /// Wallpaper yang dipasang [uids] sebagai banner profil (terpisah dari
+  /// wallpaper komentar). View belum ada / gagal = kosong.
+  Future<Map<String, CommentWallpaper>> getBannerForUids(List<String> uids) async {
+    final distinct = uids.where(_uidRe.hasMatch).toSet().toList();
+    final out = <String, CommentWallpaper>{};
+    for (var i = 0; i < distinct.length; i += 80) {
+      final chunk = distinct.sublist(i, i + 80 > distinct.length ? distinct.length : i + 80);
+      final res = await _dio.get<dynamic>(
+        'rest/v1/wp_banner_view',
+        queryParameters: {
+          'firebase_uid': 'in.(${chunk.join(',')})',
+          'select': 'firebase_uid,wallpaper_id,rarity,file_name',
+        },
+      );
+      final data = res.data;
+      if (data is! List) continue;
+      for (final row in data.whereType<Map>()) {
+        final m = Map<String, dynamic>.from(row);
+        final uid = m['firebase_uid'];
+        final w = CommentWallpaper.fromJson(m);
+        if (uid is String && w != null) out[uid] = w;
+      }
+    }
+    return out;
+  }
+
   // ------------------------------------------------------------ user
 
   Future<WallpaperState> getState() async => WallpaperState.fromJson(
@@ -113,6 +139,16 @@ class WallpaperRepository {
       'wibuplay-wallpaper-user',
       {'action': 'equip', 'wallpaper_id': wallpaperId},
       'Gagal memasang wallpaper',
+    );
+  }
+
+  /// Pasang wallpaper milik sendiri sebagai banner profil; null = lepas.
+  /// Server mengecek wallpaper itu benar-benar dimiliki.
+  Future<void> equipBanner(String? wallpaperId) async {
+    await _call(
+      'wibuplay-wallpaper-user',
+      {'action': 'banner', 'wallpaper_id': wallpaperId},
+      'Gagal memasang banner',
     );
   }
 
