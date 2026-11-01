@@ -8,9 +8,10 @@ import '../../../core/build_flags.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/update_checker.dart';
 import 'force_update_screen.dart';
+import 'play_migration_screen.dart';
 import '../../glass/glass.dart';
 
-enum _Phase { checking, blocked, ok }
+enum _Phase { checking, blocked, migrate, ok }
 
 /// Gerbang update wajib. Dipasang PALING LUAR (di atas AuthGate): tiap app
 /// dibuka, cek release terbaru di GitHub. Kalau lebih baru dari versi yang
@@ -66,6 +67,12 @@ class _UpdateGateState extends State<UpdateGate> {
     // dilarang mengunduh/memasang APK sendiri, jadi cek GitHub dilewati.
     // Sebagai gantinya pakai Play In-App Updates: kalau ada versi baru di
     // Play (termasuk track pengujian), tampil layar update resmi dari Play.
+    // APK GitHub terakhir: tidak cek update lagi, langsung minta pindah ke Play.
+    if (BuildFlags.migrateToPlay) {
+      if (widget.minSplash > Duration.zero) await Future<void>.delayed(widget.minSplash);
+      if (mounted) setState(() => _phase = _Phase.migrate);
+      return;
+    }
     if (BuildFlags.isPlay) {
       final started = DateTime.now();
       try {
@@ -124,6 +131,8 @@ class _UpdateGateState extends State<UpdateGate> {
             onRetry: _startDownload,
           ),
         );
+      case _Phase.migrate:
+        body = const PlayMigrationScreen(key: ValueKey('migrate'));
       case _Phase.ok:
         body = KeyedSubtree(key: const ValueKey('app'), child: widget.child);
     }

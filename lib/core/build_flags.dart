@@ -9,6 +9,15 @@ class BuildFlags {
 
   static const bool isPlay = bool.fromEnvironment('PLAY_BUILD');
 
+  /// Build APK GitHub terakhir (release.yml, `--dart-define=MIGRATE_TO_PLAY=true`):
+  /// app terkunci di layar "Install dari Play Store". Update berikutnya hanya
+  /// lewat Play Store, jadi GitHub Releases tidak dipakai lagi.
+  static const bool migrateToPlay =
+      !isPlay && bool.fromEnvironment('MIGRATE_TO_PLAY');
+
+  /// Package app di Play Store.
+  static const String playPackage = 'com.aistudio.zenime.app';
+
   /// Filter konten dewasa (genre/judul) di komik dan daftar genre anime.
   /// Selalu aktif di build Play; di build APK bisa dinyalakan dengan
   /// `--dart-define=SAFE_CONTENT=true`.

@@ -8,7 +8,7 @@ on:
       version_name:
         description: 'Versi (format x.y atau x.y.z, contoh 2.4)'
         required: true
-        default: '2.7'
+        default: '3.0'
       publish:
         description: 'Buat GitHub Release + upload APK?'
         type: boolean
@@ -274,6 +274,7 @@ jobs:
           --dart-define=FIREBASE_API_KEY=${{ secrets.FIREBASE_API_KEY }}
           --dart-define=FIREBASE_APP_ID=${{ secrets.FIREBASE_APP_ID }}
           --dart-define=APK_SIG_SHA256=$APK_SIG_SHA256
+          --dart-define=MIGRATE_TO_PLAY=true
 
       # Flutter menandatangani APK rilis dengan debug key kalau gradle belum diatur.
       # Daripada menambal build.gradle.kts, APK ditandatangani ulang di sini pakai
