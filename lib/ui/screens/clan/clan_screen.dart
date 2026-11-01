@@ -534,7 +534,8 @@ class _HeaderCard extends StatelessWidget {
                 ],
               ],
             ),
-            // Leader tidak bisa keluar biasa (harus transfer/bubarkan clan dulu).
+            // Leader tidak bisa keluar biasa: jadikan member lain Leader dulu
+            // (ketuk nama member > Jadikan Leader), atau bubarkan clan.
             if (data.myRole != ClanRoles.leader)
               TextButton(
                 onPressed: onLeave,
@@ -1192,8 +1193,8 @@ class _DonateDialogState extends State<_DonateDialog> {
   }
 }
 
-/// Menu aksi member: ubah role (sesuai hierarki) atau kick (dengan konfirmasi).
-/// Pop(true) kalau ada perubahan.
+/// Menu aksi member: ubah role (sesuai hierarki), jadikan leader (khusus
+/// leader), atau kick (dengan konfirmasi). Pop(true) kalau ada perubahan.
 class _MemberActionDialog extends ConsumerStatefulWidget {
   const _MemberActionDialog({
     required this.clanId,
@@ -1211,6 +1212,7 @@ class _MemberActionDialog extends ConsumerStatefulWidget {
 
 class _MemberActionDialogState extends ConsumerState<_MemberActionDialog> {
   bool _confirmKick = false;
+  bool _confirmTransfer = false;
   bool _busy = false;
   String? _error;
 
@@ -1238,6 +1240,8 @@ class _MemberActionDialogState extends ConsumerState<_MemberActionDialog> {
     final repo = ref.read(clanRepositoryProvider);
     final assignable = ClanRoles.assignableRoles(widget.actorRole, t.role);
     final canKick = ClanRoles.canKick(widget.actorRole, t.role);
+    final canTransfer = widget.actorRole == ClanRoles.leader;
+    final confirming = _confirmKick || _confirmTransfer;
 
     return AlertDialog(
       backgroundColor: AppColors.surfaceDark,
@@ -1250,6 +1254,12 @@ class _MemberActionDialogState extends ConsumerState<_MemberActionDialog> {
             Text(
               'Yakin mau kick ${t.username} dari clan?',
               style: const TextStyle(color: AppColors.textSecondary),
+            )
+          else if (_confirmTransfer)
+            Text(
+              '${t.username} akan jadi Leader clan ini. Kamu turun jadi Vice Leader '
+              'dan tidak bisa mengambil jabatan Leader kembali tanpa diberikan olehnya.',
+              style: const TextStyle(color: AppColors.textSecondary, height: 1.35),
             )
           else ...[
             Row(
@@ -1290,6 +1300,21 @@ class _MemberActionDialogState extends ConsumerState<_MemberActionDialog> {
                   ),
                 ),
             ],
+            if (canTransfer) ...[
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _busy ? null : () => setState(() => _confirmTransfer = true),
+                  icon: const Icon(Icons.workspace_premium_rounded, size: 18),
+                  label: const Text('Jadikan Leader', style: TextStyle(fontWeight: FontWeight.w800)),
+                  style: OutlinedButton.styleFrom(
+                    side: BorderSide(color: clanRoleColor(ClanRoles.leader).withValues(alpha: 0.8)),
+                    foregroundColor: clanRoleColor(ClanRoles.leader),
+                  ),
+                ),
+              ),
+            ],
           ],
           if (_error != null) ...[
             const SizedBox(height: 10),
@@ -1310,15 +1335,26 @@ class _MemberActionDialogState extends ConsumerState<_MemberActionDialog> {
           onPressed: _busy
               ? null
               : () {
-                  if (_confirmKick) {
-                    setState(() => _confirmKick = false);
+                  if (confirming) {
+                    setState(() {
+                      _confirmKick = false;
+                      _confirmTransfer = false;
+                    });
                   } else {
                     Navigator.of(context).pop(false);
                   }
                 },
-          child: Text(_confirmKick ? 'Batal' : 'Tutup'),
+          child: Text(confirming ? 'Batal' : 'Tutup'),
         ),
-        if (_confirmKick)
+        if (_confirmTransfer)
+          TextButton(
+            onPressed: _busy ? null : () => _run(() => repo.transferLeader(widget.clanId, t.firebaseUid)),
+            child: Text(
+              'Jadikan Leader',
+              style: TextStyle(color: clanRoleColor(ClanRoles.leader), fontWeight: FontWeight.w800),
+            ),
+          )
+        else if (_confirmKick)
           TextButton(
             onPressed: _busy ? null : () => _run(() => repo.kickMember(widget.clanId, t.firebaseUid)),
             child: const Text(
