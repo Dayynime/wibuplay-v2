@@ -31,7 +31,6 @@ import '../comic/comic_profile_section.dart';
 import '../xp/xp_leaderboard_screen.dart';
 import 'profile_controller.dart';
 import '../../components/avatar_frame.dart';
-import '../../components/profile_effect.dart';
 import '../../components/join_date_stat.dart';
 import '../../../data/models/avatar_frame_models.dart';
 import '../../glass/glass.dart';
@@ -82,7 +81,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final avatarUrl = _resolvedAvatar(user, profile.data, profile.loading);
 
     // Material (bukan ColoredBox) supaya efek ripple InkWell tab terlihat.
-    final effectUid = user?.uid ?? '';
     return Material(
       color: AppColors.backgroundDark,
       child: Stack(
@@ -109,9 +107,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ],
             ),
           ),
-          // Efek profil menutupi seluruh layar dan tidak ikut scroll.
-          if (effectUid.isNotEmpty)
-            Positioned.fill(child: ProfileEffectOverlay(uid: effectUid)),
         ],
       ),
     );

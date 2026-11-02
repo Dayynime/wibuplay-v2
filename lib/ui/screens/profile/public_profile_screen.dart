@@ -14,7 +14,6 @@ import '../../app_routes.dart';
 import '../../components/cards.dart';
 import '../../components/profile_badges.dart';
 import '../../components/net_image.dart';
-import '../../components/profile_effect.dart';
 import '../../components/role_badges.dart';
 import '../../components/join_date_stat.dart';
 import '../clan/clan_browse_screen.dart';
@@ -175,8 +174,6 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
               ],
             ),
           ),
-          // Efek profil menutupi seluruh layar dan tidak ikut scroll.
-          Positioned.fill(child: ProfileEffectOverlay(uid: uid)),
           Positioned(
             top: MediaQuery.paddingOf(context).top + 8,
             left: 8,

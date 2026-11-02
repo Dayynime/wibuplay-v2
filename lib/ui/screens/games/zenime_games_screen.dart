@@ -11,7 +11,6 @@ import '../avatar_frame/avatar_frame_screen.dart';
 import '../chess/chess_board.dart';
 import '../chess/chess_lobby_screen.dart';
 import '../level_badge/level_badge_shop_screen.dart';
-import '../profile_effect/profile_effect_screen.dart';
 import '../store/coin_screen.dart';
 import '../tree/tree_screen.dart';
 import '../wallpaper/wallpaper_screen.dart';
@@ -93,14 +92,6 @@ class _ZenimeGamesScreenState extends ConsumerState<ZenimeGamesScreen>
       colors: const [Color(0xFF1A1033), Color(0xFF6D28D9), Color(0xFFE8A317)],
       page: () => const LevelBadgeShopScreen(),
       preview: () => const LevelBadgePreview(),
-    ),
-    _GameItem(
-      title: 'Efek Profil',
-      subtitle: 'Animasi keren di profilmu',
-      icon: Icons.auto_awesome_rounded,
-      colors: const [Color(0xFF2A0B3D), Color(0xFFDB2777), Color(0xFFF59E0B)],
-      page: () => const ProfileEffectScreen(),
-      preview: () => const EffectPreview(),
     ),
   ];
 

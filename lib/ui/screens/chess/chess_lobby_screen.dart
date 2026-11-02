@@ -191,6 +191,8 @@ class _ChessLobbyScreenState extends ConsumerState<ChessLobbyScreen> with Widget
             _joinRow(),
             const SizedBox(height: 22),
             ..._sections(),
+            const SizedBox(height: 28),
+            const _ChessSignature(),
           ],
         ),
       ),
@@ -806,6 +808,39 @@ class _ActionButton extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Tanda tangan pembuat fitur catur, di bagian paling bawah lobby.
+class _ChessSignature extends StatelessWidget {
+  const _ChessSignature();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Container(width: 36, height: 1, color: Colors.white.withValues(alpha: 0.12)),
+        const SizedBox(height: 12),
+        Text(
+          '♞  Catur Zenime',
+          style: TextStyle(
+            color: AppColors.textSecondary.withValues(alpha: 0.85),
+            fontSize: 12.5,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.4,
+          ),
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          'Dibuat oleh Dayynime · 27 Oktober 2026',
+          style: TextStyle(
+            color: AppColors.textMuted,
+            fontSize: 11.5,
+            fontStyle: FontStyle.italic,
+          ),
+        ),
+      ],
     );
   }
 }
