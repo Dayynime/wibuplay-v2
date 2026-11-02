@@ -130,6 +130,11 @@ jobs:
           for perm in ['RECORD_AUDIO', 'MODIFY_AUDIO_SETTINGS']:
               if 'android.permission.%s"' % perm not in s:
                   s = s.replace('<application', '<uses-permission android:name="android.permission.%s"/>\n    <application' % perm, 1)
+          # Izin RECORD_AUDIO membuat Play menganggap mikrofon WAJIB, sehingga
+          # perangkat tanpa mikrofon (sebagian tablet/desktop/TV) tidak bisa
+          # memasang app. Mikrofon cuma untuk voice chat catur, jadi opsional.
+          if 'android.hardware.microphone' not in s:
+              s = s.replace('<application', '<uses-feature android:name="android.hardware.microphone" android:required="false"/>\n    <application', 1)
           if 'supportsPictureInPicture' not in s:
               s = s.replace('<activity', '<activity android:supportsPictureInPicture="true"', 1)
           if 'networkSecurityConfig' not in s:
