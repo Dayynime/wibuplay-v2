@@ -17,9 +17,9 @@ LevelBadgeStyle? levelBadgeStyleOrNull(String? id) {
 /// Badge level milik user [uid]: pakai gaya yang dibeli user itu di shop
 /// ([LevelStyledBadge]), atau badge level bawaan kalau belum memasang.
 ///
-/// Di daftar (chat, komentar, leaderboard, teman) badge digambar diam supaya
-/// tidak ngelag saat banyak user memasang badge; animasi hanya di profil
-/// ([animate] = true).
+/// Badge dari shop beranimasi di semua tempat (chat, komentar, leaderboard,
+/// teman, profil). [animate] = false menggambarnya diam (pose statis).
+/// Animasi otomatis berhenti kalau "kurangi animasi" di HP aktif.
 class UserLevelBadge extends StatelessWidget {
   const UserLevelBadge({
     super.key,
@@ -28,7 +28,7 @@ class UserLevelBadge extends StatelessWidget {
     this.height,
     this.progress,
     this.pin = false,
-    this.animate = false,
+    this.animate = true,
   });
 
   final String uid;
@@ -43,7 +43,7 @@ class UserLevelBadge extends StatelessWidget {
   /// Tampilan bawaan pakai [LevelPin] (pin di bawah avatar profil).
   final bool pin;
 
-  /// Badge dari shop bergerak (profil). false = gambar diam (daftar/chat).
+  /// Badge dari shop bergerak. false = gambar diam.
   final bool animate;
 
   @override
