@@ -181,13 +181,13 @@ class OnlinePresence {
             final leaves = diff['leaves'];
             if (joins is Map) {
               joins.forEach((k, v) {
-                if (k is String && _uidRe.hasMatch(k)) next[k] = (next[k] ?? 0) + math.max(1, _metaCount(v));
+                if (k is String && _uidRe.hasMatch(k)) next[k] = (next[k] ?? 0) + math.max<int>(1, _metaCount(v));
               });
             }
             if (leaves is Map) {
               leaves.forEach((k, v) {
                 if (k is! String) return;
-                final n = (next[k] ?? 0) - math.max(1, _metaCount(v));
+                final n = (next[k] ?? 0) - math.max<int>(1, _metaCount(v));
                 if (n > 0) {
                   next[k] = n;
                 } else {
