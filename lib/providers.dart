@@ -48,6 +48,7 @@ import 'data/models/home_bootstrap.dart';
 import 'data/repository/tree_repository.dart';
 import 'data/repository/level_badge_repository.dart';
 import 'data/repository/chess_repository.dart';
+import 'data/repository/nobar_repository.dart';
 import 'data/supabase/supabase_client.dart';
 
 /// Di-override di main() setelah LocalStore.open() selesai.
@@ -191,6 +192,11 @@ final levelBadgeRepositoryProvider = Provider<LevelBadgeRepository>(
 /// Catur mabar (Edge Function `chess-game`).
 final chessRepositoryProvider = Provider<ChessRepository>(
   (ref) => ChessRepository(ref.watch(supabaseDioProvider)),
+);
+
+/// Nobar + voice chat (Edge Function `nobar-room`).
+final nobarRepositoryProvider = Provider<NobarRepository>(
+  (ref) => NobarRepository(ref.watch(supabaseDioProvider)),
 );
 
 /// Wallpaper Komentar (gacha spin, koleksi, panel admin).

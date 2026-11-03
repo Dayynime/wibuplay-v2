@@ -298,6 +298,9 @@ class WpVideoController extends ChangeNotifier {
 
   Future<void> setPlaybackSpeed(double speed) => _player.setRate(speed);
 
+  /// Volume video 0..100 (dipakai Nobar supaya suara teman tetap terdengar).
+  Future<void> setVolume(double volume) => _player.setVolume(volume.clamp(0, 100).toDouble());
+
   @override
   Future<void> dispose() async {
     if (_disposed) return;

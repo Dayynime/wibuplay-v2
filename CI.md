@@ -179,3 +179,11 @@ manifest rilis bawaan Flutter tidak punya izin internet.
 - Backend: Edge Function `zenime-admin-get-role`, `-list-roles`, `-list-users`, `-set-role`, `-ban-user`, `-unban-user`, `-ban-device`, `-unban-device`, semua dengan Firebase ID Token di header Authorization. Function ini dipakai bersama Zenime, tidak ada di repo ini.
 - Belum dipindah: hapus pesan orang lain di Chat Global oleh admin (`zenime-admin-delete-message`); `deleteMessage` di chat saat ini hanya untuk pesan sendiri.
 
+
+## Nobar (nonton bareng + voice chat)
+
+- Maks 5 orang per room. Buat room: tombol **Nobar** di player. Masuk room: Menu > Nobar (kode 6 karakter).
+- Video dikontrol host (play/pause/seek/ganti episode, auto next). Anggota menyesuaikan lewat Realtime Broadcast topik `nobar-<room id>` event `sync` (host kirim tiap 2 detik + tiap ada perubahan; anggota seek kalau selisih > 2 detik). Host keluar / hilang > 90 detik -> host pindah otomatis.
+- Voice: `lib/data/voice/nobar_voice.dart`, WebRTC mesh audio (satu koneksi per pasangan, uid lebih kecil yang membuat offer), sinyal lewat event `voice` di topik yang sama. Mic default mati; bisukan orang lain hanya di HP sendiri; host bisa matikan mic anggota / mute all / keluarkan.
+- Server: Edge Function `nobar-room` + tabel `nobar_rooms`, `nobar_members`, `nobar_bans` (`server/nobar/`, panduan di `server/nobar/DEPLOY.md`).
+- UI: `lib/ui/screens/nobar/` (lobby, layar room, panel voice).

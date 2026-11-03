@@ -25,6 +25,8 @@ import '../../components/mini_player.dart';
 import '../../components/net_image.dart';
 import '../comments/comments_section.dart';
 import '../download/download_actions.dart';
+import '../../../data/repository/nobar_repository.dart';
+import '../nobar/nobar_lobby_screen.dart' show openNobarRoom;
 import 'player_controller.dart';
 import 'player_gestures.dart';
 import 'player_settings_sheet.dart';
@@ -312,6 +314,48 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
       }
     }
     return best;
+  }
+
+  bool _creatingNobar = false;
+
+  /// Bikin room Nobar dari episode yang sedang diputar, lalu pindah ke layar
+  /// nobar (player ini ditutup supaya cuma satu video yang jalan).
+  Future<void> _startNobar(PlayerUiState ui, bool locked) async {
+    if (_creatingNobar) return;
+    final messenger = ScaffoldMessenger.of(context);
+    void say(String text) => messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(text)));
+    final epId = ui.currentEpisodeId;
+    if (epId.trim().isEmpty) {
+      say('Tunggu episodenya termuat dulu');
+      return;
+    }
+    if (locked) {
+      say('Episode ini khusus Premium');
+      return;
+    }
+    _creatingNobar = true;
+    say('Membuat room nobar…');
+    try {
+      final vc = _vc;
+      final pos = vc != null && vc.value.isInitialized ? vc.value.position.inMilliseconds : 0;
+      final room = await ref.read(nobarRepositoryProvider).create(
+            movieId: ui.movieId,
+            episodeId: epId,
+            movieTitle: ui.anime?.title,
+            posterUrl: ui.anime?.posterUrl,
+            positionMs: pos,
+          );
+      if (!mounted) return;
+      messenger.hideCurrentSnackBar();
+      _stopPlayer();
+      await openNobarRoom(context, room, replace: true);
+    } on NobarException catch (e) {
+      say(e.message);
+    } finally {
+      _creatingNobar = false;
+    }
   }
 
   void _stopPlayer() {
@@ -1511,6 +1555,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                             label: 'Favorit',
                             tint: isFavorite ? AppColors.accentViolet : AppColors.textSecondary,
                             onTap: () => _notifier.toggleFavorite(),
+                          ),
+                          const SizedBox(width: 10),
+                          _ActionIconButton(
+                            icon: Icons.groups_rounded,
+                            label: 'Nobar',
+                            tint: AppColors.accentViolet,
+                            onTap: () => _startNobar(ui, gate.locked),
                           ),
                           const SizedBox(width: 10),
                           _ActionIconButton(
