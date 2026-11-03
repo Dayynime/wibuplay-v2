@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:share_plus/share_plus.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/chess_models.dart';
@@ -16,6 +15,7 @@ import '../../app_routes.dart';
 import '../../components/friend_avatar.dart';
 import '../../glass/glass.dart';
 import 'chess_board.dart';
+import 'chess_invite.dart';
 import 'chess_voice_bar.dart';
 
 /// Satu permainan catur: menunggu lawan, bermain, dan hasil akhir.
@@ -412,10 +412,6 @@ class _ChessGameScreenState extends ConsumerState<ChessGameScreen> with WidgetsB
     Navigator.of(context).pushReplacement(fadeRoute(ChessGameScreen(gameId: id)));
   }
 
-  Future<void> _shareCode(String code) async {
-    await Share.share('Ayo main catur di Zenime! Buka Zenime Games → Catur → Masuk pakai kode, lalu ketik: $code');
-  }
-
   void _snack(String msg) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
@@ -686,7 +682,7 @@ class _ChessGameScreenState extends ConsumerState<ChessGameScreen> with WidgetsB
                 ),
               ),
               const SizedBox(width: 10),
-              Expanded(child: _SmallButton(label: 'Bagikan', primary: true, onTap: () => _shareCode(code))),
+              Expanded(child: _SmallButton(label: 'Bagikan', primary: true, onTap: () => showChessShareSheet(context, g))),
             ],
           ),
         ] else

@@ -11,6 +11,7 @@ import '../../../data/models/friend_models.dart';
 import '../../components/friend_avatar.dart';
 import '../../components/swipe_to_reply.dart';
 import 'private_chat_controller.dart';
+import '../chess/chess_invite.dart';
 import '../../glass/glass.dart';
 
 String _two(int n) => n.toString().padLeft(2, '0');
@@ -544,6 +545,8 @@ class _DmBubble extends StatelessWidget {
                 days: m.giftDays!,
                 title: isOwn ? 'Kamu memberi Premium' : 'Kamu menerima Premium!',
               )
+            else if (chessInviteCode(m.message) != null)
+              ChessInviteCard(message: m.message, mine: isOwn)
             else
               Text(
                 m.message,

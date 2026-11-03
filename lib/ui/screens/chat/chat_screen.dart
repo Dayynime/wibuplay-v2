@@ -26,6 +26,7 @@ import '../profile/public_profile_screen.dart';
 import 'private_chat_controller.dart';
 import 'clan_chat_tab.dart';
 import 'wp_event_chat_card.dart';
+import '../chess/chess_invite.dart';
 import 'private_chat_pane.dart';
 import 'chat_controller.dart';
 import '../../components/avatar_frame.dart';
@@ -746,6 +747,8 @@ class ChatMessageBubble extends StatelessWidget {
                 days: m.giftDays!,
                 title: 'memberi Premium ke ${m.giftRecipientUsername ?? 'pengguna'}',
               )
+            else if (chessInviteCode(m.message) != null)
+              ChessInviteCard(message: m.message, mine: mine)
             else
               Text(
                 m.message,

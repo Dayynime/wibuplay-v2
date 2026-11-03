@@ -274,7 +274,6 @@ jobs:
           --dart-define=FIREBASE_API_KEY=${{ secrets.FIREBASE_API_KEY }}
           --dart-define=FIREBASE_APP_ID=${{ secrets.FIREBASE_APP_ID }}
           --dart-define=APK_SIG_SHA256=$APK_SIG_SHA256
-          --dart-define=MIGRATE_TO_PLAY=true
 
       # Flutter menandatangani APK rilis dengan debug key kalau gradle belum diatur.
       # Daripada menambal build.gradle.kts, APK ditandatangani ulang di sini pakai
