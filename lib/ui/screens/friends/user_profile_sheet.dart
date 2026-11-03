@@ -5,6 +5,7 @@ import '../../../core/error_message.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/friend_models.dart';
 import '../../../providers.dart';
+import '../../components/activity_status.dart';
 import '../../components/friend_avatar.dart';
 import '../../components/game_badges.dart';
 import '../../components/net_image.dart';
@@ -181,6 +182,8 @@ class _UserProfileSheetState extends ConsumerState<UserProfileSheet> {
               ],
             ),
           ),
+          const SizedBox(height: 6),
+          ActivityStatus(uid: uid),
           const SizedBox(height: 10),
           Wrap(
             alignment: WrapAlignment.center,

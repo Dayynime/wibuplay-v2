@@ -16,6 +16,7 @@ import '../../../providers.dart';
 import '../../app_routes.dart';
 import '../gift/gift_premium_sheet.dart';
 import '../gift/giveaway.dart';
+import '../../components/activity_status.dart';
 import '../../components/game_badges.dart';
 import '../../components/role_badges.dart';
 import '../../components/top_giver_badge.dart';
@@ -283,11 +284,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         appBar: GlassAppBar(
           backgroundColor: AppColors.backgroundDark,
           elevation: 0,
-          title: Text(switch (_tab) {
-            0 => 'Chat Global',
-            1 => 'Chat Teman',
-            _ => 'Chat Clan',
-          }),
+          title: _tab == 0
+              ? const Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [Text('Chat Global'), OnlineCountLabel()],
+                )
+              : Text(_tab == 1 ? 'Chat Teman' : 'Chat Clan'),
           actions: [
             if (_tab == 1)
               IconButton(

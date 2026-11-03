@@ -10,6 +10,7 @@ import '../../../data/models/chat_models.dart';
 import '../../../data/models/comment_models.dart';
 import '../../../data/models/friend_models.dart';
 import '../../../providers.dart';
+import '../../components/activity_status.dart';
 import '../../app_routes.dart';
 import '../../components/cards.dart';
 import '../../components/profile_badges.dart';
@@ -338,6 +339,8 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
                   ],
                 ),
               ),
+              const SizedBox(height: 6),
+              ActivityStatus(uid: uid),
               const SizedBox(height: 10),
               // Level ada di cincin avatar & clan di depan nama.
               Wrap(

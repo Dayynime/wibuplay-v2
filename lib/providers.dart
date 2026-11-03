@@ -297,6 +297,24 @@ String? resolveProfileBanner({CommentWallpaper? wallpaper, required bool premium
   return null;
 }
 
+/// Kapan user [uid] terakhir aktif (tabel user_last_seen, dicatat server lewat
+/// zenime-check-ban). Belum ada / gagal = null.
+final lastSeenProvider = FutureProvider.autoDispose.family<DateTime?, String>((ref, uid) async {
+  if (uid.isEmpty) return null;
+  try {
+    final res = await ref.watch(supabaseDioProvider).get<dynamic>(
+      'rest/v1/user_last_seen',
+      queryParameters: {'firebase_uid': 'eq.$uid', 'select': 'last_seen', 'limit': 1},
+    );
+    final d = res.data;
+    if (d is List && d.isNotEmpty && d.first is Map) {
+      final v = (d.first as Map)['last_seen'];
+      if (v is String) return DateTime.tryParse(v);
+    }
+  } catch (_) {}
+  return null;
+});
+
 /// Profil chat (username/avatar) per uid. Gagal = null.
 final chatProfileProvider = FutureProvider.family<ChatProfile?, String>((ref, uid) async {
   final repo = ref.watch(chatRepositoryProvider);

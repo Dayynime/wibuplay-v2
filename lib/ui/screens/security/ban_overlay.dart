@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../data/models/chat_models.dart';
+import '../../../data/realtime/online_presence.dart';
 import '../../../providers.dart';
 import '../../app_routes.dart';
 import '../../components/mini_player.dart';
@@ -43,12 +44,20 @@ class _BanWatcherState extends ConsumerState<BanWatcher> with WidgetsBindingObse
     // Tunda cek pertama: kalau user baru login & ternyata diban, alur login
     // sudah menanganinya sendiri (signOut + pesan error di layar login).
     _timer = Timer(const Duration(seconds: 5), _startLoop);
+    _presenceOn();
+  }
+
+  /// Status online real-time: ikut hidup selama user login & app di depan.
+  void _presenceOn() {
+    final uid = ref.read(authUserProvider).valueOrNull?.uid;
+    if (uid != null && uid.isNotEmpty) OnlinePresence.instance.start(uid);
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _timer?.cancel();
+    OnlinePresence.instance.stop();
     super.dispose();
   }
 
@@ -63,8 +72,10 @@ class _BanWatcherState extends ConsumerState<BanWatcher> with WidgetsBindingObse
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _startLoop();
+      _presenceOn();
     } else if (state == AppLifecycleState.paused) {
       _timer?.cancel();
+      OnlinePresence.instance.stop();
     }
   }
 
