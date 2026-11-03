@@ -7,6 +7,7 @@ import '../../app_routes.dart';
 import '../clan/clan_manage_screen.dart';
 import '../clan/clan_screen.dart';
 import '../friends/friends_screen.dart';
+import '../nobar/nobar_invite.dart';
 
 /// Buka halaman tujuan sebuah notifikasi (dari lonceng, banner in-app, atau
 /// tap push di status bar). [data] = payload notif (`clan_id`, dll).
@@ -46,6 +47,10 @@ Future<void> openNotificationTarget(
       if (clanId.isEmpty) return;
       await nav.push<void>(fadeRoute(ClanScreen(clanId: clanId)));
       return;
+
+    case 'nobar_invite':
+      await handleNobarInviteNotification(ref, data);
+      return;
   }
 }
 
@@ -55,5 +60,7 @@ IconData notificationIcon(String type) => switch (type) {
       'friend_accepted' => Icons.how_to_reg_rounded,
       'clan_join_request' => Icons.group_add_rounded,
       'clan_joined' => Icons.shield_rounded,
+      'nobar_invite' => Icons.groups_rounded,
+      'nobar_declined' => Icons.group_off_rounded,
       _ => Icons.notifications_rounded,
     };

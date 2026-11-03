@@ -113,6 +113,29 @@ class NobarRepository {
     return NobarIce.fromJson(d);
   }
 
+  /// Undang teman ([uid]) ke room; dia dapat notif + push.
+  Future<void> invite(String roomId, String uid) async {
+    await _call({'action': 'invite', 'id': roomId, 'uid': uid}, 'Gagal mengirim undangan');
+  }
+
+  /// Jawab undangan. Terima = langsung masuk room (return room), tolak = null.
+  Future<NobarRoom?> respondInvite(String inviteId, {required bool accept}) async {
+    const f = 'Gagal menjawab undangan';
+    final d = await _call({'action': 'invite_respond', 'invite_id': inviteId, 'accept': accept}, f);
+    return accept ? _room(d, f) : null;
+  }
+
+  Future<List<NobarInvite>> myInvites() async {
+    final d = await _call({'action': 'my_invites'}, 'Gagal memuat undangan');
+    final list = d['invites'];
+    if (list is! List) return const [];
+    return list
+        .whereType<Map>()
+        .map((e) => NobarInvite.fromData(Map<String, dynamic>.from(e)))
+        .whereType<NobarInvite>()
+        .toList();
+  }
+
   Future<List<NobarRoom>> myRooms() async {
     final d = await _call({'action': 'list'}, 'Gagal memuat room');
     final list = d['rooms'];

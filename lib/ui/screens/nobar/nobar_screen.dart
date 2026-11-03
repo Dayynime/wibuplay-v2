@@ -19,6 +19,7 @@ import '../../../data/voice/nobar_voice.dart';
 import '../../../providers.dart';
 import '../../components/mini_player.dart';
 import '../player/player_controller.dart';
+import 'nobar_invite.dart';
 import 'nobar_voice_panel.dart';
 
 /// Status video dari host yang sedang diikuti anggota.
@@ -590,6 +591,10 @@ class _NobarScreenState extends ConsumerState<NobarScreen> with WidgetsBindingOb
     Navigator.of(context).pop();
   }
 
+  void _openInvite() {
+    showNobarInviteSheet(context, _room, onShareCode: _share);
+  }
+
   void _share() {
     final title = _room.movieTitle ?? 'anime';
     Share.share(
@@ -664,7 +669,7 @@ class _NobarScreenState extends ConsumerState<NobarScreen> with WidgetsBindingOb
                     voice: voice,
                     myUid: _uid ?? '',
                     onKick: _kick,
-                    onInvite: _share,
+                    onInvite: _openInvite,
                   ),
                 const SizedBox(height: 16),
                 _volumeRow(),
@@ -722,7 +727,7 @@ class _NobarScreenState extends ConsumerState<NobarScreen> with WidgetsBindingOb
                     onTap: _copyCode,
                     color: AppColors.accentViolet,
                   ),
-                  _chip(icon: Icons.person_add_alt_1_rounded, label: 'Undang', onTap: _share),
+                  _chip(icon: Icons.person_add_alt_1_rounded, label: 'Undang', onTap: _openInvite),
                 ],
               ),
             ],

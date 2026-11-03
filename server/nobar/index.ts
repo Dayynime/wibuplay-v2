@@ -14,26 +14,25 @@
 //   state   {id, episode_id, position_ms, playing}  -> host saja
 //   ice     {id}           -> server STUN/TURN untuk voice
 //   list                   -> room aktif yang aku ikuti
+//   invite        {id, uid}           -> undang teman (notif + push)
+//   invite_respond {invite_id, accept} -> terima (masuk room) / tolak
+//   my_invites                        -> undangan yang masih menunggu jawabanku
 //
-// Env yang dipakai (sudah otomatis dari .env lewat env_file):
-//   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
-//   TURN_URLS   contoh: "turn:turn.zenime.biz.id:3478?transport=udp,turn:turn.zenime.biz.id:3478?transport=tcp"
-//   TURN_SECRET static-auth-secret coturn (use-auth-secret)
-//   -> SAMAKAN dengan yang dipakai `chess-game` (aksi voice_ice). Kalau nama
-//      env di chess-game beda, ganti dua baris TURN_* di bawah.
+// Login & database memakai helper bersama `_shared/wp.ts` (db service role,
+// verifyUser lewat tabel firebase_jwks). Kredensial TURN memakai `turn.ts`
+// yang SAMA dengan chess-game (disalin ke folder ini saat deploy), membaca
+// env TURN_SECRET & TURN_URLS dari .env.
 
-import { createClient } from "npm:@supabase/supabase-js@2";
-import { createLocalJWKSet, jwtVerify } from "npm:jose@5";
+import { db, verifyUser } from "../_shared/wp.ts";
+import { turnConfigFromEnv, turnCredentials } from "./turn.ts";
 
-const FIREBASE_PROJECT = "zenime-609d0";
 const MAX_MEMBERS = 5;
 const ACTIVE_MS = 90_000;
-const TURN_URLS = (Deno.env.get("TURN_URLS") ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-const TURN_SECRET = Deno.env.get("TURN_SECRET") ?? "";
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const db = createClient(SUPABASE_URL, SERVICE_KEY, { auth: { persistSession: false } });
+const SB_URL = (Deno.env.get("SUPABASE_URL") ?? "http://kong:8000").replace(/\/$/, "");
+const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+const turn = turnConfigFromEnv((k: string) => Deno.env.get(k));
+if (!turn) console.warn("nobar-room: TURN_SECRET/TURN_URLS belum diatur, voice di data seluler bisa gagal");
 
 // ------------------------------------------------------------------ util
 
@@ -63,46 +62,12 @@ function roomId(v: unknown): string {
   return v.toLowerCase();
 }
 
-// ------------------------------------------------------------------ auth
-// JWKS Firebase dibaca dari tabel public.firebase_jwks (diisi cron host,
-// karena VPS tidak bisa ke googleapis lewat IPv4). Sama dengan function lain.
-
-let jwksCache: { at: number; set: ReturnType<typeof createLocalJWKSet> } | null = null;
-
-async function getJwks() {
-  if (jwksCache && Date.now() - jwksCache.at < 10 * 60_000) return jwksCache.set;
-  const { data, error } = await db.from("firebase_jwks").select("jwks").eq("id", 1).maybeSingle();
-  if (error || !data?.jwks) throw new HttpError(503, "Server login belum siap, coba lagi");
-  const jwks = typeof data.jwks === "string" ? JSON.parse(data.jwks) : data.jwks;
-  const set = createLocalJWKSet(jwks);
-  jwksCache = { at: Date.now(), set };
-  return set;
-}
-
-async function verifyUser(req: Request): Promise<string> {
-  const h = req.headers.get("Authorization") ?? "";
-  const token = h.startsWith("Bearer ") ? h.slice(7) : "";
-  if (!token) throw new HttpError(401, "Kamu harus login dulu");
-  try {
-    const { payload } = await jwtVerify(token, await getJwks(), {
-      issuer: `https://securetoken.google.com/${FIREBASE_PROJECT}`,
-      audience: FIREBASE_PROJECT,
-    });
-    const uid = payload.sub;
-    if (typeof uid !== "string" || !uid) throw new Error("no sub");
-    return uid;
-  } catch (e) {
-    if (e instanceof HttpError) throw e;
-    throw new HttpError(401, "Sesi login habis, buka ulang aplikasi");
-  }
-}
-
 // ------------------------------------------------------------------ realtime
 
 /** Kabari semua anggota supaya memuat ulang data room (isi ping tidak dipercaya app). */
 async function ping(id: string, reason: string) {
   try {
-    await fetch(`${SUPABASE_URL}/realtime/v1/api/broadcast`, {
+    const res = await fetch(`${SB_URL}/realtime/v1/api/broadcast`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -113,6 +78,7 @@ async function ping(id: string, reason: string) {
         messages: [{ topic: `nobar-${id}`, event: "ping", payload: { reason, at: Date.now() } }],
       }),
     });
+    if (!res.ok) console.error("nobar-room broadcast", res.status, (await res.text()).slice(0, 200));
   } catch (_) {
     // App tetap heartbeat tiap 30 dtk, jadi ping yang gagal tidak fatal.
   }
@@ -200,24 +166,32 @@ function newCode() {
   return Array.from(b, (x) => CODE_CHARS[x % CODE_CHARS.length]).join("");
 }
 
-async function turnCredentials(uid: string) {
-  const servers: Record<string, unknown>[] = [];
-  if (TURN_URLS.length && TURN_SECRET) {
-    // coturn "use-auth-secret": username = expiry:uid, password = base64(HMAC-SHA1)
-    const username = `${Math.floor(Date.now() / 1000) + 6 * 3600}:${uid}`;
-    const key = await crypto.subtle.importKey(
-      "raw",
-      new TextEncoder().encode(TURN_SECRET),
-      { name: "HMAC", hash: "SHA-1" },
-      false,
-      ["sign"],
-    );
-    const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(username));
-    const credential = btoa(String.fromCharCode(...new Uint8Array(sig)));
-    servers.push({ urls: TURN_URLS, username, credential });
-  }
-  return { ice_servers: servers, turn_ready: servers.length > 0 };
+async function iceServers(uid: string) {
+  if (!turn) return { ice_servers: [], turn_ready: false };
+  return { ice_servers: [await turnCredentials(uid, turn)], turn_ready: true };
 }
+
+
+const INVITE_TTL_MS = 3 * 3600_000;
+const INVITE_COOLDOWN_MS = 2 * 60_000;
+
+async function isFriend(a: string, b: string) {
+  const { data } = await db
+    .from("friendships")
+    .select("id")
+    .eq("status", "accepted")
+    .or(`and(requester_uid.eq.${a},addressee_uid.eq.${b}),and(requester_uid.eq.${b},addressee_uid.eq.${a})`)
+    .limit(1);
+  return (data ?? []).length > 0;
+}
+
+async function displayName(uid: string) {
+  const { data } = await db.from("chat_profiles").select("username").eq("firebase_uid", uid).maybeSingle();
+  const n = (data?.username ?? "").trim();
+  return n || "Temanmu";
+}
+
+const UID_RE = /^[A-Za-z0-9_-]{1,128}$/;
 
 // ------------------------------------------------------------------ aksi
 
@@ -336,7 +310,133 @@ async function handle(uid: string, body: Record<string, unknown>) {
     case "ice": {
       const id = roomId(body.id);
       if (!(await isMember(id, uid))) throw new HttpError(403, "Kamu tidak ada di room ini");
-      return await turnCredentials(uid);
+      return await iceServers(uid);
+    }
+
+    case "invite": {
+      const id = roomId(body.id);
+      const target = str(body.uid, 128);
+      if (!target || !UID_RE.test(target) || target === uid) throw new HttpError(400, "User tidak valid");
+      if (!(await isMember(id, uid))) throw new HttpError(403, "Kamu tidak ada di room ini");
+      const room = await loadRoom(id);
+      if (room.members.some((m) => m.uid === target)) throw new HttpError(409, "Dia sudah ada di room");
+      if (room.members.length >= MAX_MEMBERS) throw new HttpError(409, `Room penuh (maksimal ${MAX_MEMBERS} orang)`);
+      if (!(await isFriend(uid, target))) throw new HttpError(403, "Cuma bisa mengundang teman");
+      const { data: ban } = await db.from("nobar_bans").select("room_id").eq("room_id", id).eq("firebase_uid", target).maybeSingle();
+      if (ban) throw new HttpError(403, "Dia sudah dikeluarkan dari room ini");
+
+      const { data: last } = await db
+        .from("nobar_invites")
+        .select("id, created_at")
+        .eq("room_id", id)
+        .eq("to_uid", target)
+        .eq("status", "pending")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (last && Date.now() - new Date(last.created_at).getTime() < INVITE_COOLDOWN_MS) {
+        throw new HttpError(429, "Undangan sudah dikirim, tunggu sebentar");
+      }
+      if (last) {
+        await db.from("nobar_invites").update({ status: "declined", responded_at: new Date().toISOString() }).eq("id", last.id);
+        await db.rpc("nobar_close_invite_notif", { p_invite: last.id, p_expired: true });
+      }
+
+      const { data: inv, error } = await db
+        .from("nobar_invites")
+        .insert({ room_id: id, from_uid: uid, to_uid: target })
+        .select("id")
+        .single();
+      if (error || !inv) throw new HttpError(500, "Gagal mengirim undangan");
+
+      const name = await displayName(uid);
+      const title = room.movie_title ? `"${room.movie_title}"` : "anime";
+      const { error: nErr } = await db.rpc("nobar_notify", {
+        p_to: target,
+        p_from: uid,
+        p_type: "nobar_invite",
+        p_title: "Ajakan Nobar",
+        p_body: `${name} ngajak kamu nobar ${title}`,
+        p_data: {
+          invite_id: inv.id,
+          room_id: id,
+          from_name: name,
+          movie_title: room.movie_title ?? "",
+          poster_url: room.poster_url ?? "",
+        },
+      });
+      if (nErr) console.error("nobar-room notify", nErr.message);
+      return { ok: true };
+    }
+
+    case "invite_respond": {
+      const inviteId = roomId(body.invite_id);
+      const accept = body.accept === true;
+      const { data: inv } = await db.from("nobar_invites").select("*").eq("id", inviteId).maybeSingle();
+      if (!inv || inv.to_uid !== uid) throw new HttpError(404, "Undangan tidak ditemukan");
+      if (inv.status !== "pending") throw new HttpError(410, "Undangan ini sudah dijawab");
+      const expired = Date.now() - new Date(inv.created_at).getTime() > INVITE_TTL_MS;
+      const { data: room } = await db.from("nobar_rooms").select("closed_at").eq("id", inv.room_id).maybeSingle();
+      if (expired || !room || room.closed_at) {
+        await db.from("nobar_invites").update({ status: "declined", responded_at: new Date().toISOString() }).eq("id", inviteId);
+        await db.rpc("nobar_close_invite_notif", { p_invite: inviteId, p_expired: true });
+        throw new HttpError(410, "Undangan sudah tidak berlaku (room sudah ditutup)");
+      }
+
+      if (!accept) {
+        await db.from("nobar_invites").update({ status: "declined", responded_at: new Date().toISOString() }).eq("id", inviteId);
+        await db.rpc("nobar_close_invite_notif", { p_invite: inviteId, p_expired: false });
+        const name = await displayName(uid);
+        await db.rpc("nobar_notify", {
+          p_to: inv.from_uid,
+          p_from: uid,
+          p_type: "nobar_declined",
+          p_title: "Ajakan nobar ditolak",
+          p_body: `${name} belum bisa ikut nobar`,
+          p_data: { room_id: inv.room_id },
+        });
+        return { ok: true };
+      }
+
+      const { data: res, error } = await db.rpc("nobar_join", { p_room: inv.room_id, p_uid: uid, p_max: MAX_MEMBERS });
+      if (error) throw new HttpError(500, "Gagal masuk room");
+      if (res === "closed") throw new HttpError(410, "Room sudah ditutup");
+      if (res === "banned") throw new HttpError(403, "Kamu sudah dikeluarkan dari room ini");
+      if (res === "full") throw new HttpError(409, `Room penuh (maksimal ${MAX_MEMBERS} orang)`);
+      await db.from("nobar_invites").update({ status: "accepted", responded_at: new Date().toISOString() }).eq("id", inviteId);
+      await db.rpc("nobar_close_invite_notif", { p_invite: inviteId, p_expired: false });
+      await leaveOthers(uid, inv.room_id);
+      await ping(inv.room_id, "join");
+      return { room: await loadRoom(inv.room_id) };
+    }
+
+    case "my_invites": {
+      const since = new Date(Date.now() - INVITE_TTL_MS).toISOString();
+      const { data } = await db
+        .from("nobar_invites")
+        .select("id, room_id, from_uid, created_at")
+        .eq("to_uid", uid)
+        .eq("status", "pending")
+        .gte("created_at", since)
+        .order("created_at", { ascending: false })
+        .limit(10);
+      const out = [];
+      for (const inv of data ?? []) {
+        const { data: room } = await db
+          .from("nobar_rooms")
+          .select("movie_title, poster_url, closed_at")
+          .eq("id", inv.room_id)
+          .maybeSingle();
+        if (!room || room.closed_at) continue;
+        out.push({
+          invite_id: inv.id,
+          room_id: inv.room_id,
+          from_name: await displayName(inv.from_uid),
+          movie_title: room.movie_title ?? "",
+          poster_url: room.poster_url ?? "",
+        });
+      }
+      return { invites: out };
     }
 
     case "list": {
@@ -355,8 +455,15 @@ async function handle(uid: string, body: Record<string, unknown>) {
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
+  let uid: string;
   try {
-    const uid = await verifyUser(req);
+    ({ uid } = await verifyUser(req));
+  } catch (e) {
+    const status = typeof (e as { status?: unknown })?.status === "number" ? (e as { status: number }).status : 401;
+    const msg = e instanceof Error && e.message ? e.message : "Kamu harus login dulu";
+    return json({ error: msg }, status);
+  }
+  try {
     let body: Record<string, unknown>;
     try {
       body = await req.json();

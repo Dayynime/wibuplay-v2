@@ -112,6 +112,36 @@ class NobarRoom {
   }
 }
 
+/// Undangan nobar dari teman yang masih menunggu jawaban.
+class NobarInvite {
+  const NobarInvite({
+    required this.inviteId,
+    required this.roomId,
+    required this.fromName,
+    this.movieTitle = '',
+    this.posterUrl = '',
+  });
+
+  final String inviteId;
+  final String roomId;
+  final String fromName;
+  final String movieTitle;
+  final String posterUrl;
+
+  /// Dari data notifikasi / push (`invite_id`, `room_id`, `from_name`, ...).
+  static NobarInvite? fromData(Map<String, dynamic> d) {
+    final id = d['invite_id']?.toString() ?? '';
+    if (id.isEmpty) return null;
+    return NobarInvite(
+      inviteId: id,
+      roomId: d['room_id']?.toString() ?? '',
+      fromName: (d['from_name']?.toString() ?? '').trim().isEmpty ? 'Temanmu' : d['from_name'].toString(),
+      movieTitle: d['movie_title']?.toString() ?? '',
+      posterUrl: d['poster_url']?.toString() ?? '',
+    );
+  }
+}
+
 /// Server STUN/TURN untuk voice chat nobar.
 class NobarIce {
   const NobarIce({required this.iceServers, required this.turnReady});
