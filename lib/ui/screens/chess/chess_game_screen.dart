@@ -15,6 +15,7 @@ import '../../app_routes.dart';
 import '../../components/friend_avatar.dart';
 import '../../glass/glass.dart';
 import 'chess_board.dart';
+import 'chess_fx.dart';
 import 'chess_invite.dart';
 import 'chess_voice_bar.dart';
 
@@ -46,6 +47,10 @@ class _ChessGameScreenState extends ConsumerState<ChessGameScreen> with WidgetsB
   ChessGame? _game;
   String? _error;
   bool _busy = false;
+
+  /// Overlay animasi hasil (menang/kalah/remis), muncul saat permainan
+  /// selesai selagi layar ini terbuka.
+  bool _showResult = false;
 
   // Tampilan lokal (langkah yang baru dikirim muncul sebelum server menjawab).
   Map<String, String> _pieces = const {};
@@ -173,11 +178,13 @@ class _ChessGameScreenState extends ConsumerState<ChessGameScreen> with WidgetsB
     if (byOpponent) {
       HapticFeedback.lightImpact();
     }
-    if (prev != null && !prev.isOver && g.isOver) {
-      HapticFeedback.mediumImpact();
+    final justEnded = prev != null && !prev.isOver && g.isOver;
+    if (justEnded) {
+      HapticFeedback.heavyImpact();
     }
 
     setState(() {
+      if (justEnded && g.outcomeFor(g.myColor) != null) _showResult = true;
       _game = g;
       _ensureVoice();
       _error = null;
@@ -455,7 +462,42 @@ class _ChessGameScreenState extends ConsumerState<ChessGameScreen> with WidgetsB
             ),
         ],
       ),
-      body: _body(g),
+      body: Stack(
+        children: [
+          Positioned.fill(child: _body(g)),
+          if (_showResult && g != null && g.isOver && g.outcomeFor(g.myColor) != null)
+            Positioned.fill(child: _resultOverlay(g)),
+        ],
+      ),
+    );
+  }
+
+  Widget _resultOverlay(ChessGame g) {
+    final rm = g.rematch;
+    final String label;
+    final VoidCallback? action;
+    if (rm != null && !rm.byMe) {
+      label = 'Terima main lagi';
+      action = _busy ? null : _rematch;
+    } else if (rm != null && rm.byMe) {
+      label = 'Menunggu lawan…';
+      action = () => _openRematch(rm.id);
+    } else {
+      label = 'Main lagi';
+      action = _busy ? null : _rematch;
+    }
+    return ChessResultOverlay(
+      outcome: g.outcomeFor(g.myColor)!,
+      reason: chessEndText(g),
+      myColor: g.myColor ?? 'w',
+      rematchLabel: label,
+      onClose: () => setState(() => _showResult = false),
+      onRematch: action == null
+          ? null
+          : () {
+              setState(() => _showResult = false);
+              action!();
+            },
     );
   }
 
@@ -508,9 +550,17 @@ class _ChessGameScreenState extends ConsumerState<ChessGameScreen> with WidgetsB
     final lastTo = _pendingUci?.substring(2, 4) ?? g.lastMove?.to;
 
     return LayoutBuilder(builder: (context, c) {
-      final maxBoard = c.maxWidth - 24;
-      final boardSize = maxBoard.clamp(0.0, c.maxHeight * 0.62).toDouble();
-      return ListView(
+      final maxBoard = c.maxWidth - 24 - 10; // 10 = bingkai papan
+      final boardSize = maxBoard.clamp(0.0, c.maxHeight * 0.6).toDouble();
+      return DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: RadialGradient(
+            center: Alignment(0, -0.2),
+            radius: 1.0,
+            colors: [Color(0xFF1B2232), AppColors.backgroundDark],
+          ),
+        ),
+        child: ListView(
         physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
         padding: EdgeInsets.fromLTRB(12, 6, 12, 24 + MediaQuery.paddingOf(context).bottom),
         children: [
@@ -523,7 +573,10 @@ class _ChessGameScreenState extends ConsumerState<ChessGameScreen> with WidgetsB
           ),
           const SizedBox(height: 8),
           Center(
-            child: SizedBox.square(
+            child: ChessBoardFrame(
+              myTurn: g.isActive && g.isMyTurn && _pendingUci == null,
+              inCheck: g.isActive && g.inCheck && _pendingUci == null,
+              child: SizedBox.square(
               dimension: boardSize,
               child: ChessBoardView(
                 pieces: _pieces,
@@ -538,6 +591,7 @@ class _ChessGameScreenState extends ConsumerState<ChessGameScreen> with WidgetsB
                 onSelect: (s) => setState(() => _selected = s),
                 onMove: _onMove,
                 dimmed: g.isWaiting,
+              ),
               ),
             ),
           ),
@@ -556,6 +610,7 @@ class _ChessGameScreenState extends ConsumerState<ChessGameScreen> with WidgetsB
             _MoveList(history: g.history, controller: _movesScroll),
           ],
         ],
+        ),
       );
     });
   }
@@ -598,10 +653,45 @@ class _ChessGameScreenState extends ConsumerState<ChessGameScreen> with WidgetsB
           text = 'Giliran lawan';
           if (first != null) text += ' · ${(first / 1000).ceil()} dtk untuk langkah pertama';
         }
-        return Text(
-          text,
-          textAlign: TextAlign.center,
-          style: TextStyle(color: color, fontSize: 14, fontWeight: FontWeight.w700),
+        final mine = g.isMyTurn && _pendingUci == null;
+        final check = g.inCheck && g.isMyTurn;
+        return Center(
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 250),
+            transitionBuilder: (child, a) => FadeTransition(
+              opacity: a,
+              child: ScaleTransition(scale: Tween<double>(begin: 0.9, end: 1).animate(a), child: child),
+            ),
+            child: Container(
+              key: ValueKey('$mine$check'),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(30),
+                color: check
+                    ? AppColors.accentViolet.withValues(alpha: 0.2)
+                    : (mine ? Colors.white.withValues(alpha: 0.1) : Colors.white.withValues(alpha: 0.04)),
+                border: Border.all(
+                  color: check
+                      ? AppColors.accentViolet.withValues(alpha: 0.7)
+                      : Colors.white.withValues(alpha: mine ? 0.25 : 0.08),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (mine) ...[
+                    Icon(
+                      check ? Icons.warning_amber_rounded : Icons.touch_app_rounded,
+                      size: 16,
+                      color: color,
+                    ),
+                    const SizedBox(width: 6),
+                  ],
+                  Text(text, style: TextStyle(color: color, fontSize: 13.5, fontWeight: FontWeight.w700)),
+                ],
+              ),
+            ),
+          ),
         );
       },
     ));
@@ -746,10 +836,41 @@ class _ChessGameScreenState extends ConsumerState<ChessGameScreen> with WidgetsB
       rematchButton = _SmallButton(label: 'Main lagi', primary: true, onTap: _busy ? null : _rematch);
     }
 
-    return _Card(
-      borderColor: accent.withValues(alpha: 0.5),
+    final icon = switch (outcome) {
+      'win' => Icons.emoji_events_rounded,
+      'loss' => Icons.sentiment_dissatisfied_rounded,
+      'draw' => Icons.handshake_rounded,
+      _ => Icons.flag_rounded,
+    };
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [accent.withValues(alpha: 0.18), AppColors.surfaceCard],
+        ),
+        border: Border.all(color: accent.withValues(alpha: 0.5)),
+      ),
+      child: Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: TextStyle(color: accent, fontSize: 22, fontWeight: FontWeight.w800)),
+        Row(
+          children: [
+            Icon(icon, color: accent, size: 26),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(title, style: TextStyle(color: accent, fontSize: 22, fontWeight: FontWeight.w800)),
+            ),
+            if (outcome != null)
+              IconButton(
+                tooltip: 'Putar ulang animasi',
+                onPressed: () => setState(() => _showResult = true),
+                icon: const Icon(Icons.replay_rounded, color: AppColors.textSecondary),
+              ),
+          ],
+        ),
         const SizedBox(height: 4),
         Text(chessEndText(g), style: const TextStyle(color: AppColors.textSecondary, fontSize: 13.5)),
         const SizedBox(height: 14),
@@ -761,6 +882,7 @@ class _ChessGameScreenState extends ConsumerState<ChessGameScreen> with WidgetsB
           ],
         ),
       ],
+      ),
     );
   }
 }
@@ -802,10 +924,29 @@ class _PlayerBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = player;
     final showClock = game.isActive || game.isOver;
-    return Row(
+    final turn = game.isActive && game.turn == color;
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 250),
+      padding: const EdgeInsets.fromLTRB(8, 7, 7, 7),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        color: turn ? Colors.white.withValues(alpha: 0.07) : Colors.white.withValues(alpha: 0.025),
+        border: Border.all(
+          color: turn ? AppColors.accentViolet.withValues(alpha: 0.55) : Colors.white.withValues(alpha: 0.06),
+        ),
+      ),
+      child: Row(
       children: [
         if (p != null)
-          FriendAvatar(url: p.avatarUrl, seed: p.uid, label: p.username, size: 34)
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 250),
+            padding: const EdgeInsets.all(2),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: turn ? AppColors.accentViolet : Colors.transparent, width: 2),
+            ),
+            child: FriendAvatar(url: p.avatarUrl, seed: p.uid, label: p.username, size: 34),
+          )
         else
           Container(
             width: 34,
@@ -868,6 +1009,7 @@ class _PlayerBar extends StatelessWidget {
             },
           ),
       ],
+      ),
     );
   }
 }
