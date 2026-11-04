@@ -18,6 +18,7 @@ import 'data/repository/auth_repository.dart';
 import 'data/repository/chat_repository.dart';
 import 'data/repository/clan_repository.dart';
 import 'data/repository/clan_chat_repository.dart';
+import 'data/repository/clan_access_repository.dart';
 import 'data/repository/clan_daily_repository.dart';
 import 'data/repository/public_profile_repository.dart';
 import 'data/repository/safety_repository.dart';
@@ -714,6 +715,11 @@ final clanChatRepositoryProvider = Provider<ClanChatRepository>(
 /// Absen harian clan (Edge Function `clan-daily`).
 final clanDailyRepositoryProvider = Provider<ClanDailyRepository>(
   (ref) => ClanDailyRepository(ref.watch(supabaseDioProvider)),
+);
+
+/// Mode join, level minimal & undangan clan (Edge Function `clan-access`).
+final clanAccessRepositoryProvider = Provider<ClanAccessRepository>(
+  (ref) => ClanAccessRepository(ref.watch(supabaseDioProvider)),
 );
 
 final privateChatRepositoryProvider = Provider<PrivateChatRepository>(

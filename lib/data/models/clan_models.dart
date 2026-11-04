@@ -39,6 +39,8 @@ class Clan {
     this.memberLimit = 30,
     this.treasuryBalance = 0,
     this.badgeStyle,
+    this.joinMode,
+    this.minLevel = 1,
   });
 
   final String id;
@@ -59,6 +61,13 @@ class Clan {
   /// Id badge tag yang dipasang (lihat ClanBadgeStyle); null = pelangi bawaan.
   final String? badgeStyle;
 
+  /// Mode join (lihat [ClanJoinMode]). null = server belum mengirim kolom ini
+  /// (perlakukan seperti mode lama: request join biasa).
+  final String? joinMode;
+
+  /// Level XP minimal untuk join/request (undangan bebas level).
+  final int minLevel;
+
   factory Clan.fromJson(Map<String, dynamic> j) => Clan(
         id: (j['id'] as String?) ?? '',
         tag: (j['tag'] as String?) ?? '',
@@ -72,7 +81,47 @@ class Clan {
         memberLimit: (j['member_limit'] as num?)?.toInt() ?? 30,
         treasuryBalance: (j['treasury_balance'] as num?)?.toInt() ?? 0,
         badgeStyle: j['badge_style'] as String?,
+        joinMode: j['join_mode'] as String?,
+        minLevel: (j['min_level'] as num?)?.toInt() ?? 1,
       );
+}
+
+/// Mode join clan (kolom `clans.join_mode`). Aturannya ditegakkan server.
+class ClanJoinMode {
+  ClanJoinMode._();
+
+  static const String open = 'open';
+  static const String approval = 'approval';
+  static const String invite = 'invite';
+  static const String closed = 'closed';
+
+  static const List<String> all = [open, approval, invite, closed];
+
+  static String label(String? mode) {
+    switch (mode) {
+      case open:
+        return 'Terbuka';
+      case invite:
+        return 'Hanya Undangan';
+      case closed:
+        return 'Tertutup';
+      default:
+        return 'Butuh Persetujuan';
+    }
+  }
+
+  static String description(String mode) {
+    switch (mode) {
+      case open:
+        return 'Siapa pun yang memenuhi level langsung jadi anggota';
+      case invite:
+        return 'Hanya bisa masuk lewat undangan leader/pengurus';
+      case closed:
+        return 'Tidak menerima anggota baru, undangan juga dimatikan';
+      default:
+        return 'Request join harus di-approve leader/pengurus';
+    }
+  }
 }
 
 /// Baris tabel `clan_members`.

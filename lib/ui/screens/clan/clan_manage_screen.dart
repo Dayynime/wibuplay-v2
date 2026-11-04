@@ -12,6 +12,7 @@ import '../../app_routes.dart';
 import '../../components/clan_badge_styles.dart';
 import '../../components/clan_tag_badge.dart';
 import '../../components/game_badges.dart';
+import 'clan_access_widgets.dart';
 import 'clan_badge_shop_screen.dart';
 import 'clan_widgets.dart';
 import '../../glass/glass.dart';
@@ -88,7 +89,8 @@ class _ClanManageScreenState extends ConsumerState<ClanManageScreen> {
   @override
   Widget build(BuildContext context) {
     final pending = ref.watch(clanPendingRequestsProvider(widget.clanId));
-    final clan = ref.watch(clanDetailProvider(widget.clanId)).valueOrNull?.clan;
+    final detail = ref.watch(clanDetailProvider(widget.clanId)).valueOrNull;
+    final clan = detail?.clan;
     final tab = _isLeader ? _tab : 0;
 
     return GlassScaffold(
@@ -112,12 +114,27 @@ class _ClanManageScreenState extends ConsumerState<ClanManageScreen> {
           ),
           Expanded(
             child: tab == 0
-                ? _RequestsTab(
-                    pending: pending,
-                    busyId: _busyId,
-                    onRetry: () => ref.invalidate(clanPendingRequestsProvider(widget.clanId)),
-                    onApprove: (r) => _respond(r, true),
-                    onReject: (r) => _respond(r, false),
+                ? Column(
+                    children: [
+                      // Undang teman: leader & pengurus (dicek lagi di server).
+                      if (clan != null && ClanRoles.canManageClan(widget.myRole))
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                          child: ClanInviteButton(
+                            clan: clan,
+                            memberUids: {for (final m in detail!.members) m.firebaseUid},
+                          ),
+                        ),
+                      Expanded(
+                        child: _RequestsTab(
+                          pending: pending,
+                          busyId: _busyId,
+                          onRetry: () => ref.invalidate(clanPendingRequestsProvider(widget.clanId)),
+                          onApprove: (r) => _respond(r, true),
+                          onReject: (r) => _respond(r, false),
+                        ),
+                      ),
+                    ],
                   )
                 : clan == null
                     ? const Center(
@@ -762,6 +779,9 @@ class _SettingsTabState extends ConsumerState<_SettingsTab> {
             ],
           ),
         ),
+        const SizedBox(height: 16),
+        // Mode join + level minimal
+        ClanJoinSettingsCard(clan: clan, onChanged: widget.onChanged),
         const SizedBox(height: 16),
         // Kartu Badge Clan
         _BadgeEntry(clan: clan),

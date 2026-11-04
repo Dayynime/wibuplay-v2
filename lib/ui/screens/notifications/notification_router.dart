@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/models/clan_models.dart';
 import '../../../providers.dart';
 import '../../app_routes.dart';
+import '../clan/clan_access_widgets.dart';
 import '../clan/clan_manage_screen.dart';
 import '../clan/clan_screen.dart';
 import '../friends/friends_screen.dart';
@@ -51,6 +52,10 @@ Future<void> openNotificationTarget(
     case 'nobar_invite':
       await handleNobarInviteNotification(ref, data);
       return;
+
+    case 'clan_invite':
+      await handleClanInviteNotification(ref, data);
+      return;
   }
 }
 
@@ -60,6 +65,7 @@ IconData notificationIcon(String type) => switch (type) {
       'friend_accepted' => Icons.how_to_reg_rounded,
       'clan_join_request' => Icons.group_add_rounded,
       'clan_joined' => Icons.shield_rounded,
+      'clan_invite' => Icons.mail_rounded,
       'nobar_invite' => Icons.groups_rounded,
       'nobar_declined' => Icons.group_off_rounded,
       _ => Icons.notifications_rounded,

@@ -64,12 +64,14 @@ class _ClanScreenState extends ConsumerState<ClanScreen> {
     ref.invalidate(myClanMembershipProvider);
   }
 
-  Future<void> _join() async {
+  Future<void> _join(String? joinMode) async {
     setState(() => _joining = true);
     try {
       await ref.read(clanRepositoryProvider).submitJoinRequest(widget.clanId);
       _refreshAll();
-      _toast('Request join terkirim, tunggu di-approve leader/officer ya');
+      _toast(joinMode == ClanJoinMode.open
+          ? 'Selamat, kamu sekarang anggota clan ini!'
+          : 'Request join terkirim, tunggu di-approve leader/officer ya');
     } on ClanException catch (e) {
       _toast(e.message);
     } finally {
@@ -234,8 +236,11 @@ class _ClanScreenState extends ConsumerState<ClanScreen> {
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
               child: _HeaderCard(
                 data: d,
+                myLevel: d.myUid.isEmpty
+                    ? null
+                    : ref.watch(myXpProvider(d.myUid)).whenOrNull(data: (x) => x?.level ?? 1),
                 joining: _joining,
-                onJoin: _join,
+                onJoin: () => _join(d.clan.joinMode),
                 onDonate: _donate,
                 onLeave: _leave,
                 onManage: () => _openManage(d),
@@ -359,6 +364,7 @@ class _ClanScreenState extends ConsumerState<ClanScreen> {
 class _HeaderCard extends StatelessWidget {
   const _HeaderCard({
     required this.data,
+    required this.myLevel,
     required this.joining,
     required this.onJoin,
     required this.onDonate,
@@ -367,6 +373,9 @@ class _HeaderCard extends StatelessWidget {
   });
 
   final ClanDetailData data;
+
+  /// Level XP user yang login (null = belum termuat / tidak login).
+  final int? myLevel;
   final bool joining;
   final VoidCallback onJoin;
   final VoidCallback onDonate;
@@ -501,7 +510,9 @@ class _HeaderCard extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 12),
+                _AccessChips(clan: c),
+                const SizedBox(height: 14),
                 _actions(),
               ],
             ),
@@ -511,17 +522,32 @@ class _HeaderCard extends StatelessWidget {
     );
   }
 
+  Widget _joinAction(Clan c) {
+    if (c.joinMode == ClanJoinMode.closed) {
+      return const _StatusPill('Clan Tertutup', icon: Icons.lock_rounded);
+    }
+    if (c.joinMode == ClanJoinMode.invite) {
+      return const _StatusPill('Hanya Lewat Undangan', icon: Icons.mail_lock_rounded);
+    }
+    final lvl = myLevel;
+    if (lvl != null && lvl < c.minLevel) {
+      return _StatusPill('Butuh Level ${c.minLevel}', icon: Icons.trending_up_rounded);
+    }
+    final open = c.joinMode == ClanJoinMode.open;
+    return ClanGradientButton(
+      text: open ? 'Gabung Sekarang' : 'Join Clan',
+      icon: open ? Icons.login_rounded : Icons.person_add_alt_1_rounded,
+      loading: joining,
+      onTap: onJoin,
+    );
+  }
+
   Widget _actions() {
     switch (data.cta) {
       case ClanCta.login:
         return const _StatusPill('Login dulu untuk gabung clan');
       case ClanCta.join:
-        return ClanGradientButton(
-          text: 'Join Clan',
-          icon: Icons.person_add_alt_1_rounded,
-          loading: joining,
-          onTap: onJoin,
-        );
+        return _joinAction(data.clan);
       case ClanCta.pending:
         return const _StatusPill('Menunggu Persetujuan');
       case ClanCta.blockedOtherClan:
@@ -664,12 +690,22 @@ class _Stat extends StatelessWidget {
 }
 
 class _StatusPill extends StatelessWidget {
-  const _StatusPill(this.text);
+  const _StatusPill(this.text, {this.icon});
 
   final String text;
+  final IconData? icon;
 
   @override
   Widget build(BuildContext context) {
+    const color = Color(0x8CFFFFFF);
+    final label = Text(
+      text,
+      style: const TextStyle(
+        color: color,
+        fontSize: 14,
+        fontWeight: FontWeight.w700,
+      ),
+    );
     return Container(
       height: 50,
       alignment: Alignment.center,
@@ -677,13 +713,71 @@ class _StatusPill extends StatelessWidget {
         color: const Color(0x14FFFFFF),
         borderRadius: BorderRadius.circular(16),
       ),
-      child: Text(
-        text,
-        style: const TextStyle(
-          color: Color(0x8CFFFFFF),
-          fontSize: 14,
-          fontWeight: FontWeight.w700,
-        ),
+      child: icon == null
+          ? label
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 17, color: color),
+                const SizedBox(width: 8),
+                label,
+              ],
+            ),
+    );
+  }
+}
+
+/// Chip kecil: mode join clan + level minimal.
+class _AccessChips extends StatelessWidget {
+  const _AccessChips({required this.clan});
+
+  final Clan clan;
+
+  static (IconData, Color) _style(String? mode) {
+    switch (mode) {
+      case ClanJoinMode.open:
+        return (Icons.lock_open_rounded, const Color(0xFF34D399));
+      case ClanJoinMode.invite:
+        return (Icons.mail_lock_rounded, const Color(0xFF60A5FA));
+      case ClanJoinMode.closed:
+        return (Icons.lock_rounded, const Color(0xFFFF8A98));
+      default:
+        return (Icons.how_to_reg_rounded, heroGold);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final (icon, color) = _style(clan.joinMode);
+    return Wrap(
+      spacing: 8,
+      runSpacing: 6,
+      children: [
+        _chip(icon, ClanJoinMode.label(clan.joinMode), color),
+        if (clan.minLevel > 1)
+          _chip(Icons.military_tech_rounded, 'Min. Level ${clan.minLevel}', AppColors.accentVioletLight),
+      ],
+    );
+  }
+
+  Widget _chip(IconData icon, String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: color),
+          const SizedBox(width: 5),
+          Text(
+            text,
+            style: TextStyle(color: color, fontSize: 11.5, fontWeight: FontWeight.w700),
+          ),
+        ],
       ),
     );
   }
