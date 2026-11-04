@@ -41,6 +41,7 @@ class Clan {
     this.badgeStyle,
     this.joinMode,
     this.minLevel = 1,
+    this.leaderboardHidden = false,
   });
 
   final String id;
@@ -68,6 +69,9 @@ class Clan {
   /// Level XP minimal untuk join/request (undangan bebas level).
   final int minLevel;
 
+  /// true = tidak ikut diperingkat (mis. clan khusus admin).
+  final bool leaderboardHidden;
+
   factory Clan.fromJson(Map<String, dynamic> j) => Clan(
         id: (j['id'] as String?) ?? '',
         tag: (j['tag'] as String?) ?? '',
@@ -83,6 +87,7 @@ class Clan {
         badgeStyle: j['badge_style'] as String?,
         joinMode: j['join_mode'] as String?,
         minLevel: (j['min_level'] as num?)?.toInt() ?? 1,
+        leaderboardHidden: j['leaderboard_hidden'] == true,
       );
 }
 

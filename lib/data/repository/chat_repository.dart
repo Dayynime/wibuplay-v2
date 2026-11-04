@@ -246,6 +246,7 @@ class ChatRepository {
       'rest/v1/clans',
       queryParameters: {
         'select': 'id,tag,photo_url,level,total_xp',
+        'leaderboard_hidden': 'is.false',
         'order': 'level.desc,total_xp.desc',
         'limit': limit,
       },

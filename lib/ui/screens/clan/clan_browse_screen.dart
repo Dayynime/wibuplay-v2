@@ -122,6 +122,8 @@ class _ClanBrowseScreenState extends ConsumerState<ClanBrowseScreen> {
                 final q = _query.trim().toLowerCase();
                 var list = all.where((c) {
                   if (_mode == ClanBrowseMode.mine && c.id != myClanId) return false;
+                  // Clan khusus (mis. admin) tidak ikut diperingkat.
+                  if (_mode == ClanBrowseMode.leaderboard && c.leaderboardHidden) return false;
                   return q.isEmpty ||
                       c.name.toLowerCase().contains(q) ||
                       c.tag.toLowerCase().contains(q);
