@@ -11,6 +11,7 @@ import '../../components/role_badges.dart';
 import '../../app_routes.dart';
 import '../../components/hero_slides.dart' show heroGold;
 import 'clan_chat_screen.dart';
+import 'clan_daily_card.dart';
 import 'clan_manage_screen.dart';
 import 'clan_widgets.dart';
 import '../profile/public_profile_screen.dart';
@@ -264,6 +265,14 @@ class _ClanScreenState extends ConsumerState<ClanScreen> {
                     ),
                   ),
                 ),
+              ),
+            ),
+          // Absen harian: hanya untuk anggota clan ini (server tetap memverifikasi).
+          if (d.myRole != null)
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(16, 0, 16, 14),
+                child: ClanDailyCard(),
               ),
             ),
           SliverToBoxAdapter(
