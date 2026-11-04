@@ -9,6 +9,7 @@ import '../../../data/repository/nobar_repository.dart';
 import '../../../providers.dart';
 import '../../app_routes.dart';
 import '../../components/friend_avatar.dart';
+import '../../components/friend_search_field.dart';
 import '../../components/net_image.dart';
 import 'nobar_screen.dart';
 
@@ -42,6 +43,7 @@ class _InviteSheetState extends ConsumerState<_InviteSheet> {
   List<FriendDisplay>? _friends;
   String? _error;
   String? _sending;
+  String _query = '';
   final Set<String> _sent = <String>{};
 
   @override
@@ -90,7 +92,8 @@ class _InviteSheetState extends ConsumerState<_InviteSheet> {
     final h = MediaQuery.sizeOf(context).height;
     final inRoom = widget.room.members.map((m) => m.uid).toSet();
     final full = widget.room.members.length >= widget.room.maxMembers;
-    final friends = _friends;
+    final all = _friends;
+    final friends = all == null ? null : filterFriends(all, _query);
 
     Widget list;
     if (_error != null) {
@@ -103,6 +106,8 @@ class _InviteSheetState extends ConsumerState<_InviteSheet> {
         padding: EdgeInsets.all(24),
         child: Center(child: CircularProgressIndicator(color: AppColors.accentViolet)),
       );
+    } else if (friends.isEmpty && all!.isNotEmpty) {
+      list = const FriendSearchEmpty();
     } else if (friends.isEmpty) {
       list = const Padding(
         padding: EdgeInsets.all(16),
@@ -160,7 +165,9 @@ class _InviteSheetState extends ConsumerState<_InviteSheet> {
       );
     }
 
-    return SafeArea(
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: SafeArea(
       top: false,
       child: ConstrainedBox(
         constraints: BoxConstraints(maxHeight: h * 0.8),
@@ -181,6 +188,10 @@ class _InviteSheetState extends ConsumerState<_InviteSheet> {
                     : 'Temanmu dapat notifikasi dan tinggal tekan Gabung.',
                 style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13),
               ),
+              if ((all?.isNotEmpty ?? false)) ...[
+                const SizedBox(height: 10),
+                FriendSearchField(onChanged: (v) => setState(() => _query = v)),
+              ],
               const SizedBox(height: 8),
               Flexible(child: list),
               const Divider(color: Colors.white12),
@@ -203,6 +214,7 @@ class _InviteSheetState extends ConsumerState<_InviteSheet> {
             ],
           ),
         ),
+      ),
       ),
     );
   }

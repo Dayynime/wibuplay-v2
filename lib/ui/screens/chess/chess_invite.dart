@@ -10,6 +10,7 @@ import '../../../data/repository/chess_repository.dart';
 import '../../../providers.dart';
 import '../../app_routes.dart';
 import '../../components/friend_avatar.dart';
+import '../../components/friend_search_field.dart';
 import 'chess_game_screen.dart';
 
 // Undangan catur dikirim sebagai pesan teks biasa di chat (global, clan,
@@ -186,6 +187,7 @@ class _ShareSheetState extends ConsumerState<_ShareSheet> {
   final Set<String> _sent = <String>{};
   List<FriendDisplay>? _friends;
   bool _showFriends = false;
+  String _query = '';
   String? _friendError;
 
   String get _text => chessInviteText(widget.game);
@@ -263,7 +265,9 @@ class _ShareSheetState extends ConsumerState<_ShareSheet> {
   Widget build(BuildContext context) {
     final clan = ref.watch(myClanMembershipProvider).valueOrNull;
     final h = MediaQuery.sizeOf(context).height;
-    return SafeArea(
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: SafeArea(
       top: false,
       child: ConstrainedBox(
         constraints: BoxConstraints(maxHeight: h * 0.8),
@@ -296,6 +300,7 @@ class _ShareSheetState extends ConsumerState<_ShareSheet> {
           ),
         ),
       ),
+      ),
     );
   }
 
@@ -321,7 +326,8 @@ class _ShareSheetState extends ConsumerState<_ShareSheet> {
   }
 
   Widget _friendList() {
-    final friends = _friends;
+    final all = _friends;
+    final friends = all == null ? null : filterFriends(all, _query);
     Widget body;
     if (_friendError != null) {
       body = Padding(
@@ -333,6 +339,8 @@ class _ShareSheetState extends ConsumerState<_ShareSheet> {
         padding: EdgeInsets.all(24),
         child: Center(child: CircularProgressIndicator(color: AppColors.accentViolet)),
       );
+    } else if (friends.isEmpty && all!.isNotEmpty) {
+      body = const FriendSearchEmpty();
     } else if (friends.isEmpty) {
       body = const Padding(
         padding: EdgeInsets.all(16),
@@ -375,6 +383,10 @@ class _ShareSheetState extends ConsumerState<_ShareSheet> {
           icon: const Icon(Icons.arrow_back_rounded, size: 18),
           label: const Text('Kembali'),
         ),
+        if ((all?.isNotEmpty ?? false)) ...[
+          FriendSearchField(onChanged: (v) => setState(() => _query = v)),
+          const SizedBox(height: 8),
+        ],
         Flexible(child: body),
       ],
     );

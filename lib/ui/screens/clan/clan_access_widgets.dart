@@ -9,6 +9,7 @@ import '../../../data/repository/clan_access_repository.dart';
 import '../../../providers.dart';
 import '../../app_routes.dart';
 import '../../components/friend_avatar.dart';
+import '../../components/friend_search_field.dart';
 import 'clan_screen.dart';
 import 'clan_widgets.dart';
 
@@ -404,10 +405,8 @@ class _InviteSheetState extends ConsumerState<_InviteSheet> {
   @override
   Widget build(BuildContext context) {
     final h = MediaQuery.sizeOf(context).height;
-    final q = _query.trim().toLowerCase();
-    final friends = _friends
-        ?.where((f) => q.isEmpty || f.username.toLowerCase().contains(q))
-        .toList();
+    final all = _friends;
+    final friends = all == null ? null : filterFriends(all, _query);
 
     Widget list;
     if (_error != null) {
@@ -420,14 +419,13 @@ class _InviteSheetState extends ConsumerState<_InviteSheet> {
         padding: EdgeInsets.all(24),
         child: Center(child: CircularProgressIndicator(color: AppColors.accentViolet)),
       );
-    } else if (friends.isEmpty) {
-      list = Padding(
-        padding: const EdgeInsets.all(16),
-        child: Text(
-          q.isEmpty ? 'Kamu belum punya teman di Zenime.' : 'Tidak ada teman dengan nama itu.',
-          style: const TextStyle(color: AppColors.textSecondary),
-        ),
+    } else if (all!.isEmpty) {
+      list = const Padding(
+        padding: EdgeInsets.all(16),
+        child: Text('Kamu belum punya teman di Zenime.', style: TextStyle(color: AppColors.textSecondary)),
       );
+    } else if (friends.isEmpty) {
+      list = const FriendSearchEmpty();
     } else {
       list = ListView.builder(
         shrinkWrap: true,
@@ -500,25 +498,8 @@ class _InviteSheetState extends ConsumerState<_InviteSheet> {
                   'Temanmu dapat notifikasi dan tinggal tekan Gabung. Undangan bebas level.',
                   style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13),
                 ),
-                if ((_friends?.length ?? 0) > 6) ...[
-                  const SizedBox(height: 10),
-                  TextField(
-                    onChanged: (v) => setState(() => _query = v),
-                    style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      isDense: true,
-                      hintText: 'Cari teman',
-                      hintStyle: const TextStyle(color: AppColors.textMuted),
-                      prefixIcon: const Icon(Icons.search_rounded, color: AppColors.textMuted, size: 20),
-                      filled: true,
-                      fillColor: const Color(0x0FFFFFFF),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                  ),
-                ],
+                const SizedBox(height: 10),
+                FriendSearchField(onChanged: (v) => setState(() => _query = v)),
                 const SizedBox(height: 8),
                 Flexible(child: list),
               ],
