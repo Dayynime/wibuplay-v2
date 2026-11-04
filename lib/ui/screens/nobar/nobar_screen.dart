@@ -18,6 +18,7 @@ import '../../../data/repository/nobar_repository.dart';
 import '../../../data/voice/nobar_voice.dart';
 import '../../../providers.dart';
 import '../../components/mini_player.dart';
+import '../../components/net_image.dart';
 import '../player/player_controller.dart';
 import 'nobar_invite.dart';
 import 'nobar_voice_panel.dart';
@@ -652,34 +653,52 @@ class _NobarScreenState extends ConsumerState<NobarScreen> with WidgetsBindingOb
 
   Widget _portraitLayout(PlayerUiState ui) {
     final voice = _voice;
-    return SafeArea(
-      bottom: false,
-      child: Column(
-        children: [
-          AspectRatio(aspectRatio: 16 / 9, child: _videoBox(ui)),
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 32),
-              children: [
-                _header(ui),
-                const SizedBox(height: 16),
-                if (voice != null)
-                  NobarVoicePanel(
-                    room: _room,
-                    voice: voice,
-                    myUid: _uid ?? '',
-                    onKick: _kick,
-                    onInvite: _openInvite,
-                  ),
-                const SizedBox(height: 16),
-                _volumeRow(),
-                const SizedBox(height: 16),
-                _episodeSection(ui),
-              ],
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    return Stack(
+      children: [
+        SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              AspectRatio(aspectRatio: 16 / 9, child: _videoBox(ui)),
+              Expanded(
+                child: ListView(
+                  padding: EdgeInsets.fromLTRB(16, 16, 16, 130 + bottomInset),
+                  children: [
+                    _roomHeader(ui),
+                    const SizedBox(height: 22),
+                    if (voice != null)
+                      NobarMembersStrip(
+                        room: _room,
+                        voice: voice,
+                        myUid: _uid ?? '',
+                        onKick: _kick,
+                        onInvite: _openInvite,
+                      ),
+                    const SizedBox(height: 26),
+                    _episodeSection(ui),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (voice != null)
+          Positioned(
+            left: 16,
+            right: 16,
+            bottom: 12 + bottomInset,
+            child: NobarControlDock(
+              voice: voice,
+              isHost: _isHost,
+              onVolume: _openVolume,
+              onMuteAll: () {
+                voice.forceMute(null);
+                _snack('Mic semua anggota dimatikan');
+              },
             ),
           ),
-        ],
-      ),
+      ],
     );
   }
 
@@ -699,11 +718,26 @@ class _NobarScreenState extends ConsumerState<NobarScreen> with WidgetsBindingOb
     );
   }
 
-  Widget _header(PlayerUiState ui) {
+  /// Poster + judul + episode + kode, dengan tombol Undang dan menu lainnya.
+  Widget _roomHeader(PlayerUiState ui) {
     final title = ui.anime?.title ?? _room.movieTitle ?? 'Nobar';
+    final poster = ui.anime?.posterUrl ?? _room.posterUrl ?? '';
     return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: SizedBox(
+            width: 46,
+            height: 64,
+            child: poster.isEmpty
+                ? const ColoredBox(
+                    color: AppColors.surfaceElevated,
+                    child: Icon(Icons.movie_rounded, color: AppColors.textMuted),
+                  )
+                : NetImage(poster, fit: BoxFit.cover),
+          ),
+        ),
+        const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -712,99 +746,153 @@ class _NobarScreenState extends ConsumerState<NobarScreen> with WidgetsBindingOb
                 title,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: AppColors.textWhite, fontSize: 17, fontWeight: FontWeight.w800),
+                style: const TextStyle(
+                  color: AppColors.textWhite,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  height: 1.25,
+                ),
               ),
-              const SizedBox(height: 4),
-              Text(_episodeLabel(ui), style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
+              const SizedBox(height: 5),
+              Row(
                 children: [
-                  _chip(
-                    icon: Icons.tag_rounded,
-                    label: _room.code,
-                    onTap: _copyCode,
-                    color: AppColors.accentViolet,
+                  Flexible(
+                    child: Text(
+                      _episodeLabel(ui),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: AppColors.textSecondary, fontSize: 12.5),
+                    ),
                   ),
-                  _chip(icon: Icons.person_add_alt_1_rounded, label: 'Undang', onTap: _openInvite),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 6),
+                    child: Text('·', style: TextStyle(color: AppColors.textMuted)),
+                  ),
+                  InkWell(
+                    onTap: _copyCode,
+                    borderRadius: BorderRadius.circular(6),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            _room.code,
+                            style: const TextStyle(
+                              color: AppColors.accentVioletLight,
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                          const SizedBox(width: 3),
+                          const Icon(Icons.copy_rounded, size: 12, color: AppColors.accentVioletLight),
+                        ],
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ],
           ),
         ),
         const SizedBox(width: 8),
-        IconButton.filledTonal(
-          tooltip: 'Keluar',
-          style: IconButton.styleFrom(backgroundColor: AppColors.surfaceElevated),
-          onPressed: _confirmLeave,
-          icon: const Icon(Icons.logout_rounded, color: AppColors.textWhite, size: 20),
+        FilledButton.icon(
+          style: FilledButton.styleFrom(
+            backgroundColor: AppColors.accentViolet,
+            foregroundColor: Colors.white,
+            visualDensity: VisualDensity.compact,
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            shape: const StadiumBorder(),
+          ),
+          onPressed: _openInvite,
+          icon: const Icon(Icons.person_add_alt_1_rounded, size: 18),
+          label: const Text('Undang', style: TextStyle(fontWeight: FontWeight.w700)),
+        ),
+        PopupMenuButton<String>(
+          tooltip: 'Lainnya',
+          color: AppColors.surfaceElevated,
+          icon: const Icon(Icons.more_vert_rounded, color: AppColors.textSecondary),
+          onSelected: (v) {
+            switch (v) {
+              case 'share':
+                _share();
+              case 'copy':
+                _copyCode();
+              case 'leave':
+                _confirmLeave();
+            }
+          },
+          itemBuilder: (_) => const [
+            PopupMenuItem(value: 'share', child: Text('Bagikan kode room')),
+            PopupMenuItem(value: 'copy', child: Text('Salin kode')),
+            PopupMenuItem(
+              value: 'leave',
+              child: Text('Keluar dari nobar', style: TextStyle(color: AppColors.errorRed)),
+            ),
+          ],
         ),
       ],
     );
   }
 
-  Widget _chip({required IconData icon, required String label, required VoidCallback onTap, Color? color}) {
-    final c = color ?? AppColors.textSecondary;
-    return Material(
-      color: c.withValues(alpha: 0.12),
-      shape: StadiumBorder(side: BorderSide(color: c.withValues(alpha: 0.4))),
-      child: InkWell(
-        customBorder: const StadiumBorder(),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 15, color: color ?? AppColors.textWhite),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  color: color ?? AppColors.textWhite,
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: label.length == 6 ? 1.5 : 0,
+  /// Lembar volume video (suara teman tidak ikut berubah).
+  void _openVolume() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.surfaceDark,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheet) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 12),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Suara video',
+                  style: TextStyle(color: AppColors.textWhite, fontSize: 16, fontWeight: FontWeight.w800),
                 ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _volumeRow() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 6, 6, 6),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceCard,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            _videoVolume == 0 ? Icons.volume_off_rounded : Icons.movie_rounded,
-            color: AppColors.textSecondary,
-            size: 20,
-          ),
-          const SizedBox(width: 10),
-          const Text('Suara video', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
-          Expanded(
-            child: Slider(
-              value: _videoVolume,
-              min: 0,
-              max: 100,
-              activeColor: AppColors.accentViolet,
-              onChanged: (v) {
-                setState(() => _videoVolume = v);
-                _vc?.setVolume(v);
-              },
+                const SizedBox(height: 2),
+                const Text(
+                  'Kecilkan supaya obrolan teman lebih jelas. Suara teman tidak ikut berubah.',
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 12.5),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(
+                      _videoVolume == 0 ? Icons.volume_off_rounded : Icons.volume_down_rounded,
+                      color: AppColors.textSecondary,
+                    ),
+                    Expanded(
+                      child: Slider(
+                        value: _videoVolume,
+                        min: 0,
+                        max: 100,
+                        activeColor: AppColors.accentViolet,
+                        onChanged: (v) {
+                          setState(() => _videoVolume = v);
+                          setSheet(() {});
+                          _vc?.setVolume(v);
+                        },
+                      ),
+                    ),
+                    SizedBox(
+                      width: 40,
+                      child: Text(
+                        '${_videoVolume.round()}%',
+                        textAlign: TextAlign.end,
+                        style: const TextStyle(color: AppColors.textSecondary, fontSize: 12.5),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -821,16 +909,28 @@ class _NobarScreenState extends ConsumerState<NobarScreen> with WidgetsBindingOb
               'Episode',
               style: TextStyle(color: AppColors.textWhite, fontSize: 15, fontWeight: FontWeight.w700),
             ),
+            const SizedBox(width: 8),
+            Text('${eps.length}', style: const TextStyle(color: AppColors.textMuted, fontSize: 12.5)),
             const Spacer(),
             if (!_isHost)
-              const Text('Dipilih host', style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
+              const Row(
+                children: [
+                  Icon(Icons.lock_outline_rounded, size: 13, color: AppColors.textMuted),
+                  SizedBox(width: 4),
+                  Text('Dipilih host', style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
+                ],
+              ),
           ],
         ),
-        const SizedBox(height: 10),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [for (final e in eps) _episodeChip(e, ui)],
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 42,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: eps.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 8),
+            itemBuilder: (_, i) => _episodeChip(eps[i], ui),
+          ),
         ),
       ],
     );
@@ -839,22 +939,31 @@ class _NobarScreenState extends ConsumerState<NobarScreen> with WidgetsBindingOb
   Widget _episodeChip(EpisodeItem e, PlayerUiState ui) {
     final current = e.id == ui.currentEpisodeId;
     return Material(
-      color: current ? AppColors.accentViolet : AppColors.surfaceElevated,
-      borderRadius: BorderRadius.circular(10),
+      color: current ? AppColors.accentViolet : Colors.white.withValues(alpha: 0.06),
+      borderRadius: BorderRadius.circular(12),
       child: InkWell(
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(12),
         onTap: !_isHost || current ? null : () => _hostPlayEpisode(e.id!),
         child: Container(
-          constraints: const BoxConstraints(minWidth: 48),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          constraints: const BoxConstraints(minWidth: 52),
+          padding: const EdgeInsets.symmetric(horizontal: 14),
           alignment: Alignment.center,
-          child: Text(
-            e.index ?? '?',
-            style: TextStyle(
-              color: current || _isHost ? AppColors.textWhite : AppColors.textMuted,
-              fontWeight: FontWeight.w700,
-              fontSize: 13,
-            ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (current) ...[
+                const Icon(Icons.graphic_eq_rounded, size: 15, color: Colors.white),
+                const SizedBox(width: 5),
+              ],
+              Text(
+                e.index ?? '?',
+                style: TextStyle(
+                  color: current || _isHost ? AppColors.textWhite : AppColors.textMuted,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13.5,
+                ),
+              ),
+            ],
           ),
         ),
       ),
