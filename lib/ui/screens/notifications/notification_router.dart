@@ -9,6 +9,7 @@ import '../clan/clan_manage_screen.dart';
 import '../clan/clan_screen.dart';
 import '../friends/friends_screen.dart';
 import '../nobar/nobar_invite.dart';
+import '../sticker/sticker_upload_screen.dart';
 
 /// Buka halaman tujuan sebuah notifikasi (dari lonceng, banner in-app, atau
 /// tap push di status bar). [data] = payload notif (`clan_id`, dll).
@@ -56,6 +57,11 @@ Future<void> openNotificationTarget(
     case 'clan_invite':
       await handleClanInviteNotification(ref, data);
       return;
+
+    case 'sticker_reviewed':
+      ref.invalidate(stickerCatalogProvider);
+      await nav.push<void>(fadeRoute(const StickerUploadScreen()));
+      return;
   }
 }
 
@@ -66,6 +72,7 @@ IconData notificationIcon(String type) => switch (type) {
       'clan_join_request' => Icons.group_add_rounded,
       'clan_joined' => Icons.shield_rounded,
       'clan_invite' => Icons.mail_rounded,
+      'sticker_reviewed' => Icons.emoji_emotions_rounded,
       'nobar_invite' => Icons.groups_rounded,
       'nobar_declined' => Icons.group_off_rounded,
       _ => Icons.notifications_rounded,

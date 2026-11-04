@@ -11,6 +11,7 @@ import '../../../data/repository/chat_repository.dart' show ChatRepository;
 import '../../../providers.dart';
 import '../../components/game_badges.dart' show UserAvatar;
 import '../../components/role_badges.dart';
+import 'admin_sticker_tab.dart';
 import 'admin_wallpaper_tab.dart';
 import '../../glass/glass.dart';
 
@@ -227,10 +228,12 @@ class _AdminScreenState extends ConsumerState<AdminScreen> {
       );
     }
 
+    final canReviewSticker = role == ZenimeRole.developer || role == ZenimeRole.admin;
     final labels = <String>[
       'Semua User',
       if (role == ZenimeRole.developer) 'Pemegang Role',
       'Wallpaper',
+      if (canReviewSticker) 'Stiker',
       'Info',
     ];
     final tab = _tab < labels.length ? _tab : 0;
@@ -290,6 +293,12 @@ class _AdminScreenState extends ConsumerState<AdminScreen> {
                 busy: _processing,
                 onAction: _run,
               ),
+              if (canReviewSticker)
+                AdminStickerTab(
+                  refresh: _refresh,
+                  busy: _processing,
+                  onAction: _run,
+                ),
               _InfoTab(role: role),
             ],
           ),

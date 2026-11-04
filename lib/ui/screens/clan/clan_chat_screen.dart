@@ -6,6 +6,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../data/models/chat_models.dart';
 import '../../../data/models/clan_chat_models.dart';
 import '../../../data/models/clan_models.dart';
+import '../../../data/models/sticker_models.dart';
 import '../../../data/repository/safety_repository.dart' show ReportChannel;
 import '../../../providers.dart';
 import '../../glass/glass.dart';
@@ -13,6 +14,7 @@ import '../chat/chat_screen.dart' show ChatMessageBubble, ChatEntryAnimation, pa
 import '../profile/public_profile_screen.dart';
 import '../safety/safety_actions.dart';
 import 'clan_chat_controller.dart';
+import '../sticker/sticker_widgets.dart';
 
 /// Chat internal clan sebagai layar penuh (tombol Chat Clan di halaman Clan).
 class ClanChatScreen extends StatelessWidget {
@@ -350,7 +352,7 @@ class _ClanChatPaneState extends ConsumerState<ClanChatPane> with WidgetsBinding
                   ),
                 ),
                 Text(
-                  target.message,
+                  stickerPreviewText(target.message),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
@@ -371,11 +373,15 @@ class _ClanChatPaneState extends ConsumerState<ClanChatPane> with WidgetsBinding
   Widget _buildInput(ClanChatState s) {
     return Container(
       color: AppColors.backgroundDarkSecondary,
-      padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+      padding: const EdgeInsets.fromLTRB(4, 8, 8, 8),
       child: SafeArea(
         top: false,
         child: Row(
           children: [
+            StickerButton(
+              enabled: !s.isSending,
+              onPicked: (t) => ref.read(clanChatControllerProvider.notifier).send(t),
+            ),
             Expanded(
               child: TextField(
                 controller: _input,

@@ -8,6 +8,8 @@ import '../../../data/repository/safety_repository.dart' show ReportChannel;
 import '../safety/safety_actions.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/comment_models.dart';
+import '../../../data/models/sticker_models.dart';
+import '../sticker/sticker_widgets.dart';
 import '../../../data/models/wallpaper_models.dart';
 import '../../../providers.dart';
 import '../../components/game_badges.dart';
@@ -470,7 +472,12 @@ class _CommentInputRowState extends ConsumerState<CommentInputRow> {
               size: 32,
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 2),
+          StickerButton(
+            size: 36,
+            enabled: loggedIn && !widget.isSending,
+            onPicked: (t) => widget.onSend(t, false),
+          ),
           Expanded(
             child: ValueListenableBuilder<TextEditingValue>(
               valueListenable: _text,
@@ -779,14 +786,17 @@ class CommentItem extends StatelessWidget {
                       ),
                     ),
                   ),
-                Text(
-                  comment.comment,
-                  style: const TextStyle(
-                    color: Color(0xE6FFFFFF),
-                    fontSize: 13,
-                    height: 1.35,
+                if (stickerCodeOf(comment.comment) case final code?)
+                  StickerView(code: code, size: 100)
+                else
+                  Text(
+                    comment.comment,
+                    style: const TextStyle(
+                      color: Color(0xE6FFFFFF),
+                      fontSize: 13,
+                      height: 1.35,
+                    ),
                   ),
-                ),
                 const SizedBox(height: 6),
                 Row(
                   children: [

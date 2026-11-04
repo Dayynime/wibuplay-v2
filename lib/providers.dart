@@ -20,6 +20,8 @@ import 'data/repository/clan_repository.dart';
 import 'data/repository/clan_chat_repository.dart';
 import 'data/repository/clan_access_repository.dart';
 import 'data/repository/clan_daily_repository.dart';
+import 'data/repository/sticker_repository.dart';
+import 'data/models/sticker_models.dart';
 import 'data/repository/public_profile_repository.dart';
 import 'data/repository/safety_repository.dart';
 import 'data/repository/comment_repository.dart';
@@ -721,6 +723,32 @@ final clanDailyRepositoryProvider = Provider<ClanDailyRepository>(
 final clanAccessRepositoryProvider = Provider<ClanAccessRepository>(
   (ref) => ClanAccessRepository(ref.watch(supabaseDioProvider)),
 );
+
+/// Stiker (katalog publik + upload Premium + review admin).
+final stickerRepositoryProvider = Provider<StickerRepository>(
+  (ref) => StickerRepository(ref.watch(supabaseDioProvider)),
+);
+
+/// Katalog stiker yang disetujui, per kode. Disimpan selama app hidup;
+/// di-refresh saat lembar stiker dibuka.
+final stickerCatalogProvider = FutureProvider<Map<String, Sticker>>((ref) async {
+  final list = await ref.watch(stickerRepositoryProvider).catalog();
+  return {for (final s in list) s.code: s};
+});
+
+/// Satu stiker untuk dirender di pesan. Cari di katalog dulu; kalau belum ada
+/// (baru disetujui setelah katalog dimuat), ambil satu dari server.
+/// null = kode tidak ada / sudah diturunkan.
+final stickerByCodeProvider = FutureProvider.family<Sticker?, String>((ref, code) async {
+  final catalog = await ref.watch(stickerCatalogProvider.future).catchError((_) => <String, Sticker>{});
+  final hit = catalog[code];
+  if (hit != null) return hit;
+  try {
+    return await ref.read(stickerRepositoryProvider).byCode(code);
+  } catch (_) {
+    return null;
+  }
+});
 
 final privateChatRepositoryProvider = Provider<PrivateChatRepository>(
   (ref) => PrivateChatRepository(ref.watch(supabaseDioProvider)),

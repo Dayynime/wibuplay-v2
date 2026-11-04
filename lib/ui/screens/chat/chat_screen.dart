@@ -28,6 +28,8 @@ import 'private_chat_controller.dart';
 import 'clan_chat_tab.dart';
 import 'wp_event_chat_card.dart';
 import '../chess/chess_invite.dart';
+import '../../../data/models/sticker_models.dart';
+import '../sticker/sticker_widgets.dart';
 import 'private_chat_pane.dart';
 import 'chat_controller.dart';
 import '../../components/avatar_frame.dart';
@@ -486,11 +488,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final blocked = s.cooldownSeconds > 0 || s.isSending;
     return Container(
       color: AppColors.backgroundDarkSecondary,
-      padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+      padding: const EdgeInsets.fromLTRB(4, 8, 8, 8),
       child: SafeArea(
         top: false,
         child: Row(
           children: [
+            StickerButton(
+              enabled: !blocked && s.myUid.isNotEmpty,
+              onPicked: (t) => _controller.send(t),
+            ),
             Expanded(
               child: TextField(
                 controller: _input,
@@ -725,7 +731,7 @@ class ChatMessageBubble extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      m.replyToMessage ?? '',
+                      stickerPreviewText(m.replyToMessage ?? ''),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
@@ -750,6 +756,8 @@ class ChatMessageBubble extends StatelessWidget {
               )
             else if (chessInviteCode(m.message) != null)
               ChessInviteCard(message: m.message, mine: mine)
+            else if (stickerCodeOf(m.message) case final code?)
+              StickerView(code: code)
             else
               Text(
                 m.message,

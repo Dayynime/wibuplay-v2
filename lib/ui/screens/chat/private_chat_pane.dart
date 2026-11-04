@@ -12,6 +12,8 @@ import '../../components/friend_avatar.dart';
 import '../../components/swipe_to_reply.dart';
 import 'private_chat_controller.dart';
 import '../chess/chess_invite.dart';
+import '../../../data/models/sticker_models.dart';
+import '../sticker/sticker_widgets.dart';
 import '../../glass/glass.dart';
 
 String _two(int n) => n.toString().padLeft(2, '0');
@@ -134,7 +136,7 @@ class _PrivateChatPaneState extends ConsumerState<PrivateChatPane> {
         if (s.replyTarget != null && s.selected != null)
           _ReplyPreviewBar(
             username: _author(s.replyTarget!.senderUid, s.selected!),
-            message: s.replyTarget!.message,
+            message: stickerPreviewText(s.replyTarget!.message),
             onCancel: _controller.clearReplyTarget,
           ),
         _DmInputBar(
@@ -143,6 +145,7 @@ class _PrivateChatPaneState extends ConsumerState<PrivateChatPane> {
               !ref.watch(blockedUsersProvider).contains(s.selected!.firebaseUid),
           isSending: s.isSending,
           onSend: _send,
+          onSticker: (t) => _controller.sendMessage(t),
         ),
       ],
     );
@@ -521,7 +524,7 @@ class _DmBubble extends StatelessWidget {
                                   ),
                                 ),
                                 Text(
-                                  m.replyToMessage ?? '',
+                                  stickerPreviewText(m.replyToMessage ?? ''),
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
@@ -547,6 +550,8 @@ class _DmBubble extends StatelessWidget {
               )
             else if (chessInviteCode(m.message) != null)
               ChessInviteCard(message: m.message, mine: isOwn)
+            else if (stickerCodeOf(m.message) case final code?)
+              StickerView(code: code)
             else
               Text(
                 m.message,
@@ -638,22 +643,25 @@ class _DmInputBar extends StatelessWidget {
     required this.enabled,
     required this.isSending,
     required this.onSend,
+    required this.onSticker,
   });
 
   final TextEditingController controller;
   final bool enabled;
   final bool isSending;
   final VoidCallback onSend;
+  final ValueChanged<String> onSticker;
 
   @override
   Widget build(BuildContext context) {
     return Container(
       color: AppColors.backgroundDarkSecondary,
-      padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+      padding: const EdgeInsets.fromLTRB(4, 8, 8, 8),
       child: SafeArea(
         top: false,
         child: Row(
           children: [
+            StickerButton(enabled: enabled && !isSending, onPicked: onSticker),
             Expanded(
               child: TextField(
                 controller: controller,
