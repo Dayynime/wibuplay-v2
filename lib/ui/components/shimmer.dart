@@ -1,5 +1,6 @@
 import 'dart:ui' as ui;
 
+import '../../core/lite_mode.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -19,21 +20,34 @@ class ShimmerBox extends StatefulWidget {
 }
 
 class _ShimmerBoxState extends State<ShimmerBox> with SingleTickerProviderStateMixin {
-  late final AnimationController _c = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 850),
-  )..repeat();
+  // Mode Ringan: tidak ada animasi sama sekali (controller tidak dibuat).
+  AnimationController? _ctrl;
+
+  AnimationController get _c => _ctrl ??= AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 850),
+      )..repeat();
 
   @override
   void dispose() {
-    _c.dispose();
+    _ctrl?.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final dpr = MediaQuery.devicePixelRatioOf(context);
     final radius = widget.borderRadius ?? BorderRadius.circular(12);
+    if (LiteMode.enabled) {
+      return ClipRRect(
+        borderRadius: radius,
+        child: SizedBox(
+          width: widget.width,
+          height: widget.height,
+          child: const ColoredBox(color: AppColors.surfaceDark),
+        ),
+      );
+    }
+    final dpr = MediaQuery.devicePixelRatioOf(context);
     return ClipRRect(
       borderRadius: radius,
       child: SizedBox(

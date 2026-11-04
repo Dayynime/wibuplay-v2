@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import '../../core/lite_mode.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -147,7 +148,8 @@ class FramedAvatar extends ConsumerWidget {
               height: size * scale,
               child: IgnorePointer(
                 child: Image(
-                  image: image,
+                  // Decode seukuran tampil; animasi WebP tetap jalan.
+                  image: ResizeImage.resizeIfNeeded(LiteMode.px(context, size * scale), null, image),
                   gaplessPlayback: true,
                   filterQuality: FilterQuality.medium,
                   // Gagal unduh = avatar tampil tanpa border.

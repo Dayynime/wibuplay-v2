@@ -1,4 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../core/lite_mode.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -46,6 +47,7 @@ class FriendAvatar extends StatelessWidget {
           child: has
               ? CachedNetworkImage(
                   imageUrl: url!,
+                  memCacheWidth: LiteMode.px(context, size),
                   fit: BoxFit.cover,
                   errorWidget: (_, __, ___) => fallback,
                 )

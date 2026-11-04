@@ -1,4 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../core/lite_mode.dart';
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
@@ -111,7 +112,11 @@ class _HeroBannerState extends State<HeroBanner> with SingleTickerProviderStateM
     final url = next.coverUrl;
     if (url.isEmpty) return;
     precacheImage(
-      CachedNetworkImageProvider(url, headers: netImageHeaders),
+      ResizeImage.resizeIfNeeded(
+        LiteMode.px(context, MediaQuery.sizeOf(context).width),
+        null,
+        CachedNetworkImageProvider(url, headers: netImageHeaders),
+      ),
       context,
       onError: (_, __) {},
     );

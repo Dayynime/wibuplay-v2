@@ -1,3 +1,4 @@
+import 'core/lite_mode.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
@@ -70,6 +71,8 @@ Future<void> main() async {
   MediaKit.ensureInitialized();
   // Mode decoder yang pernah terbukti jalan di HP ini (anti layar hitam).
   await WpDecoder.load();
+  // Mode Ringan (HP RAM kecil): cache & resolusi gambar lebih hemat.
+  await LiteMode.load();
 
   // Port MainActivity: edge-to-edge, status/nav bar warna BackgroundDark, ikon terang.
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);

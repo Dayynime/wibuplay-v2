@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/constants.dart';
+import '../../core/lite_mode.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/api/anichin_network.dart';
 import 'shimmer.dart';
@@ -46,9 +47,35 @@ class NetImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (url.isEmpty) return const SizedBox.expand();
+    // Decode seukuran kotak tampilnya (bukan ukuran asli gambar): hemat RAM.
+    // Kotak tegak (poster) dibatasi tingginya, kotak melebar (banner)
+    // dibatasi lebarnya, supaya BoxFit.cover tetap tajam.
+    return LayoutBuilder(builder: (context, c) {
+      int? w;
+      int? h;
+      final bw = c.maxWidth.isFinite ? c.maxWidth : 0.0;
+      final bh = c.maxHeight.isFinite ? c.maxHeight : 0.0;
+      if (bw > 0 && bh > 0) {
+        if (bh >= bw) {
+          h = LiteMode.px(context, bh);
+        } else {
+          w = LiteMode.px(context, bw);
+        }
+      } else if (bw > 0) {
+        w = LiteMode.px(context, bw);
+      } else if (bh > 0) {
+        h = LiteMode.px(context, bh);
+      }
+      return _image(w, h);
+    });
+  }
+
+  Widget _image(int? memW, int? memH) {
     return CachedNetworkImage(
       imageUrl: url,
       httpHeaders: _headersFor(url),
+      memCacheWidth: memW,
+      memCacheHeight: memH,
       fit: fit,
       alignment: alignment,
       fadeInDuration: const Duration(milliseconds: 200),

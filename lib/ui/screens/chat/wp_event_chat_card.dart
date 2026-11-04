@@ -1,4 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../../core/lite_mode.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -170,6 +171,7 @@ class _PreviewBackground extends StatelessWidget {
   Widget build(BuildContext context) {
     Widget img(String u) => CachedNetworkImage(
           imageUrl: u,
+          memCacheWidth: LiteMode.px(context, MediaQuery.sizeOf(context).width),
           fit: BoxFit.cover,
           alignment: Alignment.topCenter,
           fadeInDuration: const Duration(milliseconds: 250),

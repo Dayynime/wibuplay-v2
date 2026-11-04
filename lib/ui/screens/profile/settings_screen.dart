@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import '../../../core/lite_mode.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -330,6 +331,26 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen>
                     onChanged: (v) => ref.read(glassSettingsProvider).setEnabled(v),
                   ),
                   onTap: () => ref.read(glassSettingsProvider).setEnabled(!glass.enabled),
+                );
+              },
+            ),
+            ValueListenableBuilder<bool>(
+              valueListenable: LiteMode.notifier,
+              builder: (context, lite, _) {
+                final ram = LiteMode.ramGb;
+                final ramText = ram > 0 ? ' · RAM ${ram.toStringAsFixed(1)} GB' : '';
+                return _SettingsRow(
+                  icon: Icons.speed_rounded,
+                  title: 'Mode Ringan',
+                  subtitle: (lite
+                          ? 'Aktif: hemat memori untuk HP kentang'
+                          : 'Mati') +
+                      (LiteMode.isAuto ? ' (otomatis$ramText)' : ''),
+                  trailing: _AnimatedToggle(
+                    value: lite,
+                    onChanged: (v) => LiteMode.set(v),
+                  ),
+                  onTap: () => LiteMode.set(!lite),
                 );
               },
             ),

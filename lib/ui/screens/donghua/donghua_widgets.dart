@@ -1,4 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../../core/lite_mode.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
@@ -24,9 +25,24 @@ class DonghuaImage extends StatelessWidget {
   Widget build(BuildContext context) {
     final url = AnichinNetwork.imageUrl(path);
     if (url == null) return const SizedBox.expand();
+    return LayoutBuilder(builder: (context, c) {
+      final bw = c.maxWidth.isFinite ? c.maxWidth : 0.0;
+      final bh = c.maxHeight.isFinite ? c.maxHeight : 0.0;
+      final tall = bh >= bw;
+      return _img(
+        url,
+        bw > 0 && !tall ? LiteMode.px(context, bw) : null,
+        bh > 0 && tall ? LiteMode.px(context, bh) : null,
+      );
+    });
+  }
+
+  Widget _img(String url, int? memW, int? memH) {
     return CachedNetworkImage(
       imageUrl: url,
       httpHeaders: AnichinNetwork.imageHeaders,
+      memCacheWidth: memW,
+      memCacheHeight: memH,
       fit: fit,
       alignment: alignment,
       fadeInDuration: const Duration(milliseconds: 200),

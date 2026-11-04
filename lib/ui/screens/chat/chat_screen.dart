@@ -1,4 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../../core/lite_mode.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -790,7 +791,8 @@ class ChatMessageBubble extends StatelessWidget {
         radius: 16,
         backgroundColor: AppColors.surfaceVariantDark,
         backgroundImage: (avatarUrl != null && avatarUrl!.isNotEmpty)
-            ? CachedNetworkImageProvider(avatarUrl!)
+            ? ResizeImage.resizeIfNeeded(
+                LiteMode.px(context, 32), null, CachedNetworkImageProvider(avatarUrl!))
             : null,
         child: (avatarUrl == null || avatarUrl!.isEmpty)
             ? Text(
@@ -1123,6 +1125,7 @@ class _ChatProfileDialogState extends ConsumerState<_ChatProfileDialog> {
                             child: hasAvatar
                                 ? CachedNetworkImage(
                                     imageUrl: _avatarUrl!,
+                                    memCacheWidth: LiteMode.px(context, 84),
                                     fit: BoxFit.cover,
                                     errorWidget: (_, __, ___) => GeneratedAvatar(
                                       seed: widget.uid,
