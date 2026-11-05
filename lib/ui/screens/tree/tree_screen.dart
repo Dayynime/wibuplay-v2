@@ -406,7 +406,7 @@ class _TreeScreenState extends ConsumerState<TreeScreen> with SingleTickerProvid
     if (tree == null || tree.isMaxLevel || _upgrading) return;
     final uid = _uid;
     final balance = _balance ?? (uid == null ? null : ref.read(coinBalanceProvider(uid)).valueOrNull);
-    final ok = await showGlassSheet<bool>(
+    final count = await showGlassSheet<int>(
       context: context,
       backgroundColor: _kSheet,
       shape: const RoundedRectangleBorder(
@@ -414,14 +414,15 @@ class _TreeScreenState extends ConsumerState<TreeScreen> with SingleTickerProvid
       ),
       builder: (_) => _UpgradeSheet(tree: tree, balance: balance),
     );
-    if (ok != true || !mounted) return;
+    if (count == null || count < 1 || !mounted) return;
     _debounce?.cancel();
     await _flush();
     if (!mounted) return;
     setState(() => _upgrading = true);
     try {
-      final r = await _repo.upgrade();
+      final r = await _repo.upgrade(count: count);
       if (!mounted) return;
+      if (r.levels > 1) _toast('Naik ${r.levels} level! Sekarang level ${r.tree.level}');
       _balance = r.balance;
       _apply(r.tree);
       _scene.celebrate();
@@ -1709,17 +1710,44 @@ class _StatRow extends StatelessWidget {
   }
 }
 
-class _UpgradeSheet extends StatelessWidget {
+class _UpgradeSheet extends StatefulWidget {
   const _UpgradeSheet({required this.tree, required this.balance});
 
   final TreeState tree;
   final int? balance;
 
   @override
+  State<_UpgradeSheet> createState() => _UpgradeSheetState();
+}
+
+class _UpgradeSheetState extends State<_UpgradeSheet> {
+  int _count = 1;
+
+  /// Pilihan jumlah level: (jumlah, label). Maks = sebanyak yang terbeli.
+  List<(int, String)> _options() {
+    final t = widget.tree;
+    final out = <(int, String)>[(1, '+1')];
+    for (final n in const [5, 10]) {
+      if (n <= t.levelsLeft && t.costFor(n) != null) out.add((n, '+$n'));
+    }
+    final bal = widget.balance;
+    if (bal != null) {
+      final max = t.maxAffordable(bal);
+      if (max > 1 && !out.any((o) => o.$1 == max)) out.add((max, 'Maks'));
+    }
+    return out;
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final tree = widget.tree;
+    final balance = widget.balance;
     final next = tree.next;
-    final cost = tree.upgradeCost ?? 0;
-    final enough = balance == null || balance! >= cost;
+    final options = _options();
+    if (!options.any((o) => o.$1 == _count)) _count = 1;
+    final cost = tree.costFor(_count) ?? tree.upgradeCost ?? 0;
+    final enough = balance == null || balance >= cost;
+    final multi = _count > 1;
     String mins(int sec) => formatTreeMinutes((sec / 60).round());
 
     return SafeArea(
@@ -1739,17 +1767,43 @@ class _UpgradeSheet extends StatelessWidget {
                   padding: EdgeInsets.symmetric(horizontal: 14),
                   child: Icon(Icons.double_arrow_rounded, color: _kLeaf, size: 28),
                 ),
-                _LevelOrb(level: tree.level + 1),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 200),
+                  transitionBuilder: (c, a) => ScaleTransition(scale: a, child: c),
+                  child: _LevelOrb(key: ValueKey(_count), level: tree.level + _count),
+                ),
               ],
             ),
             const SizedBox(height: 10),
-            const Text(
-              'Upgrade Pohon',
+            Text(
+              multi ? 'Upgrade $_count Level' : 'Upgrade Pohon',
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800),
+              style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w800),
             ),
+            if (options.length > 1) ...[
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  for (final (n, label) in options)
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 3),
+                        child: _CountChip(
+                          label: label,
+                          sub: n > 1 && label == 'Maks' ? '+$n' : null,
+                          selected: _count == n,
+                          onTap: () {
+                            HapticFeedback.selectionClick();
+                            setState(() => _count = n);
+                          },
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ],
             const SizedBox(height: 16),
-            if (next != null) ...[
+            if (next != null && !multi) ...[
               _StatRow(
                 icon: Icons.timer_outlined,
                 label: '1 buah tiap',
@@ -1768,7 +1822,15 @@ class _UpgradeSheet extends StatelessWidget {
                 value: '${tree.coinsPerFruit}',
                 next: '${next.coinsPerFruit}',
               ),
-            ],
+            ] else if (multi)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text(
+                  'Langsung naik ke level ${tree.level + _count}. Biaya total dari semua level dipotong sekali.',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Color(0xFFB7C0CF), fontSize: 13),
+                ),
+              ),
             const SizedBox(height: 8),
             if (!enough)
               Padding(
@@ -1781,13 +1843,13 @@ class _UpgradeSheet extends StatelessWidget {
               ),
             _BigButton(
               colors: const [Color(0xFF4ADE80), Color(0xFF16A34A)],
-              onTap: enough ? () => Navigator.of(context).pop(true) : null,
+              onTap: enough ? () => Navigator.of(context).pop(_count) : null,
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text(
-                    'UPGRADE',
-                    style: TextStyle(
+                  Text(
+                    multi ? 'UPGRADE +$_count' : 'UPGRADE',
+                    style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.w900,
                       fontSize: 15,
@@ -1811,8 +1873,54 @@ class _UpgradeSheet extends StatelessWidget {
   }
 }
 
+/// Tombol pilihan jumlah level di lembar upgrade.
+class _CountChip extends StatelessWidget {
+  const _CountChip({required this.label, required this.selected, required this.onTap, this.sub});
+
+  final String label;
+  final String? sub;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        height: 44,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          color: selected ? _kLeaf.withValues(alpha: 0.18) : const Color(0x0FFFFFFF),
+          border: Border.all(
+            color: selected ? _kLeaf : Colors.white.withValues(alpha: 0.08),
+            width: selected ? 1.5 : 1,
+          ),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color: selected ? Colors.white : const Color(0xFFB7C0CF),
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            if (sub != null)
+              Text(sub!, style: const TextStyle(color: Color(0xFF8A93A3), fontSize: 10, fontWeight: FontWeight.w700)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _LevelOrb extends StatelessWidget {
-  const _LevelOrb({required this.level, this.dim = false});
+  const _LevelOrb({super.key, required this.level, this.dim = false});
 
   final int level;
   final bool dim;

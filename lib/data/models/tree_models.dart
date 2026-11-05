@@ -47,6 +47,8 @@ class TreeState {
     required this.totalCoins,
     required this.serverNow,
     this.look,
+    this.upgradeCostBase,
+    this.upgradeCostStep,
   });
 
   final int level;
@@ -74,6 +76,11 @@ class TreeState {
   final int totalCoins;
   final DateTime serverNow;
 
+  /// Rumus biaya upgrade dari server: Lv.n -> n+1 = base + step * n.
+  /// null = server lama (cuma bisa +1 level).
+  final int? upgradeCostBase;
+  final int? upgradeCostStep;
+
   /// Dekorasi yang dipasang. null = respons ini tidak membawa data dekorasi
   /// (mis. hasil panen) -> pakai yang terakhir diketahui.
   final TreeLook? look;
@@ -81,6 +88,30 @@ class TreeState {
   bool get isFull => fruits >= capacity;
   bool get isMaxLevel => level >= maxLevel || upgradeCost == null;
   int get coinsLeftToday => (dailyCap - coinsToday).clamp(0, dailyCap);
+
+  /// Sisa level sampai maksimal.
+  int get levelsLeft => (maxLevel - level).clamp(0, maxLevel);
+
+  /// Total ZCoin untuk naik [n] level sekaligus. null = tidak bisa dihitung.
+  int? costFor(int n) {
+    if (n <= 0 || n > levelsLeft) return null;
+    if (n == 1) return upgradeCost;
+    final b = upgradeCostBase;
+    final s = upgradeCostStep;
+    if (b == null || s == null) return null;
+    return n * b + s * (n * level + n * (n - 1) ~/ 2);
+  }
+
+  /// Level terbanyak yang terbeli dengan saldo [balance] (0 = tidak ada).
+  int maxAffordable(int balance) {
+    var n = 0;
+    while (n < levelsLeft) {
+      final c = costFor(n + 1);
+      if (c == null || c > balance) break;
+      n++;
+    }
+    return n;
+  }
 
   factory TreeState.fromJson(Map<String, dynamic> j) {
     final next = j['next'];
@@ -106,6 +137,8 @@ class TreeState {
       totalCoins: _i(j['total_coins']),
       serverNow: _d(j['server_now']) ?? DateTime.now().toUtc(),
       look: j['equipped'] is Map ? TreeLook.fromJson(Map<String, dynamic>.from(j['equipped'] as Map)) : null,
+      upgradeCostBase: (j['upgrade_cost_base'] as num?)?.toInt(),
+      upgradeCostStep: (j['upgrade_cost_step'] as num?)?.toInt(),
     );
   }
 }
@@ -125,9 +158,12 @@ class TreeHarvestResult {
 }
 
 class TreeUpgradeResult {
-  const TreeUpgradeResult({required this.cost, required this.balance, required this.tree});
+  const TreeUpgradeResult({required this.cost, required this.balance, required this.tree, this.levels = 1});
 
   final int cost;
+
+  /// Jumlah level yang naik.
+  final int levels;
   final int balance;
   final TreeState tree;
 }

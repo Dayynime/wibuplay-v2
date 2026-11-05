@@ -59,10 +59,12 @@ class TreeRepository {
     );
   }
 
-  Future<TreeUpgradeResult> upgrade() async {
-    final d = await _call({'action': 'upgrade'}, 'Gagal upgrade pohon');
+  /// Naik [count] level sekaligus (biaya total dihitung & dipotong server).
+  Future<TreeUpgradeResult> upgrade({int count = 1}) async {
+    final d = await _call({'action': 'upgrade', 'count': count}, 'Gagal upgrade pohon');
     return TreeUpgradeResult(
       cost: (d['cost'] as num?)?.toInt() ?? 0,
+      levels: (d['levels'] as num?)?.toInt() ?? 1,
       balance: (d['balance'] as num?)?.toInt() ?? 0,
       tree: _tree(d['tree']),
     );
