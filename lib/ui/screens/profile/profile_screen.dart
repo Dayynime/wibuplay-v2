@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../components/rarity_chip.dart';
 import '../../../core/error_message.dart';
 import '../../../core/firebase_config.dart';
 import '../../../core/gif_quota.dart';
@@ -320,6 +321,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ],
           ),
         ),
+        // Badge rarity kalau banner berasal dari wallpaper komentar
+        // (kiri atas, sejajar tombol pengaturan; tidak menutupi avatar).
+        if (wpBanner != null)
+          Positioned(
+            top: topPad + 23,
+            left: 16,
+            child: BannerRarityBadge(rarity: wpBanner.rarity),
+          ),
         Positioned(
           top: topPad + 8,
           right: 12,

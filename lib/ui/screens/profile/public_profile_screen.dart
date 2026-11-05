@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../components/rarity_chip.dart';
 import '../../../data/repository/safety_repository.dart' show ReportChannel;
 import '../safety/safety_actions.dart';
 import '../../../core/error_message.dart';
@@ -267,6 +268,7 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
               ? NetImage(backdrop!)
               : const ColoredBox(color: AppColors.surfaceVariantDark),
         ),
+
         const Positioned.fill(
           child: DecoratedBox(
             decoration: BoxDecoration(
@@ -282,6 +284,14 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
             ),
           ),
         ),
+        // Badge rarity kalau banner berasal dari wallpaper komentar
+        // (kiri atas, di sebelah tombol kembali; tidak menutupi avatar).
+        if (wpBanner != null)
+          Positioned(
+            top: topPad + 23,
+            left: 64,
+            child: BannerRarityBadge(rarity: wpBanner.rarity),
+          ),
         Padding(
           padding: EdgeInsets.only(top: topPad + 28, bottom: 20),
           child: Column(

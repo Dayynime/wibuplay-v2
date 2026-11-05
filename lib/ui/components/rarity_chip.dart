@@ -32,6 +32,32 @@ class RarityChip extends StatelessWidget {
   }
 }
 
+/// Badge rarity wallpaper di banner profil (desain sama dengan badge di
+/// wallpaper komentar), dengan bayangan tipis supaya terbaca di gambar terang.
+/// Tampil di atas banner yang berasal dari wallpaper komentar.
+class BannerRarityBadge extends StatelessWidget {
+  const BannerRarityBadge({super.key, required this.rarity, this.fontSize = 11});
+
+  final WallpaperRarity rarity;
+  final double fontSize;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: Semantics(
+        label: 'Banner wallpaper ${rarity.label}',
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: const [BoxShadow(color: Color(0x59000000), blurRadius: 10, offset: Offset(0, 2))],
+          ),
+          child: RarityChip(rarity: rarity, opacity: 0.9, fontSize: fontSize),
+        ),
+      ),
+    );
+  }
+}
+
 class _ShinyChip extends StatefulWidget {
   const _ShinyChip({required this.rarity, required this.fontSize});
 

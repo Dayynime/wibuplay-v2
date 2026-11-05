@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../components/rarity_chip.dart';
 import '../../../core/error_message.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/friend_models.dart';
@@ -102,8 +103,9 @@ class _UserProfileSheetState extends ConsumerState<UserProfileSheet> {
     final clanTag = ref.watch(userClanTagProvider(uid)).valueOrNull;
 
     final name = (profile?.username.trim().isNotEmpty ?? false) ? profile!.username : 'Pengguna Zenime';
+    final wpBanner = ref.watch(bannerWallpaperProvider(uid)).valueOrNull;
     final banner = resolveProfileBanner(
-      wallpaper: ref.watch(bannerWallpaperProvider(uid)).valueOrNull,
+      wallpaper: wpBanner,
       premium: premium,
       customUrl: profile?.bannerUrl,
     );
@@ -128,6 +130,12 @@ class _UserProfileSheetState extends ConsumerState<UserProfileSheet> {
                       : const ColoredBox(color: AppColors.surfaceVariantDark),
                 ),
               ),
+              if (wpBanner != null)
+                Positioned(
+                  top: 110 - 28,
+                  right: 12,
+                  child: BannerRarityBadge(rarity: wpBanner.rarity, fontSize: 10),
+                ),
               Positioned(
                 top: 110 - 44,
                 child: Container(
