@@ -53,11 +53,17 @@ class XpProgress {
 /// (lihat XpLevelFormula.kt di Zenime). Kalau formula server berubah, ubah
 /// di sini juga supaya progress bar tidak salah tampil.
 ///
-/// totalXpForLevel(N) = 100 * N * (N - 1). Level 1 = 0 XP.
+/// Lihat totalXpForLevel. Level 1 = 0 XP.
 class XpLevelFormula {
   XpLevelFormula._();
 
-  static int totalXpForLevel(int n) => 100 * n * (n - 1);
+  /// Total XP minimal untuk mencapai level [n] (sama dengan server
+  /// `level_for_total_xp`): Lv.1-20 rumus lama 100*n*(n-1), mulai Lv.20
+  /// (38.000 XP) rata 2.000 XP per level.
+  static int totalXpForLevel(int n) {
+    if (n <= 1) return 0;
+    return n <= 20 ? 100 * n * (n - 1) : 2000 * (n - 1);
+  }
 
   static XpProgress progress(int totalXp, int level) {
     final floor = totalXpForLevel(level);
