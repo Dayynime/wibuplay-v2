@@ -12,6 +12,7 @@ import '../store/coin_screen.dart';
 import '../store/premium_screen.dart';
 import '../games/zenime_games_screen.dart';
 import '../nobar/nobar_lobby_screen.dart';
+import '../feed/feed_screen.dart';
 import '../../glass/glass.dart';
 import '../../components/net_image.dart' show netImageHeaders;
 
@@ -126,6 +127,19 @@ class MenuScreen extends ConsumerWidget {
                 end: Alignment.bottomRight,
               ),
               onTap: () => Navigator.of(context).push<void>(fadeRoute(const NobarLobbyScreen())),
+            ),
+            const SizedBox(height: 14),
+            _MenuCard(
+              title: 'Feed',
+              subtitle: 'Postingan & cerita dari pengguna Zenime',
+              icon: Icons.dynamic_feed_rounded,
+              accent: const Color(0xFF8B5CF6),
+              gradient: const LinearGradient(
+                colors: [Color(0xFF1E1533), Color(0xFF151A23)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              onTap: () => Navigator.of(context).push<void>(fadeRoute(const FeedScreen())),
             ),
             const SizedBox(height: 14),
             _MenuCard(

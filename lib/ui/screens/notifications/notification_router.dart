@@ -8,6 +8,7 @@ import '../clan/clan_access_widgets.dart';
 import '../clan/clan_manage_screen.dart';
 import '../clan/clan_screen.dart';
 import '../friends/friends_screen.dart';
+import '../feed/feed_screen.dart';
 import '../nobar/nobar_invite.dart';
 import '../sticker/sticker_upload_screen.dart';
 import '../chat/chat_screen.dart';
@@ -24,6 +25,12 @@ Future<void> openNotificationTarget(
   final clanId = data['clan_id']?.toString() ?? '';
 
   switch (type) {
+    case 'feed_comment':
+      final postId = int.tryParse(data['post_id']?.toString() ?? '');
+      if (postId == null) return;
+      await nav.push<void>(fadeRoute(FeedPostScreen(postId: postId)));
+      return;
+
     case 'chat_mention':
       // Chat Clan = tab 2, Chat Global = tab 0.
       final tab = data['channel']?.toString() == 'clan' ? 2 : 0;
