@@ -252,7 +252,8 @@ class _GiveawayCardState extends ConsumerState<GiveawayCard> {
 
 // =============================================================== buat
 
-Future<void> showCreateGiveawaySheet(BuildContext context) {
+/// [clan] true = giveaway di chat clan (khusus anggota clan).
+Future<void> showCreateGiveawaySheet(BuildContext context, {bool clan = false}) {
   return showGeneralDialog<void>(
     context: context,
     useRootNavigator: true,
@@ -260,7 +261,7 @@ Future<void> showCreateGiveawaySheet(BuildContext context) {
     barrierLabel: 'Tutup',
     barrierColor: Colors.black.withValues(alpha: 0.6),
     transitionDuration: const Duration(milliseconds: 260),
-    pageBuilder: (_, __, ___) => const _CreateGiveawaySheet(),
+    pageBuilder: (_, __, ___) => _CreateGiveawaySheet(clan: clan),
     transitionBuilder: (_, anim, __, child) {
       final a = CurvedAnimation(parent: anim, curve: Curves.easeOutBack, reverseCurve: Curves.easeIn);
       return FadeTransition(
@@ -272,7 +273,9 @@ Future<void> showCreateGiveawaySheet(BuildContext context) {
 }
 
 class _CreateGiveawaySheet extends ConsumerStatefulWidget {
-  const _CreateGiveawaySheet();
+  const _CreateGiveawaySheet({this.clan = false});
+
+  final bool clan;
 
   @override
   ConsumerState<_CreateGiveawaySheet> createState() => _CreateGiveawaySheetState();
@@ -349,6 +352,7 @@ class _CreateGiveawaySheetState extends ConsumerState<_CreateGiveawaySheet> {
             days: _days,
             slots: _slots,
             message: _note.text,
+            clan: widget.clan,
           );
       final uid = ref.read(authUserProvider).valueOrNull?.uid;
       if (uid != null) {
@@ -357,7 +361,11 @@ class _CreateGiveawaySheetState extends ConsumerState<_CreateGiveawaySheet> {
       }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('👑 Giveaway $_days hari × $_slots dibuat!')),
+        SnackBar(
+          content: Text(widget.clan
+              ? '👑 Giveaway clan $_days hari × $_slots dibuat!'
+              : '👑 Giveaway $_days hari × $_slots dibuat!'),
+        ),
       );
       Navigator.pop(context);
     } catch (e) {
@@ -393,16 +401,26 @@ class _CreateGiveawaySheetState extends ConsumerState<_CreateGiveawaySheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Row(
+              Row(
                 children: [
-                  _CrownIcon(size: 30),
-                  SizedBox(width: 12),
-                  Text(
-                    'Buat Giveaway',
-                    style: TextStyle(color: AppColors.textWhite, fontSize: 25, fontWeight: FontWeight.w700),
+                  const _CrownIcon(size: 30),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      widget.clan ? 'Giveaway Clan' : 'Buat Giveaway',
+                      style: const TextStyle(color: AppColors.textWhite, fontSize: 25, fontWeight: FontWeight.w700),
+                    ),
                   ),
                 ],
               ),
+              if (widget.clan)
+                const Padding(
+                  padding: EdgeInsets.only(top: 6),
+                  child: Text(
+                    'Hanya anggota clan kamu yang bisa klaim.',
+                    style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                  ),
+                ),
               const SizedBox(height: 22),
               AnimatedSize(
                 duration: const Duration(milliseconds: 220),

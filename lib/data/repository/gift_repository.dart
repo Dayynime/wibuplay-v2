@@ -164,11 +164,13 @@ class GiftRepository {
     }
   }
 
-  /// Buat giveaway di chat global. Return baris pesan kartu giveaway.
+  /// Buat giveaway di chat global, atau di chat clan kalau [clan] true
+  /// (khusus anggota clan). Return baris pesan kartu giveaway (global).
   Future<Map<String, dynamic>?> createGiveaway({
     required int days,
     required int slots,
     String message = '',
+    bool clan = false,
   }) async {
     try {
       final d = await callAuthedFunction(_dio, 'premium-gift', {
@@ -176,6 +178,7 @@ class GiftRepository {
         'days': days,
         'slots': slots,
         'message': message.trim(),
+        if (clan) 'channel': 'clan',
       });
       final m = d is Map ? d['message'] : null;
       return m is Map ? Map<String, dynamic>.from(m) : null;

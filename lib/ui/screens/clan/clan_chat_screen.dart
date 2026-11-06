@@ -16,6 +16,7 @@ import '../safety/safety_actions.dart';
 import 'clan_chat_controller.dart';
 import '../sticker/sticker_widgets.dart';
 import '../chat/chat_mute.dart';
+import '../gift/giveaway.dart' show showCreateGiveawaySheet;
 
 /// Chat internal clan sebagai layar penuh (tombol Chat Clan di halaman Clan).
 class ClanChatScreen extends StatelessWidget {
@@ -109,9 +110,27 @@ class _ClanChatPaneState extends ConsumerState<ClanChatPane> with WidgetsBinding
   }
 
   /// Ubah pesan clan ke ChatMessage supaya bisa dirender bubble Chat Global.
+  /// Kartu giveaway clan: pesan berisi token `[giveaway:<id>:<hari>]` yang
+  /// hanya bisa ditulis server (premium-gift).
+  static final RegExp _giveawayRe = RegExp(r'^\[giveaway:(\d+):(\d+)\]$');
+
   ChatMessage _toChat(ClanChatState s, ClanMessage m, ClanMessage? replied) {
     final p = s.profiles[m.firebaseUid];
     final hasReply = m.replyToId != null;
+    final gw = _giveawayRe.firstMatch(m.message.trim());
+    if (gw != null) {
+      return ChatMessage(
+        id: m.id,
+        firebaseUid: m.firebaseUid,
+        username: _nameOf(s, m.firebaseUid),
+        avatarUrl: p?.avatarUrl,
+        message: '',
+        createdAt: m.createdAt.toIso8601String(),
+        messageType: 'giveaway',
+        giveawayId: int.parse(gw.group(1)!),
+        giftDays: int.parse(gw.group(2)!),
+      );
+    }
     return ChatMessage(
       id: m.id,
       firebaseUid: m.firebaseUid,
@@ -220,7 +239,8 @@ class _ClanChatPaneState extends ConsumerState<ClanChatPane> with WidgetsBinding
                   },
                 ),
             ],
-            if (own || _canModerate)
+            // Kartu giveaway permanen (sama dengan chat global).
+            if ((own || _canModerate) && !_giveawayRe.hasMatch(m.message.trim()))
               ListTile(
                 leading: const Icon(Icons.delete_outline, color: AppColors.errorRed),
                 title: const Text('Hapus', style: TextStyle(color: AppColors.errorRed)),
@@ -326,7 +346,9 @@ class _ClanChatPaneState extends ConsumerState<ClanChatPane> with WidgetsBinding
             ref.read(clanChatControllerProvider.notifier).setReplyTarget(m);
             _focus.requestFocus();
           },
-          onDelete: (own || _canModerate) ? () => _requestDelete(m, own) : null,
+          onDelete: (own || _canModerate) && !_giveawayRe.hasMatch(m.message.trim())
+              ? () => _requestDelete(m, own)
+              : null,
           onProfileTap: own ? null : () => openPublicProfile(context, m.firebaseUid),
         );
         if (!_live.contains(m.id)) return bubble;
@@ -415,6 +437,18 @@ class _ClanChatPaneState extends ConsumerState<ClanChatPane> with WidgetsBinding
                     borderSide: BorderSide.none,
                   ),
                 ),
+              ),
+            ),
+            const SizedBox(width: 6),
+            // Giveaway Premium khusus anggota clan (mahkota).
+            SizedBox(
+              width: 46,
+              height: 46,
+              child: IconButton.filled(
+                tooltip: 'Giveaway Clan',
+                onPressed: () => showCreateGiveawaySheet(context, clan: true),
+                style: IconButton.styleFrom(backgroundColor: const Color(0xFFE6A817)),
+                icon: const Icon(Icons.workspace_premium, size: 22, color: Colors.black),
               ),
             ),
             const SizedBox(width: 6),
