@@ -9,6 +9,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../data/models/sticker_models.dart';
 import '../../../providers.dart';
 import '../../app_routes.dart';
+import '../../components/app_toast.dart';
 import '../../components/net_image.dart';
 import 'sticker_upload_screen.dart';
 
@@ -40,9 +41,14 @@ class StickerView extends ConsumerWidget {
         return Semantics(
           label: 'Stiker ${st.name}',
           image: true,
-          child: SizedBox.square(
-            dimension: size,
-            child: NetImage(st.url, fit: BoxFit.contain),
+          button: true,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => showStickerInfo(context, st),
+            child: SizedBox.square(
+              dimension: size,
+              child: NetImage(st.url, fit: BoxFit.contain),
+            ),
           ),
         );
       },
@@ -89,6 +95,122 @@ class StickerButton extends StatelessWidget {
 // ============================================================================
 // Lembar pilih stiker
 // ============================================================================
+
+// ============================================================================
+// Favorit stiker (disimpan di HP)
+// ============================================================================
+
+const String _kFavKey = 'sticker_fav_v1';
+const int _kFavMax = 60;
+
+/// Daftar kode stiker favorit (terbaru di depan), disimpan di SharedPreferences.
+class StickerFavorites extends StateNotifier<List<String>> {
+  StickerFavorites() : super(const []) {
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final p = await SharedPreferences.getInstance();
+      final saved = p.getStringList(_kFavKey);
+      if (saved != null && mounted) state = saved;
+    } catch (_) {}
+  }
+
+  /// true = jadi favorit, false = dilepas, null = sudah penuh.
+  Future<bool?> toggle(String code) async {
+    final on = !state.contains(code);
+    if (on && state.length >= _kFavMax) return null;
+    state = on ? [code, ...state] : state.where((c) => c != code).toList();
+    try {
+      final p = await SharedPreferences.getInstance();
+      await p.setStringList(_kFavKey, state);
+    } catch (_) {}
+    return on;
+  }
+}
+
+final stickerFavoritesProvider =
+    StateNotifierProvider<StickerFavorites, List<String>>((ref) => StickerFavorites());
+
+/// Tambah/lepas favorit + toast. Dipakai lembar stiker & info stiker.
+Future<void> toggleStickerFavorite(BuildContext context, WidgetRef ref, Sticker s) async {
+  HapticFeedback.mediumImpact();
+  final r = await ref.read(stickerFavoritesProvider.notifier).toggle(s.code);
+  if (!context.mounted) return;
+  showAppToast(
+    context,
+    switch (r) {
+      true => '"${s.name}" masuk Favorit',
+      false => '"${s.name}" dihapus dari Favorit',
+      null => 'Favorit penuh (maks $_kFavMax). Lepas yang lain dulu.',
+    },
+    kind: r == null ? ToastKind.warning : (r ? ToastKind.success : ToastKind.info),
+    icon: r == true ? Icons.star_rounded : Icons.star_outline_rounded,
+  );
+}
+
+/// Info stiker dari chat: gambar besar, nama, pack, tombol favorit.
+Future<void> showStickerInfo(BuildContext context, Sticker s) {
+  return showModalBottomSheet<void>(
+    context: context,
+    backgroundColor: AppColors.surfaceDark,
+    shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+    builder: (_) => _StickerInfoSheet(sticker: s),
+  );
+}
+
+class _StickerInfoSheet extends ConsumerWidget {
+  const _StickerInfoSheet({required this.sticker});
+
+  final Sticker sticker;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final fav = ref.watch(stickerFavoritesProvider).contains(sticker.code);
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox.square(dimension: 160, child: NetImage(sticker.url, fit: BoxFit.contain)),
+            const SizedBox(height: 12),
+            Text(
+              sticker.name,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: AppColors.textWhite, fontSize: 17, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              'Pack ${sticker.pack ?? kStickerNoPack}',
+              style: const TextStyle(color: AppColors.textMuted, fontSize: 12.5),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  backgroundColor: fav ? const Color(0x1FFFFFFF) : const Color(0xFFF5B301),
+                  foregroundColor: fav ? AppColors.textWhite : const Color(0xFF241A00),
+                  minimumSize: const Size.fromHeight(46),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                onPressed: () => toggleStickerFavorite(context, ref, sticker),
+                icon: Icon(fav ? Icons.star_rounded : Icons.star_outline_rounded),
+                label: Text(
+                  fav ? 'Hapus dari Favorit' : 'Simpan ke Favorit',
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 const String _kRecentKey = 'sticker_recent_v1';
 const int _kRecentMax = 16;
@@ -218,6 +340,9 @@ class _StickerSheetState extends ConsumerState<_StickerSheet> {
         final recent = q.isEmpty && sel == null
             ? _recent.map((c) => map[c]).whereType<Sticker>().toList()
             : const <Sticker>[];
+        final favs = q.isEmpty && sel == null
+            ? ref.watch(stickerFavoritesProvider).map((c) => map[c]).whereType<Sticker>().toList()
+            : const <Sticker>[];
         return CustomScrollView(
           shrinkWrap: true,
           slivers: [
@@ -236,10 +361,24 @@ class _StickerSheetState extends ConsumerState<_StickerSheet> {
                   ),
                 ),
               ),
+            if (favs.isNotEmpty) ...[
+              _label('⭐ Favorit'),
+              _grid(favs),
+            ],
             if (recent.isNotEmpty) ...[
               _label('Terakhir dipakai'),
               _grid(recent),
             ],
+            if (favs.isEmpty && q.isEmpty && sel == null)
+              const SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.only(top: 6),
+                  child: Text(
+                    'Tips: tahan stiker untuk menyimpannya ke Favorit',
+                    style: TextStyle(color: AppColors.textMuted, fontSize: 11.5),
+                  ),
+                ),
+              ),
             _label(q.isNotEmpty
                 ? 'Hasil pencarian'
                 : sel == null
@@ -350,17 +489,37 @@ class _StickerSheetState extends ConsumerState<_StickerSheet> {
         itemCount: list.length,
         itemBuilder: (_, i) {
           final s = list[i];
-          return Tooltip(
-            message: s.name,
+          final fav = ref.watch(stickerFavoritesProvider).contains(s.code);
+          return Semantics(
+            label: s.name,
+            button: true,
             child: Material(
               color: const Color(0x0AFFFFFF),
               borderRadius: BorderRadius.circular(12),
               child: InkWell(
                 borderRadius: BorderRadius.circular(12),
                 onTap: () => _pick(s),
-                child: Padding(
-                  padding: const EdgeInsets.all(6),
-                  child: NetImage(s.url, fit: BoxFit.contain),
+                onLongPress: () => toggleStickerFavorite(context, ref, s),
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: Padding(
+                        padding: const EdgeInsets.all(6),
+                        child: NetImage(s.url, fit: BoxFit.contain),
+                      ),
+                    ),
+                    if (fav)
+                      const Positioned(
+                        top: 3,
+                        right: 3,
+                        child: Icon(
+                          Icons.star_rounded,
+                          size: 15,
+                          color: Color(0xFFF5B301),
+                          shadows: [Shadow(color: Color(0x99000000), blurRadius: 4)],
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ),
