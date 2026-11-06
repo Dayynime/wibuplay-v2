@@ -191,3 +191,47 @@ class NobarChatMessage {
         createdAt: DateTime.tryParse((j['created_at'] as String?) ?? '')?.toLocal() ?? DateTime.now(),
       );
 }
+
+/// Room di daftar "Lagi nobar" (action `public_list`). Sengaja tanpa id &
+/// kode room: untuk masuk tetap wajib memasukkan kode dari host.
+class NobarPublicRoom {
+  const NobarPublicRoom({
+    required this.host,
+    required this.members,
+    required this.memberCount,
+    required this.maxMembers,
+    required this.isMember,
+    this.movieTitle,
+    this.posterUrl,
+  });
+
+  final NobarMember host;
+  final List<NobarMember> members;
+  final int memberCount;
+  final int maxMembers;
+
+  /// true = aku sendiri ada di room ini.
+  final bool isMember;
+  final String? movieTitle;
+  final String? posterUrl;
+
+  bool get isFull => memberCount >= maxMembers;
+
+  static NobarPublicRoom? fromJson(dynamic v, int maxMembers) {
+    if (v is! Map) return null;
+    final host = NobarMember.fromJson(v['host']);
+    if (host == null) return null;
+    final list = v['members'];
+    final members = list is List ? list.map(NobarMember.fromJson).whereType<NobarMember>().toList() : <NobarMember>[];
+    final poster = v['poster_url'] as String?;
+    return NobarPublicRoom(
+      host: host,
+      members: members,
+      memberCount: (v['member_count'] as num?)?.toInt() ?? members.length,
+      maxMembers: maxMembers,
+      isMember: v['is_member'] == true,
+      movieTitle: (v['movie_title'] as String?)?.trim(),
+      posterUrl: (poster == null || poster.isEmpty) ? null : poster,
+    );
+  }
+}

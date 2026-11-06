@@ -153,6 +153,15 @@ class NobarRepository {
         .toList();
   }
 
+  /// Semua room yang sedang nobar (tanpa kode; masuk tetap pakai kode).
+  Future<List<NobarPublicRoom>> publicRooms() async {
+    final d = await _call({'action': 'public_list'}, 'Gagal memuat daftar nobar');
+    final list = d['rooms'];
+    if (list is! List) return const [];
+    final max = (d['max_members'] as num?)?.toInt() ?? kNobarMaxMembers;
+    return list.map((e) => NobarPublicRoom.fromJson(e, max)).whereType<NobarPublicRoom>().toList();
+  }
+
   Future<List<NobarRoom>> myRooms() async {
     final d = await _call({'action': 'list'}, 'Gagal memuat room');
     final list = d['rooms'];

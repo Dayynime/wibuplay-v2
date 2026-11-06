@@ -7,13 +7,15 @@
 //
 // Aksi (body JSON, field `action`):
 //   create  {movie_id, episode_id, movie_title?, poster_url?, position_ms?}
-//   join    {code} atau {id}
+//   join    {code} atau {id}  (id cuma untuk kembali ke room yang aku ikuti)
 //   get     {id}           -> sekaligus heartbeat (panggil tiap ~30 dtk)
 //   leave   {id}
 //   kick    {id, uid}      -> host saja, user tidak bisa masuk lagi
 //   state   {id, episode_id, position_ms, playing}  -> host saja
 //   ice     {id}           -> server STUN/TURN untuk voice
 //   list                   -> room aktif yang aku ikuti
+//   public_list            -> semua room yang sedang nobar (TANPA id & kode;
+//                             masuk tetap wajib pakai kode dari host)
 //   invite        {id, uid}           -> undang teman (notif + push)
 //   invite_respond {invite_id, accept} -> terima (masuk room) / tolak
 //   my_invites                        -> undangan yang masih menunggu jawabanku
@@ -305,6 +307,8 @@ async function handle(uid: string, body: Record<string, unknown>) {
       let id: string | null = null;
       if (body.id != null) {
         id = roomId(body.id);
+        // Lewat id hanya untuk kembali ke room sendiri; orang lain wajib kode.
+        if (!(await isMember(id, uid))) throw new HttpError(403, "Masuk pakai kode room dari host");
       } else {
         const code = str(body.code, 12)?.toUpperCase().replace(/[^A-Z0-9]/g, "");
         if (!code || code.length !== 6) throw new HttpError(400, "Kode room harus 6 karakter");
@@ -538,6 +542,71 @@ async function handle(uid: string, body: Record<string, unknown>) {
       if (!(await isMember(id, uid))) throw new HttpError(403, "Kamu tidak ada di room ini");
       const after = Math.max(0, Math.floor(Number(body.after) || 0));
       return { messages: await chatRows(id, after) };
+    }
+
+    case "public_list": {
+      // Room yang masih ada anggota aktif (heartbeat < 90 dtk), terbaru dulu.
+      const since = new Date(Date.now() - ACTIVE_MS).toISOString();
+      const { data: act, error } = await db
+        .from("nobar_members")
+        .select("room_id, firebase_uid, joined_at")
+        .gte("last_seen", since)
+        .order("joined_at", { ascending: true })
+        .limit(500);
+      if (error) throw new HttpError(500, "Gagal memuat daftar nobar");
+      const byRoom = new Map<string, string[]>();
+      for (const m of act ?? []) {
+        const l = byRoom.get(m.room_id) ?? [];
+        l.push(m.firebase_uid);
+        byRoom.set(m.room_id, l);
+      }
+      if (!byRoom.size) return { rooms: [] };
+      const { data: rooms } = await db
+        .from("nobar_rooms")
+        .select("id, host_uid, movie_title, poster_url, created_at")
+        .in("id", [...byRoom.keys()])
+        .is("closed_at", null)
+        .order("created_at", { ascending: false })
+        .limit(40);
+      const list = rooms ?? [];
+      const uids = new Set<string>();
+      for (const r of list) {
+        uids.add(r.host_uid);
+        for (const u of byRoom.get(r.id) ?? []) uids.add(u);
+      }
+      const profiles = new Map<string, Record<string, unknown>>();
+      if (uids.size) {
+        const { data: ps } = await db
+          .from("chat_profiles")
+          .select("firebase_uid, username, avatar_url, username_color")
+          .in("firebase_uid", [...uids]);
+        for (const p of ps ?? []) profiles.set(p.firebase_uid, p);
+      }
+      const person = (u: string) => {
+        const p = profiles.get(u) ?? {};
+        return {
+          uid: u,
+          username: (p.username as string | undefined)?.trim() || "Pengguna",
+          avatar_url: p.avatar_url ?? null,
+          username_color: p.username_color ?? null,
+        };
+      };
+      return {
+        max_members: MAX_MEMBERS,
+        rooms: list.map((r) => {
+          const members = byRoom.get(r.id) ?? [];
+          return {
+            // Sengaja tanpa id & kode room: masuk tetap lewat kode dari host.
+            movie_title: r.movie_title,
+            poster_url: r.poster_url,
+            created_at: r.created_at,
+            host: person(r.host_uid),
+            members: members.map(person),
+            member_count: members.length,
+            is_member: members.includes(uid),
+          };
+        }),
+      };
     }
 
     case "list": {
