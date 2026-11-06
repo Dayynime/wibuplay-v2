@@ -35,6 +35,7 @@ import '../sticker/sticker_widgets.dart';
 import 'private_chat_pane.dart';
 import 'chat_controller.dart';
 import 'chat_mute.dart';
+import 'chat_pin.dart';
 import '../../components/avatar_frame.dart';
 import '../../glass/glass.dart';
 import '../../components/clan_tag_badge.dart';
@@ -296,6 +297,19 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   },
                 ),
             ],
+            // Sematkan pesan (developer/admin/moderator), termasuk pesan sendiri.
+            if (ref.read(canChatMuteProvider).valueOrNull == true)
+              ListTile(
+                leading: const Icon(Icons.push_pin_outlined, color: AppColors.accentViolet),
+                title: Text(
+                  ref.read(chatPinsProvider).any((p) => p.id == m.id) ? 'Lepas sematan' : 'Sematkan pesan',
+                  style: const TextStyle(color: AppColors.textWhite),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  toggleChatPin(context, ref, m.id);
+                },
+              ),
             // Pesan gift/giveaway permanen (tidak bisa dihapus siapa pun).
             if ((m.firebaseUid == s.myUid || s.canDeleteOthers) && !m.isGift && !m.isGiveaway)
               ListTile(
@@ -408,6 +422,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               child: _tab == 0
                   ? Column(
                       children: [
+                        ChatPinBanner(
+                          onJump: (id) {
+                            if (!s.messages.any((m) => m.id == id)) return false;
+                            _jumpToMessage(s, id);
+                            return true;
+                          },
+                        ),
                         Expanded(child: _buildList(s)),
                         if (s.replyTarget != null) _buildReplyBar(s.replyTarget!),
                         ChatMuteGate(child: _buildInput(s)),
