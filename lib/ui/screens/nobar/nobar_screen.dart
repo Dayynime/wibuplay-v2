@@ -21,6 +21,7 @@ import '../../../providers.dart';
 import '../../components/mini_player.dart';
 import '../../components/net_image.dart';
 import '../player/player_controller.dart';
+import 'nobar_chat_panel.dart';
 import 'nobar_invite.dart';
 import 'nobar_voice_panel.dart';
 
@@ -75,6 +76,17 @@ class _NobarScreenState extends ConsumerState<NobarScreen> with WidgetsBindingOb
 
   /// XP nonton cuma dihitung saat app di layar depan.
   bool _inForeground = true;
+
+  // ------------------------------------------------------------ chat
+  /// 0 = tab Room, 1 = tab Chat.
+  int _panel = 0;
+  List<NobarChatMessage> _chat = const [];
+  int _chatLastId = 0;
+  int _chatUnread = 0;
+  bool _chatLoading = true;
+  bool _chatSending = false;
+  bool _chatFetching = false;
+  bool _chatAgain = false;
 
   // ------------------------------------------------------------ video
   WpVideoController? _vc;
@@ -148,7 +160,73 @@ class _NobarScreenState extends ConsumerState<NobarScreen> with WidgetsBindingOb
       }
       _applyPlayback();
       _scheduleHideControls();
+      _pullChat();
     });
+  }
+
+  // ================================================================ chat
+
+  /// Ambil chat baru dari server (setelah id terakhir). Dipanggil saat ada
+  /// sinyal "chat" dari realtime dan tiap heartbeat room (cadangan).
+  Future<void> _pullChat() async {
+    if (_leaving) return;
+    if (_chatFetching) {
+      _chatAgain = true;
+      return;
+    }
+    _chatFetching = true;
+    try {
+      do {
+        _chatAgain = false;
+        final fresh = await _repo.chatList(_room.id, after: _chatLastId);
+        if (!mounted) return;
+        final news = fresh.where((m) => m.id > _chatLastId).toList();
+        if (news.isNotEmpty) {
+          final first = _chatLastId == 0;
+          final fromOthers = news.where((m) => m.uid != _uid).length;
+          setState(() {
+            _chat = [..._chat, ...news].length > 200
+                ? [..._chat, ...news].sublist([..._chat, ...news].length - 200)
+                : [..._chat, ...news];
+            _chatLastId = news.last.id;
+            // Riwayat awal tidak dihitung sebagai pesan baru.
+            if (!first && _panel != 1) _chatUnread += fromOthers;
+          });
+        }
+      } while (_chatAgain && mounted);
+    } catch (_) {
+      // Chat cuma pelengkap; heartbeat berikutnya mencoba lagi.
+    } finally {
+      _chatFetching = false;
+      if (mounted && _chatLoading) setState(() => _chatLoading = false);
+    }
+  }
+
+  Future<bool> _sendChat(String text) async {
+    if (_chatSending) return false;
+    setState(() => _chatSending = true);
+    try {
+      await _repo.sendChat(_room.id, text);
+      await _pullChat();
+      return true;
+    } on NobarException catch (e) {
+      _snack(e.message);
+      return false;
+    } catch (_) {
+      _snack('Gagal mengirim pesan');
+      return false;
+    } finally {
+      if (mounted) setState(() => _chatSending = false);
+    }
+  }
+
+  void _setPanel(int i) {
+    if (_panel == i) return;
+    setState(() {
+      _panel = i;
+      if (i == 1) _chatUnread = 0;
+    });
+    if (i == 1) _pullChat();
   }
 
   @override
@@ -204,6 +282,7 @@ class _NobarScreenState extends ConsumerState<NobarScreen> with WidgetsBindingOb
     try {
       final room = await _repo.get(_room.id);
       if (!mounted) return;
+      unawaited(_pullChat());
       final wasHost = _isHost;
       setState(() => _room = room);
       _voice?.setRoom(room);
@@ -230,6 +309,8 @@ class _NobarScreenState extends ConsumerState<NobarScreen> with WidgetsBindingOb
     switch (m.event) {
       case 'ping':
         _scheduleRefresh();
+      case 'chat':
+        _pullChat();
       case 'sync_req':
         if (_isHost) _broadcastSync();
       case 'sync':
@@ -683,24 +764,36 @@ class _NobarScreenState extends ConsumerState<NobarScreen> with WidgetsBindingOb
           child: Column(
             children: [
               AspectRatio(aspectRatio: 16 / 9, child: _videoBox(ui)),
+              _panelTabs(),
               Expanded(
-                child: ListView(
-                  padding: EdgeInsets.fromLTRB(16, 16, 16, 130 + bottomInset),
-                  children: [
-                    _roomHeader(ui),
-                    const SizedBox(height: 22),
-                    if (voice != null)
-                      NobarMembersStrip(
-                        room: _room,
-                        voice: voice,
+                child: _panel == 1
+                    ? NobarChatPanel(
+                        messages: _chat,
                         myUid: _uid ?? '',
-                        onKick: _kick,
-                        onInvite: _openInvite,
+                        hostUid: _room.hostUid,
+                        sending: _chatSending,
+                        loading: _chatLoading,
+                        onSend: _sendChat,
+                        // Kolom ketik di atas dock suara yang mengambang.
+                        bottomPadding: voice != null ? 92 + bottomInset : 8 + bottomInset,
+                      )
+                    : ListView(
+                        padding: EdgeInsets.fromLTRB(16, 16, 16, 130 + bottomInset),
+                        children: [
+                          _roomHeader(ui),
+                          const SizedBox(height: 22),
+                          if (voice != null)
+                            NobarMembersStrip(
+                              room: _room,
+                              voice: voice,
+                              myUid: _uid ?? '',
+                              onKick: _kick,
+                              onInvite: _openInvite,
+                            ),
+                          const SizedBox(height: 26),
+                          _episodeSection(ui),
+                        ],
                       ),
-                    const SizedBox(height: 26),
-                    _episodeSection(ui),
-                  ],
-                ),
               ),
             ],
           ),
@@ -737,6 +830,71 @@ class _NobarScreenState extends ConsumerState<NobarScreen> with WidgetsBindingOb
             child: NobarMiniVoice(room: _room, voice: voice, myUid: _uid ?? ''),
           ),
       ],
+    );
+  }
+
+  /// Tab Room / Chat di bawah video (Chat dapat badge pesan baru).
+  Widget _panelTabs() {
+    Widget tab(int i, IconData icon, String label, {int badge = 0}) {
+      final sel = _panel == i;
+      return Expanded(
+        child: InkWell(
+          onTap: () => _setPanel(i),
+          child: Container(
+            height: 44,
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(color: sel ? AppColors.accentViolet : Colors.transparent, width: 2.5),
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, size: 17, color: sel ? AppColors.textWhite : AppColors.textMuted),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: sel ? AppColors.textWhite : AppColors.textMuted,
+                    fontWeight: sel ? FontWeight.w800 : FontWeight.w600,
+                    fontSize: 13.5,
+                  ),
+                ),
+                if (badge > 0) ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    constraints: const BoxConstraints(minWidth: 18),
+                    height: 18,
+                    padding: const EdgeInsets.symmetric(horizontal: 5),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: AppColors.accentViolet,
+                      borderRadius: BorderRadius.circular(9),
+                    ),
+                    child: Text(
+                      badge > 99 ? '99+' : '$badge',
+                      style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.backgroundDark,
+        border: Border(bottom: BorderSide(color: Colors.white.withValues(alpha: 0.06))),
+      ),
+      child: Row(
+        children: [
+          tab(0, Icons.groups_rounded, 'Room'),
+          tab(1, Icons.chat_bubble_rounded, 'Chat', badge: _chatUnread),
+        ],
+      ),
     );
   }
 

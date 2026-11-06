@@ -88,6 +88,23 @@ class NobarRepository {
     return _room(await _call({'action': 'get', 'id': id}, f), f);
   }
 
+  /// Kirim chat ke room. Return id pesan.
+  Future<int> sendChat(String id, String message) async {
+    final d = await _call({'action': 'chat', 'id': id, 'message': message}, 'Gagal mengirim pesan');
+    return (d['id'] as num?)?.toInt() ?? 0;
+  }
+
+  /// Chat setelah [after] (0 = 50 pesan terakhir), urut lama ke baru.
+  Future<List<NobarChatMessage>> chatList(String id, {int after = 0}) async {
+    final d = await _call({'action': 'chat_list', 'id': id, 'after': after}, 'Gagal memuat chat');
+    final raw = d['messages'];
+    if (raw is! List) return const [];
+    return [
+      for (final e in raw)
+        if (e is Map) NobarChatMessage.fromJson(Map<String, dynamic>.from(e)),
+    ];
+  }
+
   Future<void> leave(String id) async {
     await _call({'action': 'leave', 'id': id}, 'Gagal keluar room');
   }

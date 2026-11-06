@@ -17,6 +17,8 @@
 //   invite        {id, uid}           -> undang teman (notif + push)
 //   invite_respond {invite_id, accept} -> terima (masuk room) / tolak
 //   my_invites                        -> undangan yang masih menunggu jawabanku
+//   chat      {id, message}           -> kirim chat ke room (anggota saja)
+//   chat_list {id, after?}            -> pesan setelah id `after` (0 = 50 terakhir)
 //
 // Login & database memakai helper bersama `_shared/wp.ts` (db service role,
 // verifyUser lewat tabel firebase_jwks). Kredensial TURN memakai `turn.ts`
@@ -82,6 +84,72 @@ async function ping(id: string, reason: string) {
   } catch (_) {
     // App tetap heartbeat tiap 30 dtk, jadi ping yang gagal tidak fatal.
   }
+}
+
+/** Kabari anggota ada chat baru. Isinya cuma id; app mengambil pesan lewat
+ *  `chat_list`, jadi broadcast palsu dari luar tidak bisa memalsukan isi chat. */
+async function chatPing(id: string, lastId: number) {
+  try {
+    await fetch(`${SB_URL}/realtime/v1/api/broadcast`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: SERVICE_KEY,
+        Authorization: `Bearer ${SERVICE_KEY}`,
+      },
+      body: JSON.stringify({
+        messages: [{ topic: `nobar-${id}`, event: "chat", payload: { last_id: lastId, at: Date.now() } }],
+      }),
+    });
+  } catch (_) {
+    // App juga menarik chat tiap heartbeat, jadi ping yang gagal tidak fatal.
+  }
+}
+
+// ------------------------------------------------------------------ chat
+
+const CHAT_MAX = 300;
+const CHAT_BURST = 5;        // maks pesan per 10 detik per orang
+const CHAT_PER_MINUTE = 20;  // maks pesan per menit per orang
+
+function cleanChat(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  // Buang karakter kontrol (kecuali baris baru), rapikan spasi berlebih.
+  const s = v.replace(/[\u0000-\u0009\u000B-\u001F\u007F]/g, "").replace(/\n{3,}/g, "\n\n").trim();
+  if (!s || s.length > CHAT_MAX) return null;
+  return s;
+}
+
+async function chatRows(id: string, after: number) {
+  let q = db.from("nobar_messages").select("id, firebase_uid, message, created_at").eq("room_id", id);
+  q = after > 0
+    ? q.gt("id", after).order("id", { ascending: true }).limit(100)
+    : q.order("id", { ascending: false }).limit(50);
+  const { data, error } = await q;
+  if (error) throw new HttpError(500, "Gagal memuat chat");
+  const rows = (data ?? []).slice();
+  if (after <= 0) rows.reverse();
+  const uids = [...new Set(rows.map((r) => r.firebase_uid))];
+  const profiles = new Map<string, Record<string, unknown>>();
+  if (uids.length) {
+    const { data: ps } = await db
+      .from("chat_profiles")
+      .select("firebase_uid, username, avatar_url, username_color")
+      .in("firebase_uid", uids);
+    for (const p of ps ?? []) profiles.set(p.firebase_uid, p);
+  }
+  return rows.map((r) => {
+    const p = profiles.get(r.firebase_uid) ?? {};
+    return {
+      id: r.id,
+      uid: r.firebase_uid,
+      username: (p.username as string | undefined)?.trim() || "Pengguna",
+      avatar_url: p.avatar_url ?? null,
+      username_color: p.username_color ?? null,
+      message: r.message,
+      created_at: r.created_at,
+    };
+  });
 }
 
 // ------------------------------------------------------------------ data
@@ -437,6 +505,39 @@ async function handle(uid: string, body: Record<string, unknown>) {
         });
       }
       return { invites: out };
+    }
+
+    case "chat": {
+      const id = roomId(body.id);
+      const message = cleanChat(body.message);
+      if (!message) throw new HttpError(400, `Pesan 1-${CHAT_MAX} karakter`);
+      if (!(await isMember(id, uid))) throw new HttpError(403, "Kamu tidak ada di room ini");
+      const { data: banned } = await db.from("banned_accounts").select("firebase_uid").eq("firebase_uid", uid).maybeSingle();
+      if (banned) throw new HttpError(403, "Akun ini diblokir");
+
+      const since = (ms: number) => new Date(Date.now() - ms).toISOString();
+      const count = async (ms: number) => {
+        const { count: n } = await db.from("nobar_messages").select("id", { count: "exact", head: true })
+          .eq("room_id", id).eq("firebase_uid", uid).gte("created_at", since(ms));
+        return n ?? 0;
+      };
+      if ((await count(10_000)) >= CHAT_BURST || (await count(60_000)) >= CHAT_PER_MINUTE) {
+        throw new HttpError(429, "Pelan-pelan ya, tunggu sebentar sebelum kirim lagi");
+      }
+
+      const { data: row, error } = await db.from("nobar_messages")
+        .insert({ room_id: id, firebase_uid: uid, message })
+        .select("id").single();
+      if (error || !row) throw new HttpError(500, "Gagal mengirim pesan");
+      await chatPing(id, row.id);
+      return { id: row.id };
+    }
+
+    case "chat_list": {
+      const id = roomId(body.id);
+      if (!(await isMember(id, uid))) throw new HttpError(403, "Kamu tidak ada di room ini");
+      const after = Math.max(0, Math.floor(Number(body.after) || 0));
+      return { messages: await chatRows(id, after) };
     }
 
     case "list": {

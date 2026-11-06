@@ -159,3 +159,35 @@ class NobarIce {
     );
   }
 }
+
+
+/// Satu pesan chat di room nobar (isi & nama pengirim dari server).
+class NobarChatMessage {
+  const NobarChatMessage({
+    required this.id,
+    required this.uid,
+    required this.username,
+    required this.message,
+    required this.createdAt,
+    this.avatarUrl,
+    this.usernameColor,
+  });
+
+  final int id;
+  final String uid;
+  final String username;
+  final String? avatarUrl;
+  final String? usernameColor;
+  final String message;
+  final DateTime createdAt;
+
+  factory NobarChatMessage.fromJson(Map<String, dynamic> j) => NobarChatMessage(
+        id: (j['id'] as num?)?.toInt() ?? 0,
+        uid: (j['uid'] as String?) ?? '',
+        username: (j['username'] as String?) ?? 'Pengguna',
+        avatarUrl: j['avatar_url'] as String?,
+        usernameColor: j['username_color'] as String?,
+        message: (j['message'] as String?) ?? '',
+        createdAt: DateTime.tryParse((j['created_at'] as String?) ?? '')?.toLocal() ?? DateTime.now(),
+      );
+}
