@@ -668,6 +668,17 @@ final homeCuplixProvider = FutureProvider.autoDispose<List<CuplixItem>>((ref) as
 });
 
 /// Tag clan satu user (null = belum gabung clan / gagal).
+/// Clan user [uid] (id, nama, tag) untuk pil clan di header profil.
+final userClanInfoProvider =
+    FutureProvider.autoDispose.family<({String id, String name, String tag})?, String>((ref, uid) async {
+  if (uid.isEmpty) return null;
+  try {
+    return await ref.watch(chatRepositoryProvider).getClanInfoForUid(uid);
+  } catch (_) {
+    return null;
+  }
+});
+
 final userClanTagProvider = FutureProvider.autoDispose.family<String?, String>((ref, uid) async {
   if (uid.isEmpty) return null;
   final repo = ref.watch(chatRepositoryProvider);

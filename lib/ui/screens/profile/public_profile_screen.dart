@@ -19,6 +19,8 @@ import '../../components/net_image.dart';
 import '../../components/role_badges.dart';
 import '../../components/join_date_stat.dart';
 import '../clan/clan_browse_screen.dart';
+import '../tree/tree_screen.dart';
+import '../../components/app_toast.dart';
 import '../comments/comments_section.dart' show openCommentThreadFromProfile;
 import '../xp/xp_leaderboard_screen.dart';
 import 'profile_controller.dart';
@@ -302,6 +304,8 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
                 seed: uid,
                 label: name,
                 showXpRing: true,
+                leading: ProfileAchievementBadges.topXpChip(ref, uid),
+                trailing: ProfileAchievementBadges.topGiverChip(ref, uid),
               ),
               const SizedBox(height: 10),
               Padding(
@@ -352,15 +356,15 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
               const SizedBox(height: 6),
               ActivityStatus(uid: uid),
               const SizedBox(height: 10),
-              // Level ada di cincin avatar & clan di depan nama.
+              // Nama clan + role. Top XP / Top Giver ada di samping pin level.
               Wrap(
                 alignment: WrapAlignment.center,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 spacing: 6,
                 runSpacing: 6,
                 children: [
+                  ProfileClanPill(uid: uid),
                   RoleBadge(firebaseUid: uid, height: 22, rounded: true),
-                  ...ProfileAchievementBadges.chips(ref, uid),
                 ],
               ),
               const SizedBox(height: 18),
@@ -393,7 +397,17 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
                             .push<void>(fadeRoute(const ClanBrowseScreen())),
                       ),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ProfilePillButton(
+                        icon: Icons.park_rounded,
+                        label: 'Pohon',
+                        color: const Color(0xFF4ADE80),
+                        borderColor: const Color(0x994ADE80),
+                        onTap: () => _openTree(name, avatarUrl),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: ProfilePillButton(
                         icon: Icons.leaderboard,
@@ -462,6 +476,24 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
   }
 
   Widget _statDivider() => Container(width: 1, height: 26, color: const Color(0x40FFFFFF));
+
+  /// Pohon: profil sendiri -> pohonku; teman -> mampir ke pohonnya.
+  void _openTree(String name, String? avatarUrl) {
+    final nav = Navigator.of(context);
+    if (_isMe) {
+      nav.push<void>(fadeRoute(const TreeScreen()));
+      return;
+    }
+    if (_relation is FriendRelationFriends) {
+      nav.push<void>(fadeRoute(TreeVisitScreen(friendUid: widget.uid, username: name, avatarUrl: avatarUrl)));
+      return;
+    }
+    showAppToast(
+      context,
+      _myUid.isEmpty ? 'Masuk dulu untuk mampir ke pohon teman' : 'Berteman dulu biar bisa mampir ke pohonnya',
+      icon: Icons.park_rounded,
+    );
+  }
 
   // ------------------------------------------------------------- tombol teman
 

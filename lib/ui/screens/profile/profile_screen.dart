@@ -23,6 +23,8 @@ import '../../components/net_image.dart';
 import '../../components/role_badges.dart';
 import '../auth/login_screen.dart';
 import '../clan/clan_browse_screen.dart';
+import '../clan/clan_screen.dart';
+import '../tree/tree_screen.dart';
 import 'image_crop_screen.dart';
 import '../comments/comments_section.dart' show openCommentThreadFromProfile;
 import 'my_xp_card.dart';
@@ -180,6 +182,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 seed: uid.isEmpty ? name : uid,
                 label: name,
                 showXpRing: true,
+                leading: ProfileAchievementBadges.topXpChip(ref, uid),
+                trailing: ProfileAchievementBadges.topGiverChip(ref, uid),
               ),
               const SizedBox(height: 10),
               Padding(
@@ -234,8 +238,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ),
               ),
               const SizedBox(height: 10),
-              // Level ada di cincin avatar & clan di depan nama; di sini
-              // tinggal role + pencapaian (Top Giver / Top XP).
+              // Nama clan + role. Top XP / Top Giver ada di samping pin level.
               if (uid.isNotEmpty)
                 Wrap(
                   alignment: WrapAlignment.center,
@@ -243,8 +246,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   spacing: 6,
                   runSpacing: 6,
                   children: [
+                    ProfileClanPill(uid: uid),
                     RoleBadge(firebaseUid: uid, height: 22, rounded: true),
-                    ...ProfileAchievementBadges.chips(ref, uid),
                   ],
                 ),
               const SizedBox(height: 18),
@@ -283,7 +286,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                             .push<void>(fadeRoute(const ClanBrowseScreen())),
                       ),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: ProfilePillButton(
+                        icon: Icons.park_rounded,
+                        label: 'Pohon',
+                        color: const Color(0xFF4ADE80),
+                        borderColor: const Color(0x994ADE80),
+                        onTap: () => user == null
+                            ? _openLogin()
+                            : Navigator.of(context).push<void>(fadeRoute(const TreeScreen())),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: ProfilePillButton(
                         icon: Icons.leaderboard,
@@ -915,9 +930,15 @@ class ProfileHeroAvatar extends ConsumerWidget {
     required this.seed,
     required this.label,
     this.showXpRing = false,
+    this.leading,
+    this.trailing,
   });
 
   static const double size = 96;
+
+  /// Badge di kiri & kanan pin level (mis. Top XP / Top Giver), sejajar pin.
+  final Widget? leading;
+  final Widget? trailing;
 
   final String uid;
   final String? url;
@@ -950,9 +971,83 @@ class ProfileHeroAvatar extends ConsumerWidget {
     final bottom = ext - ring > ProfileXpRing.pinOverhang
         ? ext - ring
         : ProfileXpRing.pinOverhang;
+    final ringW = ProfileXpRing(uid: uid, avatarSize: size, child: avatar);
+    if (leading == null && trailing == null) {
+      return Padding(padding: EdgeInsets.only(top: top, bottom: bottom), child: ringW);
+    }
+    // Badge samping: bawahnya sejajar bawah cincin lalu digeser turun
+    // setengah tinggi pin, jadi titik tengahnya segaris dengan pin level.
+    final gap = (ext > ring ? ext - ring : 0.0) + 8;
+    Widget side(Widget? w, Alignment a) => Expanded(
+          child: Align(
+            alignment: a,
+            child: w == null
+                ? const SizedBox.shrink()
+                : Transform.translate(
+                    offset: const Offset(0, ProfileXpRing.pinOverhang),
+                    child: FittedBox(fit: BoxFit.scaleDown, child: w),
+                  ),
+          ),
+        );
     return Padding(
       padding: EdgeInsets.only(top: top, bottom: bottom),
-      child: ProfileXpRing(uid: uid, avatarSize: size, child: avatar),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          side(leading, Alignment.bottomRight),
+          SizedBox(width: gap),
+          ringW,
+          SizedBox(width: gap),
+          side(trailing, Alignment.bottomLeft),
+        ],
+      ),
+    );
+  }
+}
+
+/// Pil nama clan di header profil (ketuk = buka halaman clan).
+class ProfileClanPill extends ConsumerWidget {
+  const ProfileClanPill({super.key, required this.uid});
+
+  final String uid;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final info = ref.watch(userClanInfoProvider(uid)).valueOrNull;
+    if (info == null || info.name.isEmpty) return const SizedBox.shrink();
+    return Material(
+      color: const Color(0x8C0B0E14),
+      shape: StadiumBorder(side: BorderSide(color: Colors.white.withValues(alpha: 0.18))),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () => Navigator.of(context).push<void>(fadeRoute(ClanScreen(clanId: info.id))),
+        child: Container(
+          height: 22,
+          constraints: const BoxConstraints(maxWidth: 190),
+          padding: const EdgeInsets.symmetric(horizontal: 9),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.shield_rounded, size: 13, color: Color(0xFFFFC54D)),
+              const SizedBox(width: 5),
+              Flexible(
+                child: Text(
+                  info.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.textWhite,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.3,
+                    height: 1.1,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -1025,9 +1120,10 @@ class ProfilePillButton extends StatelessWidget {
         side: BorderSide(color: borderColor),
         shape: const StadiumBorder(),
         minimumSize: const Size.fromHeight(44),
+        padding: const EdgeInsets.symmetric(horizontal: 10),
       ),
       icon: Icon(icon, size: 16),
-      label: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+      label: FittedBox(fit: BoxFit.scaleDown, child: Text(label, maxLines: 1)),
     );
   }
 }

@@ -240,6 +240,22 @@ class ChatRepository {
     return out;
   }
 
+  /// Clan milik [uid]: {id, name, tag} (null = tidak ikut clan).
+  Future<({String id, String name, String tag})?> getClanInfoForUid(String uid) async {
+    if (uid.isEmpty) return null;
+    final res = await _dio.get<dynamic>(
+      'rest/v1/clan_members',
+      queryParameters: {'firebase_uid': 'eq.$uid', 'select': 'clan_id,clans(name,tag)', 'limit': 1},
+    );
+    final rows = _rows(res.data);
+    if (rows.isEmpty) return null;
+    final row = rows.first;
+    final clan = row['clans'];
+    final id = (row['clan_id'] as String?) ?? '';
+    if (id.isEmpty || clan is! Map) return null;
+    return (id: id, name: (clan['name'] as String?) ?? '', tag: (clan['tag'] as String?) ?? '');
+  }
+
   /// Top clan (level tertinggi, lalu total XP) buat slide Top Leaderboard.
   Future<List<ClanSummary>> getTopClans({int limit = 4}) async {
     final res = await _dio.get<dynamic>(

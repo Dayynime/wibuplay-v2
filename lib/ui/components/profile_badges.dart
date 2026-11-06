@@ -363,27 +363,38 @@ class ProfileAchievementBadges extends ConsumerWidget {
 
   /// Dipakai buat menyusun Wrap: list kosong = tidak ada pencapaian.
   static List<Widget> chips(WidgetRef ref, String uid) {
-    if (uid.isEmpty) return const [];
-    final giver = ref.watch(topGiverRankProvider(uid));
-    final xp = ref.watch(topXpRankProvider(uid));
     return [
-      if (giver != null)
-        ProfileAchievementChip(
-          icon: Icons.card_giftcard,
-          label: 'Top Giver',
-          rank: giver,
-          color: giverColor,
-          tooltip: 'Peringkat $giver di leaderboard Top Giver',
-        ),
-      if (xp != null)
-        ProfileAchievementChip(
-          icon: Icons.bolt_rounded,
-          label: 'Top XP',
-          rank: xp,
-          color: xpColor,
-          tooltip: 'Peringkat $xp XP bulan ini',
-        ),
+      if (topGiverChip(ref, uid) case final g?) g,
+      if (topXpChip(ref, uid) case final x?) x,
     ];
+  }
+
+  /// Chip "Top Giver #n" (null = tidak masuk peringkat).
+  static Widget? topGiverChip(WidgetRef ref, String uid) {
+    if (uid.isEmpty) return null;
+    final giver = ref.watch(topGiverRankProvider(uid));
+    if (giver == null) return null;
+    return ProfileAchievementChip(
+      icon: Icons.card_giftcard,
+      label: 'Top Giver',
+      rank: giver,
+      color: giverColor,
+      tooltip: 'Peringkat $giver di leaderboard Top Giver',
+    );
+  }
+
+  /// Chip "Top XP #n" (null = tidak masuk peringkat).
+  static Widget? topXpChip(WidgetRef ref, String uid) {
+    if (uid.isEmpty) return null;
+    final xp = ref.watch(topXpRankProvider(uid));
+    if (xp == null) return null;
+    return ProfileAchievementChip(
+      icon: Icons.bolt_rounded,
+      label: 'Top XP',
+      rank: xp,
+      color: xpColor,
+      tooltip: 'Peringkat $xp XP bulan ini',
+    );
   }
 
   @override
