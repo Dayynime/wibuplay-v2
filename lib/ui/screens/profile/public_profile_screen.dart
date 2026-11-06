@@ -26,6 +26,7 @@ import '../xp/xp_leaderboard_screen.dart';
 import 'profile_controller.dart';
 import 'profile_screen_seed.dart';
 import 'profile_screen.dart';
+import 'profile_card.dart';
 import '../../glass/glass.dart';
 import '../../components/clan_tag_badge.dart';
 
@@ -214,9 +215,21 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
                       );
                     } else if (v == 'block') {
                       confirmBlockUser(context, ref, uid: uid, name: name);
+                    } else if (v == 'card') {
+                      showProfileCard(
+                        context,
+                        uid: uid,
+                        favorites: favorites ?? const [],
+                        animeCount: history?.map((h) => h.movieId).toSet().length ?? 0,
+                        episodeCount: history?.length ?? 0,
+                      );
                     }
                   },
                   itemBuilder: (_) => const [
+                    PopupMenuItem(
+                      value: 'card',
+                      child: Text('Kartu profil', style: TextStyle(color: AppColors.textWhite)),
+                    ),
                     PopupMenuItem(
                       value: 'report',
                       child: Text('Laporkan profil', style: TextStyle(color: AppColors.textWhite)),

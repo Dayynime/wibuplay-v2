@@ -1,6 +1,9 @@
 package com.dayynime.wibuplay
 
 import android.app.DownloadManager
+import android.content.ContentValues
+import android.os.Environment
+import android.provider.MediaStore
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PictureInPictureParams
@@ -72,6 +75,42 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        // Simpan gambar (kartu profil) ke Galeri: Pictures/Zenime. Android 10+
+        // lewat MediaStore tanpa izin; Android lama -> false (app pakai Bagikan).
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "wibuplay/gallery")
+            .setMethodCallHandler { call, result ->
+                if (call.method != "saveImage") {
+                    result.notImplemented()
+                    return@setMethodCallHandler
+                }
+                val bytes = call.argument<ByteArray>("bytes")
+                val name = call.argument<String>("name") ?: "zenime-${System.currentTimeMillis()}.png"
+                if (bytes == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                    result.success(false)
+                    return@setMethodCallHandler
+                }
+                try {
+                    val values = ContentValues().apply {
+                        put(MediaStore.Images.Media.DISPLAY_NAME, name)
+                        put(MediaStore.Images.Media.MIME_TYPE, "image/png")
+                        put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/Zenime")
+                        put(MediaStore.Images.Media.IS_PENDING, 1)
+                    }
+                    val uri = contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+                    if (uri == null) {
+                        result.success(false)
+                        return@setMethodCallHandler
+                    }
+                    contentResolver.openOutputStream(uri)?.use { it.write(bytes) }
+                    values.clear()
+                    values.put(MediaStore.Images.Media.IS_PENDING, 0)
+                    contentResolver.update(uri, values, null, null)
+                    result.success(true)
+                } catch (e: Exception) {
+                    result.success(false)
+                }
+            }
+
         // Pemutar video ExoPlayer (android_native/WpExo.kt).
         exo?.disposeAll()
         exo = WpExo(applicationContext, flutterEngine.dartExecutor.binaryMessenger, flutterEngine.renderer)

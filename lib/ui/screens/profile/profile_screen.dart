@@ -1,3 +1,4 @@
+import 'profile_card.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -343,6 +344,27 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             top: topPad + 23,
             left: 16,
             child: BannerRarityBadge(rarity: wpBanner.rarity),
+          ),
+        // Kartu profil (simpan / bagikan sebagai gambar).
+        if (uid.isNotEmpty)
+          Positioned(
+            top: topPad + 8,
+            right: 64,
+            child: Material(
+              color: const Color(0x59000000),
+              shape: const CircleBorder(),
+              child: IconButton(
+                onPressed: () => showProfileCard(
+                  context,
+                  uid: uid,
+                  favorites: favorites,
+                  animeCount: uniqueAnime,
+                  episodeCount: history.length,
+                ),
+                tooltip: 'Kartu profil',
+                icon: const Icon(Icons.badge_outlined, color: Colors.white),
+              ),
+            ),
           ),
         Positioned(
           top: topPad + 8,
