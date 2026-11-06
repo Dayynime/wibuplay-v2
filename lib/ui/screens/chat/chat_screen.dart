@@ -34,6 +34,7 @@ import '../../../data/repository/chat_unread_repository.dart';
 import '../sticker/sticker_widgets.dart';
 import 'private_chat_pane.dart';
 import 'chat_controller.dart';
+import 'chat_mute.dart';
 import '../../components/avatar_frame.dart';
 import '../../glass/glass.dart';
 import '../../components/clan_tag_badge.dart';
@@ -285,6 +286,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   confirmBlockUser(context, ref, uid: m.firebaseUid, name: m.username);
                 },
               ),
+              if (ref.read(canChatMuteProvider).valueOrNull == true)
+                ListTile(
+                  leading: const Icon(Icons.volume_off_rounded, color: AppColors.errorRed),
+                  title: Text('Mute ${m.username}', style: const TextStyle(color: AppColors.textWhite)),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    showChatMuteSheet(context, ref, uid: m.firebaseUid, name: m.username);
+                  },
+                ),
             ],
             // Pesan gift/giveaway permanen (tidak bisa dihapus siapa pun).
             if ((m.firebaseUid == s.myUid || s.canDeleteOthers) && !m.isGift && !m.isGiveaway)
@@ -310,6 +320,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   @override
   Widget build(BuildContext context) {
     final s = ref.watch(chatControllerProvider);
+    ref.watch(canChatMuteProvider); // muat role lebih awal untuk menu Mute
 
     ref.listen<ChatUiState>(chatControllerProvider, (prev, next) {
       // Muatan awal (isLoading true -> false) tidak dianimasikan.
@@ -399,7 +410,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       children: [
                         Expanded(child: _buildList(s)),
                         if (s.replyTarget != null) _buildReplyBar(s.replyTarget!),
-                        _buildInput(s),
+                        ChatMuteGate(child: _buildInput(s)),
                       ],
                     )
                   : _tab == 2

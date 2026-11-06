@@ -10,6 +10,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../data/models/comment_models.dart';
 import '../../../data/models/sticker_models.dart';
 import '../sticker/sticker_widgets.dart';
+import '../chat/chat_mute.dart';
 import '../../../data/models/wallpaper_models.dart';
 import '../../../providers.dart';
 import '../../components/game_badges.dart';
@@ -453,7 +454,11 @@ class _CommentInputRowState extends ConsumerState<CommentInputRow> {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => widget.myUid.isEmpty
+      ? _buildRow(context)
+      : ChatMuteGate(compact: true, child: _buildRow(context));
+
+  Widget _buildRow(BuildContext context) {
     final uid = widget.myUid;
     final profile = uid.isEmpty ? null : ref.watch(chatProfileProvider(uid)).valueOrNull;
     final isPremium = ref.watch(myPremiumProvider).valueOrNull ?? false;

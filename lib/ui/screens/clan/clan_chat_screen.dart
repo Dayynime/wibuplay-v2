@@ -15,6 +15,7 @@ import '../profile/public_profile_screen.dart';
 import '../safety/safety_actions.dart';
 import 'clan_chat_controller.dart';
 import '../sticker/sticker_widgets.dart';
+import '../chat/chat_mute.dart';
 
 /// Chat internal clan sebagai layar penuh (tombol Chat Clan di halaman Clan).
 class ClanChatScreen extends StatelessWidget {
@@ -209,6 +210,15 @@ class _ClanChatPaneState extends ConsumerState<ClanChatPane> with WidgetsBinding
                   confirmBlockUser(context, ref, uid: m.firebaseUid, name: name);
                 },
               ),
+              if (ref.read(canChatMuteProvider).valueOrNull == true)
+                ListTile(
+                  leading: const Icon(Icons.volume_off_rounded, color: AppColors.errorRed),
+                  title: Text('Mute $name', style: const TextStyle(color: AppColors.textWhite)),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    showChatMuteSheet(context, ref, uid: m.firebaseUid, name: name);
+                  },
+                ),
             ],
             if (own || _canModerate)
               ListTile(
@@ -229,6 +239,7 @@ class _ClanChatPaneState extends ConsumerState<ClanChatPane> with WidgetsBinding
   Widget build(BuildContext context) {
     final s = ref.watch(clanChatControllerProvider);
     final myUid = ref.watch(authUserProvider.select((a) => a.valueOrNull?.uid)) ?? '';
+    ref.watch(canChatMuteProvider); // muat role lebih awal untuk menu Mute
 
     ref.listen<ClanChatState>(clanChatControllerProvider, (prev, next) {
       // Muatan awal (isLoading true -> false) tidak dianimasikan.
@@ -253,7 +264,7 @@ class _ClanChatPaneState extends ConsumerState<ClanChatPane> with WidgetsBinding
               style: const TextStyle(color: AppColors.errorRed, fontSize: 11.5),
             ),
           ),
-        _buildInput(s),
+        ChatMuteGate(child: _buildInput(s)),
       ],
     );
   }
