@@ -26,6 +26,12 @@ class FavoriteEntity {
   final String? views;
   final int timestamp;
 
+  /// Penanda favorit donghua (disimpan di kolom `type`, ikut tersinkron).
+  static const String donghuaType = 'Donghua';
+
+  /// true = favorit donghua (id = slug donghua), false = anime.
+  bool get isDonghua => type == donghuaType;
+
   AnimeItem toAnimeItem() => AnimeItem(
         id: id,
         title: title,

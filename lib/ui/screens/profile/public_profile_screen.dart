@@ -786,7 +786,6 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
       );
 
   Widget _buildFavorites(List<FavoriteEntity>? favorites, bool loading, bool failed) {
-    const double cardW = 120;
     final Widget body;
     if (loading) {
       body = _loadingBox();
@@ -794,41 +793,61 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
       body = const ProfileEmptyBox(text: 'Gagal memuat favorit. Coba lagi nanti.');
     } else if (favorites == null) {
       body = const ProfileEmptyBox(text: 'Pengguna ini menyembunyikan daftar favoritnya.');
-    } else if (favorites.isEmpty) {
-      body = const ProfileEmptyBox(text: 'Belum ada anime favorit.');
     } else {
-      body = SizedBox(
-        height: cardW * 1.5 + 62,
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          itemCount: favorites.length,
-          separatorBuilder: (_, __) => const SizedBox(width: 12),
-          itemBuilder: (context, i) {
-            final fav = favorites[i];
-            return SizedBox(
-              width: cardW,
-              child: AnimePosterCard(
-                key: ValueKey(fav.id),
-                anime: fav.toAnimeItem(),
-                width: cardW,
-                onTap: () => openDetail(context, fav.id),
-              ),
-            );
-          },
-        ),
+      final anime = favorites.where((f) => !f.isDonghua).toList();
+      final donghua = favorites.where((f) => f.isDonghua).toList();
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ProfileSectionHeader(
+            icon: Icons.favorite,
+            title: 'Anime Favorit',
+            trailing: anime.isEmpty ? null : '${anime.length} Anime',
+          ),
+          if (anime.isEmpty) const ProfileEmptyBox(text: 'Belum ada anime favorit.') else _favoriteRow(anime),
+          if (donghua.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            ProfileSectionHeader(
+              icon: Icons.movie_filter_rounded,
+              title: 'Donghua Favorit',
+              trailing: '${donghua.length} Donghua',
+            ),
+            _favoriteRow(donghua),
+          ],
+        ],
       );
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        ProfileSectionHeader(
-          icon: Icons.favorite,
-          title: 'Favorite Shows',
-          trailing: (favorites == null || favorites.isEmpty) ? null : '${favorites.length} Anime',
-        ),
+        const ProfileSectionHeader(icon: Icons.favorite, title: 'Anime Favorit'),
         body,
       ],
+    );
+  }
+
+  Widget _favoriteRow(List<FavoriteEntity> list) {
+    const double cardW = 120;
+    return SizedBox(
+      height: cardW * 1.5 + 62,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: list.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 12),
+        itemBuilder: (context, i) {
+          final fav = list[i];
+          return SizedBox(
+            width: cardW,
+            child: AnimePosterCard(
+              key: ValueKey(fav.id),
+              anime: fav.toAnimeItem(),
+              width: cardW,
+              onTap: () => fav.isDonghua ? openDonghuaDetail(context, fav.id) : openDetail(context, fav.id),
+            ),
+          );
+        },
+      ),
     );
   }
 

@@ -624,67 +624,82 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   // ---------------------------------------------------------------- favorit
 
   Widget _buildFavorites(List<FavoriteEntity> favorites) {
-    const double cardW = 120;
+    final anime = favorites.where((f) => !f.isDonghua).toList();
+    final donghua = favorites.where((f) => f.isDonghua).toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         ProfileSectionHeader(
           icon: Icons.favorite,
-          title: 'Favorite Shows',
-          trailing: favorites.isEmpty ? null : '${favorites.length} Anime',
+          title: 'Anime Favorit',
+          trailing: anime.isEmpty ? null : '${anime.length} Anime',
         ),
-        if (favorites.isEmpty)
+        if (anime.isEmpty)
           const ProfileEmptyBox(text: 'Belum ada anime favorit.')
         else
-          SizedBox(
-            height: cardW * 1.5 + 62,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: favorites.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 12),
-              itemBuilder: (context, i) {
-                final fav = favorites[i];
-                return SizedBox(
-                  width: cardW,
-                  child: Stack(
-                    key: ValueKey(fav.id),
-                    children: [
-                      AnimePosterCard(
-                        anime: fav.toAnimeItem(),
-                        width: cardW,
-                        onTap: () => widget.onAnimeClick(fav.id),
-                      ),
-                      // Tombol hapus favorit (kiri atas poster).
-                      Positioned(
-                        top: 6,
-                        left: 6,
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: () => _confirmRemoveFavorite(fav),
-                          child: Container(
-                            width: 28,
-                            height: 28,
-                            decoration: const BoxDecoration(
-                              color: Color(0xB30B0E14),
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.delete_outline,
-                              color: AppColors.errorRed,
-                              size: 17,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
+          _favoriteRow(anime),
+        if (donghua.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          ProfileSectionHeader(
+            icon: Icons.movie_filter_rounded,
+            title: 'Donghua Favorit',
+            trailing: '${donghua.length} Donghua',
           ),
+          _favoriteRow(donghua),
+        ],
         const ComicFavoritesBlock(),
       ],
+    );
+  }
+
+  Widget _favoriteRow(List<FavoriteEntity> list) {
+    const double cardW = 120;
+    return SizedBox(
+      height: cardW * 1.5 + 62,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: list.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 12),
+        itemBuilder: (context, i) {
+          final fav = list[i];
+          return SizedBox(
+            width: cardW,
+            child: Stack(
+              key: ValueKey(fav.id),
+              children: [
+                AnimePosterCard(
+                  anime: fav.toAnimeItem(),
+                  width: cardW,
+                  onTap: () => fav.isDonghua ? openDonghuaDetail(context, fav.id) : widget.onAnimeClick(fav.id),
+                ),
+                // Tombol hapus favorit (kiri atas poster).
+                Positioned(
+                  top: 6,
+                  left: 6,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: () => _confirmRemoveFavorite(fav),
+                    child: Container(
+                      width: 28,
+                      height: 28,
+                      decoration: const BoxDecoration(
+                        color: Color(0xB30B0E14),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.delete_outline,
+                        color: AppColors.errorRed,
+                        size: 17,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 

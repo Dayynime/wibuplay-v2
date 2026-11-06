@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/anichin_models.dart';
 import '../../components/common_components.dart';
+import '../../../providers.dart';
+import '../../components/app_toast.dart';
 import 'donghua_detail_controller.dart';
 import 'donghua_widgets.dart';
 import '../../glass/glass.dart';
@@ -174,6 +176,57 @@ class _DonghuaDetailScreenState extends ConsumerState<DonghuaDetailScreen>
     );
   }
 
+  /// Tombol favorit (kanan atas hero), sama gaya dengan tombol kembali.
+  Widget _favoriteButton(AnichinAnimeDetail detail) {
+    final fav = ref.watch(localStoreProvider.select((s) => s.isFavorite(widget.slug)));
+    return Align(
+      alignment: Alignment.topRight,
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Material(
+            color: Colors.black.withValues(alpha: 0.6),
+            shape: const CircleBorder(),
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: () async {
+                final wasFav = fav;
+                await ref.read(repositoryProvider).toggleDonghuaFavorite(
+                      slug: widget.slug,
+                      title: detail.name,
+                      poster: detail.thumbnail,
+                      status: detail.info['status'],
+                      synopsis: detail.sinopsis,
+                      genre: detail.genres.join(', '),
+                    );
+                if (!mounted) return;
+                showAppToast(
+                  context,
+                  wasFav ? 'Dihapus dari favorit' : 'Ditambahkan ke favorit Donghua',
+                  kind: wasFav ? ToastKind.info : ToastKind.success,
+                  icon: wasFav ? Icons.bookmark_remove_rounded : Icons.bookmark_added_rounded,
+                );
+              },
+              child: SizedBox(
+                width: 40,
+                height: 40,
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 200),
+                  transitionBuilder: (c, a) => ScaleTransition(scale: a, child: c),
+                  child: Icon(
+                    fav ? Icons.bookmark : Icons.bookmark_border,
+                    key: ValueKey(fav),
+                    color: fav ? AppColors.accentViolet : Colors.white,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _content(AnichinAnimeDetail detail) {
     final startEpisode = startEpisodeOf(detail.episodes);
     final meta = [
@@ -215,6 +268,7 @@ class _DonghuaDetailScreenState extends ConsumerState<DonghuaDetailScreen>
                     ),
                   ),
                   _backButton(),
+                  _favoriteButton(detail),
                   Positioned(
                     left: 20,
                     right: 96,

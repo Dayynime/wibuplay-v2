@@ -397,6 +397,37 @@ class AnimeRepository {
     }
   }
 
+  /// Favorit donghua: disimpan di daftar favorit yang sama dengan
+  /// `type = Donghua` dan id = slug, supaya bisa dipisah dari anime.
+  Future<void> toggleDonghuaFavorite({
+    required String slug,
+    required String title,
+    String? poster,
+    String? status,
+    String? synopsis,
+    String? genre,
+  }) async {
+    if (slug.isEmpty) return;
+    if (_store.isFavorite(slug)) {
+      await _store.deleteFavorite(slug);
+      _sync((repo, uid) => repo.syncFavoriteRemoved(uid, slug));
+      return;
+    }
+    final entity = FavoriteEntity(
+      id: slug,
+      title: title.isEmpty ? 'Donghua' : title,
+      posterUrl: poster ?? '',
+      coverUrl: poster ?? '',
+      synopsis: synopsis,
+      genre: genre,
+      status: status,
+      type: FavoriteEntity.donghuaType,
+      timestamp: DateTime.now().millisecondsSinceEpoch,
+    );
+    await _store.insertFavorite(entity);
+    _sync((repo, uid) => repo.syncFavoriteAdded(uid, entity));
+  }
+
   Future<void> removeFavorite(String id) async {
     await _store.deleteFavorite(id);
     _sync((repo, uid) => repo.syncFavoriteRemoved(uid, id));

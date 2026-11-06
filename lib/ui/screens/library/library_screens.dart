@@ -228,11 +228,13 @@ class FavoritesScreen extends ConsumerStatefulWidget {
 }
 
 class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
-  int _tab = 0; // 0 = anime, 1 = komik
+  int _tab = 0; // 0 = anime, 1 = donghua, 2 = komik
 
   @override
   Widget build(BuildContext context) {
-    final favorites = ref.watch(profileFavoritesProvider);
+    final all = ref.watch(profileFavoritesProvider);
+    final anime = all.where((f) => !f.isDonghua).toList();
+    final donghua = all.where((f) => f.isDonghua).toList();
     final comicCount = ref.watch(comicStoreProvider).favorites.length;
     final controller = ref.read(profileControllerProvider);
 
@@ -245,34 +247,13 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
       if (ok) await controller.removeFavorite(fav.id);
     }
 
-    return GlassScaffold(
-      backgroundColor: AppColors.backgroundDark,
-      appBar: _appBar('Favorit'),
-      body: Column(
+    Widget grid(List<FavoriteEntity> list, String empty, String key) {
+      return ListView(
+        key: ValueKey(key),
+        padding: const EdgeInsets.only(top: 4, bottom: 40),
         children: [
-          _LibraryTabs(
-            labels: [
-              favorites.isEmpty ? 'Anime' : 'Anime (${favorites.length})',
-              comicCount == 0 ? 'Komik' : 'Komik ($comicCount)',
-            ],
-            selected: _tab,
-            onChanged: (i) => setState(() => _tab = i),
-          ),
-          Expanded(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 220),
-              child: _tab == 1
-                  ? ListView(
-                      key: const ValueKey('komik'),
-                      padding: const EdgeInsets.only(bottom: 40),
-                      children: const [ComicFavoritesBlock(showHeader: false, grid: true)],
-                    )
-                  : ListView(
-                      key: const ValueKey('anime'),
-                      padding: const EdgeInsets.only(top: 4, bottom: 40),
-                      children: [
-          if (favorites.isEmpty)
-            const ProfileEmptyBox(text: 'Belum ada anime favorit.')
+          if (list.isEmpty)
+            ProfileEmptyBox(text: empty)
           else
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -284,7 +265,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
                     spacing: gap,
                     runSpacing: 14,
                     children: [
-                      for (final fav in favorites)
+                      for (final fav in list)
                         SizedBox(
                           key: ValueKey(fav.id),
                           width: cardW,
@@ -293,7 +274,9 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
                               AnimePosterCard(
                                 anime: fav.toAnimeItem(),
                                 width: cardW,
-                                onTap: () => openDetail(context, fav.id),
+                                onTap: () => fav.isDonghua
+                                    ? openDonghuaDetail(context, fav.id)
+                                    : openDetail(context, fav.id),
                               ),
                               Positioned(
                                 top: 6,
@@ -324,8 +307,36 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
                 },
               ),
             ),
-                      ],
-                    ),
+        ],
+      );
+    }
+
+    return GlassScaffold(
+      backgroundColor: AppColors.backgroundDark,
+      appBar: _appBar('Favorit'),
+      body: Column(
+        children: [
+          _LibraryTabs(
+            labels: [
+              anime.isEmpty ? 'Anime' : 'Anime (${anime.length})',
+              donghua.isEmpty ? 'Donghua' : 'Donghua (${donghua.length})',
+              comicCount == 0 ? 'Komik' : 'Komik ($comicCount)',
+            ],
+            selected: _tab,
+            onChanged: (i) => setState(() => _tab = i),
+          ),
+          Expanded(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 220),
+              child: switch (_tab) {
+                1 => grid(donghua, 'Belum ada donghua favorit. Tekan ikon bookmark di halaman donghua.', 'donghua'),
+                2 => ListView(
+                    key: const ValueKey('komik'),
+                    padding: const EdgeInsets.only(bottom: 40),
+                    children: const [ComicFavoritesBlock(showHeader: false, grid: true)],
+                  ),
+                _ => grid(anime, 'Belum ada anime favorit.', 'anime'),
+              },
             ),
           ),
         ],
