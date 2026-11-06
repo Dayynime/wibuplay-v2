@@ -17,6 +17,7 @@ import 'clan_chat_controller.dart';
 import '../sticker/sticker_widgets.dart';
 import '../chat/chat_mute.dart';
 import '../chat/chat_reactions.dart';
+import '../chat/chat_mention.dart';
 import '../gift/giveaway.dart' show showCreateGiveawaySheet;
 
 /// Chat internal clan sebagai layar penuh (tombol Chat Clan di halaman Clan).
@@ -71,6 +72,7 @@ class ClanChatPane extends ConsumerStatefulWidget {
 
 class _ClanChatPaneState extends ConsumerState<ClanChatPane> with WidgetsBindingObserver {
   final _input = TextEditingController();
+  late final MentionTracker _mention = MentionTracker(_input);
   final _focus = FocusNode();
 
   /// Pesan yang masuk setelah muatan awal (dianimasikan, seperti Chat Global).
@@ -101,8 +103,12 @@ class _ClanChatPaneState extends ConsumerState<ClanChatPane> with WidgetsBinding
   }
 
   Future<void> _send() async {
-    final ok = await ref.read(clanChatControllerProvider.notifier).send(_input.text);
-    if (ok) _input.clear();
+    final text = _input.text;
+    final ok = await ref.read(clanChatControllerProvider.notifier).send(text, mentionUids: _mention.uidsFor(text));
+    if (ok) {
+      _input.clear();
+      _mention.clear();
+    }
   }
 
   String _nameOf(ClanChatState s, String uid) {
@@ -294,7 +300,12 @@ class _ClanChatPaneState extends ConsumerState<ClanChatPane> with WidgetsBinding
               style: const TextStyle(color: AppColors.errorRed, fontSize: 11.5),
             ),
           ),
-        ChatMuteGate(child: _buildInput(s)),
+        ChatMuteGate(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [MentionSuggestions(tracker: _mention), _buildInput(s)],
+          ),
+        ),
       ],
     );
   }

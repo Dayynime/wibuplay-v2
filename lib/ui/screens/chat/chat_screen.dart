@@ -37,6 +37,7 @@ import 'chat_controller.dart';
 import 'chat_mute.dart';
 import 'chat_pin.dart';
 import 'chat_reactions.dart';
+import 'chat_mention.dart';
 import '../../components/avatar_frame.dart';
 import '../../glass/glass.dart';
 import '../../components/clan_tag_badge.dart';
@@ -74,6 +75,7 @@ class ChatScreen extends ConsumerStatefulWidget {
 
 class _ChatScreenState extends ConsumerState<ChatScreen> {
   final TextEditingController _input = TextEditingController();
+  late final MentionTracker _mention = MentionTracker(_input);
 
   /// 0 = Chat Global, 1 = Chat Teman (tab Teman ala Zenime), 2 = Chat Clan.
   late int _tab = widget.initialTab.clamp(0, 2);
@@ -189,8 +191,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   Future<void> _send() async {
-    final ok = await _controller.send(_input.text);
-    if (ok) _input.clear();
+    final text = _input.text;
+    final ok = await _controller.send(text, mentionUids: _mention.uidsFor(text));
+    if (ok) {
+      _input.clear();
+      _mention.clear();
+    }
   }
 
   Future<void> _confirmDelete(ChatMessage m) async {
@@ -441,7 +447,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         ),
                         Expanded(child: _buildList(s)),
                         if (s.replyTarget != null) _buildReplyBar(s.replyTarget!),
-                        ChatMuteGate(child: _buildInput(s)),
+                        ChatMuteGate(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [MentionSuggestions(tracker: _mention), _buildInput(s)],
+                          ),
+                        ),
                       ],
                     )
                   : _tab == 2
@@ -895,7 +906,7 @@ class ChatMessageBubble extends StatelessWidget {
             else if (stickerCodeOf(m.message) case final code?)
               StickerView(code: code)
             else
-              Text(
+              MentionText(
                 m.message,
                 style: const TextStyle(color: AppColors.textWhite, fontSize: 14, height: 1.3),
               ),

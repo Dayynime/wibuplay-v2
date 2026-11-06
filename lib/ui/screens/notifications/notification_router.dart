@@ -24,6 +24,12 @@ Future<void> openNotificationTarget(
   final clanId = data['clan_id']?.toString() ?? '';
 
   switch (type) {
+    case 'chat_mention':
+      // Chat Clan = tab 2, Chat Global = tab 0.
+      final tab = data['channel']?.toString() == 'clan' ? 2 : 0;
+      await nav.push<void>(fadeRoute(ChatScreen(initialTab: tab)));
+      return;
+
     case 'private_message':
       final sender = data['sender_uid']?.toString();
       await nav.push<void>(fadeRoute(ChatScreen(initialTab: 1, openPeerUid: sender)));

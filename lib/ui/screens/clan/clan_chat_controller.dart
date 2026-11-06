@@ -6,6 +6,7 @@ import '../../../core/error_message.dart';
 import '../../../data/models/chat_models.dart';
 import '../../../data/models/clan_chat_models.dart';
 import '../../../providers.dart';
+import '../chat/chat_mention.dart' show chatMentionRepositoryProvider;
 
 const int kClanChatMaxLength = 500;
 
@@ -142,7 +143,8 @@ class ClanChatController extends AutoDisposeNotifier<ClanChatState> {
 
   void setReplyTarget(ClanMessage? m) => _update((s) => s.copyWith(replyTarget: () => m));
 
-  Future<bool> send(String raw) async {
+  /// [mentionUids]: teman yang di-mention (@nama) -> dapat notif.
+  Future<bool> send(String raw, {List<String> mentionUids = const []}) async {
     final text = raw.trim();
     if (text.isEmpty || state.isSending) return false;
     _update((s) => s.copyWith(isSending: true, sendError: () => null));
@@ -159,6 +161,9 @@ class ClanChatController extends AutoDisposeNotifier<ClanChatState> {
         );
       });
       unawaited(_loadProfiles(state.messages));
+      if (mentionUids.isNotEmpty) {
+        unawaited(ref.read(chatMentionRepositoryProvider).notify('clan', sent.id, mentionUids));
+      }
       return true;
     } catch (e) {
       _update((s) => s.copyWith(

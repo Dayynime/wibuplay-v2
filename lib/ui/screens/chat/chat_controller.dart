@@ -8,6 +8,7 @@ import '../../../data/realtime/chat_realtime_client.dart';
 import '../../../data/repository/chat_repository.dart';
 import '../../../providers.dart';
 import 'chat_session_cache.dart';
+import 'chat_mention.dart' show chatMentionRepositoryProvider;
 
 const int _cooldownSeconds = 5;
 const int _maxMessageLength = 300;
@@ -322,7 +323,8 @@ class ChatController extends AutoDisposeNotifier<ChatUiState> {
   // ------------------------------------------------------------------ aksi
 
   /// Return true kalau pesan terkirim (UI mengosongkan kolom input).
-  Future<bool> send(String text) async {
+  /// [mentionUids]: teman yang di-mention (@nama) -> dapat notif.
+  Future<bool> send(String text, {List<String> mentionUids = const []}) async {
     final trimmed = text.trim();
     if (trimmed.isEmpty) return false;
     if (state.cooldownSeconds > 0 || state.isSending) return false;
@@ -349,6 +351,9 @@ class ChatController extends AutoDisposeNotifier<ChatUiState> {
             replyTarget: () => null,
           ));
       _checkBadges([sent]);
+      if (mentionUids.isNotEmpty) {
+        unawaited(ref.read(chatMentionRepositoryProvider).notify('global', sent.id, mentionUids));
+      }
       // Sama seperti Zenime: habis kirim, sinkron ulang dengan server.
       await _refresh();
       if (!_alive) return true;
