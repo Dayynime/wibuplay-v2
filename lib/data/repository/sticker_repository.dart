@@ -61,10 +61,18 @@ class StickerRepository {
 
   /// Semua stiker yang disetujui (terbaru dulu).
   Future<List<Sticker>> catalog() async {
-    final res = await _dio.get<dynamic>(
-      'rest/v1/sticker_catalog',
-      queryParameters: {'select': 'code,name,path', 'order': 'approved_at.desc', 'limit': 1000},
-    );
+    Future<Response<dynamic>> get(String select) => _dio.get<dynamic>(
+          'rest/v1/sticker_catalog',
+          queryParameters: {'select': select, 'order': 'approved_at.desc', 'limit': 1000},
+        );
+    Response<dynamic> res;
+    try {
+      res = await get('code,name,path,pack');
+    } on DioException catch (e) {
+      // Server belum punya kolom pack: tetap tampil (semua masuk "Lainnya").
+      if (e.response?.statusCode != 400) rethrow;
+      res = await get('code,name,path');
+    }
     return _rows(res.data).map(Sticker.fromJson).where((s) => s.code.isNotEmpty).toList();
   }
 
@@ -102,6 +110,7 @@ class StickerRepository {
   Future<void> upload({
     required String filePath,
     required String name,
+    String? pack,
     void Function(double progress)? onProgress,
   }) async {
     final file = File(filePath);
@@ -112,7 +121,11 @@ class StickerRepository {
     final mime = await detectMime(filePath);
     if (mime == null) throw const StickerException('File harus PNG, JPG, WebP, atau GIF');
 
-    final signed = await _call({'action': 'sign', 'name': name.trim(), 'mime': mime}, 'Gagal menyiapkan upload');
+    final p = pack?.trim();
+    final signed = await _call(
+      {'action': 'sign', 'name': name.trim(), 'mime': mime, if (p != null && p.isNotEmpty) 'pack': p},
+      'Gagal menyiapkan upload',
+    );
     final id = signed['id'];
     final path = signed['path'];
     final token = signed['token'];

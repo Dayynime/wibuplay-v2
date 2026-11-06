@@ -20,11 +20,14 @@ String _publicUrl(String path) => '${SupabaseConfig.url}/storage/v1/object/publi
 
 /// Stiker di katalog publik (sudah disetujui).
 class Sticker {
-  const Sticker({required this.code, required this.name, required this.path});
+  const Sticker({required this.code, required this.name, required this.path, this.pack});
 
   final String code;
   final String name;
   final String path;
+
+  /// Nama pack (null = "Lainnya").
+  final String? pack;
 
   String get url => _publicUrl(path);
 
@@ -32,7 +35,16 @@ class Sticker {
         code: (j['code'] as String?) ?? '',
         name: (j['name'] as String?) ?? '',
         path: (j['path'] as String?) ?? '',
+        pack: _packOf(j['pack']),
       );
+}
+
+/// Label tab untuk stiker tanpa pack.
+const String kStickerNoPack = 'Lainnya';
+
+String? _packOf(Object? v) {
+  final s = (v as String?)?.trim();
+  return s == null || s.isEmpty ? null : s;
 }
 
 /// Status stiker milik sendiri.
@@ -44,11 +56,13 @@ class MySticker {
     required this.status,
     this.path,
     this.rejectReason,
+    this.pack,
   });
 
   final String id;
   final String code;
   final String name;
+  final String? pack;
 
   /// pending | approved | rejected | removed
   final String status;
@@ -64,6 +78,7 @@ class MySticker {
         status: (j['status'] as String?) ?? 'pending',
         path: j['path'] as String?,
         rejectReason: j['reject_reason'] as String?,
+        pack: _packOf(j['pack']),
       );
 }
 
@@ -80,12 +95,14 @@ class AdminSticker {
     this.previewUrl,
     this.path,
     this.rejectReason,
+    this.pack,
   });
 
   final String id;
   final String code;
   final String name;
   final String status;
+  final String? pack;
   final String uploaderUid;
   final String uploaderName;
   final int? sizeBytes;
@@ -115,5 +132,6 @@ class AdminSticker {
         previewUrl: j['preview_url'] as String?,
         path: j['path'] as String?,
         rejectReason: j['reject_reason'] as String?,
+        pack: _packOf(j['pack']),
       );
 }

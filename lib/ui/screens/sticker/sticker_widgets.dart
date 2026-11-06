@@ -133,6 +133,9 @@ class _StickerSheetState extends ConsumerState<_StickerSheet> {
   List<String> _recent = const [];
   String _query = '';
 
+  /// Tab pack yang dipilih (huruf kecil). null = Semua.
+  String? _pack;
+
   @override
   void initState() {
     super.initState();
@@ -190,16 +193,58 @@ class _StickerSheetState extends ConsumerState<_StickerSheet> {
             ),
           );
         }
-        final all = map.values.where((s) => q.isEmpty || s.name.toLowerCase().contains(q)).toList();
-        final recent = q.isEmpty ? _recent.map((c) => map[c]).whereType<Sticker>().toList() : const <Sticker>[];
+        // Kelompokkan per pack (tanpa beda huruf besar/kecil), terbanyak dulu,
+        // "Lainnya" paling akhir.
+        final packs = <String, (String, int)>{};
+        for (final s in map.values) {
+          final label = s.pack ?? kStickerNoPack;
+          packs.update(label.toLowerCase(), (v) => (v.$1, v.$2 + 1), ifAbsent: () => (label, 1));
+        }
+        final noPack = kStickerNoPack.toLowerCase();
+        final packList = packs.entries.toList()
+          ..sort((a, b) {
+            if (a.key == noPack) return 1;
+            if (b.key == noPack) return -1;
+            final c = b.value.$2.compareTo(a.value.$2);
+            return c != 0 ? c : a.value.$1.toLowerCase().compareTo(b.value.$1.toLowerCase());
+          });
+        final sel = _pack != null && packs.containsKey(_pack) ? _pack : null;
+
+        final all = map.values.where((s) {
+          if (sel != null && (s.pack ?? kStickerNoPack).toLowerCase() != sel) return false;
+          if (q.isEmpty) return true;
+          return s.name.toLowerCase().contains(q) || (s.pack ?? '').toLowerCase().contains(q);
+        }).toList();
+        final recent = q.isEmpty && sel == null
+            ? _recent.map((c) => map[c]).whereType<Sticker>().toList()
+            : const <Sticker>[];
         return CustomScrollView(
           shrinkWrap: true,
           slivers: [
+            if (packList.length > 1)
+              SliverToBoxAdapter(
+                child: SizedBox(
+                  height: 40,
+                  child: ListView(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.only(top: 8),
+                    children: [
+                      _packChip('Semua', map.length, sel == null, () => setState(() => _pack = null)),
+                      for (final e in packList)
+                        _packChip(e.value.$1, e.value.$2, sel == e.key, () => setState(() => _pack = e.key)),
+                    ],
+                  ),
+                ),
+              ),
             if (recent.isNotEmpty) ...[
               _label('Terakhir dipakai'),
               _grid(recent),
             ],
-            _label(q.isEmpty ? 'Semua stiker' : 'Hasil pencarian'),
+            _label(q.isNotEmpty
+                ? 'Hasil pencarian'
+                : sel == null
+                    ? 'Semua stiker'
+                    : 'Pack ${packs[sel]!.$1}'),
             if (all.isEmpty)
               const SliverToBoxAdapter(
                 child: Padding(
@@ -266,6 +311,25 @@ class _StickerSheetState extends ConsumerState<_StickerSheet> {
       ),
     );
   }
+
+  Widget _packChip(String label, int count, bool selected, VoidCallback onTap) => Padding(
+        padding: const EdgeInsets.only(right: 6),
+        child: ChoiceChip(
+          label: Text('$label  $count'),
+          selected: selected,
+          onSelected: (_) => onTap(),
+          showCheckmark: false,
+          visualDensity: VisualDensity.compact,
+          selectedColor: AppColors.accentViolet,
+          backgroundColor: const Color(0x0FFFFFFF),
+          side: BorderSide(color: Colors.white.withValues(alpha: selected ? 0 : 0.08)),
+          labelStyle: TextStyle(
+            color: selected ? Colors.white : AppColors.textSecondary,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      );
 
   Widget _label(String text) => SliverToBoxAdapter(
         child: Padding(

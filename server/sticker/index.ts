@@ -2,7 +2,7 @@
 // Semua aturan (premium, kuota, status) ada di SQL (sticker.sql).
 //
 // Body JSON:
-//   { action: "sign", name, mime }            -> { id, path, token, max_bytes }
+//   { action: "sign", name, mime, pack? }     -> { id, path, token, max_bytes }
 //   { action: "register", id }                -> { success }   (file dicek server)
 //   { action: "mine" }                        -> { items }
 //   { action: "admin_list", status, offset }  -> { items }     (developer/admin)
@@ -79,6 +79,7 @@ serve(async (req) => {
         p_uid: uid,
         p_name: typeof body.name === "string" ? body.name : "",
         p_mime: mime,
+        p_pack: typeof body.pack === "string" ? body.pack : null,
       }) as { id?: string; path?: string } | null;
       if (!row?.id || !row?.path) throw new HttpError(500, "Gagal membuat upload");
 

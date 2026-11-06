@@ -263,6 +263,10 @@ class _AdminStickerTabState extends ConsumerState<AdminStickerTab> {
                   style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
                 ),
                 Text(
+                  'Pack: ${s.pack ?? kStickerNoPack}',
+                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 11.5),
+                ),
+                Text(
                   'Kode ${s.code}',
                   style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
                 ),

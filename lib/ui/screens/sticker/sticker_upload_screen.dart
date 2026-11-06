@@ -23,6 +23,7 @@ class StickerUploadScreen extends ConsumerStatefulWidget {
 class _StickerUploadScreenState extends ConsumerState<StickerUploadScreen> {
   final _picker = ImagePicker();
   final _name = TextEditingController();
+  final _pack = TextEditingController();
   XFile? _picked;
   int _pickedSize = 0;
   bool _uploading = false;
@@ -42,6 +43,7 @@ class _StickerUploadScreenState extends ConsumerState<StickerUploadScreen> {
   @override
   void dispose() {
     _name.dispose();
+    _pack.dispose();
     super.dispose();
   }
 
@@ -113,6 +115,7 @@ class _StickerUploadScreenState extends ConsumerState<StickerUploadScreen> {
       await _repo.upload(
         filePath: x.path,
         name: name,
+        pack: _pack.text,
         onProgress: (p) {
           if (mounted) setState(() => _progress = p);
         },
@@ -261,6 +264,27 @@ class _StickerUploadScreenState extends ConsumerState<StickerUploadScreen> {
             ),
           ),
           const SizedBox(height: 4),
+          TextField(
+            controller: _pack,
+            enabled: isPremium && !_uploading,
+            maxLength: 24,
+            style: const TextStyle(color: Colors.white),
+            cursorColor: AppColors.accentViolet,
+            onChanged: (_) => setState(() {}),
+            decoration: InputDecoration(
+              labelText: 'Pack (opsional)',
+              hintText: 'mis. Wowo, Kucing Lucu',
+              helperText: 'Stiker sejenis dikumpulkan di satu pack. Kosong = Lainnya',
+              helperStyle: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+              labelStyle: const TextStyle(color: AppColors.textSecondary),
+              hintStyle: const TextStyle(color: AppColors.textMuted),
+              filled: true,
+              fillColor: const Color(0x0DFFFFFF),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
+            ),
+          ),
+          _packSuggestions(isPremium),
+          const SizedBox(height: 8),
           if (_uploading) ...[
             ClipRRect(
               borderRadius: BorderRadius.circular(4),
@@ -286,9 +310,49 @@ class _StickerUploadScreenState extends ConsumerState<StickerUploadScreen> {
           const SizedBox(height: 10),
           const Text(
             'PNG, JPG, WebP, atau GIF (boleh bergerak), maks 1 MB. Stiker direview developer dulu '
-            'sebelum bisa dipakai semua orang. Maks 5 upload per hari.',
+            'sebelum bisa dipakai semua orang. Maks 100 upload per hari.',
             style: TextStyle(color: AppColors.textMuted, fontSize: 11.5),
           ),
+        ],
+      ),
+    );
+  }
+
+  /// Pack yang sudah ada di katalog (terbanyak dulu), ketuk = isi kolom pack.
+  Widget _packSuggestions(bool enabled) {
+    final catalog = ref.watch(stickerCatalogProvider).valueOrNull;
+    if (catalog == null) return const SizedBox.shrink();
+    final counts = <String, (String, int)>{};
+    for (final s in catalog.values) {
+      final p = s.pack;
+      if (p == null) continue;
+      counts.update(p.toLowerCase(), (v) => (v.$1, v.$2 + 1), ifAbsent: () => (p, 1));
+    }
+    if (counts.isEmpty) return const SizedBox.shrink();
+    final list = counts.values.toList()..sort((a, b) => b.$2.compareTo(a.$2));
+    final typed = _pack.text.trim().toLowerCase();
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Wrap(
+        spacing: 6,
+        runSpacing: 6,
+        children: [
+          for (final (label, n) in list.take(12))
+            ActionChip(
+              label: Text('$label · $n'),
+              onPressed: !enabled || _uploading
+                  ? null
+                  : () => setState(() => _pack.text = label),
+              visualDensity: VisualDensity.compact,
+              backgroundColor:
+                  typed == label.toLowerCase() ? AppColors.accentViolet : const Color(0x0FFFFFFF),
+              side: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+              labelStyle: TextStyle(
+                color: typed == label.toLowerCase() ? Colors.white : AppColors.textSecondary,
+                fontSize: 11.5,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
         ],
       ),
     );
@@ -358,6 +422,12 @@ class _MyStickerRow extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(color: AppColors.textWhite, fontWeight: FontWeight.w700),
+                ),
+                Text(
+                  'Pack: ${s.pack ?? kStickerNoPack}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
                 ),
                 if (s.rejectReason != null && s.rejectReason!.isNotEmpty && s.status != 'approved')
                   Text(
