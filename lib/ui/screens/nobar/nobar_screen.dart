@@ -9,6 +9,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 
 import '../../../core/premium_access.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/watch_xp_gate.dart';
 import '../../../core/wp_video.dart';
 import '../../../data/models/episode_item.dart';
 import '../../../data/models/nobar_models.dart';
@@ -71,6 +72,9 @@ class _NobarScreenState extends ConsumerState<NobarScreen> with WidgetsBindingOb
   Timer? _hideControls;
   int _tickCount = 0;
   bool _leaving = false;
+
+  /// XP nonton cuma dihitung saat app di layar depan.
+  bool _inForeground = true;
 
   // ------------------------------------------------------------ video
   WpVideoController? _vc;
@@ -150,6 +154,7 @@ class _NobarScreenState extends ConsumerState<NobarScreen> with WidgetsBindingOb
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    WatchXpGate.release(this);
     _heartbeat?.cancel();
     _hostTick?.cancel();
     _refreshDebounce?.cancel();
@@ -170,6 +175,7 @@ class _NobarScreenState extends ConsumerState<NobarScreen> with WidgetsBindingOb
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    _inForeground = state == AppLifecycleState.resumed;
     if (state == AppLifecycleState.resumed) {
       _refresh();
       if (!_isHost) _rt?.send('sync_req', {'from': _uid});
@@ -261,6 +267,22 @@ class _NobarScreenState extends ConsumerState<NobarScreen> with WidgetsBindingOb
     }
     if (_tickCount % 15 == 0 && vc != null && vc.value.isInitialized) {
       _notifier.saveProgress(vc.value.position.inMilliseconds, vc.value.duration.inMilliseconds);
+    }
+
+    // XP nonton (host & anggota), aturan sama dengan player biasa: cuma detik
+    // yang benar-benar diputar, tidak buffering, app di depan. Server tetap
+    // membatasi (jarak 50 detik per akun, maks akun per HP).
+    if (vc != null &&
+        vc.value.isInitialized &&
+        vc.value.isPlaying &&
+        !vc.value.isBuffering &&
+        _inForeground &&
+        WatchXpGate.onActiveSecond(this)) {
+      unawaited(
+        ref.read(xpRepositoryProvider).sendHeartbeat(minutes: 1).then((ok) {
+          if (ok && mounted) ref.invalidate(myXpProvider);
+        }).catchError((Object _) => false),
+      );
     }
   }
 
