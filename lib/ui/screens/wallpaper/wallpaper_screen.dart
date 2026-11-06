@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../components/app_toast.dart';
 import '../../components/rarity_chip.dart';
 import 'gacha_widgets.dart';
 import '../../../core/theme/app_colors.dart';
@@ -123,10 +124,8 @@ class _WallpaperScreenState extends ConsumerState<WallpaperScreen> {
     }
   }
 
-  void _snack(String msg) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(msg)));
+  void _snack(String msg, {ToastKind kind = ToastKind.info, IconData? icon}) {
+    showAppToast(context, msg, kind: kind, icon: icon);
   }
 
   void _refreshCoins() {
@@ -141,12 +140,12 @@ class _WallpaperScreenState extends ConsumerState<WallpaperScreen> {
     final s = _state;
     if (_spinning || s == null) return;
     if (s.pool.isEmpty) {
-      _snack('Belum ada wallpaper yang bisa didapat.');
+      _snack('Belum ada wallpaper yang bisa didapat.', kind: ToastKind.warning);
       return;
     }
     final cost = count == 10 ? s.spin10Cost : s.spinCost;
     if (s.balance < cost) {
-      _snack('ZCoin kurang ${formatZCoin(cost - s.balance)} untuk Spin ${count}x.');
+      _snack('ZCoin kurang ${formatZCoin(cost - s.balance)} untuk Spin ${count}x.', kind: ToastKind.warning);
       return;
     }
 
@@ -158,7 +157,7 @@ class _WallpaperScreenState extends ConsumerState<WallpaperScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _spinning = false);
-        _snack(e is WallpaperException ? e.message : 'Spin gagal. Saldo tidak terpotong, coba lagi.');
+        _snack(e is WallpaperException ? e.message : 'Spin gagal. Saldo tidak terpotong, coba lagi.', kind: ToastKind.error);
       }
       return;
     }
@@ -238,9 +237,13 @@ class _WallpaperScreenState extends ConsumerState<WallpaperScreen> {
       setState(() => _bannerId = id);
       final uid = _uid;
       if (uid.isNotEmpty) ref.invalidate(bannerWallpaperProvider(uid));
-      _snack(id == null ? 'Banner profil dilepas' : 'Wallpaper terpasang jadi banner profilmu');
+      _snack(
+        id == null ? 'Banner profil dilepas' : 'Wallpaper terpasang jadi banner profilmu',
+        kind: id == null ? ToastKind.info : ToastKind.success,
+        icon: id == null ? Icons.hide_image_rounded : Icons.account_circle_rounded,
+      );
     } catch (e) {
-      if (mounted) _snack(e is WallpaperException ? e.message : 'Gagal, coba lagi');
+      if (mounted) _snack(e is WallpaperException ? e.message : 'Gagal, coba lagi', kind: ToastKind.error);
     } finally {
       if (mounted) setState(() => _equipping = false);
     }
@@ -253,9 +256,13 @@ class _WallpaperScreenState extends ConsumerState<WallpaperScreen> {
       await _repo.equip(id);
       if (!mounted) return;
       setState(() => _state = _state?.copyWith(equippedId: () => id));
-      _snack(id == null ? 'Wallpaper dilepas' : 'Wallpaper terpasang di komentarmu');
+      _snack(
+        id == null ? 'Wallpaper dilepas' : 'Wallpaper terpasang di komentarmu',
+        kind: id == null ? ToastKind.info : ToastKind.success,
+        icon: id == null ? Icons.hide_image_rounded : Icons.wallpaper_rounded,
+      );
     } catch (e) {
-      if (mounted) _snack(e is WallpaperException ? e.message : 'Gagal, coba lagi');
+      if (mounted) _snack(e is WallpaperException ? e.message : 'Gagal, coba lagi', kind: ToastKind.error);
     } finally {
       if (mounted) setState(() => _equipping = false);
     }
