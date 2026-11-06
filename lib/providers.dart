@@ -19,6 +19,7 @@ import 'data/repository/chat_repository.dart';
 import 'data/repository/clan_repository.dart';
 import 'data/repository/clan_chat_repository.dart';
 import 'data/repository/clan_access_repository.dart';
+import 'data/repository/chat_unread_repository.dart';
 import 'data/repository/clan_daily_repository.dart';
 import 'data/repository/sticker_repository.dart';
 import 'data/models/sticker_models.dart';
@@ -733,6 +734,11 @@ final clanDailyRepositoryProvider = Provider<ClanDailyRepository>(
 /// Mode join, level minimal & undangan clan (Edge Function `clan-access`).
 final clanAccessRepositoryProvider = Provider<ClanAccessRepository>(
   (ref) => ClanAccessRepository(ref.watch(supabaseDioProvider)),
+);
+
+/// Jumlah chat belum dibaca untuk badge tab Teman & Clan.
+final chatUnreadRepositoryProvider = Provider<ChatUnreadRepository>(
+  (ref) => ChatUnreadRepository(ref.watch(supabaseDioProvider)),
 );
 
 /// Stiker (katalog publik + upload Premium + review admin).

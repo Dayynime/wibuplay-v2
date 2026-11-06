@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/lite_mode.dart';
 import 'package:flutter/material.dart';
@@ -29,6 +30,7 @@ import 'clan_chat_tab.dart';
 import 'wp_event_chat_card.dart';
 import '../chess/chess_invite.dart';
 import '../../../data/models/sticker_models.dart';
+import '../../../data/repository/chat_unread_repository.dart';
 import '../sticker/sticker_widgets.dart';
 import 'private_chat_pane.dart';
 import 'chat_controller.dart';
@@ -55,7 +57,13 @@ String _timeLabel(ChatMessage m) {
 
 /// Chat Global yang sama dengan Zenime (tabel + realtime yang sama).
 class ChatScreen extends ConsumerStatefulWidget {
-  const ChatScreen({super.key});
+  const ChatScreen({super.key, this.initialTab = 0, this.openPeerUid});
+
+  /// 0 = Global, 1 = Teman, 2 = Clan.
+  final int initialTab;
+
+  /// Langsung buka chat dengan teman ini (dari notifikasi pesan pribadi).
+  final String? openPeerUid;
 
   @override
   ConsumerState<ChatScreen> createState() => _ChatScreenState();
@@ -65,7 +73,51 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   final TextEditingController _input = TextEditingController();
 
   /// 0 = Chat Global, 1 = Chat Teman (tab Teman ala Zenime), 2 = Chat Clan.
-  int _tab = 0;
+  late int _tab = widget.initialTab.clamp(0, 2);
+
+  /// Teman yang chat-nya dibuka otomatis begitu daftar chat termuat.
+  late String? _pendingPeer = widget.openPeerUid;
+
+  /// Jumlah belum dibaca dari server (badge tab). Disegarkan berkala selama
+  /// layar Chat terbuka; tab Clan yang sedang dilihat otomatis ditandai dibaca.
+  ChatUnread _unread = const ChatUnread();
+  Timer? _unreadTimer;
+  late final ChatUnreadRepository _unreadRepo;
+
+  @override
+  void initState() {
+    super.initState();
+    _unreadRepo = ref.read(chatUnreadRepositoryProvider);
+    _refreshUnread();
+    _unreadTimer = Timer.periodic(const Duration(seconds: 20), (_) => _refreshUnread());
+  }
+
+  Future<void> _refreshUnread() async {
+    if (ref.read(authUserProvider).valueOrNull == null) return;
+    try {
+      final u = _tab == 2 ? await _unreadRepo.markClanRead() : await _unreadRepo.counts();
+      if (mounted) setState(() => _unread = u);
+    } catch (_) {
+      // Badge cuma pemanis: gagal muat tidak mengganggu chat.
+    }
+  }
+
+  void _setTab(int i) {
+    if (_tab == i) return;
+    final leavingClan = _tab == 2;
+    setState(() => _tab = i);
+    // Masuk tab Clan -> tandai dibaca. Keluar dari Clan -> tandai lagi supaya
+    // pesan yang sempat dibaca di sana tidak dihitung.
+    if (i == 2 || leavingClan) {
+      if (leavingClan && i != 2) {
+        _unreadRepo.markClanRead().then((u) {
+          if (mounted) setState(() => _unread = u);
+        }).catchError((Object _) {});
+      } else {
+        _refreshUnread();
+      }
+    }
+  }
 
   /// Id pesan yang masuk SETELAH layar selesai memuat (kena animasi masuk).
   final Set<int> _live = {};
@@ -109,6 +161,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
   @override
   void dispose() {
+    _unreadTimer?.cancel();
+    if (_tab == 2) {
+      _unreadRepo.markClanRead().catchError((Object _) => const ChatUnread());
+    }
     _input.dispose();
     super.dispose();
   }
@@ -277,6 +333,28 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     final inConversation =
         ref.watch(privateChatControllerProvider.select((x) => x.selected != null));
 
+    // Dari notifikasi: buka chat teman itu begitu daftar percakapan siap.
+    ref.listen<PrivateChatState>(privateChatControllerProvider, (prev, next) {
+      final peer = _pendingPeer;
+      if (peer == null || next.isLoading) return;
+      for (final c in next.conversations) {
+        if (c.friend.firebaseUid == peer) {
+          _pendingPeer = null;
+          ref.read(privateChatControllerProvider.notifier).openChat(c.friend);
+          return;
+        }
+      }
+      _pendingPeer = null; // bukan teman lagi / tidak ada di daftar
+    });
+
+    // Badge Teman: kalau daftar chat sudah dimuat (realtime) pakai hitungan
+    // lokal, kalau belum pakai angka dari server.
+    final localPrivate = ref.watch(privateChatControllerProvider.select(
+      (x) => x.isLoading ? null : x.conversations.fold<int>(0, (a, c) => a + c.unread),
+    ));
+    final privateBadge = localPrivate ?? _unread.private;
+    final clanBadge = _tab == 2 ? 0 : _unread.clan;
+
     return PopScope(
       // Back saat membuka chat teman = kembali ke daftar chat, bukan keluar.
       canPop: !(_tab == 1 && inConversation),
@@ -314,7 +392,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         ),
         body: Column(
           children: [
-            _buildChatTabs(),
+            _buildChatTabs(privateBadge, clanBadge),
             Expanded(
               child: _tab == 0
                   ? Column(
@@ -338,8 +416,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   /// Tab Global / Teman di bawah app bar (indikator pendek, gaya Zenime).
-  Widget _buildChatTabs() {
+  Widget _buildChatTabs(int privateBadge, int clanBadge) {
     const labels = ['Global', 'Teman', 'Clan'];
+    final badges = [0, privateBadge, clanBadge];
     return Column(
       children: [
         Row(
@@ -347,18 +426,24 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             for (var i = 0; i < labels.length; i++)
               Expanded(
                 child: InkWell(
-                  onTap: () => setState(() => _tab = i),
+                  onTap: () => _setTab(i),
                   child: Padding(
                     padding: const EdgeInsets.only(top: 10, bottom: 6),
                     child: Column(
                       children: [
-                        Text(
-                          labels[i],
-                          style: TextStyle(
-                            color: _tab == i ? AppColors.textWhite : const Color(0x80FFFFFF),
-                            fontSize: 14,
-                            fontWeight: _tab == i ? FontWeight.w700 : FontWeight.w400,
-                          ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              labels[i],
+                              style: TextStyle(
+                                color: _tab == i ? AppColors.textWhite : const Color(0x80FFFFFF),
+                                fontSize: 14,
+                                fontWeight: _tab == i ? FontWeight.w700 : FontWeight.w400,
+                              ),
+                            ),
+                            _TabBadge(count: badges[i]),
+                          ],
                         ),
                         const SizedBox(height: 6),
                         AnimatedContainer(
@@ -1285,6 +1370,41 @@ class _ChatProfileDialogState extends ConsumerState<_ChatProfileDialog> {
           ],
         ),
       ),
+    );
+  }
+}
+
+
+/// Badge angka di tab chat (muncul/hilang dengan animasi).
+class _TabBadge extends StatelessWidget {
+  const _TabBadge({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 220),
+      transitionBuilder: (c, a) => ScaleTransition(scale: a, child: c),
+      child: count <= 0
+          ? const SizedBox.shrink(key: ValueKey(0))
+          : Container(
+              key: ValueKey(count > 99 ? 100 : count),
+              margin: const EdgeInsets.only(left: 6),
+              constraints: const BoxConstraints(minWidth: 18),
+              height: 18,
+              padding: const EdgeInsets.symmetric(horizontal: 5),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: AppColors.accentViolet,
+                borderRadius: BorderRadius.circular(9),
+                boxShadow: [BoxShadow(color: AppColors.accentViolet.withValues(alpha: 0.45), blurRadius: 8)],
+              ),
+              child: Text(
+                count > 99 ? '99+' : '$count',
+                style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w800, height: 1),
+              ),
+            ),
     );
   }
 }

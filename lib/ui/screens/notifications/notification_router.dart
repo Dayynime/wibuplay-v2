@@ -10,6 +10,7 @@ import '../clan/clan_screen.dart';
 import '../friends/friends_screen.dart';
 import '../nobar/nobar_invite.dart';
 import '../sticker/sticker_upload_screen.dart';
+import '../chat/chat_screen.dart';
 
 /// Buka halaman tujuan sebuah notifikasi (dari lonceng, banner in-app, atau
 /// tap push di status bar). [data] = payload notif (`clan_id`, dll).
@@ -23,6 +24,11 @@ Future<void> openNotificationTarget(
   final clanId = data['clan_id']?.toString() ?? '';
 
   switch (type) {
+    case 'private_message':
+      final sender = data['sender_uid']?.toString();
+      await nav.push<void>(fadeRoute(ChatScreen(initialTab: 1, openPeerUid: sender)));
+      return;
+
     case 'friend_request':
     case 'friend_accepted':
       await nav.push<void>(fadeRoute(const FriendsScreen()));
@@ -73,6 +79,7 @@ IconData notificationIcon(String type) => switch (type) {
       'clan_joined' => Icons.shield_rounded,
       'clan_invite' => Icons.mail_rounded,
       'sticker_reviewed' => Icons.emoji_emotions_rounded,
+      'private_message' => Icons.chat_bubble_rounded,
       'nobar_invite' => Icons.groups_rounded,
       'nobar_declined' => Icons.group_off_rounded,
       _ => Icons.notifications_rounded,
