@@ -144,12 +144,33 @@ jobs:
           PY
           cat android/app/src/main/AndroidManifest.xml
 
+      # Pemutar ExoPlayer (android_native/WpExo.kt) butuh Media3 di modul app.
+      # Versi disamakan dengan yang dipakai video_player_android supaya tidak bentrok.
+      - name: Tambah dependency Media3 (ExoPlayer)
+        run: |
+          python3 - <<'PY'
+          import glob, sys
+          files = glob.glob('android/app/build.gradle*')
+          if not files:
+              print('::error::android/app/build.gradle(.kts) tidak ditemukan')
+              sys.exit(1)
+          p = files[0]
+          s = open(p, encoding='utf-8').read()
+          if 'media3-exoplayer' not in s:
+              s += ('\ndependencies {\n'
+                    '    implementation("androidx.media3:media3-exoplayer:1.9.2")\n'
+                    '    implementation("androidx.media3:media3-exoplayer-hls:1.9.2")\n'
+                    '}\n')
+              open(p, 'w', encoding='utf-8').write(s)
+          PY
+          tail -5 android/app/build.gradle*
       - name: Pasang MainActivity (PiP)
         run: |
           DIR=$(dirname "$(find android/app/src/main -name MainActivity.kt -o -name MainActivity.java | head -n1)")
           rm -f "$DIR"/MainActivity.kt "$DIR"/MainActivity.java
           mkdir -p android/app/src/main/kotlin/com/dayynime/wibuplay
           cp android_native/MainActivity.kt android/app/src/main/kotlin/com/dayynime/wibuplay/MainActivity.kt
+          cp android_native/WpExo.kt android/app/src/main/kotlin/com/dayynime/wibuplay/WpExo.kt
 
       - name: Pasang ikon dan splash Zenime
         run: |

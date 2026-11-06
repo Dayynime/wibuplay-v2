@@ -382,7 +382,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
         d.contains('Decoder') ||
         d.contains('decoder') ||
         d.contains('hwdec');
-    if (!isDecoder || _decoderRetries >= 2 || _currentLink == null) {
+    if (!isDecoder || _decoderRetries >= WpDecoder.maxLevel || _currentLink == null) {
       return false;
     }
     _decoderRetries++;

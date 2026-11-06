@@ -39,6 +39,7 @@ import java.io.File
  */
 class MainActivity : FlutterActivity() {
     private var channel: MethodChannel? = null
+    private var exo: WpExo? = null
     private var canEnter = false
     private var ratio = Rational(16, 9)
 
@@ -71,6 +72,9 @@ class MainActivity : FlutterActivity() {
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        // Pemutar video ExoPlayer (android_native/WpExo.kt).
+        exo?.disposeAll()
+        exo = WpExo(applicationContext, flutterEngine.dartExecutor.binaryMessenger, flutterEngine.renderer)
         val ch = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "wibuplay/pip")
         ch.setMethodCallHandler { call, result ->
             when (call.method) {
@@ -174,6 +178,12 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+    }
+
+    override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
+        exo?.disposeAll()
+        exo = null
+        super.cleanUpFlutterEngine(flutterEngine)
     }
 
     // ---------------------------------------------------------------- security

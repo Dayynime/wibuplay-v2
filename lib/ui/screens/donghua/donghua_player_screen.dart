@@ -94,6 +94,10 @@ class _DonghuaPlayerScreenState extends ConsumerState<DonghuaPlayerScreen>
 
   WpVideoController? _vc;
   String? _loadedUrl;
+
+  /// Mode pemutar (lihat WpDecoder): naik otomatis kalau ExoPlayer gagal.
+  int _decoderLevel = WpDecoder.savedLevel;
+  int _decoderRetries = 0;
   String? _pendingUrl;
   final ValueNotifier<PlayerPlayback> _pb =
       ValueNotifier<PlayerPlayback>(const PlayerPlayback());
@@ -196,10 +200,11 @@ class _DonghuaPlayerScreenState extends ConsumerState<DonghuaPlayerScreen>
     final WpVideoController vc;
     try {
       vc = url.startsWith('file://')
-          ? WpVideoController.file(File.fromUri(Uri.parse(url)))
+          ? WpVideoController.file(File.fromUri(Uri.parse(url)), decoderLevel: _decoderLevel)
           : WpVideoController.networkUrl(
               Uri.parse(url),
               httpHeaders: AnichinNetwork.headersFor(url),
+              decoderLevel: _decoderLevel,
             );
     } catch (_) {
       if (mounted) setState(() => _playerError = true);
@@ -234,8 +239,26 @@ class _DonghuaPlayerScreenState extends ConsumerState<DonghuaPlayerScreen>
       if (!mounted || _vc != vc) return;
       _onVideo();
       setState(() {});
-    } catch (_) {
+    } catch (e) {
       if (mounted && _vc == vc) {
+        // Format/decoder tidak didukung mode ini: coba mode berikutnya
+        // (akhirnya media_kit), dari riwayat tontonan seperti biasa.
+        final desc = vc.value.errorDescription ?? '$e';
+        if (desc.toLowerCase().contains('decoder') &&
+            _decoderRetries < WpDecoder.maxLevel &&
+            _decoderLevel < WpDecoder.maxLevel) {
+          _decoderRetries++;
+          _decoderLevel++;
+          _vc = null;
+          _loadedUrl = null;
+          vc.removeListener(_onVideo);
+          try {
+            await vc.dispose();
+          } catch (_) {}
+          await Future<void>.delayed(const Duration(milliseconds: 500));
+          if (mounted) await _loadUrl(url);
+          return;
+        }
         _pb.value = const PlayerPlayback(isBuffering: false);
         setState(() => _playerError = true);
       }

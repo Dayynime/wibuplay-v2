@@ -557,7 +557,7 @@ class _NobarScreenState extends ConsumerState<NobarScreen> with WidgetsBindingOb
       if (!mounted || _vc != vc) return;
       final desc = vc.value.errorDescription ?? '$e';
       final isDecoder = desc.contains('MediaCodec') || desc.toLowerCase().contains('decoder') || desc.contains('hwdec');
-      if (isDecoder && _decoderRetries < 2 && _decoderLevel < WpDecoder.maxLevel) {
+      if (isDecoder && _decoderRetries < WpDecoder.maxLevel && _decoderLevel < WpDecoder.maxLevel) {
         _decoderRetries++;
         _decoderLevel++;
         _loadedLink = null;
