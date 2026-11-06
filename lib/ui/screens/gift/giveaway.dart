@@ -8,6 +8,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../data/repository/gift_repository.dart';
 import '../../../providers.dart';
 import '../../app_routes.dart' show openPremium;
+import '../../../core/review_prompter.dart';
 
 const Color _gold = Color(0xFFF5B73B);
 const Color _goldDeep = Color(0xFFE0892B);
@@ -130,6 +131,7 @@ class _GiveawayCardState extends ConsumerState<GiveawayCard> {
     try {
       final days = await ref.read(giveawayStoreProvider.notifier).claim(widget.giveawayId);
       messenger.showSnackBar(SnackBar(content: Text('🎉 Kamu dapat Premium $days hari!')));
+      ReviewPrompter.onHappyMoment();
     } catch (e) {
       messenger.showSnackBar(
         SnackBar(content: Text(e is GiftException ? e.message : 'Gagal klaim, coba lagi')),

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../data/repository/feed_repository.dart';
@@ -12,6 +13,7 @@ import '../../app_routes.dart';
 import '../../components/app_toast.dart';
 import '../../components/friend_avatar.dart';
 import '../../components/net_image.dart';
+import '../../components/shimmer.dart';
 import '../chat/chat_mute.dart' show canChatMuteProvider;
 import '../profile/public_profile_screen.dart';
 
@@ -22,11 +24,17 @@ final feedRepositoryProvider = Provider<FeedRepository>(
 String _ago(DateTime t) {
   final d = DateTime.now().difference(t);
   if (d.inMinutes < 1) return 'baru saja';
-  if (d.inMinutes < 60) return '${d.inMinutes} mnt';
-  if (d.inHours < 24) return '${d.inHours} jam';
-  if (d.inDays < 7) return '${d.inDays} hr';
+  if (d.inMinutes < 60) return '${d.inMinutes}m';
+  if (d.inHours < 24) return '${d.inHours}j';
+  if (d.inDays < 7) return '${d.inDays}h';
   String two(int v) => v.toString().padLeft(2, '0');
-  return '${two(t.day)}/${two(t.month)}/${t.year}';
+  return '${two(t.day)}/${two(t.month)}/${t.year % 100}';
+}
+
+String _count(int n) {
+  if (n < 1000) return '$n';
+  if (n < 1000000) return '${(n / 1000).toStringAsFixed(n < 10000 ? 1 : 0).replaceAll('.0', '')}rb';
+  return '${(n / 1000000).toStringAsFixed(1).replaceAll('.0', '')}jt';
 }
 
 Color? _hex(String? hex) {
@@ -39,9 +47,26 @@ Color? _hex(String? hex) {
 
 String _err(Object e, String fallback) => e is FeedException ? e.message : fallback;
 
+const Color _likeRed = Color(0xFFFF4D6A);
+
+/// Buka tulis postingan (cek login & Premium dulu). Return postingan baru.
+Future<FeedPost?> _openCompose(BuildContext context, WidgetRef ref) async {
+  final uid = ref.read(authUserProvider).valueOrNull?.uid;
+  if (uid == null || uid.isEmpty) {
+    showAppToast(context, 'Login dulu untuk posting', kind: ToastKind.warning);
+    return null;
+  }
+  if (ref.read(myPremiumProvider).valueOrNull != true) {
+    showAppToast(context, 'Bikin postingan khusus Premium', kind: ToastKind.warning, icon: Icons.workspace_premium);
+    openPremium(context);
+    return null;
+  }
+  return Navigator.of(context).push<FeedPost>(fadeRoute(const FeedComposeScreen()));
+}
+
 // =================================================================== layar
 
-/// Feed: postingan user (Premium), tab Semua & Teman.
+/// Feed: postingan user (Premium), tab Untukmu & Teman.
 class FeedScreen extends ConsumerStatefulWidget {
   const FeedScreen({super.key});
 
@@ -54,17 +79,7 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
   final _friendsKey = GlobalKey<_FeedTabState>();
 
   Future<void> _compose() async {
-    final uid = ref.read(authUserProvider).valueOrNull?.uid;
-    if (uid == null || uid.isEmpty) {
-      showAppToast(context, 'Login dulu untuk posting', kind: ToastKind.warning);
-      return;
-    }
-    if (ref.read(myPremiumProvider).valueOrNull != true) {
-      showAppToast(context, 'Bikin postingan khusus Premium', kind: ToastKind.warning, icon: Icons.workspace_premium);
-      openPremium(context);
-      return;
-    }
-    final post = await Navigator.of(context).push<FeedPost>(fadeRoute(const FeedComposeScreen()));
+    final post = await _openCompose(context, ref);
     if (post == null || !mounted) return;
     _allKey.currentState?.insert(post);
     _friendsKey.currentState?.insert(post);
@@ -76,30 +91,78 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
       length: 2,
       child: Scaffold(
         backgroundColor: AppColors.backgroundDark,
-        appBar: AppBar(
-          backgroundColor: AppColors.backgroundDark,
-          foregroundColor: AppColors.textWhite,
-          title: const Text('Feed', style: TextStyle(fontWeight: FontWeight.w800)),
-          bottom: const TabBar(
-            indicatorColor: AppColors.accentViolet,
-            labelColor: AppColors.textWhite,
-            unselectedLabelColor: AppColors.textMuted,
-            labelStyle: TextStyle(fontWeight: FontWeight.w800),
-            tabs: [Tab(text: 'Semua'), Tab(text: 'Teman')],
+        body: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              // ------------------------------------------------ kepala
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 6, 16, 6),
+                child: Row(
+                  children: [
+                    IconButton(
+                      onPressed: () => Navigator.of(context).maybePop(),
+                      icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textWhite),
+                    ),
+                    const Text(
+                      'Feed',
+                      style: TextStyle(color: AppColors.textWhite, fontSize: 24, fontWeight: FontWeight.w900),
+                    ),
+                    const Spacer(),
+                    Container(
+                      height: 38,
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceCard,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: TabBar(
+                        isScrollable: true,
+                        tabAlignment: TabAlignment.start,
+                        dividerColor: Colors.transparent,
+                        indicatorSize: TabBarIndicatorSize.tab,
+                        indicator: BoxDecoration(
+                          color: AppColors.accentViolet,
+                          borderRadius: BorderRadius.circular(17),
+                        ),
+                        labelColor: Colors.white,
+                        unselectedLabelColor: AppColors.textMuted,
+                        labelPadding: const EdgeInsets.symmetric(horizontal: 14),
+                        labelStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+                        splashBorderRadius: BorderRadius.circular(17),
+                        tabs: const [Tab(text: 'Untukmu'), Tab(text: 'Teman')],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: TabBarView(
+                  children: [
+                    _FeedTab(key: _allKey, tab: 'all', onCompose: _compose),
+                    _FeedTab(key: _friendsKey, tab: 'friends', onCompose: _compose),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
-        floatingActionButton: FloatingActionButton.extended(
-          backgroundColor: AppColors.accentViolet,
-          foregroundColor: Colors.white,
-          onPressed: _compose,
-          icon: const Icon(Icons.edit_rounded),
-          label: const Text('Posting', style: TextStyle(fontWeight: FontWeight.w800)),
-        ),
-        body: TabBarView(
-          children: [
-            _FeedTab(key: _allKey, tab: 'all'),
-            _FeedTab(key: _friendsKey, tab: 'friends'),
-          ],
+        floatingActionButton: DecoratedBox(
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: const LinearGradient(
+              colors: [AppColors.accentVioletLight, AppColors.accentViolet],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            boxShadow: [BoxShadow(color: AppColors.accentViolet.withValues(alpha: 0.45), blurRadius: 18, offset: const Offset(0, 6))],
+          ),
+          child: FloatingActionButton(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            onPressed: _compose,
+            child: const Icon(Icons.add_rounded, color: Colors.white, size: 30),
+          ),
         ),
       ),
     );
@@ -107,9 +170,10 @@ class _FeedScreenState extends ConsumerState<FeedScreen> {
 }
 
 class _FeedTab extends ConsumerStatefulWidget {
-  const _FeedTab({super.key, required this.tab});
+  const _FeedTab({super.key, required this.tab, required this.onCompose});
 
   final String tab;
+  final VoidCallback onCompose;
 
   @override
   ConsumerState<_FeedTab> createState() => _FeedTabState();
@@ -132,7 +196,7 @@ class _FeedTabState extends ConsumerState<_FeedTab> with AutomaticKeepAliveClien
   void initState() {
     super.initState();
     _scroll.addListener(() {
-      if (_scroll.position.pixels > _scroll.position.maxScrollExtent - 600) _loadMore();
+      if (_scroll.position.pixels > _scroll.position.maxScrollExtent - 800) _loadMore();
     });
     _load();
   }
@@ -182,6 +246,9 @@ class _FeedTabState extends ConsumerState<_FeedTab> with AutomaticKeepAliveClien
   void insert(FeedPost p) {
     if (_posts.any((x) => x.id == p.id)) return;
     setState(() => _posts = [p, ..._posts]);
+    if (_scroll.hasClients) {
+      _scroll.animateTo(0, duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
+    }
   }
 
   void _replace(FeedPost p) => setState(() => _posts = [for (final x in _posts) x.id == p.id ? p : x]);
@@ -192,15 +259,21 @@ class _FeedTabState extends ConsumerState<_FeedTab> with AutomaticKeepAliveClien
   Widget build(BuildContext context) {
     super.build(context);
     if (_loading) {
-      return const Center(child: CircularProgressIndicator(color: AppColors.accentViolet, strokeWidth: 3));
+      return ListView(
+        physics: const NeverScrollableScrollPhysics(),
+        children: const [_ComposerPrompt(onTap: null), _PostSkeleton(), _PostSkeleton(), _PostSkeleton()],
+      );
     }
     if (_error != null && _posts.isEmpty) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            const Icon(Icons.wifi_off_rounded, color: AppColors.textMuted, size: 40),
+            const SizedBox(height: 10),
             Text(_error!, style: const TextStyle(color: AppColors.textSecondary)),
-            TextButton(
+            const SizedBox(height: 8),
+            FilledButton.tonal(
               onPressed: () {
                 setState(() => _loading = true);
                 _load();
@@ -213,54 +286,151 @@ class _FeedTabState extends ConsumerState<_FeedTab> with AutomaticKeepAliveClien
     }
     return RefreshIndicator(
       color: AppColors.accentViolet,
+      backgroundColor: AppColors.surfaceDark,
       onRefresh: _load,
-      child: _posts.isEmpty
-          ? ListView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              children: [
-                const SizedBox(height: 120),
-                Center(
-                  child: Text(
-                    widget.tab == 'friends' ? 'Belum ada postingan dari temanmu.' : 'Belum ada postingan. Jadi yang pertama!',
-                    style: const TextStyle(color: AppColors.textMuted),
+      child: ListView.builder(
+        controller: _scroll,
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.only(bottom: 110),
+        itemCount: 1 + (_posts.isEmpty ? 1 : _posts.length) + (_loadingMore ? 1 : 0),
+        itemBuilder: (context, i) {
+          if (i == 0) return _ComposerPrompt(onTap: widget.onCompose);
+          if (_posts.isEmpty) {
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(32, 80, 32, 0),
+              child: Column(
+                children: [
+                  Icon(
+                    widget.tab == 'friends' ? Icons.people_outline_rounded : Icons.dynamic_feed_rounded,
+                    color: AppColors.textMuted,
+                    size: 52,
                   ),
-                ),
-              ],
-            )
-          : ListView.builder(
-              controller: _scroll,
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 96),
-              itemCount: _posts.length + (_loadingMore ? 1 : 0),
-              itemBuilder: (context, i) {
-                if (i >= _posts.length) {
-                  return const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Center(child: CircularProgressIndicator(color: AppColors.accentViolet, strokeWidth: 2.5)),
-                  );
-                }
-                final p = _posts[i];
-                return FeedPostCard(
-                  key: ValueKey(p.id),
-                  post: p,
+                  const SizedBox(height: 12),
+                  Text(
+                    widget.tab == 'friends' ? 'Teman-temanmu belum posting apa pun' : 'Belum ada postingan',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: AppColors.textWhite, fontWeight: FontWeight.w700, fontSize: 15),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Jadi yang pertama berbagi cerita nonton!',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+                  ),
+                ],
+              ),
+            );
+          }
+          final idx = i - 1;
+          if (idx >= _posts.length) {
+            return const Padding(
+              padding: EdgeInsets.all(20),
+              child: Center(child: CircularProgressIndicator(color: AppColors.accentViolet, strokeWidth: 2.5)),
+            );
+          }
+          final p = _posts[idx];
+          return FeedPostCard(
+            key: ValueKey(p.id),
+            post: p,
+            onChanged: _replace,
+            onDeleted: _remove,
+            onOpen: () => Navigator.of(context).push<void>(fadeRoute(FeedPostScreen(
+                  postId: p.id,
+                  initial: p,
                   onChanged: _replace,
                   onDeleted: _remove,
-                  onOpen: () => Navigator.of(context).push<void>(fadeRoute(FeedPostScreen(
-                        postId: p.id,
-                        initial: p,
-                        onChanged: _replace,
-                        onDeleted: _remove,
-                      ))),
-                );
-              },
+                ))),
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// Baris "Apa yang lagi kamu tonton?" di atas feed (seperti aplikasi sosmed).
+class _ComposerPrompt extends ConsumerWidget {
+  const _ComposerPrompt({required this.onTap});
+
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final uid = ref.watch(authUserProvider).valueOrNull?.uid ?? '';
+    final me = uid.isEmpty ? null : ref.watch(chatProfileProvider(uid)).valueOrNull;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 8, 12, 14),
+      decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Color(0x14FFFFFF)))),
+      child: Row(
+        children: [
+          FriendAvatar(url: me?.avatarUrl, seed: uid.isEmpty ? 'guest' : uid, label: me?.username ?? '?', size: 40),
+          const SizedBox(width: 12),
+          Expanded(
+            child: InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(22),
+              child: Container(
+                height: 42,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                alignment: Alignment.centerLeft,
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceCard,
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(color: const Color(0x14FFFFFF)),
+                ),
+                child: const Text(
+                  'Apa yang lagi kamu tonton?',
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 14),
+                ),
+              ),
             ),
+          ),
+          IconButton(
+            onPressed: onTap,
+            icon: const Icon(Icons.image_outlined, color: AppColors.accentVioletLight),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PostSkeleton extends StatelessWidget {
+  const _PostSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.fromLTRB(16, 16, 16, 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ShimmerBox(width: 42, height: 42, borderRadius: BorderRadius.all(Radius.circular(21))),
+          SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ShimmerBox(width: 140, height: 13),
+                SizedBox(height: 10),
+                ShimmerBox(height: 12),
+                SizedBox(height: 6),
+                ShimmerBox(width: 200, height: 12),
+                SizedBox(height: 12),
+                ShimmerBox(height: 190, borderRadius: BorderRadius.all(Radius.circular(16))),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
 // =================================================================== kartu
 
-/// Satu postingan: kepala (avatar, nama, waktu, menu), isi, gambar, like & komentar.
+/// Satu postingan gaya sosmed: avatar di kiri, nama · waktu, teks yang bisa
+/// dibuka penuh, gambar (ketuk dua kali = suka, ketuk = layar penuh),
+/// serta tombol suka / komentar / bagikan.
 class FeedPostCard extends ConsumerStatefulWidget {
   const FeedPostCard({
     super.key,
@@ -274,7 +444,7 @@ class FeedPostCard extends ConsumerStatefulWidget {
   final ValueChanged<FeedPost> onChanged;
   final ValueChanged<int> onDeleted;
 
-  /// null = sudah di halaman detail (kartu tidak bisa di-tap).
+  /// null = sudah di halaman detail (teks tampil penuh, kartu tidak di-tap).
   final VoidCallback? onOpen;
 
   @override
@@ -283,18 +453,25 @@ class FeedPostCard extends ConsumerStatefulWidget {
 
 class _FeedPostCardState extends ConsumerState<FeedPostCard> {
   bool _liking = false;
+  bool _expanded = false;
+  int _burst = 0;
+  int _pop = 0;
 
-  Future<void> _toggleLike() async {
+  static const int _collapseAt = 260;
+
+  Future<void> _toggleLike({bool onlyLike = false}) async {
     final uid = ref.read(authUserProvider).valueOrNull?.uid;
     if (uid == null || uid.isEmpty) {
       showAppToast(context, 'Login dulu untuk menyukai', kind: ToastKind.warning);
       return;
     }
+    final p = widget.post;
+    if (onlyLike && p.liked) return;
     if (_liking) return;
     _liking = true;
-    HapticFeedback.selectionClick();
-    final p = widget.post;
+    HapticFeedback.lightImpact();
     final on = !p.liked;
+    setState(() => _pop++);
     widget.onChanged(p.copyWith(liked: on, likeCount: (p.likeCount + (on ? 1 : -1)).clamp(0, 1 << 30)));
     try {
       final n = await ref.read(feedRepositoryProvider).like(p.id, on);
@@ -305,6 +482,19 @@ class _FeedPostCardState extends ConsumerState<FeedPostCard> {
     } finally {
       _liking = false;
     }
+  }
+
+  void _doubleTapLike() {
+    setState(() => _burst++);
+    _toggleLike(onlyLike: true);
+  }
+
+  Future<void> _share() async {
+    final p = widget.post;
+    final text = p.body.trim().isEmpty ? 'Lihat postingan ${p.username} di Zenime!' : '${p.username} di Zenime:\n"${p.body.trim()}"';
+    try {
+      await Share.share(text);
+    } catch (_) {}
   }
 
   Future<void> _delete() async {
@@ -333,119 +523,289 @@ class _FeedPostCardState extends ConsumerState<FeedPostCard> {
     }
   }
 
+  void _openImage(String url) {
+    Navigator.of(context).push<void>(PageRouteBuilder<void>(
+      opaque: false,
+      barrierColor: Colors.black,
+      pageBuilder: (_, __, ___) => _ImageViewer(url: url),
+      transitionsBuilder: (_, a, __, child) => FadeTransition(opacity: a, child: child),
+    ));
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = widget.post;
+    final detail = widget.onOpen == null;
     final myUid = ref.watch(authUserProvider).valueOrNull?.uid ?? '';
     final staff = ref.watch(canChatMuteProvider).valueOrNull == true;
     final canDelete = p.uid == myUid || staff;
     final url = p.imageUrl;
+    final long = !detail && !_expanded && p.body.length > _collapseAt;
+    final body = long ? '${p.body.substring(0, _collapseAt).trimRight()}…' : p.body;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceCard,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: widget.onOpen,
-        child: Column(
+    return InkWell(
+      onTap: widget.onOpen,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 14, 8, 6),
+        decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: Color(0x14FFFFFF)))),
+        child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 10, 4, 6),
-              child: Row(
+            GestureDetector(
+              onTap: () => openPublicProfile(context, p.uid),
+              child: FriendAvatar(url: p.avatarUrl, seed: p.uid, label: p.username, size: 42),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  GestureDetector(
-                    onTap: () => openPublicProfile(context, p.uid),
-                    child: FriendAvatar(url: p.avatarUrl, seed: p.uid, label: p.username, size: 38),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          p.username,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: _hex(p.usernameColor) ?? AppColors.textWhite,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 14,
+                  // ---------------------------------------- nama · waktu · menu
+                  Row(
+                    children: [
+                      Flexible(
+                        child: GestureDetector(
+                          onTap: () => openPublicProfile(context, p.uid),
+                          child: Text(
+                            p.username,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: _hex(p.usernameColor) ?? AppColors.textWhite,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 14.5,
+                            ),
                           ),
                         ),
-                        Text(
-                          [if (p.userNumber != null) '#${p.userNumber}', _ago(p.createdAt)].join(' · '),
-                          style: const TextStyle(color: AppColors.textMuted, fontSize: 11.5),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        [if (p.userNumber != null) '#${p.userNumber}', _ago(p.createdAt)].join(' · '),
+                        style: const TextStyle(color: AppColors.textMuted, fontSize: 12.5),
+                      ),
+                      const Spacer(),
+                      if (canDelete)
+                        SizedBox(
+                          width: 32,
+                          height: 24,
+                          child: PopupMenuButton<String>(
+                            padding: EdgeInsets.zero,
+                            icon: const Icon(Icons.more_horiz_rounded, color: AppColors.textMuted, size: 20),
+                            color: AppColors.surfaceDark,
+                            onSelected: (v) {
+                              if (v == 'delete') _delete();
+                            },
+                            itemBuilder: (_) => const [
+                              PopupMenuItem(
+                                value: 'delete',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.delete_outline_rounded, color: AppColors.errorRed, size: 20),
+                                    SizedBox(width: 10),
+                                    Text('Hapus postingan', style: TextStyle(color: AppColors.errorRed)),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                  // ---------------------------------------- teks
+                  if (p.body.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 3, right: 8),
+                      child: Text.rich(
+                        TextSpan(
+                          text: body,
+                          children: [
+                            if (long)
+                              WidgetSpan(
+                                alignment: PlaceholderAlignment.baseline,
+                                baseline: TextBaseline.alphabetic,
+                                child: GestureDetector(
+                                  onTap: () => setState(() => _expanded = true),
+                                  child: const Text(
+                                    ' Lihat selengkapnya',
+                                    style: TextStyle(color: AppColors.accentVioletLight, fontWeight: FontWeight.w700, fontSize: 14),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        style: TextStyle(
+                          color: AppColors.textWhite,
+                          fontSize: detail ? 16 : 14.5,
+                          height: 1.45,
+                        ),
+                      ),
+                    ),
+                  // ---------------------------------------- gambar
+                  if (url != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 10, right: 8),
+                      child: GestureDetector(
+                        onTap: () => _openImage(url),
+                        onDoubleTap: _doubleTapLike,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: AspectRatio(
+                            aspectRatio: p.imageRatio,
+                            child: Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                ColoredBox(
+                                  color: AppColors.surfaceElevated,
+                                  child: NetImage(url, fit: BoxFit.cover),
+                                ),
+                                if (_burst > 0) _HeartBurst(key: ValueKey(_burst)),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  // ---------------------------------------- aksi
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Row(
+                      children: [
+                        _Action(
+                          icon: TweenAnimationBuilder<double>(
+                            key: ValueKey('pop$_pop'),
+                            tween: Tween(begin: _pop == 0 ? 1.0 : 0.6, end: 1.0),
+                            duration: const Duration(milliseconds: 380),
+                            curve: Curves.elasticOut,
+                            builder: (_, s, child) => Transform.scale(scale: s, child: child),
+                            child: Icon(
+                              p.liked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                              size: 21,
+                              color: p.liked ? _likeRed : AppColors.textSecondary,
+                            ),
+                          ),
+                          label: p.likeCount > 0 ? _count(p.likeCount) : null,
+                          color: p.liked ? _likeRed : AppColors.textSecondary,
+                          onTap: () => _toggleLike(),
+                        ),
+                        _Action(
+                          icon: const Icon(Icons.mode_comment_outlined, size: 20, color: AppColors.textSecondary),
+                          label: p.commentCount > 0 ? _count(p.commentCount) : null,
+                          color: AppColors.textSecondary,
+                          onTap: widget.onOpen,
+                        ),
+                        _Action(
+                          icon: const Icon(Icons.send_outlined, size: 19, color: AppColors.textSecondary),
+                          color: AppColors.textSecondary,
+                          onTap: _share,
                         ),
                       ],
                     ),
-                  ),
-                  if (canDelete)
-                    PopupMenuButton<String>(
-                      icon: const Icon(Icons.more_vert_rounded, color: AppColors.textMuted, size: 20),
-                      color: AppColors.surfaceDark,
-                      onSelected: (v) {
-                        if (v == 'delete') _delete();
-                      },
-                      itemBuilder: (_) => const [
-                        PopupMenuItem(
-                          value: 'delete',
-                          child: Text('Hapus postingan', style: TextStyle(color: AppColors.errorRed)),
-                        ),
-                      ],
-                    ),
-                ],
-              ),
-            ),
-            if (p.body.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
-                child: Text(
-                  p.body,
-                  maxLines: widget.onOpen == null ? null : 8,
-                  overflow: widget.onOpen == null ? null : TextOverflow.ellipsis,
-                  style: const TextStyle(color: AppColors.textWhite, fontSize: 14.5, height: 1.4),
-                ),
-              ),
-            if (url != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(10, 0, 10, 4),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: AspectRatio(
-                    aspectRatio: p.imageRatio,
-                    child: ColoredBox(
-                      color: AppColors.surfaceElevated,
-                      child: NetImage(url, fit: BoxFit.cover),
-                    ),
-                  ),
-                ),
-              ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(4, 0, 8, 4),
-              child: Row(
-                children: [
-                  TextButton.icon(
-                    onPressed: _toggleLike,
-                    style: TextButton.styleFrom(foregroundColor: p.liked ? const Color(0xFFFF4D6A) : AppColors.textSecondary),
-                    icon: Icon(p.liked ? Icons.favorite_rounded : Icons.favorite_border_rounded, size: 20),
-                    label: Text('${p.likeCount}', style: const TextStyle(fontWeight: FontWeight.w700)),
-                  ),
-                  TextButton.icon(
-                    onPressed: widget.onOpen,
-                    style: TextButton.styleFrom(foregroundColor: AppColors.textSecondary),
-                    icon: const Icon(Icons.mode_comment_outlined, size: 19),
-                    label: Text('${p.commentCount}', style: const TextStyle(fontWeight: FontWeight.w700)),
                   ),
                 ],
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _Action extends StatelessWidget {
+  const _Action({required this.icon, required this.color, this.label, this.onTap});
+
+  final Widget icon;
+  final String? label;
+  final Color color;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(4, 8, 14, 8),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            icon,
+            if (label != null) ...[
+              const SizedBox(width: 5),
+              Text(label!, style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 13)),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Hati besar yang muncul lalu memudar saat gambar diketuk dua kali.
+class _HeartBurst extends StatelessWidget {
+  const _HeartBurst({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: TweenAnimationBuilder<double>(
+        tween: Tween(begin: 0, end: 1),
+        duration: const Duration(milliseconds: 750),
+        builder: (_, t, __) {
+          final scale = t < 0.35 ? Curves.easeOutBack.transform(t / 0.35) * 1.15 : 1.15 - (t - 0.35) * 0.25;
+          final opacity = t < 0.7 ? 1.0 : (1 - (t - 0.7) / 0.3).clamp(0.0, 1.0);
+          return Center(
+            child: Opacity(
+              opacity: opacity,
+              child: Transform.scale(
+                scale: scale,
+                child: const Icon(
+                  Icons.favorite_rounded,
+                  size: 96,
+                  color: Colors.white,
+                  shadows: [Shadow(color: Color(0x88000000), blurRadius: 18)],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// Gambar layar penuh, bisa di-zoom; ketuk / geser untuk menutup.
+class _ImageViewer extends StatelessWidget {
+  const _ImageViewer({required this.url});
+
+  final String url;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        children: [
+          GestureDetector(
+            onTap: () => Navigator.of(context).maybePop(),
+            onVerticalDragEnd: (d) {
+              if ((d.primaryVelocity ?? 0).abs() > 600) Navigator.of(context).maybePop();
+            },
+            child: Center(
+              child: InteractiveViewer(
+                minScale: 1,
+                maxScale: 4,
+                child: NetImage(url, fit: BoxFit.contain),
+              ),
+            ),
+          ),
+          SafeArea(
+            child: IconButton(
+              onPressed: () => Navigator.of(context).maybePop(),
+              icon: const Icon(Icons.close_rounded, color: Colors.white),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -468,6 +828,7 @@ class FeedPostScreen extends ConsumerStatefulWidget {
 
 class _FeedPostScreenState extends ConsumerState<FeedPostScreen> {
   final _input = TextEditingController();
+  final _focus = FocusNode();
   FeedPost? _post;
   List<FeedComment> _comments = const [];
   bool _loadingComments = true;
@@ -488,6 +849,7 @@ class _FeedPostScreenState extends ConsumerState<FeedPostScreen> {
   @override
   void dispose() {
     _input.dispose();
+    _focus.dispose();
     super.dispose();
   }
 
@@ -580,18 +942,17 @@ class _FeedPostScreenState extends ConsumerState<FeedPostScreen> {
   Widget build(BuildContext context) {
     final p = _post;
     final myUid = ref.watch(authUserProvider).valueOrNull?.uid ?? '';
+    final me = myUid.isEmpty ? null : ref.watch(chatProfileProvider(myUid)).valueOrNull;
     final staff = ref.watch(canChatMuteProvider).valueOrNull == true;
 
     Widget body;
     if (p == null) {
-      body = Center(
-        child: _error == null
-            ? const CircularProgressIndicator(color: AppColors.accentViolet, strokeWidth: 3)
-            : Text(_error!, style: const TextStyle(color: AppColors.textSecondary)),
-      );
+      body = _error == null
+          ? ListView(physics: const NeverScrollableScrollPhysics(), children: const [_PostSkeleton()])
+          : Center(child: Text(_error!, style: const TextStyle(color: AppColors.textSecondary)));
     } else {
       body = ListView(
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 16),
+        padding: const EdgeInsets.only(bottom: 16),
         children: [
           FeedPostCard(
             post: p,
@@ -601,24 +962,35 @@ class _FeedPostScreenState extends ConsumerState<FeedPostScreen> {
               Navigator.of(context).maybePop();
             },
           ),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(4, 4, 4, 8),
-            child: Text('Komentar', style: TextStyle(color: AppColors.textWhite, fontWeight: FontWeight.w800)),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+            child: Text(
+              p.commentCount > 0 ? 'Komentar · ${_count(p.commentCount)}' : 'Komentar',
+              style: const TextStyle(color: AppColors.textWhite, fontWeight: FontWeight.w800, fontSize: 15),
+            ),
           ),
           if (_loadingComments)
             const Padding(
-              padding: EdgeInsets.all(20),
+              padding: EdgeInsets.all(24),
               child: Center(child: CircularProgressIndicator(color: AppColors.accentViolet, strokeWidth: 2.5)),
             )
           else if (_comments.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(20),
-              child: Center(child: Text('Belum ada komentar.', style: TextStyle(color: AppColors.textMuted))),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 28),
+              child: Column(
+                children: [
+                  const Icon(Icons.chat_bubble_outline_rounded, color: AppColors.textMuted, size: 34),
+                  const SizedBox(height: 8),
+                  const Text('Belum ada komentar', style: TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
+                  TextButton(onPressed: () => _focus.requestFocus(), child: const Text('Jadi yang pertama')),
+                ],
+              ),
             )
           else ...[
             for (final c in _comments)
               _CommentTile(
                 comment: c,
+                isAuthor: c.uid == p.uid,
                 canDelete: c.uid == myUid || p.uid == myUid || staff,
                 onDelete: () => _deleteComment(c),
               ),
@@ -643,6 +1015,7 @@ class _FeedPostScreenState extends ConsumerState<FeedPostScreen> {
       backgroundColor: AppColors.backgroundDark,
       appBar: AppBar(
         backgroundColor: AppColors.backgroundDark,
+        surfaceTintColor: Colors.transparent,
         foregroundColor: AppColors.textWhite,
         title: const Text('Postingan', style: TextStyle(fontWeight: FontWeight.w800)),
       ),
@@ -651,41 +1024,58 @@ class _FeedPostScreenState extends ConsumerState<FeedPostScreen> {
           Expanded(child: body),
           if (p != null)
             Container(
-              color: AppColors.backgroundDarkSecondary,
+              decoration: const BoxDecoration(
+                color: AppColors.backgroundDark,
+                border: Border(top: BorderSide(color: Color(0x14FFFFFF))),
+              ),
               padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
               child: SafeArea(
                 top: false,
                 child: Row(
                   children: [
+                    FriendAvatar(url: me?.avatarUrl, seed: myUid.isEmpty ? 'guest' : myUid, label: me?.username ?? '?', size: 34, framed: false),
+                    const SizedBox(width: 10),
                     Expanded(
                       child: TextField(
                         controller: _input,
+                        focusNode: _focus,
                         maxLength: 500,
                         minLines: 1,
                         maxLines: 4,
+                        textCapitalization: TextCapitalization.sentences,
                         style: const TextStyle(color: AppColors.textWhite, fontSize: 14),
                         decoration: InputDecoration(
                           counterText: '',
                           isDense: true,
-                          hintText: 'Tulis komentar...',
+                          hintText: 'Tambahkan komentar...',
                           hintStyle: const TextStyle(color: AppColors.textMuted),
                           filled: true,
-                          fillColor: AppColors.surfaceDark,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                          fillColor: AppColors.surfaceCard,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(22), borderSide: BorderSide.none),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 6),
-                    IconButton.filled(
-                      onPressed: _sending ? null : _send,
-                      style: IconButton.styleFrom(backgroundColor: AppColors.accentViolet),
-                      icon: _sending
-                          ? const SizedBox.square(
-                              dimension: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                            )
-                          : const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+                    ListenableBuilder(
+                      listenable: _input,
+                      builder: (_, __) {
+                        final empty = _input.text.trim().isEmpty;
+                        return TextButton(
+                          onPressed: _sending || empty ? null : _send,
+                          child: _sending
+                              ? const SizedBox.square(
+                                  dimension: 18,
+                                  child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.accentViolet),
+                                )
+                              : Text(
+                                  'Kirim',
+                                  style: TextStyle(
+                                    color: empty ? AppColors.textMuted : AppColors.accentVioletLight,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                        );
+                      },
                     ),
                   ],
                 ),
@@ -698,16 +1088,22 @@ class _FeedPostScreenState extends ConsumerState<FeedPostScreen> {
 }
 
 class _CommentTile extends StatelessWidget {
-  const _CommentTile({required this.comment, required this.canDelete, required this.onDelete});
+  const _CommentTile({
+    required this.comment,
+    required this.isAuthor,
+    required this.canDelete,
+    required this.onDelete,
+  });
 
   final FeedComment comment;
+  final bool isAuthor;
   final bool canDelete;
   final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
     final c = comment;
-    return GestureDetector(
+    return InkWell(
       onLongPress: !canDelete
           ? null
           : () => showModalBottomSheet<void>(
@@ -715,7 +1111,7 @@ class _CommentTile extends StatelessWidget {
                 backgroundColor: AppColors.surfaceDark,
                 builder: (ctx) => SafeArea(
                   child: ListTile(
-                    leading: const Icon(Icons.delete_outline, color: AppColors.errorRed),
+                    leading: const Icon(Icons.delete_outline_rounded, color: AppColors.errorRed),
                     title: const Text('Hapus komentar', style: TextStyle(color: AppColors.errorRed)),
                     onTap: () {
                       Navigator.pop(ctx);
@@ -725,47 +1121,54 @@ class _CommentTile extends StatelessWidget {
                 ),
               ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 7),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             GestureDetector(
               onTap: () => openPublicProfile(context, c.uid),
-              child: FriendAvatar(url: c.avatarUrl, seed: c.uid, label: c.username, size: 32, framed: false),
+              child: FriendAvatar(url: c.avatarUrl, seed: c.uid, label: c.username, size: 34, framed: false),
             ),
             const SizedBox(width: 10),
             Expanded(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceCard,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            c.username,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: _hex(c.usernameColor) ?? AppColors.accentVioletLight,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 12.5,
-                            ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          c.username,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: _hex(c.usernameColor) ?? AppColors.textWhite,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 13,
                           ),
                         ),
-                        const SizedBox(width: 6),
-                        Text(_ago(c.createdAt), style: const TextStyle(color: AppColors.textMuted, fontSize: 10.5)),
+                      ),
+                      if (isAuthor) ...[
+                        const SizedBox(width: 5),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: AppColors.accentViolet.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Text(
+                            'Pembuat',
+                            style: TextStyle(color: AppColors.accentVioletLight, fontSize: 9.5, fontWeight: FontWeight.w800),
+                          ),
+                        ),
                       ],
-                    ),
-                    const SizedBox(height: 2),
-                    Text(c.body, style: const TextStyle(color: AppColors.textWhite, fontSize: 13.5, height: 1.35)),
-                  ],
-                ),
+                      const SizedBox(width: 6),
+                      Text(_ago(c.createdAt), style: const TextStyle(color: AppColors.textMuted, fontSize: 11.5)),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(c.body, style: const TextStyle(color: AppColors.textWhite, fontSize: 14, height: 1.4)),
+                ],
               ),
             ),
           ],
@@ -786,6 +1189,7 @@ class FeedComposeScreen extends ConsumerStatefulWidget {
 }
 
 class _FeedComposeScreenState extends ConsumerState<FeedComposeScreen> {
+  static const int _max = 1000;
   final _text = TextEditingController();
   final _picker = ImagePicker();
   String? _imagePath;
@@ -865,84 +1269,172 @@ class _FeedComposeScreenState extends ConsumerState<FeedComposeScreen> {
   @override
   Widget build(BuildContext context) {
     final path = _imagePath;
+    final uid = ref.watch(authUserProvider).valueOrNull?.uid ?? '';
+    final me = uid.isEmpty ? null : ref.watch(chatProfileProvider(uid)).valueOrNull;
+
     return Scaffold(
       backgroundColor: AppColors.backgroundDark,
       appBar: AppBar(
         backgroundColor: AppColors.backgroundDark,
+        surfaceTintColor: Colors.transparent,
         foregroundColor: AppColors.textWhite,
-        title: const Text('Postingan baru', style: TextStyle(fontWeight: FontWeight.w800)),
+        leading: IconButton(
+          onPressed: () => Navigator.of(context).maybePop(),
+          icon: const Icon(Icons.close_rounded),
+        ),
         actions: [
           Padding(
-            padding: const EdgeInsets.only(right: 10),
-            child: FilledButton(
-              onPressed: _posting ? null : _post,
-              style: FilledButton.styleFrom(backgroundColor: AppColors.accentViolet),
-              child: _posting
-                  ? SizedBox.square(
-                      dimension: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                        value: path != null && _progress > 0 && _progress < 1 ? _progress : null,
-                      ),
-                    )
-                  : const Text('Posting', style: TextStyle(fontWeight: FontWeight.w800)),
+            padding: const EdgeInsets.only(right: 12),
+            child: ListenableBuilder(
+              listenable: _text,
+              builder: (_, __) {
+                final ready = _text.text.trim().isNotEmpty || path != null;
+                return FilledButton(
+                  onPressed: _posting || !ready ? null : _post,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.accentViolet,
+                    disabledBackgroundColor: AppColors.surfaceElevated,
+                    shape: const StadiumBorder(),
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                  ),
+                  child: _posting
+                      ? SizedBox.square(
+                          dimension: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                            value: path != null && _progress > 0 && _progress < 1 ? _progress : null,
+                          ),
+                        )
+                      : const Text('Posting', style: TextStyle(fontWeight: FontWeight.w800)),
+                );
+              },
             ),
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
+      body: Column(
         children: [
-          TextField(
-            controller: _text,
-            autofocus: true,
-            maxLength: 1000,
-            minLines: 4,
-            maxLines: 12,
-            style: const TextStyle(color: AppColors.textWhite, fontSize: 15, height: 1.4),
-            decoration: InputDecoration(
-              hintText: 'Lagi nonton apa? Ceritain dong...',
-              hintStyle: const TextStyle(color: AppColors.textMuted),
-              filled: true,
-              fillColor: AppColors.surfaceCard,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide.none),
-            ),
-          ),
-          const SizedBox(height: 12),
-          if (path == null)
-            OutlinedButton.icon(
-              onPressed: _posting ? null : _pick,
-              icon: const Icon(Icons.image_outlined),
-              label: const Text('Tambah gambar'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.accentVioletLight,
-                side: BorderSide(color: AppColors.accentViolet.withValues(alpha: 0.5)),
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
-            )
-          else
-            Stack(
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
               children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(14),
-                  child: Image.file(File(path), fit: BoxFit.cover, width: double.infinity),
-                ),
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: IconButton.filled(
-                    onPressed: _posting ? null : () => setState(() => _imagePath = null),
-                    style: IconButton.styleFrom(backgroundColor: Colors.black54),
-                    icon: const Icon(Icons.close_rounded, color: Colors.white, size: 20),
-                  ),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    FriendAvatar(url: me?.avatarUrl, seed: uid.isEmpty ? 'guest' : uid, label: me?.username ?? '?', size: 42),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Text(
+                              me?.username ?? '',
+                              style: const TextStyle(color: AppColors.textWhite, fontWeight: FontWeight.w800, fontSize: 15),
+                            ),
+                          ),
+                          Container(
+                            margin: const EdgeInsets.only(top: 4),
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: const Color(0x33FFFFFF)),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.public_rounded, size: 13, color: AppColors.textSecondary),
+                                SizedBox(width: 4),
+                                Text('Publik', style: TextStyle(color: AppColors.textSecondary, fontSize: 11.5)),
+                              ],
+                            ),
+                          ),
+                          TextField(
+                            controller: _text,
+                            autofocus: true,
+                            maxLength: _max,
+                            minLines: 3,
+                            maxLines: null,
+                            textCapitalization: TextCapitalization.sentences,
+                            style: const TextStyle(color: AppColors.textWhite, fontSize: 17, height: 1.45),
+                            decoration: const InputDecoration(
+                              counterText: '',
+                              hintText: 'Apa yang lagi kamu tonton?',
+                              hintStyle: TextStyle(color: AppColors.textMuted, fontSize: 17),
+                              border: InputBorder.none,
+                            ),
+                          ),
+                          if (path != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Stack(
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(16),
+                                    child: Image.file(File(path), fit: BoxFit.cover, width: double.infinity),
+                                  ),
+                                  Positioned(
+                                    top: 8,
+                                    right: 8,
+                                    child: Material(
+                                      color: Colors.black54,
+                                      shape: const CircleBorder(),
+                                      child: IconButton(
+                                        visualDensity: VisualDensity.compact,
+                                        onPressed: _posting ? null : () => setState(() => _imagePath = null),
+                                        icon: const Icon(Icons.close_rounded, color: Colors.white, size: 18),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-          const SizedBox(height: 14),
-          const Text(
-            'Postingan bisa dilihat semua pengguna. Jaga sopan santun ya; postingan yang melanggar akan dihapus.',
-            style: TextStyle(color: AppColors.textMuted, fontSize: 12, height: 1.4),
+          ),
+          // ------------------------------------------------ toolbar bawah
+          Container(
+            decoration: const BoxDecoration(border: Border(top: BorderSide(color: Color(0x14FFFFFF)))),
+            padding: const EdgeInsets.fromLTRB(8, 4, 16, 4),
+            child: SafeArea(
+              top: false,
+              child: Row(
+                children: [
+                  IconButton(
+                    tooltip: 'Tambah gambar',
+                    onPressed: _posting || path != null ? null : _pick,
+                    icon: const Icon(Icons.image_outlined, color: AppColors.accentVioletLight),
+                  ),
+                  const Expanded(
+                    child: Text(
+                      'Jaga sopan santun ya 🙏',
+                      style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+                    ),
+                  ),
+                  ListenableBuilder(
+                    listenable: _text,
+                    builder: (_, __) {
+                      final left = _max - _text.text.length;
+                      return Text(
+                        '$left',
+                        style: TextStyle(
+                          color: left < 50 ? AppColors.errorRed : AppColors.textMuted,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
           ),
         ],
       ),

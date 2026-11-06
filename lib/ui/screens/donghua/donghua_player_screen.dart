@@ -31,6 +31,7 @@ import '../player/player_screen.dart';
 import '../player/quality_sheet.dart';
 import 'donghua_widgets.dart';
 import '../../glass/glass.dart';
+import 'package:wibuplay/core/review_prompter.dart';
 
 /// Link video langsung (GET /video-source/{slug}). Dijaga token premium di
 /// server. Diambil FRESH tiap layar dibuka (link ada masa berlakunya).
@@ -94,6 +95,9 @@ class _DonghuaPlayerScreenState extends ConsumerState<DonghuaPlayerScreen>
 
   WpVideoController? _vc;
   String? _loadedUrl;
+
+  /// Episode ini sudah dihitung "tamat" untuk ReviewPrompter.
+  bool _finishCounted = false;
 
   /// Mode pemutar (lihat WpDecoder): naik otomatis kalau ExoPlayer gagal.
   int _decoderLevel = WpDecoder.savedLevel;
@@ -160,6 +164,7 @@ class _DonghuaPlayerScreenState extends ConsumerState<DonghuaPlayerScreen>
 
   @override
   void dispose() {
+    ReviewPrompter.onPlayerClosed();
     _saveHistory();
     WidgetsBinding.instance.removeObserver(this);
     WatchXpGate.release(this);
@@ -188,6 +193,7 @@ class _DonghuaPlayerScreenState extends ConsumerState<DonghuaPlayerScreen>
   Future<void> _loadUrl(String url) async {
     if (!mounted || url == _loadedUrl) return;
     _loadedUrl = url;
+    _finishCounted = false;
     _pendingUrl = null;
 
     final old = _vc;
@@ -278,6 +284,12 @@ class _DonghuaPlayerScreenState extends ConsumerState<DonghuaPlayerScreen>
       durationMs: v.duration.inMilliseconds < 0 ? 0 : v.duration.inMilliseconds,
     );
     _pb.value = snap;
+
+    // Tamat (>= 90%): dihitung sekali untuk permintaan rating Play Store.
+    if (!_finishCounted && snap.durationMs > 60000 && snap.positionMs >= snap.durationMs * 0.9) {
+      _finishCounted = true;
+      unawaited(ReviewPrompter.onEpisodeFinished());
+    }
 
     if (snap.isPlaying != _wasPlaying) {
       _wasPlaying = snap.isPlaying;

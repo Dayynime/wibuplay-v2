@@ -32,6 +32,7 @@ import 'player_gestures.dart';
 import 'player_settings_sheet.dart';
 import 'quality_sheet.dart';
 import '../../glass/glass.dart';
+import 'package:wibuplay/core/review_prompter.dart';
 
 /// Link donasi Trakteer (sama dengan Zenime).
 const String kTrakteerUrl = 'https://trakteer.id/Dayynimee';
@@ -209,6 +210,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
 
   @override
   void dispose() {
+    ReviewPrompter.onPlayerClosed();
     WidgetsBinding.instance.removeObserver(this);
     WatchXpGate.release(this);
     _hideTimer?.cancel();
@@ -550,6 +552,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
         _lastDurMs > 0 &&
         (v.isCompleted || v.position.inMilliseconds >= _lastDurMs - 300)) {
       _endedHandled = true;
+      unawaited(ReviewPrompter.onEpisodeFinished());
       _notifier.startAutoNextCountdown();
     }
   }
