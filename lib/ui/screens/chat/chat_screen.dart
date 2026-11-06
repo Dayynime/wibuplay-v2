@@ -36,6 +36,7 @@ import 'private_chat_pane.dart';
 import 'chat_controller.dart';
 import 'chat_mute.dart';
 import 'chat_pin.dart';
+import 'chat_reactions.dart';
 import '../../components/avatar_frame.dart';
 import '../../glass/glass.dart';
 import '../../components/clan_tag_badge.dart';
@@ -225,6 +226,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (s.myUid.isNotEmpty)
+              ChatReactionPicker(
+                channel: 'global',
+                id: m.id,
+                onPicked: (e) {
+                  Navigator.pop(ctx);
+                  reactToMessage(context, ref, 'global', m.id, e);
+                },
+              ),
             ListTile(
               leading: const Icon(Icons.reply, color: AppColors.accentViolet),
               title: const Text('Balas', style: TextStyle(color: AppColors.textWhite)),
@@ -518,6 +528,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         ),
       );
     }
+    // Daftarkan pesan yang dimuat supaya reaksinya ikut diambil.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ref.read(chatReactionsProvider('global').notifier).track(msgs.map((m) => m.id));
+    });
     // reverse: true -> pesan terbaru menempel di bawah dan list tetap di sana.
     return ScrollablePositionedList.builder(
       itemScrollController: _itemScroll,
@@ -530,6 +544,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         final bubble = ChatMessageBubble(
           key: ValueKey(m.id),
           message: m,
+          reactions: ChatReactionChips(channel: 'global', id: m.id),
           mine: m.firebaseUid == s.myUid,
           nameColor: parseChatHex(s.usernameColors[m.firebaseUid]),
           userNumber: s.userNumbers[m.firebaseUid],
@@ -716,9 +731,13 @@ class ChatMessageBubble extends StatelessWidget {
     this.avatarUrl,
     this.onProfileTap,
     this.onOwnAvatarTap,
+    this.reactions,
   });
 
   final ChatMessage message;
+
+  /// Chip reaksi emoji di bawah isi pesan (null = tidak ada).
+  final Widget? reactions;
 
   /// Tap avatar / nama = buka profil user (Tambah Teman). null untuk pesan sendiri.
   final VoidCallback? onProfileTap;
@@ -888,6 +907,7 @@ class ChatMessageBubble extends StatelessWidget {
                   style: TextStyle(color: AppColors.textMuted, fontSize: 10),
                 ),
               ),
+            if (reactions != null) reactions!,
             const SizedBox(height: 4),
             Row(
               mainAxisSize: MainAxisSize.min,

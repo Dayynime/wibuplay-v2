@@ -16,6 +16,7 @@ import '../safety/safety_actions.dart';
 import 'clan_chat_controller.dart';
 import '../sticker/sticker_widgets.dart';
 import '../chat/chat_mute.dart';
+import '../chat/chat_reactions.dart';
 import '../gift/giveaway.dart' show showCreateGiveawaySheet;
 
 /// Chat internal clan sebagai layar penuh (tombol Chat Clan di halaman Clan).
@@ -187,6 +188,15 @@ class _ClanChatPaneState extends ConsumerState<ClanChatPane> with WidgetsBinding
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (myUid.isNotEmpty)
+              ChatReactionPicker(
+                channel: 'clan',
+                id: m.id,
+                onPicked: (e) {
+                  Navigator.pop(ctx);
+                  reactToMessage(context, ref, 'clan', m.id, e);
+                },
+              ),
             ListTile(
               leading: const Icon(Icons.reply, color: AppColors.accentViolet),
               title: const Text('Balas', style: TextStyle(color: AppColors.textWhite)),
@@ -324,6 +334,10 @@ class _ClanChatPaneState extends ConsumerState<ClanChatPane> with WidgetsBinding
         ),
       );
     }
+    // Daftarkan pesan yang dimuat supaya reaksinya ikut diambil.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ref.read(chatReactionsProvider('clan').notifier).track(msgs.map((m) => m.id));
+    });
     // reverse: true -> pesan terbaru menempel di bawah dan list tetap di sana.
     return ListView.builder(
       reverse: true,
@@ -337,6 +351,7 @@ class _ClanChatPaneState extends ConsumerState<ClanChatPane> with WidgetsBinding
         final bubble = ChatMessageBubble(
           key: ValueKey('cm-${m.id}'),
           message: _toChat(s, m, replied),
+          reactions: ChatReactionChips(channel: 'clan', id: m.id),
           mine: own,
           nameColor: parseChatHex(p?.usernameColor),
           userNumber: p?.userNumber,
