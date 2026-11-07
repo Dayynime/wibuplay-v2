@@ -1,6 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../../core/content_filter.dart';
 import '../../core/firebase_config.dart';
@@ -78,83 +81,162 @@ class AnimeRepository {
     }
 
     try {
-      // Ambil kategori hot dari 3/2/home/hot supaya carousel hero berisi anime asli
-      var heroAnimeList = <AnimeItem>[];
-      try {
-        final hotApiResp = await _api.getHomeCategory('hot', page: 0);
-        heroAnimeList = _filterValidHeroAnime(JsonHelper.parseAnimeList(hotApiResp.data));
-      } catch (_) {}
+      // Kategori hot (untuk carousel hero) dan daftar Beranda diambil
+      // BERSAMAAN, bukan bergantian: tunggu satu kali, bukan dua kali.
+      // Hot boleh gagal (hero lalu diambil dari hot/popular daftar Beranda).
+      final first = await Future.wait<dynamic>([
+        _api
+            .getHomeCategory('hot', page: 0)
+            .then<dynamic>((r) => r.data)
+            .catchError((Object _) => null),
+        _api.getHomeList(limit: 12, day: currentDay).then<dynamic>((r) => r.data),
+      ]);
+      final hotCategory = first[0];
+      final home = first[1];
 
-      final resp = await _api.getHomeList(limit: 12, day: currentDay);
-      final rawData = resp.data;
-      if (rawData is Map) {
-        final hot = JsonHelper.parseAnimeList(rawData['hot']);
-        final popular = JsonHelper.parseAnimeList(rawData['popular']);
-        final newRelease = JsonHelper.parseAnimeList(rawData['new']);
-        final random = JsonHelper.parseAnimeList(rawData['random']);
-        var today = JsonHelper.parseAnimeList(rawData['today']);
-        final update = JsonHelper.parseAnimeList(rawData['update']);
-        final waiting = JsonHelper.parseAnimeList(rawData['waiting']);
-        final updateLabels = JsonHelper.parseEpisodeLabels(rawData['update']);
-
+      // Respons mentah disimpan apa adanya supaya bisa disimpan ke HP dan
+      // diurai ulang dengan aturan yang sama (lihat _homeFromRaw).
+      final raw = <String, dynamic>{'hotCategory': hotCategory};
+      if (home is Map) {
+        raw['home'] = home;
         // Cadangan: jadwal hari ini dari endpoint jadwal kalau section kosong.
-        if (today.isEmpty) {
+        if (JsonHelper.parseAnimeList(home['today']).isEmpty) {
           try {
-            today = await getSchedule(currentDay);
+            raw['schedule'] = (await _api.getSchedule(currentDay, sort: 'views', page: 0)).data;
           } catch (_) {}
         }
-
-        // Kalau hero kosong, ambil dari hot lalu popular (JANGAN rawData['slider'])
-        if (heroAnimeList.isEmpty) heroAnimeList = _filterValidHeroAnime(hot);
-        if (heroAnimeList.isEmpty) heroAnimeList = _filterValidHeroAnime(popular);
-
-        final result = HomeSectionData(
-          slider: heroAnimeList,
-          hot: hot,
-          popular: popular,
-          newRelease: newRelease,
-          random: random,
-          today: today,
-          update: update,
-          waiting: waiting,
-          updateLabels: updateLabels,
-        );
-        _cachedHome = result;
-        _cachedHomeTime = now;
-        return result;
+      } else {
+        // Fallback ke kategori satu per satu (sekarang paralel). Hot dipakai
+        // ulang dari request di atas; diulang hanya kalau tadi gagal.
+        final rest = await Future.wait([
+          _api.getHomeCategory('popular', page: 0),
+          _api.getHomeCategory('new', page: 0),
+          _api.getHomeCategory('random', page: 0),
+        ]);
+        raw['hot'] = hotCategory ?? (await _api.getHomeCategory('hot', page: 0)).data;
+        raw['popular'] = rest[0].data;
+        raw['new'] = rest[1].data;
+        raw['random'] = rest[2].data;
       }
 
-      // Fallback ke kategori satu per satu
-      final hotResp = await _api.getHomeCategory('hot', page: 0);
-      final popResp = await _api.getHomeCategory('popular', page: 0);
-      final newResp = await _api.getHomeCategory('new', page: 0);
-      final ranResp = await _api.getHomeCategory('random', page: 0);
+      final result = _homeFromRaw(raw);
+      _cachedHome = result;
+      _cachedHomeTime = now;
+      unawaited(_saveHomeCache(raw, currentDay));
+      return result;
+    } catch (_) {
+      // Pakai cache walau sudah kedaluwarsa kalau ada (memori, lalu HP).
+      final c = _cachedHome;
+      if (c != null) return c;
+      final disk = await loadCachedHome(currentDay: currentDay);
+      if (disk != null) return disk;
+      rethrow;
+    }
+  }
 
-      final hot = JsonHelper.parseAnimeList(hotResp.data);
-      final popular = JsonHelper.parseAnimeList(popResp.data);
-      final newRelease = JsonHelper.parseAnimeList(newResp.data);
-      final random = JsonHelper.parseAnimeList(ranResp.data);
+  /// Urai respons mentah Beranda jadi [HomeSectionData].
+  /// [sameDay] false = salinan dari hari lain, section "hari ini" dikosongkan.
+  HomeSectionData _homeFromRaw(Map raw, {bool sameDay = true}) {
+    var heroAnimeList = _filterValidHeroAnime(JsonHelper.parseAnimeList(raw['hotCategory']));
 
-      if (heroAnimeList.isEmpty) {
-        heroAnimeList = _filterValidHeroAnime(hot);
-        if (heroAnimeList.isEmpty) heroAnimeList = _filterValidHeroAnime(popular);
-      }
+    final home = raw['home'];
+    if (home is Map) {
+      final hot = JsonHelper.parseAnimeList(home['hot']);
+      final popular = JsonHelper.parseAnimeList(home['popular']);
+      final newRelease = JsonHelper.parseAnimeList(home['new']);
+      final random = JsonHelper.parseAnimeList(home['random']);
+      var today = JsonHelper.parseAnimeList(home['today']);
+      if (today.isEmpty) today = JsonHelper.parseAnimeList(raw['schedule']);
+      final update = JsonHelper.parseAnimeList(home['update']);
+      final waiting = JsonHelper.parseAnimeList(home['waiting']);
+      final updateLabels = JsonHelper.parseEpisodeLabels(home['update']);
 
-      final result = HomeSectionData(
+      // Kalau hero kosong, ambil dari hot lalu popular (JANGAN home['slider'])
+      if (heroAnimeList.isEmpty) heroAnimeList = _filterValidHeroAnime(hot);
+      if (heroAnimeList.isEmpty) heroAnimeList = _filterValidHeroAnime(popular);
+
+      return HomeSectionData(
         slider: heroAnimeList,
         hot: hot,
         popular: popular,
         newRelease: newRelease,
         random: random,
+        today: sameDay ? today : const [],
+        update: update,
+        waiting: waiting,
+        updateLabels: updateLabels,
       );
-      _cachedHome = result;
-      _cachedHomeTime = now;
-      return result;
+    }
+
+    final hot = JsonHelper.parseAnimeList(raw['hot']);
+    final popular = JsonHelper.parseAnimeList(raw['popular']);
+    final newRelease = JsonHelper.parseAnimeList(raw['new']);
+    final random = JsonHelper.parseAnimeList(raw['random']);
+
+    if (heroAnimeList.isEmpty) {
+      heroAnimeList = _filterValidHeroAnime(hot);
+      if (heroAnimeList.isEmpty) heroAnimeList = _filterValidHeroAnime(popular);
+    }
+
+    return HomeSectionData(
+      slider: heroAnimeList,
+      hot: hot,
+      popular: popular,
+      newRelease: newRelease,
+      random: random,
+    );
+  }
+
+  // ---- Salinan Beranda di HP ----
+  // Beranda terakhir disimpan ke file supaya saat app dibuka dari nol isinya
+  // langsung tampil, lalu data baru menyusul di belakang (HomeController).
+
+  static const String _homeCacheName = 'home_sections_cache_v1.json';
+
+  Future<File?> _homeCacheFile() async {
+    try {
+      final dir = await getApplicationSupportDirectory();
+      return File('${dir.path}/$_homeCacheName');
     } catch (_) {
-      // Pakai cache walau sudah kedaluwarsa kalau ada
-      final c = _cachedHome;
-      if (c != null) return c;
-      rethrow;
+      return null;
+    }
+  }
+
+  Future<void> _saveHomeCache(Map<String, dynamic> raw, String day) async {
+    try {
+      final f = await _homeCacheFile();
+      if (f == null) return;
+      final body = jsonEncode({
+        'v': 1,
+        'day': day,
+        'savedAt': DateTime.now().millisecondsSinceEpoch,
+        'raw': raw,
+      });
+      // Tulis ke file sementara lalu rename: file lama tidak pernah setengah jadi.
+      final tmp = File('${f.path}.tmp');
+      await tmp.writeAsString(body, flush: true);
+      await tmp.rename(f.path);
+    } catch (_) {}
+  }
+
+  /// Salinan Beranda terakhir dari HP; null kalau belum ada, rusak, atau kosong.
+  Future<HomeSectionData?> loadCachedHome({String currentDay = 'SENIN'}) async {
+    try {
+      final f = await _homeCacheFile();
+      if (f == null || !await f.exists()) return null;
+      final j = jsonDecode(await f.readAsString());
+      if (j is! Map || j['v'] != 1) return null;
+      final raw = j['raw'];
+      if (raw is! Map) return null;
+      final d = _homeFromRaw(raw, sameDay: j['day'] == currentDay);
+      final empty = d.slider.isEmpty &&
+          d.hot.isEmpty &&
+          d.popular.isEmpty &&
+          d.newRelease.isEmpty &&
+          d.update.isEmpty;
+      return empty ? null : d;
+    } catch (_) {
+      return null;
     }
   }
 

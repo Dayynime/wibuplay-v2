@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/decor_tick.dart';
 import '../../core/theme/app_colors.dart';
 import 'avatar_frame.dart';
 
@@ -137,6 +138,9 @@ class _ClanRainbowBadgeState extends State<ClanRainbowBadge>
     duration: const Duration(milliseconds: 23400),
   )..repeat();
 
+  /// Digambar ulang maks DecorTick.fps (animasi tetap jalan).
+  late final Listenable _tick = DecorTick(_c);
+
   static const _rainbow = [
     Color(0xFFFF3B30),
     Color(0xFFFF9500),
@@ -160,7 +164,7 @@ class _ClanRainbowBadgeState extends State<ClanRainbowBadge>
     const star = TextStyle(color: Color(0xD9FFFFFF), fontSize: 7, height: 1.2);
     return RepaintBoundary(
       child: AnimatedBuilder(
-        animation: _c,
+        animation: _tick,
         builder: (context, child) {
           final v = _c.value;
           final rainbow = (v * 9) % 1.0; // 23400 / 2600

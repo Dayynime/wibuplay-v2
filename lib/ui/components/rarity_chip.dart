@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../core/decor_tick.dart';
 import '../../data/models/wallpaper_models.dart';
 
 /// Chip rarity wallpaper. Rarity biasa = warna polos / gradient statis.
@@ -74,6 +75,9 @@ class _ShinyChipState extends State<_ShinyChip> with SingleTickerProviderStateMi
     duration: const Duration(milliseconds: 2600),
   );
 
+  /// Digambar ulang maks DecorTick.fps (animasi tetap jalan).
+  late final Listenable _tick = DecorTick(_c);
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -110,7 +114,7 @@ class _ShinyChipState extends State<_ShinyChip> with SingleTickerProviderStateMi
               // Garis kilau menyapu dari kiri ke kanan, diam sebentar, lalu ulang.
               Positioned.fill(
                 child: AnimatedBuilder(
-                  animation: _c,
+                  animation: _tick,
                   builder: (_, __) {
                     // 0..0.6 = menyapu, 0.6..1 = jeda
                     final t = (_c.value / 0.6).clamp(0.0, 1.0);

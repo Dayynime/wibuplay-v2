@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/decor_tick.dart';
 import '../../data/models/xp_models.dart';
 import '../../providers.dart';
 import 'user_level_badge.dart';
@@ -205,6 +206,9 @@ class _ClanNameTagState extends State<ClanNameTag> with SingleTickerProviderStat
     duration: const Duration(milliseconds: 4000),
   );
 
+  /// Digambar ulang maks DecorTick.fps (animasi tetap jalan).
+  late final Listenable _tick = DecorTick(_c);
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -228,7 +232,7 @@ class _ClanNameTagState extends State<ClanNameTag> with SingleTickerProviderStat
       onTap: widget.onTap,
       child: RepaintBoundary(
         child: AnimatedBuilder(
-          animation: _c,
+          animation: _tick,
           builder: (context, _) {
             final g = LinearGradient(
               colors: _rainbow,

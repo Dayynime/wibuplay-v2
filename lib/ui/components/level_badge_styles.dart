@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
+import '../../core/decor_tick.dart';
 import '../../data/models/xp_models.dart';
 
 /// Badge level beranimasi dengan sistem tier: warna & efek makin "mewah"
@@ -146,6 +147,9 @@ class _LevelStyledBadgeState extends State<LevelStyledBadge> with TickerProvider
   late final AnimationController _c = AnimationController(vsync: this, duration: widget.style.period);
   late final AnimationController _intro =
       AnimationController(vsync: this, duration: const Duration(milliseconds: 650));
+
+  /// Loop digambar ulang maks DecorTick.fps; intro tetap tiap frame.
+  late final Listenable _tick = Listenable.merge([DecorTick(_c), _intro]);
   bool _reduceMotion = false;
 
   @override
@@ -189,7 +193,7 @@ class _LevelStyledBadgeState extends State<LevelStyledBadge> with TickerProvider
 
     final badge = RepaintBoundary(
       child: AnimatedBuilder(
-        animation: Listenable.merge([_c, _intro]),
+        animation: _tick,
         builder: (context, _) {
           final t = _c.value;
           final r = Curves.easeOutCubic.transform(_intro.value);

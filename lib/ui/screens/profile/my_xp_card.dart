@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/decor_tick.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/xp_models.dart';
 import '../../../providers.dart';
@@ -25,6 +26,9 @@ class _MyXpCardState extends ConsumerState<MyXpCard>
     vsync: this,
     duration: const Duration(milliseconds: 2200),
   )..repeat();
+
+  /// Kilau digambar ulang maks DecorTick.fps (animasi tetap jalan).
+  late final Listenable _tick = DecorTick(_shine);
 
   @override
   void dispose() {
@@ -78,7 +82,7 @@ class _MyXpCardState extends ConsumerState<MyXpCard>
                             ),
                           ),
                           AnimatedBuilder(
-                            animation: _shine,
+                            animation: _tick,
                             builder: (context, _) => FractionallySizedBox(
                               alignment: Alignment(-1 + 3 * _shine.value, 0),
                               widthFactor: 0.35,

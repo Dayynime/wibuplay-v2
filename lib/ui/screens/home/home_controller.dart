@@ -6,9 +6,32 @@ import '../../../providers.dart';
 
 /// Port HomeViewModel: Loading / Success / Error lewat AsyncValue.
 /// Tidak memuat ulang kalau sudah sukses, kecuali forceRefresh.
+///
+/// Saat app dibuka, salinan Beranda terakhir di HP langsung ditampilkan
+/// (tanpa shimmer), lalu data baru diambil di belakang dan menggantikannya.
+/// Kalau belum ada salinan (instal baru), alurnya sama seperti dulu.
 class HomeController extends AsyncNotifier<HomeSectionData> {
   @override
-  Future<HomeSectionData> build() => _fetch(false);
+  Future<HomeSectionData> build() async {
+    final cached = await ref
+        .read(repositoryProvider)
+        .loadCachedHome(currentDay: currentDayName());
+    if (cached != null) {
+      Future.microtask(_refreshInBackground);
+      return cached;
+    }
+    return _fetch(false);
+  }
+
+  /// Segarkan diam-diam; kalau gagal, salinan yang tampil tetap dipakai.
+  Future<void> _refreshInBackground() async {
+    try {
+      final fresh = await ref
+          .read(repositoryProvider)
+          .getHomeSections(forceRefresh: true, currentDay: currentDayName());
+      state = AsyncData(fresh);
+    } catch (_) {}
+  }
 
   /// Nama hari Indonesia (SENIN..MINGGU) sesuai hari ini.
   static String currentDayName() {

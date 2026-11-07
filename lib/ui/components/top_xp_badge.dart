@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/decor_tick.dart';
 import '../../providers.dart';
 
 /// Tag "TOP XP #posisi" untuk user yang masuk top XP bulanan.
@@ -46,6 +47,9 @@ class _TopXpChipState extends State<TopXpChip>
     duration: const Duration(milliseconds: 3800),
   );
 
+  /// Digambar ulang maks DecorTick.fps (animasi tetap jalan).
+  late final Listenable _tick = DecorTick(_c);
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -71,7 +75,7 @@ class _TopXpChipState extends State<TopXpChip>
 
     return RepaintBoundary(
       child: AnimatedBuilder(
-        animation: _c,
+        animation: _tick,
         builder: (context, _) {
           // Loncatan ikon: 2x per putaran, aktif di 55%-100% tiap siklus.
           final p = (_c.value * 2) % 1.0;

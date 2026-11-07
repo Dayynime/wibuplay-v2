@@ -11,6 +11,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../../core/decor_tick.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/local/entities.dart';
 import '../../../providers.dart';
@@ -95,6 +96,9 @@ class _ProfileCardPageState extends ConsumerState<_ProfileCardPage> with TickerP
 
   /// Kilau hologram & putaran garis neon (berulang).
   late final AnimationController _fx = AnimationController(vsync: this, duration: const Duration(seconds: 6))..repeat();
+
+  /// Efek kartu digambar ulang maks DecorTick.fps (animasi tetap jalan).
+  late final Listenable _tick = DecorTick(_fx);
 
   /// Kemiringan 3D mengikuti jari; kembali lurus saat dilepas.
   Offset _tilt = Offset.zero;
@@ -246,7 +250,7 @@ class _ProfileCardPageState extends ConsumerState<_ProfileCardPage> with TickerP
                     padding: const EdgeInsets.symmetric(horizontal: 18),
                     child: FittedBox(
                       child: AnimatedBuilder(
-                        animation: _fx,
+                        animation: _tick,
                         builder: (_, __) => Transform(
                           alignment: Alignment.center,
                           transform: Matrix4.identity()

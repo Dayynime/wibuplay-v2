@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/decor_tick.dart';
 import '../../core/screen_seed.dart';
 import '../../providers.dart';
 
@@ -333,6 +334,9 @@ class _RoleBadgeChipState extends State<RoleBadgeChip>
     with SingleTickerProviderStateMixin {
   AnimationController? _c;
 
+  /// Kilau developer digambar ulang maks DecorTick.fps.
+  late final Listenable? _tick = _c == null ? null : DecorTick(_c!);
+
   @override
   void initState() {
     super.initState();
@@ -392,7 +396,7 @@ class _RoleBadgeChipState extends State<RoleBadgeChip>
     final shaped = c == null
         ? body
         : AnimatedBuilder(
-            animation: c,
+            animation: _tick!,
             builder: (context, child) {
               // Kilau melintas dari kiri ke kanan (-0.3 .. 1.3 lebar badge).
               final t = -0.3 + 1.6 * c.value;
