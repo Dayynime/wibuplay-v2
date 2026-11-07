@@ -56,10 +56,11 @@ class HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(homeControllerProvider);
 
+    // Beranda langsung tampil (header, chat, riwayat). Selama data belum ada,
+    // tiap section menampilkan skeleton-nya sendiri lalu berganti ke isi
+    // dengan crossfade per section (gaya Animuse), bukan satu skeleton besar.
     final Widget body;
-    if (state.isLoading && !state.hasValue) {
-      body = const _HomeLoadingSkeleton(key: ValueKey('loading'));
-    } else if (state.hasError && !state.hasValue) {
+    if (state.hasError && !state.hasValue) {
       Future<void> retry() async {
         // Paksa ambil api_base_url terbaru dulu (kalau baru di-Publish).
         await RemoteConfigManager.forceRefresh();
@@ -83,13 +84,11 @@ class HomeScreen extends ConsumerWidget {
                 onRetry: retry,
               ),
             );
-    } else if (state.isLoading) {
-      // Muat ulang paksa: tampil skeleton lagi seperti HomeUiState.Loading
-      body = const _HomeLoadingSkeleton(key: ValueKey('loading'));
     } else {
       body = _HomeContent(
         key: const ValueKey('content'),
-        sections: state.requireValue,
+        // null = masih memuat (section menampilkan skeleton).
+        sections: state.valueOrNull,
         onAnimeClick: onAnimeClick,
         onWatchEpisode: onWatchEpisode,
         onSearchClick: onSearchClick,
@@ -126,7 +125,8 @@ class _HomeContent extends ConsumerStatefulWidget {
     required this.onComicSeeAllClick,
   });
 
-  final HomeSectionData sections;
+  /// null = data Beranda masih dimuat.
+  final HomeSectionData? sections;
   final ValueChanged<String> onAnimeClick;
   final void Function(String movieId, String episodeId) onWatchEpisode;
   final VoidCallback onSearchClick;
@@ -204,9 +204,84 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
     return (avail - gap * (count - 1)) / count;
   }
 
+  // ---- Skeleton & crossfade per section ----
+
+  static const Duration _swapDuration = Duration(milliseconds: 320);
+
+  /// Satu slot Beranda: skeleton saat memuat, isi saat ada, kosong kalau
+  /// datanya kosong. Pergantiannya crossfade + tinggi menyesuaikan halus.
+  Widget _slot(
+    String id, {
+    required bool loading,
+    required bool hasData,
+    required Widget Function() content,
+    required Widget Function() skeleton,
+  }) {
+    final Widget child;
+    if (loading) {
+      child = KeyedSubtree(key: ValueKey('$id-skeleton'), child: skeleton());
+    } else if (hasData) {
+      child = KeyedSubtree(key: ValueKey(id), child: content());
+    } else {
+      child = SizedBox(key: ValueKey('$id-empty'), width: double.infinity);
+    }
+    return AnimatedSize(
+      duration: _swapDuration,
+      curve: Curves.easeOutCubic,
+      alignment: Alignment.topCenter,
+      child: AnimatedSwitcher(
+        duration: _swapDuration,
+        switchInCurve: Curves.easeOut,
+        switchOutCurve: Curves.easeIn,
+        layoutBuilder: (current, previous) => Stack(
+          alignment: Alignment.topCenter,
+          children: [...previous, if (current != null) current],
+        ),
+        child: child,
+      ),
+    );
+  }
+
+  /// Baris kartu shimmer seukuran baris aslinya.
+  Widget _rowSkeleton({required double itemWidth, required double imageHeight}) {
+    return SizedBox(
+      height: imageHeight + 30,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        physics: const NeverScrollableScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        itemCount: 4,
+        separatorBuilder: (_, _) => const SizedBox(width: 10),
+        itemBuilder: (_, _) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ShimmerBox(width: itemWidth, height: imageHeight, borderRadius: AppShapes.card),
+            const SizedBox(height: 8),
+            ShimmerBox(
+              width: itemWidth * 0.75,
+              height: 12,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _posterRowSkeleton() {
+    final cell = _posterCellWidth(context);
+    return _rowSkeleton(itemWidth: cell, imageHeight: cell * 1.5);
+  }
+
+  Widget _coverRowSkeleton() {
+    final w = MediaQuery.of(context).size.width * 0.62;
+    return _rowSkeleton(itemWidth: w, imageHeight: w * 9 / 16);
+  }
+
   @override
   Widget build(BuildContext context) {
     final sections = widget.sections;
+    final loading = sections == null;
     final watchHistory = ref.watch(profileHistoryProvider);
     final user = ref.watch(authUserProvider).valueOrNull;
     final showProfileHeader = user != null && FirebaseConfig.ready;
@@ -314,11 +389,18 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
         ),
 
         // 1. Hero carousel
-        if (sections.slider.isNotEmpty)
-          Padding(
+        _slot(
+          'hero',
+          loading: loading,
+          hasData: sections?.slider.isNotEmpty ?? false,
+          skeleton: () => const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: HeroBannerSkeleton(),
+          ),
+          content: () => Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
               child: HeroBanner(
-                sliderItems: sections.slider,
+                sliderItems: sections!.slider,
                 topXp: ref.watch(heroTopXpProvider).valueOrNull ?? const [],
                 topClans: ref.watch(heroTopClansProvider).valueOrNull ?? const [],
                 topSupport: ref.watch(topSupportersProvider).valueOrNull ?? const [],
@@ -338,6 +420,7 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
                 },
               ),
             ),
+        ),
 
         // Chat global terbaru (bergeser otomatis), di bawah hero
         const Padding(
@@ -357,41 +440,89 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
           ),
 
         // 3. Episode Baru (data/home/list -> update) + label nomor episode
-        if (sections.update.isNotEmpty)
-          section(
-            delayMs: 180,
+        _slot(
+          'episode-baru',
+          loading: loading,
+          hasData: sections?.update.isNotEmpty ?? false,
+          skeleton: () => section(
+            delayMs: 0,
             title: 'Episode Baru',
-            child: _posterRow(sections.update, episodeLabels: sections.updateLabels),
+            child: _posterRowSkeleton(),
           ),
+          content: () {
+            final data = sections!;
+            return section(
+              delayMs: 180,
+              title: 'Episode Baru',
+              child: _posterRow(data.update, episodeLabels: data.updateLabels),
+            );
+          },
+        ),
 
         // 4. Sedang Hangat (hot) - kartu cover 16:9
-        if (sections.hot.isNotEmpty)
-          section(
-            delayMs: 220,
+        _slot(
+          'sedang-hangat',
+          loading: loading,
+          hasData: sections?.hot.isNotEmpty ?? false,
+          skeleton: () => section(
+            delayMs: 0,
             title: 'Sedang Hangat',
-            actionText: 'Lihat semua',
-            onAction: () => widget.onSeeAllClick('hot'),
-            child: AnimeCoverBannerRow(
-              items: sections.hot,
-              onAnimeClick: widget.onAnimeClick,
-            ),
+            child: _coverRowSkeleton(),
           ),
+          content: () {
+            final data = sections!;
+            return section(
+              delayMs: 220,
+              title: 'Sedang Hangat',
+              actionText: 'Lihat semua',
+              onAction: () => widget.onSeeAllClick('hot'),
+              child: AnimeCoverBannerRow(
+                items: data.hot,
+                onAnimeClick: widget.onAnimeClick,
+              ),
+            );
+          },
+        ),
 
         // 5. Jadwal Hari Ini
-        if (sections.today.isNotEmpty)
-          section(
-            delayMs: 260,
+        _slot(
+          'jadwal-hari-ini',
+          loading: loading,
+          hasData: sections?.today.isNotEmpty ?? false,
+          skeleton: () => section(
+            delayMs: 0,
             title: 'Jadwal Hari Ini',
-            child: _posterRow(sections.today),
+            child: _posterRowSkeleton(),
           ),
+          content: () {
+            final data = sections!;
+            return section(
+              delayMs: 260,
+              title: 'Jadwal Hari Ini',
+              child: _posterRow(data.today),
+            );
+          },
+        ),
 
         // 6. Judul Baru (new) + badge "New"
-        if (sections.newRelease.isNotEmpty)
-          section(
-            delayMs: 300,
+        _slot(
+          'judul-baru',
+          loading: loading,
+          hasData: sections?.newRelease.isNotEmpty ?? false,
+          skeleton: () => section(
+            delayMs: 0,
             title: 'Judul Baru',
-            child: _posterRow(sections.newRelease, showNewBadge: true),
+            child: _posterRowSkeleton(),
           ),
+          content: () {
+            final data = sections!;
+            return section(
+              delayMs: 300,
+              title: 'Judul Baru',
+              child: _posterRow(data.newRelease, showNewBadge: true),
+            );
+          },
+        ),
 
         // Komik terbaru (API Sanka / Bacakomik): gagal/kosong = section tidak tampil.
         ComicHomeSection(
@@ -400,63 +531,72 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
           ),
 
         // 7. Terpopuler - kartu berperingkat
-        if (sections.popular.isNotEmpty)
-          section(
-            delayMs: 340,
+        _slot(
+          'terpopuler',
+          loading: loading,
+          hasData: sections?.popular.isNotEmpty ?? false,
+          skeleton: () => section(
+            delayMs: 0,
             title: 'Terpopuler',
-            child: AnimeRankedRow(
-              items: sections.popular,
-              onAnimeClick: widget.onAnimeClick,
-            ),
+            child: _posterRowSkeleton(),
           ),
+          content: () {
+            final data = sections!;
+            return section(
+              delayMs: 340,
+              title: 'Terpopuler',
+              child: AnimeRankedRow(
+                items: data.popular,
+                onAnimeClick: widget.onAnimeClick,
+              ),
+            );
+          },
+        ),
 
         // 8. Jas Por Yu (random) - kartu cover 16:9
-        if (sections.random.isNotEmpty)
-          section(
-            delayMs: 380,
+        _slot(
+          'jas-por-yu',
+          loading: loading,
+          hasData: sections?.random.isNotEmpty ?? false,
+          skeleton: () => section(
+            delayMs: 0,
             title: 'Jas Por Yu',
-            child: AnimeCoverBannerRow(
-              items: sections.random,
-              onAnimeClick: widget.onAnimeClick,
-            ),
+            child: _coverRowSkeleton(),
           ),
+          content: () {
+            final data = sections!;
+            return section(
+              delayMs: 380,
+              title: 'Jas Por Yu',
+              child: AnimeCoverBannerRow(
+                items: data.random,
+                onAnimeClick: widget.onAnimeClick,
+              ),
+            );
+          },
+        ),
 
         // 9. Paling Dinanti (waiting)
-        if (sections.waiting.isNotEmpty)
-          section(
-            delayMs: 420,
+        _slot(
+          'paling-dinanti',
+          loading: loading,
+          hasData: sections?.waiting.isNotEmpty ?? false,
+          skeleton: () => section(
+            delayMs: 0,
             title: 'Paling Dinanti',
-            child: _posterRow(sections.waiting),
+            child: _posterRowSkeleton(),
           ),
+          content: () {
+            final data = sections!;
+            return section(
+              delayMs: 420,
+              title: 'Paling Dinanti',
+              child: _posterRow(data.waiting),
+            );
+          },
+        ),
       ],
     ),
-    );
-  }
-}
-
-class _HomeLoadingSkeleton extends StatelessWidget {
-  const _HomeLoadingSkeleton({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      bottom: false,
-      child: const Padding(
-        padding: EdgeInsets.only(top: 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
-              child: HeroBannerSkeleton(),
-            ),
-            SizedBox(height: 24),
-            AnimeRowSkeleton(),
-            SizedBox(height: 24),
-            AnimeRowSkeleton(),
-          ],
-        ),
-      ),
     );
   }
 }

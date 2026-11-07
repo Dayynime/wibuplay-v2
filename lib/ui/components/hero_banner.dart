@@ -227,11 +227,23 @@ class _HeroBannerState extends State<HeroBanner> with SingleTickerProviderStateM
             ),
           ),
         ),
-        if (pageCount > 1) ...[
+        // Slide leaderboard/support yang datanya menyusul tidak "nongol":
+        // baris indikator membesar halus dan jumlah bar berganti dengan fade.
+        AnimatedSize(
+          duration: const Duration(milliseconds: 320),
+          curve: Curves.easeOutCubic,
+          alignment: Alignment.topCenter,
+          child: pageCount <= 1
+              ? const SizedBox(width: double.infinity)
+              : Column(
+        children: [
           const SizedBox(height: 4),
           // Indikator ala Stories: satu bar per slide. Bar slide poster anime
           // terisi mengikuti jam rotasi poster; slide lain penuh saat aktif.
-          Padding(
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 320),
+            child: Padding(
+            key: ValueKey('hero-dots-$pageCount'),
             padding: const EdgeInsets.symmetric(horizontal: 28),
             child: Row(
               children: [
@@ -261,7 +273,10 @@ class _HeroBannerState extends State<HeroBanner> with SingleTickerProviderStateM
               ],
             ),
           ),
+          ),
         ],
+              ),
+        ),
       ],
     );
   }

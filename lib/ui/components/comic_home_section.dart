@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/comic/comic_providers.dart';
+import '../../data/local/page_cache.dart';
 import '../../data/models/comic_models.dart';
 import '../screens/comic/comic_widgets.dart';
 import 'common_components.dart';
@@ -9,9 +10,19 @@ import 'shimmer.dart';
 
 /// Komik terbaru di Beranda: selalu dari Bacakomik (Dayynime-v1), sama seperti
 /// Zenime. Gagal/kosong = section tidak tampil.
-final comicHomeLatestProvider = FutureProvider<List<ComicListItem>>((ref) async {
-  final res = await ref.watch(comicRepositoryProvider).getLatest();
-  return (res.komikList ?? const <ComicListItem>[]).take(12).toList();
+final comicHomeLatestProvider = FutureProvider<List<ComicListItem>>((ref) {
+  final repo = ref.watch(comicRepositoryProvider);
+  // Salinan terakhir dari HP tampil dulu, data baru menyusul (page_cache.dart).
+  return cacheFirst<List<ComicListItem>>(
+    ref,
+    key: 'comic_home_latest',
+    fetch: () async {
+      final res = await repo.getLatest();
+      return (res.komikList ?? const <ComicListItem>[]).take(12).toList();
+    },
+    encode: (v) => [for (final c in v) PageCodec.comicToJson(c)],
+    decode: (j) => nonEmpty(PageCodec.comics(j)),
+  );
 });
 
 class ComicHomeSection extends ConsumerWidget {
@@ -45,7 +56,13 @@ class ComicHomeSection extends ConsumerWidget {
           onActionClick: onSeeAllClick,
         ),
         const SizedBox(height: 8),
-        SizedBox(
+        // Skeleton -> isi: crossfade (gaya Animuse).
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 320),
+          switchInCurve: Curves.easeOut,
+          switchOutCurve: Curves.easeIn,
+          child: SizedBox(
+          key: ValueKey(items == null ? 'comic-home-skeleton' : 'comic-home'),
           height: _rowHeight,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
@@ -70,6 +87,7 @@ class ComicHomeSection extends ConsumerWidget {
                     ),
             ),
           ),
+        ),
         ),
       ],
     );
