@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lottie/lottie.dart';
 
+import '../../../core/decor_tick.dart';
 import '../../../data/models/account_models.dart' show formatZCoin;
 import '../../../data/models/friend_models.dart';
 import '../../../data/models/tree_models.dart';
@@ -1451,6 +1452,9 @@ class _HarvestButtonState extends State<_HarvestButton> with SingleTickerProvide
   late final AnimationController _pulse =
       AnimationController(vsync: this, duration: const Duration(milliseconds: 1300));
 
+  /// Denyut digambar ulang maks DecorTick.fps (animasi tetap jalan).
+  late final Listenable _pulseTick = DecorTick(_pulse);
+
   @override
   void initState() {
     super.initState();
@@ -1491,7 +1495,7 @@ class _HarvestButtonState extends State<_HarvestButton> with SingleTickerProvide
           children: [
             if (on)
               AnimatedBuilder(
-                animation: _pulse,
+                animation: _pulseTick,
                 builder: (context, _) {
                   final k = _pulse.value;
                   return Container(

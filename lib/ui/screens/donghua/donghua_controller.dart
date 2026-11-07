@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/error_message.dart';
+import '../../../data/local/page_cache.dart';
 import '../../../data/models/anichin_models.dart';
 import '../../../data/repository/anichin_repository.dart';
 import '../../../providers.dart';
@@ -144,8 +145,25 @@ class DonghuaController extends AutoDisposeNotifier<DonghuaUiState> {
 
   // ---------- Beranda (GET /) ----------
 
+  static const String _homeCacheKey = 'donghua_home';
+
   Future<void> loadHome() async {
-    _update((s) => s.copyWith(home: const DonghuaHomeState(isLoading: true)));
+    // Belum ada isi: salinan terakhir dari HP tampil dulu, data baru menyusul.
+    var showingCache = false;
+    if (_alive && state.home.sections.isEmpty) {
+      final cached = PageCodec.sections(await DiskCache.read(_homeCacheKey))
+          .where((sec) => sec.cards.isNotEmpty)
+          .toList();
+      if (cached.isNotEmpty && _alive && state.home.sections.isEmpty) {
+        _update((s) => s.copyWith(
+              home: DonghuaHomeState(sections: cached, isLoading: false),
+            ));
+        showingCache = true;
+      }
+    }
+    if (!showingCache) {
+      _update((s) => s.copyWith(home: const DonghuaHomeState(isLoading: true)));
+    }
     try {
       final res = await _repo.getHome();
       final sections = res.results
@@ -155,7 +173,14 @@ class DonghuaController extends AutoDisposeNotifier<DonghuaUiState> {
       _update((s) => s.copyWith(
             home: DonghuaHomeState(sections: sections, isLoading: false),
           ));
+      if (sections.isNotEmpty) {
+        unawaited(DiskCache.write(
+          _homeCacheKey,
+          [for (final sec in sections) PageCodec.sectionToJson(sec)],
+        ));
+      }
     } catch (e) {
+      if (showingCache) return;
       final msg = errorMessage(e, 'Gagal memuat donghua.');
       _update((s) => s.copyWith(
             home: DonghuaHomeState(isLoading: false, errorMessage: msg),
@@ -315,19 +340,44 @@ class DonghuaController extends AutoDisposeNotifier<DonghuaUiState> {
     Future<AnichinListResponse> Function(int page) fetch,
   ) async {
     final req = slot == _Slot.filter ? ++_filterRequest : 0;
-    final before = _grid(slot);
+    var before = _grid(slot);
     final sw = Stopwatch()..start();
     AnichinTiming.add('LOAD ${slot.name} p$page mulai');
-    _setGrid(
-      slot,
-      page == 1
-          ? const DonghuaGridState(isInitialLoading: true)
-          : before.copyWith(isLoadingMore: true),
-    );
+    // Tab Ongoing/Semua halaman 1: salinan terakhir dari HP tampil dulu.
+    final cacheKey = (page == 1 && slot != _Slot.filter) ? 'donghua_${slot.name}' : null;
+    var showingCache = false;
+    if (cacheKey != null && before.items.isEmpty) {
+      final cached = _validCards(PageCodec.cards(await DiskCache.read(cacheKey)));
+      if (cached.isNotEmpty && _alive && _grid(slot).items.isEmpty) {
+        _setGrid(
+          slot,
+          DonghuaGridState(
+            items: cached,
+            isInitialLoading: false,
+            // "Muat lebih" baru aktif setelah data baru datang.
+            hasNextPage: false,
+            page: 1,
+          ),
+        );
+        showingCache = true;
+      }
+      if (_alive) before = _grid(slot);
+    }
+    if (!showingCache) {
+      _setGrid(
+        slot,
+        page == 1
+            ? const DonghuaGridState(isInitialLoading: true)
+            : before.copyWith(isLoadingMore: true),
+      );
+    }
     try {
       final res = await fetch(page);
       if (slot == _Slot.filter && req != _filterRequest) return;
       final incoming = _validCards(res.results);
+      if (cacheKey != null && incoming.isNotEmpty) {
+        unawaited(DiskCache.write(cacheKey, [for (final c in incoming) PageCodec.cardToJson(c)]));
+      }
       final existing = page == 1 ? <AnichinCard>[] : before.items;
       final known = existing.map((c) => c.slug).toSet();
       final fresh = incoming.where((c) => !known.contains(c.slug)).toList();
@@ -346,6 +396,7 @@ class DonghuaController extends AutoDisposeNotifier<DonghuaUiState> {
     } catch (e) {
       AnichinTiming.add('LOAD ${slot.name} p$page ERROR ${sw.elapsedMilliseconds}ms');
       if (slot == _Slot.filter && req != _filterRequest) return;
+      if (showingCache) return;
       _setGrid(
         slot,
         page == 1

@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/decor_tick.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/models/clan_models.dart';
 import '../../data/models/support_models.dart';
@@ -120,6 +121,9 @@ class _SlideMotionState extends State<_SlideMotion> with TickerProviderStateMixi
       AnimationController(vsync: this, duration: widget.enterDuration);
   late final AnimationController _loop =
       AnimationController(vsync: this, duration: widget.loopDuration);
+
+  /// Kilau loop digambar ulang maks DecorTick.fps; animasi masuk tetap penuh.
+  late final Animation<double> _loopTick = DecorAnimation(_loop);
   bool _reduce = false;
 
   @override
@@ -159,7 +163,7 @@ class _SlideMotionState extends State<_SlideMotion> with TickerProviderStateMixi
   }
 
   @override
-  Widget build(BuildContext context) => widget.builder(context, _enter, _loop);
+  Widget build(BuildContext context) => widget.builder(context, _enter, _loopTick);
 }
 
 /// Muncul bertahap: fade + geser, mengikuti potongan [start]..[end] dari

@@ -1,3 +1,4 @@
+import 'package:flutter/animation.dart';
 import 'package:flutter/foundation.dart';
 
 /// Pembatas frame untuk animasi dekorasi yang berulang terus-menerus
@@ -50,4 +51,38 @@ class DecorTick extends Listenable {
     final filtered = _wrapped.remove(listener);
     if (filtered != null) _source.removeListener(filtered);
   }
+}
+
+/// Versi [DecorTick] berbentuk `Animation<double>`, untuk widget/painter yang
+/// menerima animasi (bukan sekadar Listenable) dan membaca `.value`-nya.
+/// Nilai dan status sama persis dengan [parent]; hanya pemberitahuan
+/// "gambar ulang" yang dibatasi ke [DecorTick.fps].
+///
+/// ```dart
+/// late final Animation<double> _loopTick = DecorAnimation(_loop);
+/// ```
+class DecorAnimation extends Animation<double> {
+  DecorAnimation(this.parent) : _tick = DecorTick(parent);
+
+  final Animation<double> parent;
+  final DecorTick _tick;
+
+  @override
+  double get value => parent.value;
+
+  @override
+  AnimationStatus get status => parent.status;
+
+  @override
+  void addListener(VoidCallback listener) => _tick.addListener(listener);
+
+  @override
+  void removeListener(VoidCallback listener) => _tick.removeListener(listener);
+
+  @override
+  void addStatusListener(AnimationStatusListener listener) => parent.addStatusListener(listener);
+
+  @override
+  void removeStatusListener(AnimationStatusListener listener) =>
+      parent.removeStatusListener(listener);
 }

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/error_message.dart';
+import '../../../data/local/page_cache.dart';
 import '../../../data/comic/comic_providers.dart';
 import '../../../data/comic/comic_source.dart';
 import '../../../data/models/comic_models.dart';
@@ -149,15 +150,32 @@ class ComicController extends Notifier<ComicUiState> {
     final token = ++_tabToken;
     final source = state.source;
     final tab = state.selectedTab;
+    final cacheKey = 'comic_${source.name}_$tab';
+    var showingCache = false;
     if (!silent) {
-      _update((s) => s.copyWith(list: const ComicListState(isInitialLoading: true)));
+      // Salinan halaman 1 terakhir dari HP tampil dulu, data baru menyusul.
+      final cached = PageCodec.comics(await DiskCache.read(cacheKey));
+      if (token != _tabToken || !_alive) return;
+      if (cached.isNotEmpty) {
+        _update((s) => s.copyWith(
+              list: ComicListState(items: cached, isInitialLoading: false),
+            ));
+        showingCache = true;
+      } else {
+        _update((s) => s.copyWith(list: const ComicListState(isInitialLoading: true)));
+      }
     }
     try {
       final res = await _repo.browse(source, tab, page: 1, forceRefresh: forceRefresh);
       if (token != _tabToken) return;
       _update((s) => s.copyWith(list: _firstPage(res)));
+      final items = res.komikList ?? const <ComicListItem>[];
+      if (items.isNotEmpty) {
+        unawaited(DiskCache.write(cacheKey, [for (final c in items) PageCodec.comicToJson(c)]));
+      }
     } catch (e) {
       if (token != _tabToken) return;
+      if (showingCache) return;
       if (silent && state.list.items.isNotEmpty) return;
       _update((s) => s.copyWith(
             list: ComicListState(

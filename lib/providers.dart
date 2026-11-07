@@ -11,6 +11,7 @@ import 'data/repository/anichin_repository.dart';
 import 'data/api/api_service.dart';
 import 'data/download/episode_download_manager.dart';
 import 'data/local/local_store.dart';
+import 'data/local/page_cache.dart';
 import 'data/repository/account_repository.dart';
 import 'data/repository/admin_repository.dart';
 import 'data/repository/anime_repository.dart';
@@ -144,14 +145,29 @@ final giftRepositoryProvider = Provider<GiftRepository>(
 
 /// Top Giver sepanjang masa + clan & level tiap orang (carousel & halaman).
 final topGiversProvider = FutureProvider<TopGiversData>((ref) async {
-  final givers = await ref.watch(giftRepositoryProvider).topGivers();
-  final uids = givers.map((g) => g.firebaseUid).where((u) => u.isNotEmpty).toList();
-  if (uids.isEmpty) return TopGiversData(givers: givers);
-  final clansF = ref.read(chatRepositoryProvider).getClanTagsForUids(uids)
-      .catchError((_) => <String, String>{});
-  final levelsF = ref.read(xpRepositoryProvider).getLevelsForUids(uids)
-      .catchError((_) => <String, int>{});
-  return TopGiversData(givers: givers, clanTags: await clansF, levels: await levelsF);
+  final gifts = ref.watch(giftRepositoryProvider);
+  final chat = ref.read(chatRepositoryProvider);
+  final xp = ref.read(xpRepositoryProvider);
+  Future<TopGiversData> fetch() async {
+    final givers = await gifts.topGivers();
+    final uids = givers.map((g) => g.firebaseUid).where((u) => u.isNotEmpty).toList();
+    if (uids.isEmpty) return TopGiversData(givers: givers);
+    final clansF = chat.getClanTagsForUids(uids).catchError((_) => <String, String>{});
+    final levelsF = xp.getLevelsForUids(uids).catchError((_) => <String, int>{});
+    return TopGiversData(givers: givers, clanTags: await clansF, levels: await levelsF);
+  }
+
+  // Salinan terakhir di HP tampil dulu, data baru menyusul (page_cache.dart).
+  return cacheFirst<TopGiversData>(
+    ref,
+    key: 'top_givers',
+    fetch: fetch,
+    encode: PageCodec.giversToJson,
+    decode: (j) {
+      final d = PageCodec.givers(j);
+      return (d == null || d.givers.isEmpty) ? null : d;
+    },
+  );
 });
 
 /// Peringkat Top Giver satu user (null = tidak masuk leaderboard). Dipakai
@@ -368,8 +384,15 @@ final myPremiumProvider = Provider<AsyncValue<bool>>((ref) {
 
 /// Top 4 XP bulan ini buat slide carousel Beranda. Gagal = slide disembunyikan.
 final heroTopXpProvider = FutureProvider.autoDispose<List<UserXpDisplay>>((ref) async {
+  final repo = ref.watch(xpRepositoryProvider);
   try {
-    return await ref.watch(xpRepositoryProvider).getTopXpDisplay(limit: 4);
+    return await cacheFirst<List<UserXpDisplay>>(
+      ref,
+      key: 'hero_top_xp',
+      fetch: () => repo.getTopXpDisplay(limit: 4),
+      encode: (v) => [for (final u in v) PageCodec.xpToJson(u)],
+      decode: (j) => nonEmpty(PageCodec.xpList(j)),
+    );
   } catch (_) {
     return const [];
   }
@@ -377,8 +400,15 @@ final heroTopXpProvider = FutureProvider.autoDispose<List<UserXpDisplay>>((ref) 
 
 /// Top 4 clan buat slide carousel Beranda. Gagal = kolom clan kosong.
 final heroTopClansProvider = FutureProvider.autoDispose<List<ClanSummary>>((ref) async {
+  final repo = ref.watch(chatRepositoryProvider);
   try {
-    return await ref.watch(chatRepositoryProvider).getTopClans(limit: 4);
+    return await cacheFirst<List<ClanSummary>>(
+      ref,
+      key: 'hero_top_clans',
+      fetch: () => repo.getTopClans(limit: 4),
+      encode: (v) => [for (final c in v) PageCodec.clanToJson(c)],
+      decode: (j) => nonEmpty(PageCodec.clans(j)),
+    );
   } catch (_) {
     return const [];
   }
@@ -625,8 +655,15 @@ final clanPendingRequestsProvider = FutureProvider.autoDispose
 
 /// Top 3 donatur buat slide carousel Beranda. Gagal = slide disembunyikan.
 final topSupportersProvider = FutureProvider.autoDispose<List<TopSupporter>>((ref) async {
+  final repo = ref.watch(xpRepositoryProvider);
   try {
-    final all = await ref.watch(xpRepositoryProvider).getTopSupporters();
+    final all = await cacheFirst<List<TopSupporter>>(
+      ref,
+      key: 'top_supporters_home',
+      fetch: () => repo.getTopSupporters(),
+      encode: (v) => [for (final s in v.take(3)) PageCodec.supporterToJson(s)],
+      decode: (j) => nonEmpty(PageCodec.supporters(j)),
+    );
     return all.take(3).toList();
   } catch (_) {
     return const [];
@@ -635,13 +672,27 @@ final topSupportersProvider = FutureProvider.autoDispose<List<TopSupporter>>((re
 
 /// Daftar Top Support lengkap buat halaman Top Support. Melempar kalau gagal
 /// (UI menampilkan error + coba lagi).
-final topSupportersFullProvider = FutureProvider.autoDispose<List<TopSupporter>>(
-  (ref) => ref.watch(xpRepositoryProvider).getTopSupporters(),
-);
+final topSupportersFullProvider = FutureProvider.autoDispose<List<TopSupporter>>((ref) {
+  final repo = ref.watch(xpRepositoryProvider);
+  return cacheFirst<List<TopSupporter>>(
+    ref,
+    key: 'top_supporters_full',
+    fetch: () => repo.getTopSupporters(),
+    encode: (v) => [for (final s in v) PageCodec.supporterToJson(s)],
+    decode: (j) => nonEmpty(PageCodec.supporters(j)),
+  );
+});
 
-final xpLeaderboardProvider = FutureProvider.autoDispose<List<UserXpDisplay>>(
-  (ref) => ref.watch(xpRepositoryProvider).getLeaderboardDisplay(),
-);
+final xpLeaderboardProvider = FutureProvider.autoDispose<List<UserXpDisplay>>((ref) {
+  final repo = ref.watch(xpRepositoryProvider);
+  return cacheFirst<List<UserXpDisplay>>(
+    ref,
+    key: 'xp_leaderboard',
+    fetch: () => repo.getLeaderboardDisplay(),
+    encode: (v) => [for (final u in v) PageCodec.xpToJson(u)],
+    decode: (j) => nonEmpty(PageCodec.xpList(j)),
+  );
+});
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
   final repo = AuthRepository(

@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../core/decor_tick.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/models/anichin_models.dart';
 import '../screens/donghua/donghua_widgets.dart';
@@ -46,6 +47,9 @@ class _DonghuaHotSectionState extends State<DonghuaHotSection>
     vsync: this,
     duration: const Duration(seconds: 8),
   )..repeat();
+
+  /// Ambient digambar ulang maks DecorTick.fps (animasi tetap jalan).
+  late final Animation<double> _ambientTick = DecorAnimation(_ambient);
 
   @override
   void didChangeDependencies() {
@@ -102,7 +106,7 @@ class _DonghuaHotSectionState extends State<DonghuaHotSection>
       RepaintBoundary(
         child: _Pressable(
           onTap: () => _tap(top[0]),
-          child: _HeroCard(card: top[0], ambient: _ambient),
+          child: _HeroCard(card: top[0], ambient: _ambientTick),
         ),
       ),
     );
@@ -116,7 +120,7 @@ class _DonghuaHotSectionState extends State<DonghuaHotSection>
                 rank: i + 1,
                 card: top[i],
                 color: i == 1 ? _silver : _bronze,
-                ambient: _ambient,
+                ambient: _ambientTick,
                 phase: i * 0.37,
               ),
             ),
@@ -130,7 +134,7 @@ class _DonghuaHotSectionState extends State<DonghuaHotSection>
         children: [
           _enterWrap(
             0,
-            _Header(ambient: _ambient, onSeeAll: widget.onSeeAllClick),
+            _Header(ambient: _ambientTick, onSeeAll: widget.onSeeAllClick),
           ),
           SizedBox(
             height: _sectionHeight,

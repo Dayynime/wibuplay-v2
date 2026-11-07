@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import '../../../core/decor_tick.dart';
 import '../../../core/lite_mode.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -944,6 +945,9 @@ class _PulseDotState extends State<_PulseDot> with SingleTickerProviderStateMixi
     duration: const Duration(milliseconds: 1400),
   )..repeat();
 
+  /// Digambar ulang maks DecorTick.fps (animasi tetap jalan).
+  late final Listenable _tick = DecorTick(_c);
+
   @override
   void dispose() {
     _c.dispose();
@@ -956,7 +960,7 @@ class _PulseDotState extends State<_PulseDot> with SingleTickerProviderStateMixi
       width: 14,
       height: 14,
       child: AnimatedBuilder(
-        animation: _c,
+        animation: _tick,
         builder: (_, __) {
           final t = _c.value;
           return Stack(

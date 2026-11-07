@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../../core/decor_tick.dart';
 import '../../../core/lite_mode.dart';
 import 'dart:math' as math;
 
@@ -87,6 +88,9 @@ class _Sheen extends StatefulWidget {
 class _SheenState extends State<_Sheen> with SingleTickerProviderStateMixin {
   late final AnimationController _c = AnimationController(vsync: this, duration: widget.period);
 
+  /// Kilau digambar ulang maks DecorTick.fps (animasi tetap jalan).
+  late final Listenable _tick = DecorTick(_c);
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -112,7 +116,7 @@ class _SheenState extends State<_Sheen> with SingleTickerProviderStateMixin {
         Positioned.fill(
           child: IgnorePointer(
             child: AnimatedBuilder(
-              animation: _c,
+              animation: _tick,
               builder: (_, __) {
                 final t = (_c.value / 0.5).clamp(0.0, 1.0);
                 final x = -1.8 + t * 3.6;

@@ -5,6 +5,7 @@ import 'dart:ui' show FontFeature;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/decor_tick.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/xp_models.dart';
 import '../../../providers.dart';
@@ -184,6 +185,9 @@ class _PodiumState extends State<_Podium> with TickerProviderStateMixin {
     duration: const Duration(seconds: 6),
   )..repeat();
 
+  /// Loop digambar ulang maks DecorTick.fps; animasi masuk tetap penuh.
+  late final Animation<double> _loopTick = DecorAnimation(_loop);
+
   @override
   void dispose() {
     _intro.dispose();
@@ -213,7 +217,7 @@ class _PodiumState extends State<_Podium> with TickerProviderStateMixin {
           pedestalHeight: cfg.$3,
           start: cfg.$4,
           intro: _intro,
-          loop: _loop,
+          loop: _loopTick,
         ),
       );
     }
@@ -241,7 +245,7 @@ class _PodiumState extends State<_Podium> with TickerProviderStateMixin {
           borderRadius: BorderRadius.circular(25),
           child: Stack(
             children: [
-              Positioned.fill(child: CustomPaint(painter: _BackdropPainter(_loop))),
+              Positioned.fill(child: CustomPaint(painter: _BackdropPainter(_loopTick))),
               SizedBox(
                 height: 360,
                 child: Padding(

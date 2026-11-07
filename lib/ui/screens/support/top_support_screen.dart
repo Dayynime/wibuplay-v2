@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../core/decor_tick.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/account_models.dart';
 import '../../../core/supabase_config.dart';
@@ -230,6 +231,9 @@ class _SupportPodiumState extends State<_SupportPodium> with TickerProviderState
     duration: const Duration(seconds: 6),
   )..repeat();
 
+  /// Loop digambar ulang maks DecorTick.fps; animasi masuk tetap penuh.
+  late final Animation<double> _loopTick = DecorAnimation(_loop);
+
   @override
   void dispose() {
     _intro.dispose();
@@ -257,7 +261,7 @@ class _SupportPodiumState extends State<_SupportPodium> with TickerProviderState
           pedestalHeight: cfg.$3,
           start: cfg.$4,
           intro: _intro,
-          loop: _loop,
+          loop: _loopTick,
         ),
       );
     }
@@ -285,7 +289,7 @@ class _SupportPodiumState extends State<_SupportPodium> with TickerProviderState
           borderRadius: BorderRadius.circular(25),
           child: Stack(
             children: [
-              Positioned.fill(child: CustomPaint(painter: _SupportBackdrop(_loop))),
+              Positioned.fill(child: CustomPaint(painter: _SupportBackdrop(_loopTick))),
               SizedBox(
                 height: 372,
                 child: Padding(
@@ -785,6 +789,9 @@ class _DonateCardState extends State<_DonateCard> with SingleTickerProviderState
     duration: const Duration(seconds: 3),
   )..repeat();
 
+  /// Digambar ulang maks DecorTick.fps (animasi tetap jalan).
+  late final Listenable _tick = DecorTick(_c);
+
   @override
   void dispose() {
     _c.dispose();
@@ -849,7 +856,7 @@ class _DonateCardState extends State<_DonateCard> with SingleTickerProviderState
           ),
           const SizedBox(height: 14),
           AnimatedBuilder(
-            animation: _c,
+            animation: _tick,
             builder: (context, _) {
               final l = _c.value * 2 * math.pi;
               // Dua denyut per loop: membesar sebentar lalu kembali.

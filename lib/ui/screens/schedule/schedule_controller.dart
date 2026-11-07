@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/error_message.dart';
+import '../../../data/local/page_cache.dart';
 import '../../../data/models/anime_item.dart';
 import '../../../providers.dart';
 import '../home/home_controller.dart';
@@ -93,9 +96,24 @@ class ScheduleController extends Notifier<ScheduleUiState> {
     );
   }
 
+  static const String _cacheKey = 'schedule_week';
+
   Future<void> loadFullWeek() async {
     final request = ++_request;
-    state = state.copyWith(isLoading: true, error: () => null);
+    // Belum ada isi: tampilkan salinan minggu terakhir dari HP dulu, lalu
+    // data baru menggantikannya. Kalau gagal, salinan tetap tampil.
+    var showingCache = false;
+    if (state.sections.isEmpty) {
+      final cached = _decodeWeek(await DiskCache.read(_cacheKey));
+      if (!_alive || request != _request) return;
+      if (cached != null) {
+        state = state.copyWith(sections: cached, isLoading: false, error: () => null);
+        showingCache = true;
+      }
+    }
+    if (!showingCache) {
+      state = state.copyWith(isLoading: true, error: () => null);
+    }
     try {
       var failed = 0;
       final results = await Future.wait([
@@ -118,11 +136,29 @@ class ScheduleController extends Notifier<ScheduleUiState> {
           ),
       ];
       state = state.copyWith(sections: sections, isLoading: false);
+      unawaited(DiskCache.write(_cacheKey, [
+        for (final d in sections) [for (final a in d.anime) PageCodec.animeToJson(a)],
+      ]));
     } catch (e) {
       if (!_alive || request != _request) return;
+      if (showingCache) return;
       final msg = errorMessage(e, 'Gagal memuat jadwal rilis');
       state = state.copyWith(isLoading: false, error: () => msg);
     }
+  }
+
+  /// Salinan tersimpan: 7 list (Senin..Minggu); null kalau tidak lengkap/kosong.
+  static List<DaySection>? _decodeWeek(Object? json) {
+    if (json is! List || json.length != days.length) return null;
+    final sections = [
+      for (var i = 0; i < days.length; i++)
+        DaySection(
+          dayIndex: i,
+          dayName: dayNames[i],
+          anime: PageCodec.animeList(json[i]),
+        ),
+    ];
+    return sections.every((d) => d.anime.isEmpty) ? null : sections;
   }
 
   /// Urut dari jam paling awal; yang tanpa jam di akhir.

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'core/lite_mode.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -19,6 +21,7 @@ import 'ui/components/mini_player.dart';
 import 'ui/route_observer.dart';
 import 'ui/components/announcement_popup.dart';
 import 'ui/screens/auth/auth_gate.dart';
+import 'ui/screens/chat/chat_session_cache.dart';
 import 'ui/screens/maintenance/maintenance_screen.dart';
 import 'ui/screens/notifications/push_host.dart';
 import 'ui/screens/security/ban_overlay.dart';
@@ -68,6 +71,8 @@ Future<void> _initBackend() async {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Salinan Chat Global dari HP dimuat di belakang (tidak menunda start).
+  unawaited(ChatSessionCache.restore());
   MediaKit.ensureInitialized();
   // Mode decoder yang pernah terbukti jalan di HP ini (anti layar hitam).
   await WpDecoder.load();

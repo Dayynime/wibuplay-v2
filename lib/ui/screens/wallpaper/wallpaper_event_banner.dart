@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../core/decor_tick.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/wallpaper_models.dart';
 
@@ -34,6 +35,9 @@ class _WallpaperEventBannerState extends State<WallpaperEventBanner> with Single
     vsync: this,
     duration: const Duration(milliseconds: 3200),
   );
+
+  /// Kilau digambar ulang maks DecorTick.fps (animasi tetap jalan).
+  late final Listenable _shineTick = DecorTick(_shine);
 
   DateTime get _now => DateTime.now().toUtc().add(widget.clockOffset);
 
@@ -134,7 +138,7 @@ class _WallpaperEventBannerState extends State<WallpaperEventBanner> with Single
               if (running)
                 Positioned.fill(
                   child: AnimatedBuilder(
-                    animation: _shine,
+                    animation: _shineTick,
                     builder: (_, __) {
                       final t = (_shine.value / 0.55).clamp(0.0, 1.0);
                       final x = -1.6 + t * 3.2;
