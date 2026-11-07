@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/constants.dart';
+import '../../core/image_cache.dart';
 import '../../core/lite_mode.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/api/anichin_network.dart';
@@ -72,6 +73,7 @@ class NetImage extends StatelessWidget {
 
   Widget _image(int? memW, int? memH) {
     return CachedNetworkImage(
+      cacheManager: AppImageCache.images,
       imageUrl: url,
       httpHeaders: _headersFor(url),
       memCacheWidth: memW,

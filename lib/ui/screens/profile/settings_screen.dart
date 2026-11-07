@@ -11,6 +11,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/build_flags.dart';
 import '../../../core/firebase_config.dart';
+import '../../../core/image_cache.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/account_models.dart';
 import '../../../data/models/chat_models.dart';
@@ -139,12 +140,8 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen>
     if (confirmed == true) await ref.read(authRepositoryProvider).signOut();
   }
 
-  /// Cache gambar di memori benar-benar dikosongkan (cache disk cover tidak disentuh).
-  void _clearCache() {
-    final cache = PaintingBinding.instance.imageCache;
-    cache.clear();
-    cache.clearLiveImages();
-  }
+  /// Cache gambar dikosongkan, di memori DAN di HP (disk).
+  Future<void> _clearCache() => AppImageCache.clearAll();
 
   // ---------------------------------------------------------------- helpers
 
@@ -1376,7 +1373,7 @@ class _QualityRow extends StatelessWidget {
 class _CacheRow extends StatefulWidget {
   const _CacheRow({required this.onClear});
 
-  final VoidCallback onClear;
+  final Future<void> Function() onClear;
 
   @override
   State<_CacheRow> createState() => _CacheRowState();
@@ -1384,14 +1381,43 @@ class _CacheRow extends StatefulWidget {
 
 class _CacheRowState extends State<_CacheRow> {
   bool _done = false;
+  bool _busy = false;
+
+  /// Ukuran cache gambar di HP; null = masih dihitung.
+  int? _bytes;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSize();
+  }
+
+  Future<void> _loadSize() async {
+    final b = await AppImageCache.diskBytes();
+    if (mounted) setState(() => _bytes = b);
+  }
 
   Future<void> _run() async {
-    if (_done) return;
-    widget.onClear();
+    if (_done || _busy) return;
+    setState(() => _busy = true);
+    await widget.onClear();
+    if (!mounted) return;
     HapticFeedback.lightImpact();
-    setState(() => _done = true);
+    setState(() {
+      _busy = false;
+      _done = true;
+    });
+    await _loadSize();
     await Future<void>.delayed(const Duration(milliseconds: 2200));
     if (mounted) setState(() => _done = false);
+  }
+
+  String get _subtitle {
+    if (_busy) return 'Membersihkan...';
+    if (_done) return 'Cache gambar sudah dikosongkan';
+    final b = _bytes;
+    if (b == null) return 'Menghitung ukuran cache...';
+    return 'Gambar tersimpan di HP: ${AppImageCache.formatBytes(b)}';
   }
 
   @override
@@ -1399,7 +1425,7 @@ class _CacheRowState extends State<_CacheRow> {
     return _SettingsRow(
       icon: Icons.cleaning_services_rounded,
       title: 'Bersihkan Cache',
-      subtitle: _done ? 'Cache memori sudah dikosongkan' : 'Kosongkan cache gambar di memori',
+      subtitle: _subtitle,
       onTap: _run,
       trailing: AnimatedSwitcher(
         duration: const Duration(milliseconds: 300),

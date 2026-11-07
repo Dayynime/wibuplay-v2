@@ -1,4 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../../core/image_cache.dart';
 import '../../../core/lite_mode.dart';
 import 'package:flutter/material.dart';
 
@@ -39,6 +40,7 @@ class DonghuaImage extends StatelessWidget {
 
   Widget _img(String url, int? memW, int? memH) {
     return CachedNetworkImage(
+      cacheManager: AppImageCache.images,
       imageUrl: url,
       httpHeaders: AnichinNetwork.imageHeaders,
       memCacheWidth: memW,

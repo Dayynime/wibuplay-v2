@@ -1,6 +1,8 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/decor_tick.dart';
+import '../../core/image_cache.dart';
 import '../../core/theme/app_colors.dart';
 import 'avatar_frame.dart';
 
@@ -296,12 +298,14 @@ class UserAvatar extends StatelessWidget {
       ),
       alignment: Alignment.center,
       child: has
-          ? Image.network(
-              url!,
+          ? CachedNetworkImage(
+              cacheManager: AppImageCache.images,
+              imageUrl: url!,
               width: size,
               height: size,
+              memCacheWidth: (size * MediaQuery.devicePixelRatioOf(context)).round(),
               fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => _letter(),
+              errorWidget: (_, __, ___) => _letter(),
             )
           : _letter(),
     );

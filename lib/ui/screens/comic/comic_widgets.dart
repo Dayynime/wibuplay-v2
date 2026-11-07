@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
+import '../../../core/image_cache.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/api/comic_network.dart';
 import '../../../data/models/comic_models.dart';
@@ -56,7 +57,7 @@ class ComicImage extends StatelessWidget {
     if (maxSide != null) {
       return Image(
         image: ResizeImage(
-          CachedNetworkImageProvider(u, headers: ComicNetwork.imageHeaders),
+          CachedNetworkImageProvider(u, cacheManager: AppImageCache.images, headers: ComicNetwork.imageHeaders),
           width: maxSide,
           height: maxSide,
           policy: ResizeImagePolicy.fit,
@@ -78,6 +79,7 @@ class ComicImage extends StatelessWidget {
       );
     }
     return CachedNetworkImage(
+      cacheManager: AppImageCache.images,
       imageUrl: u,
       httpHeaders: ComicNetwork.imageHeaders,
       fit: fit,
@@ -149,7 +151,7 @@ class _ComicCoverImageState extends State<ComicCoverImage> {
       return;
     }
     final provider = ResizeImage(
-      CachedNetworkImageProvider(u, headers: ComicNetwork.imageHeaders),
+      CachedNetworkImageProvider(u, cacheManager: AppImageCache.images, headers: ComicNetwork.imageHeaders),
       width: widget.maxSide,
       height: widget.maxSide,
       policy: ResizeImagePolicy.fit,

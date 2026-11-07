@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../../core/image_cache.dart';
 import '../../../core/lite_mode.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -948,7 +949,7 @@ class ChatMessageBubble extends StatelessWidget {
         backgroundColor: AppColors.surfaceVariantDark,
         backgroundImage: (avatarUrl != null && avatarUrl!.isNotEmpty)
             ? ResizeImage.resizeIfNeeded(
-                LiteMode.px(context, 32), null, CachedNetworkImageProvider(avatarUrl!))
+                LiteMode.px(context, 32), null, CachedNetworkImageProvider(avatarUrl!, cacheManager: AppImageCache.images))
             : null,
         child: (avatarUrl == null || avatarUrl!.isEmpty)
             ? Text(
@@ -1280,6 +1281,7 @@ class _ChatProfileDialogState extends ConsumerState<_ChatProfileDialog> {
                             color: AppColors.backgroundDark,
                             child: hasAvatar
                                 ? CachedNetworkImage(
+                                    cacheManager: AppImageCache.images,
                                     imageUrl: _avatarUrl!,
                                     memCacheWidth: LiteMode.px(context, 84),
                                     fit: BoxFit.cover,

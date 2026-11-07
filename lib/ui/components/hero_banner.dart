@@ -1,4 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../core/image_cache.dart';
 import '../../core/lite_mode.dart';
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/material.dart';
@@ -115,7 +116,7 @@ class _HeroBannerState extends State<HeroBanner> with SingleTickerProviderStateM
       ResizeImage.resizeIfNeeded(
         LiteMode.px(context, MediaQuery.sizeOf(context).width),
         null,
-        CachedNetworkImageProvider(url, headers: netImageHeaders),
+        CachedNetworkImageProvider(url, cacheManager: AppImageCache.images, headers: netImageHeaders),
       ),
       context,
       onError: (_, __) {},

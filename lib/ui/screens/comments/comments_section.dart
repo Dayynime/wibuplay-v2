@@ -1,4 +1,5 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../../core/image_cache.dart';
 import '../../../core/lite_mode.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -934,6 +935,7 @@ class CommentWallpaperFrame extends StatelessWidget {
           children: [
             Positioned.fill(
               child: CachedNetworkImage(
+                cacheManager: AppImageCache.images,
                 imageUrl: wallpaper.url,
                 memCacheWidth: LiteMode.px(context, MediaQuery.sizeOf(context).width),
                 fit: BoxFit.cover,

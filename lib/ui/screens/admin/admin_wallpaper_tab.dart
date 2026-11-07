@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../core/image_cache.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/wallpaper_models.dart';
 import '../../../data/repository/admin_repository.dart' show AdminException;
@@ -250,7 +251,7 @@ class _AdminWallpaperTabState extends ConsumerState<AdminWallpaperTab> {
           children: [
             ClipRRect(
               borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-              child: CachedNetworkImage(imageUrl: url, fit: BoxFit.contain),
+              child: CachedNetworkImage(cacheManager: AppImageCache.images, imageUrl: url, fit: BoxFit.contain),
             ),
             Padding(
               padding: const EdgeInsets.all(12),
@@ -576,6 +577,7 @@ class _AdminWallpaperTabState extends ConsumerState<AdminWallpaperTab> {
                               child: Icon(Icons.image_not_supported_outlined, color: AppColors.textMuted),
                             )
                           : CachedNetworkImage(
+                              cacheManager: AppImageCache.images,
                               imageUrl: w.previewUrl!,
                               fit: BoxFit.cover,
                               errorWidget: (_, __, ___) =>

@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/firebase_config.dart';
+import '../../../core/image_cache.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/repository/auth_repository.dart';
 import '../../../providers.dart';
@@ -780,6 +781,7 @@ class _PosterRail extends StatelessWidget {
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(16),
                   child: CachedNetworkImage(
+                    cacheManager: AppImageCache.images,
                     imageUrl: url,
                     fit: BoxFit.cover,
                     memCacheWidth: cacheW,

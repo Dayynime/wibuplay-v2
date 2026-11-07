@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/image_cache.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/wallpaper_models.dart';
 import '../../../data/repository/wallpaper_repository.dart';
@@ -626,6 +627,7 @@ class _EventEditorState extends ConsumerState<_EventEditor> {
                     children: [
                       if (c.previewUrl != null)
                         CachedNetworkImage(
+                          cacheManager: AppImageCache.images,
                           imageUrl: c.previewUrl!,
                           fit: BoxFit.cover,
                           errorWidget: (_, __, ___) => const ColoredBox(color: AppColors.surfaceVariantDark),

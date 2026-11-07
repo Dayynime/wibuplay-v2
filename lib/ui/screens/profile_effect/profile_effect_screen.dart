@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/image_cache.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/account_models.dart' show formatZCoin;
 import '../../../data/models/avatar_frame_models.dart' show AvatarFrameTier;
@@ -562,7 +563,7 @@ class _EffectThumb extends StatelessWidget {
     );
     if (url == null) return fallback;
     return Image(
-      image: CachedNetworkImageProvider(url),
+      image: CachedNetworkImageProvider(url, cacheManager: AppImageCache.images),
       fit: BoxFit.cover,
       gaplessPlayback: true,
       filterQuality: FilterQuality.medium,

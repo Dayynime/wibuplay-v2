@@ -1,5 +1,6 @@
 import 'dart:async';
 import '../../../core/decor_tick.dart';
+import '../../../core/image_cache.dart';
 import '../../../core/lite_mode.dart';
 import 'dart:math' as math;
 
@@ -244,13 +245,14 @@ class GachaBanner extends StatelessWidget {
           duration: const Duration(milliseconds: 800),
           switchInCurve: Curves.easeOut,
           child: CachedNetworkImage(
+            cacheManager: AppImageCache.images,
             key: ValueKey(w.id),
             imageUrl: w.url,
             memCacheWidth: LiteMode.decodeCap,
             fit: BoxFit.cover,
             width: double.infinity,
             height: double.infinity,
-            placeholder: (_, __) => CachedNetworkImage(imageUrl: w.previewUrl, fit: BoxFit.cover),
+            placeholder: (_, __) => CachedNetworkImage(cacheManager: AppImageCache.images, imageUrl: w.previewUrl, fit: BoxFit.cover),
             errorWidget: (_, __, ___) => const ColoredBox(color: AppColors.surfaceVariantDark),
           ),
         ),
@@ -691,6 +693,7 @@ class GachaFeaturedRow extends StatelessWidget {
                         fit: StackFit.expand,
                         children: [
                           CachedNetworkImage(
+                            cacheManager: AppImageCache.images,
                             imageUrl: w.previewUrl,
                             memCacheWidth: LiteMode.px(context, MediaQuery.sizeOf(context).width / 2),
                             fit: BoxFit.cover,
@@ -933,6 +936,7 @@ class GachaOddsList extends StatelessWidget {
                   width: 60,
                   height: 38,
                   child: CachedNetworkImage(
+                    cacheManager: AppImageCache.images,
                     imageUrl: w.previewUrl,
                     memCacheWidth: LiteMode.px(context, 60),
                     fit: BoxFit.cover,

@@ -1,8 +1,10 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/build_flags.dart';
+import '../../../core/image_cache.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/repository/safety_repository.dart';
 import '../../../providers.dart';
@@ -415,7 +417,7 @@ class _BlockedUsersScreenState extends ConsumerState<BlockedUsersScreen> {
                 leading: CircleAvatar(
                   backgroundColor: AppColors.surfaceDark,
                   backgroundImage:
-                      (u.avatarUrl ?? '').isEmpty ? null : NetworkImage(u.avatarUrl!),
+                      (u.avatarUrl ?? '').isEmpty ? null : CachedNetworkImageProvider(u.avatarUrl!, cacheManager: AppImageCache.images),
                   child: (u.avatarUrl ?? '').isEmpty
                       ? Text(name.characters.first.toUpperCase(),
                           style: const TextStyle(color: AppColors.textWhite))

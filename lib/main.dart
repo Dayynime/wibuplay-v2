@@ -10,6 +10,7 @@ import 'package:media_kit/media_kit.dart';
 
 import 'core/wp_video.dart';
 import 'core/firebase_config.dart';
+import 'core/image_cache.dart';
 import 'core/remote_config_manager.dart';
 import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
@@ -73,6 +74,9 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   // Salinan Chat Global dari HP dimuat di belakang (tidak menunda start).
   unawaited(ChatSessionCache.restore());
+  // Sekali setelah update: buang cache gambar bawaan lama (sudah diganti
+  // AppImageCache), tanpa menunda start.
+  unawaited(AppImageCache.migrateOnce());
   MediaKit.ensureInitialized();
   // Mode decoder yang pernah terbukti jalan di HP ini (anti layar hitam).
   await WpDecoder.load();

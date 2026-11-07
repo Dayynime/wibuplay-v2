@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
+import '../../../core/image_cache.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/api/comic_network.dart';
 import '../../../data/models/comic_models.dart';
@@ -463,6 +464,7 @@ class _ComicPageState extends State<ComicPage> {
     final px = (mq.size.width * mq.devicePixelRatio).round().clamp(360, 1440);
 
     return CachedNetworkImage(
+      cacheManager: AppImageCache.comicPages,
       key: ValueKey('$url#$_attempt'),
       imageUrl: url,
       httpHeaders: ComicNetwork.imageHeaders,

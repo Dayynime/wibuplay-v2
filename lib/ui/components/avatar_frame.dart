@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import '../../core/image_cache.dart';
 import '../../core/lite_mode.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -89,7 +90,7 @@ ImageProvider? avatarFrameImage(String? id) {
   final asset = avatarFrameAsset(id);
   if (asset != null) return AssetImage(asset);
   final url = avatarFrameUrl(id);
-  if (url != null) return CachedNetworkImageProvider(url);
+  if (url != null) return CachedNetworkImageProvider(url, cacheManager: AppImageCache.images);
   return null;
 }
 

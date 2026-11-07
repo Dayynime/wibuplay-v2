@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../../core/image_cache.dart';
 import '../../../core/lite_mode.dart';
 import 'dart:math' as math;
 
@@ -764,6 +765,7 @@ class _CollectionViewState extends State<_CollectionView> {
                                 width: 72,
                                 height: 46,
                                 child: CachedNetworkImage(
+                                  cacheManager: AppImageCache.images,
                                   imageUrl: equipped.previewUrl,
                                   memCacheWidth: LiteMode.px(context, 72),
                                   fit: BoxFit.cover,
@@ -946,6 +948,7 @@ class _CollectionCard extends StatelessWidget {
             fit: StackFit.expand,
             children: [
               CachedNetworkImage(
+                cacheManager: AppImageCache.images,
                 imageUrl: item.previewUrl,
                 memCacheWidth: LiteMode.px(context, MediaQuery.sizeOf(context).width / 2),
                 fit: BoxFit.cover,
@@ -1545,6 +1548,7 @@ class _RevealCard extends StatelessWidget {
           fit: StackFit.expand,
           children: [
             CachedNetworkImage(
+              cacheManager: AppImageCache.images,
               imageUrl: large ? w.url : w.previewUrl,
               memCacheWidth: large ? LiteMode.decodeCap : LiteMode.decodeCap ~/ 2,
               fit: BoxFit.cover,
@@ -1894,10 +1898,11 @@ class _CatalogPageState extends State<_CatalogPage> {
                   child: AspectRatio(
                     aspectRatio: 16 / 9,
                     child: CachedNetworkImage(
+                      cacheManager: AppImageCache.images,
                       imageUrl: w.url,
                       memCacheWidth: LiteMode.px(context, MediaQuery.sizeOf(context).width),
                       fit: BoxFit.cover,
-                      placeholder: (_, __) => CachedNetworkImage(imageUrl: w.previewUrl, fit: BoxFit.cover),
+                      placeholder: (_, __) => CachedNetworkImage(cacheManager: AppImageCache.images, imageUrl: w.previewUrl, fit: BoxFit.cover),
                       errorWidget: (_, __, ___) => const ColoredBox(color: AppColors.surfaceDark),
                     ),
                   ),
@@ -2115,6 +2120,7 @@ class _CatalogCard extends StatelessWidget {
                     fit: StackFit.expand,
                     children: [
                       CachedNetworkImage(
+                        cacheManager: AppImageCache.images,
                         imageUrl: item.previewUrl,
                         memCacheWidth: LiteMode.px(context, MediaQuery.sizeOf(context).width / 2),
                         fit: BoxFit.cover,

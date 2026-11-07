@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/image_cache.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/avatar_frame_models.dart';
 import '../../../data/models/profile_effect_models.dart';
@@ -189,6 +190,7 @@ class GachaPreview extends ConsumerWidget {
           fit: StackFit.expand,
           children: [
             CachedNetworkImage(
+              cacheManager: AppImageCache.images,
               imageUrl: w.previewUrl,
               fit: BoxFit.cover,
               placeholder: (_, __) => const ColoredBox(color: AppColors.surfaceVariantDark),
@@ -363,6 +365,7 @@ class EffectPreview extends ConsumerWidget {
                 height: 82,
                 child: banner != null && banner.isNotEmpty
                     ? CachedNetworkImage(
+                        cacheManager: AppImageCache.images,
                         imageUrl: banner,
                         fit: BoxFit.cover,
                         errorWidget: (_, __, ___) => const _BannerFallback(),

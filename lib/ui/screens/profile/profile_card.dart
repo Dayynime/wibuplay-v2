@@ -12,6 +12,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../core/decor_tick.dart';
+import '../../../core/image_cache.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/local/entities.dart';
 import '../../../providers.dart';
@@ -134,7 +135,7 @@ class _ProfileCardPageState extends ConsumerState<_ProfileCardPage> with TickerP
   /// Gambar yang tampil di kartu dimuat dulu supaya tidak tertangkap kosong.
   Future<void> _precache(List<String> urls) async {
     await Future.wait(urls.where((u) => u.isNotEmpty).map(
-          (u) => precacheImage(CachedNetworkImageProvider(u, headers: netImageHeaders), context)
+          (u) => precacheImage(CachedNetworkImageProvider(u, cacheManager: AppImageCache.images, headers: netImageHeaders), context)
               .catchError((Object _) {}),
         ));
     await Future<void>.delayed(const Duration(milliseconds: 350));
