@@ -27,6 +27,7 @@ import '../comments/comments_section.dart';
 import '../download/download_actions.dart';
 import '../../../data/repository/nobar_repository.dart';
 import '../nobar/nobar_lobby_screen.dart' show openNobarRoom;
+import 'danmaku.dart';
 import 'player_controller.dart';
 import 'player_gestures.dart';
 import 'player_settings_sheet.dart';
@@ -112,6 +113,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     with WidgetsBindingObserver {
   /// false saat app di background: detik itu tidak dihitung untuk XP.
   bool _inForeground = true;
+
+  /// Danmaku (komentar melayang) episode yang sedang diputar.
+  late final DanmakuController _dm = DanmakuController(ref.read(supabaseDioProvider));
 
   WpVideoController? _vc;
   String? _loadedLink;
@@ -211,6 +215,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
   @override
   void dispose() {
     ReviewPrompter.onPlayerClosed();
+    _dm.dispose();
     WidgetsBinding.instance.removeObserver(this);
     WatchXpGate.release(this);
     _hideTimer?.cancel();
@@ -758,6 +763,17 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     if (mounted) setState(() {});
   }
 
+  void _openDanmaku() {
+    _hideTimer?.cancel();
+    showDanmakuSheet(
+      context,
+      controller: _dm,
+      positionMs: _vc?.value.position.inMilliseconds ?? 0,
+    ).whenComplete(() {
+      if (mounted) _scheduleHide();
+    });
+  }
+
   void _openSettingsSheet() {
     final store = ref.read(localStoreProvider);
     showPlayerSettingsSheet(
@@ -1106,6 +1122,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
   @override
   Widget build(BuildContext context) {
     final ui = ref.watch(playerControllerProvider(_args));
+    if (ui.currentEpisodeId.trim().isNotEmpty) _dm.setKey('a:${ui.currentEpisodeId.trim()}');
     final isFavorite = ref.watch(localStoreProvider.select((s) => s.isFavorite(ui.movieId)));
 
     final premium = ref.watch(myPremiumProvider);
@@ -1170,7 +1187,13 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
       child: Center(
         child: AspectRatio(
           aspectRatio: ratio > 0 ? ratio : 16 / 9,
-          child: WpVideoView(vc),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              WpVideoView(vc),
+              if (!_inPip) DanmakuLayer(controller: _dm, video: vc, speed: _speed),
+            ],
+          ),
         ),
       ),
     );
@@ -1207,6 +1230,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
               onOpenServers: _openServerSheet,
               onOpenSettings: _openSettingsSheet,
               onEnterPip: _enterPip,
+              onDanmaku: _openDanmaku,
               onLock: fullscreen ? _lockScreen : null,
               onOpenEpisodes: fullscreen
                   ? () => setState(() {
@@ -1942,6 +1966,7 @@ class PlayerControlsOverlay extends StatefulWidget {
     required this.onDoubleTapRight,
     required this.onToggleOverlay,
     required this.onBack,
+    this.onDanmaku,
   });
 
   final PlayerPlayback pb;
@@ -1974,6 +1999,9 @@ class PlayerControlsOverlay extends StatefulWidget {
   final VoidCallback onDoubleTapRight;
   final VoidCallback onToggleOverlay;
   final VoidCallback onBack;
+
+  /// Buka lembar danmaku (null = tombol DM disembunyikan).
+  final VoidCallback? onDanmaku;
 
   @override
   State<PlayerControlsOverlay> createState() => PlayerControlsOverlayState();
@@ -2066,6 +2094,10 @@ class PlayerControlsOverlayState extends State<PlayerControlsOverlay> {
                                   ),
                                 ),
                                 const SizedBox(width: 10),
+                              ],
+                              if (widget.onDanmaku != null) ...[
+                                DanmakuToggleIcon(onTap: widget.onDanmaku!),
+                                const SizedBox(width: 12),
                               ],
                               GestureDetector(
                                 onTap: widget.onEnterPip,

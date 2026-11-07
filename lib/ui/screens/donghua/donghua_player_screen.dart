@@ -27,6 +27,7 @@ import '../comments/comments_section.dart';
 import '../download/download_actions.dart'
     show confirmDeleteDownload, downloadStateHighlight, downloadStateIcon, downloadStateLabel;
 import '../player/player_gestures.dart';
+import '../player/danmaku.dart';
 import '../player/player_screen.dart';
 import '../player/quality_sheet.dart';
 import 'donghua_widgets.dart';
@@ -92,6 +93,9 @@ class _DonghuaPlayerScreenState extends ConsumerState<DonghuaPlayerScreen>
     with WidgetsBindingObserver {
   /// false saat app di background: detik itu tidak dihitung untuk XP.
   bool _inForeground = true;
+
+  /// Danmaku (komentar melayang) episode yang sedang diputar.
+  late final DanmakuController _dm = DanmakuController(ref.read(supabaseDioProvider));
 
   WpVideoController? _vc;
   String? _loadedUrl;
@@ -165,6 +169,7 @@ class _DonghuaPlayerScreenState extends ConsumerState<DonghuaPlayerScreen>
   @override
   void dispose() {
     ReviewPrompter.onPlayerClosed();
+    _dm.dispose();
     _saveHistory();
     WidgetsBinding.instance.removeObserver(this);
     WatchXpGate.release(this);
@@ -507,6 +512,14 @@ class _DonghuaPlayerScreenState extends ConsumerState<DonghuaPlayerScreen>
       ..showSnackBar(SnackBar(content: Text(text)));
   }
 
+  void _openDanmaku() {
+    showDanmakuSheet(
+      context,
+      controller: _dm,
+      positionMs: _vc?.value.position.inMilliseconds ?? 0,
+    );
+  }
+
   void _openSpeedSheet() {
     const speeds = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
     showGlassSheet<void>(
@@ -778,6 +791,7 @@ class _DonghuaPlayerScreenState extends ConsumerState<DonghuaPlayerScreen>
   @override
   Widget build(BuildContext context) {
     final slug = widget.slug;
+    _dm.setKey('d:$slug');
     final videoAsync = ref.watch(donghuaVideoProvider(slug));
     final episodeAsync = ref.watch(donghuaEpisodeProvider(slug));
     final premium = ref.watch(myPremiumProvider).valueOrNull;
@@ -992,7 +1006,13 @@ class _DonghuaPlayerScreenState extends ConsumerState<DonghuaPlayerScreen>
       child: Center(
         child: AspectRatio(
           aspectRatio: ratio > 0 ? ratio : 16 / 9,
-          child: WpVideoView(vc),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              WpVideoView(vc),
+              if (!_inPip) DanmakuLayer(controller: _dm, video: vc, speed: _speed),
+            ],
+          ),
         ),
       ),
     );
@@ -1044,6 +1064,7 @@ class _DonghuaPlayerScreenState extends ConsumerState<DonghuaPlayerScreen>
                       onOpenServers: () => _openQualitySheet(medias, selectedQuality, premium),
                       onOpenSettings: _openSpeedSheet,
                       onEnterPip: _enterPip,
+                      onDanmaku: _openDanmaku,
                       onLock: _fullscreen ? _lockScreen : null,
                       onOpenEpisodes: _fullscreen
                           ? () => setState(() {
