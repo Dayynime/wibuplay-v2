@@ -313,7 +313,8 @@ class _DonghuaPlayerScreenState extends ConsumerState<DonghuaPlayerScreen>
     if (_tickCount % 5 == 0) _saveHistory();
     // XP nonton: hanya detik aktif (playing, tidak buffering, app di depan).
     // Hitungan XP global lewat WatchXpGate (bukan per player).
-    if (_inForeground && !vc.value.isBuffering && WatchXpGate.onActiveSecond(this)) {
+    // PiP (jendela kecil di atas app lain) tetap dihitung.
+    if ((_inForeground || _inPip) && !vc.value.isBuffering && WatchXpGate.onActiveSecond(this)) {
       unawaited(
         ref.read(xpRepositoryProvider).sendHeartbeat(minutes: 1).then((ok) {
           if (ok && mounted) ref.invalidate(myXpProvider);

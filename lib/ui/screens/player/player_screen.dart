@@ -605,8 +605,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
       _notifier.saveProgress(vc.value.position.inMilliseconds, dur);
     }
 
-    // XP nonton: hanya detik aktif (playing, tidak buffering, app di depan).
-    if (_inForeground && !vc.value.isBuffering && WatchXpGate.onActiveSecond(this)) {
+    // XP nonton: hanya detik aktif (playing, tidak buffering, app di depan
+    // ATAU sedang diputar di jendela PiP di atas app lain).
+    if ((_inForeground || _inPip) && !vc.value.isBuffering && WatchXpGate.onActiveSecond(this)) {
       unawaited(
         ref.read(xpRepositoryProvider).sendHeartbeat(minutes: 1).then((ok) {
           // Segarkan kartu XP di Profil begitu server menerima heartbeat.
