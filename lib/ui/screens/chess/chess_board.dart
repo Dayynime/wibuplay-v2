@@ -690,7 +690,7 @@ class _BoardPainter extends CustomPainter {
         final rank = flipped ? r + 1 : 8 - r;
         final name = '${_files[file]}$rank';
         final rect = Rect.fromLTWH(c * sq, r * sq, sq, sq);
-        final isLight = (file + rank) % 2 == 1;
+        final isLight = (file + rank) % 2 == 0; // a1 gelap, h1 terang
         canvas.drawRect(rect, isLight ? lightP : darkP);
 
         if (name == lastFrom || name == lastTo) {
