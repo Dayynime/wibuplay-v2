@@ -44,6 +44,89 @@ class ChessRealtimeClient {
   int _generation = 0;
   String? _joinRef;
 
+  // ------------------------------------------------------------ presence
+  /// Data presence diriku (mis. {'role': 'spectator'}); dikirim tiap join.
+  Map<String, dynamic>? _presenceMeta;
+
+  /// key presence -> daftar meta (satu key bisa punya beberapa koneksi).
+  final Map<String, List<Map<String, dynamic>>> _presence = {};
+
+  /// Jumlah penonton (role 'spectator') yang sedang membuka topik ini.
+  final ValueNotifier<int> spectators = ValueNotifier<int>(0);
+
+  /// Ikut "absen" di channel ini supaya terhitung (Supabase Realtime Presence).
+  void track(Map<String, dynamic> meta) {
+    _presenceMeta = meta;
+    if (_joined) _sendTrack();
+  }
+
+  void _sendTrack() {
+    final ch = _channel;
+    final meta = _presenceMeta;
+    if (ch == null || meta == null) return;
+    try {
+      ch.sink.add(jsonEncode({
+        'topic': _fullTopic,
+        'event': 'presence',
+        'payload': {'type': 'presence', 'event': 'track', 'payload': meta},
+        'ref': _nextRef(),
+      }));
+    } catch (_) {}
+  }
+
+  void _recountPresence() {
+    var n = 0;
+    for (final metas in _presence.values) {
+      if (metas.any((m) => m['role'] == 'spectator')) n++;
+    }
+    if (spectators.value != n) spectators.value = n;
+  }
+
+  static List<Map<String, dynamic>> _metasOf(dynamic v) {
+    final metas = v is Map ? v['metas'] : null;
+    return metas is List
+        ? metas.whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList()
+        : <Map<String, dynamic>>[];
+  }
+
+  void _onPresenceState(dynamic payload) {
+    _presence.clear();
+    if (payload is Map) {
+      payload.forEach((k, v) {
+        final metas = _metasOf(v);
+        if (k is String && metas.isNotEmpty) _presence[k] = metas;
+      });
+    }
+    _recountPresence();
+  }
+
+  void _onPresenceDiff(dynamic payload) {
+    if (payload is! Map) return;
+    final joins = payload['joins'];
+    final leaves = payload['leaves'];
+    if (joins is Map) {
+      joins.forEach((k, v) {
+        if (k is! String) return;
+        final list = _presence.putIfAbsent(k, () => []);
+        for (final m in _metasOf(v)) {
+          list.removeWhere((x) => x['phx_ref'] != null && x['phx_ref'] == m['phx_ref']);
+          list.add(m);
+        }
+      });
+    }
+    if (leaves is Map) {
+      leaves.forEach((k, v) {
+        if (k is! String) return;
+        final list = _presence[k];
+        if (list == null) return;
+        final refs = _metasOf(v).map((m) => m['phx_ref']).toSet();
+        list.removeWhere((x) => refs.contains(x['phx_ref']));
+        if (list.isEmpty) _presence.remove(k);
+      });
+    }
+    _recountPresence();
+  }
+
   String get _fullTopic => 'realtime:$topic';
 
   /// Ping dari server (payload hanya petunjuk, jangan dipercaya).
@@ -96,6 +179,9 @@ class ChessRealtimeClient {
     } catch (_) {}
     _channel = null;
     if (!_messages.isClosed) await _messages.close();
+    try {
+      spectators.dispose();
+    } catch (_) {}
   }
 
   void _connect() {
@@ -146,7 +232,7 @@ class ChessRealtimeClient {
       'payload': {
         'config': {
           'broadcast': {'self': false, 'ack': false},
-          'presence': {'key': ''},
+          'presence': {'key': '', 'enabled': true},
           'postgres_changes': <dynamic>[],
           'private': false,
         },
@@ -180,6 +266,8 @@ class ChessRealtimeClient {
           final payload = json['payload'];
           if (payload is Map && payload['status'] == 'ok') {
             _joined = true;
+            _presence.clear();
+            if (_presenceMeta != null) _sendTrack();
             onJoined?.call();
           }
         }
@@ -187,6 +275,14 @@ class ChessRealtimeClient {
       }
       if (event == 'phx_close' || event == 'phx_error') {
         _scheduleReconnect();
+        return;
+      }
+      if (event == 'presence_state') {
+        _onPresenceState(json['payload']);
+        return;
+      }
+      if (event == 'presence_diff') {
+        _onPresenceDiff(json['payload']);
         return;
       }
       if (event != 'broadcast') return;

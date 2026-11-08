@@ -52,6 +52,14 @@ class ChessRepository {
     return ChessLobby.fromJson(d);
   }
 
+  /// Permainan orang lain yang sedang berjalan (untuk ditonton).
+  Future<List<ChessGame>> live() async {
+    final d = await _call({'action': 'live'}, 'Gagal memuat permainan yang berlangsung');
+    final list = d['games'];
+    if (list is! List) return const [];
+    return list.whereType<Map>().map((e) => ChessGame.fromJson(Map<String, dynamic>.from(e))).toList();
+  }
+
   Future<ChessGame> get(String id) async {
     const f = 'Gagal memuat permainan';
     return _game(await _call({'action': 'get', 'id': id}, f), f);

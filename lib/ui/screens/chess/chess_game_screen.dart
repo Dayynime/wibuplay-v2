@@ -66,6 +66,12 @@ class _ChessGameScreenState extends ConsumerState<ChessGameScreen> with WidgetsB
 
   final ScrollController _movesScroll = ScrollController();
 
+  /// Sudah "absen" di presence channel permainan (pemain / penonton).
+  bool _tracked = false;
+
+  /// true = aku bukan pemain, cuma menonton.
+  bool _isSpectator(ChessGame g) => g.myColor == null && !g.isWaiting;
+
   String? get _uid => ref.read(authUserProvider).valueOrNull?.uid;
 
   @override
@@ -153,6 +159,7 @@ class _ChessGameScreenState extends ConsumerState<ChessGameScreen> with WidgetsB
       if (!mounted || seq != _loadSeq) return;
       if (_pendingUci != null) return; // jawaban langkah yang sedang dikirim yang dipakai
       _apply(g);
+      _trackPresence(g);
     } on ChessException catch (e) {
       if (!mounted || seq != _loadSeq) return;
       if (_game == null) {
@@ -194,6 +201,13 @@ class _ChessGameScreenState extends ConsumerState<ChessGameScreen> with WidgetsB
       }
     });
     if (newMove) _scrollMovesToEnd();
+  }
+
+  /// Ikut dihitung di presence channel: penonton menambah angka 👁.
+  void _trackPresence(ChessGame g) {
+    if (_tracked || _rt == null || g.isWaiting) return;
+    _tracked = true;
+    _rt!.track({'role': _isSpectator(g) ? 'spectator' : 'player'});
   }
 
   /// Siapkan panggilan suara kalau aku pemain dan lawan sudah ada.
@@ -445,6 +459,39 @@ class _ChessGameScreenState extends ConsumerState<ChessGameScreen> with WidgetsB
           style: const TextStyle(color: AppColors.textWhite, fontSize: 18, fontWeight: FontWeight.w700),
         ),
         actions: [
+          if (g != null && !g.isWaiting && _rt != null)
+            ValueListenableBuilder<int>(
+              valueListenable: _rt!.spectators,
+              builder: (_, n, __) => Padding(
+                padding: const EdgeInsets.only(right: 6),
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(20),
+                      color: Colors.white.withValues(alpha: 0.08),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.visibility_rounded, size: 16, color: AppColors.textWhite),
+                        const SizedBox(width: 5),
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 250),
+                          transitionBuilder: (c, a) => ScaleTransition(scale: a, child: c),
+                          child: Text(
+                            '$n',
+                            key: ValueKey(n),
+                            style: const TextStyle(color: AppColors.textWhite, fontWeight: FontWeight.w800, fontSize: 13),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
           if (g != null && g.isActive && g.myColor != null)
             PopupMenuButton<String>(
               tooltip: 'Opsi permainan',
@@ -596,7 +643,14 @@ class _ChessGameScreenState extends ConsumerState<ChessGameScreen> with WidgetsB
             ),
           ),
           const SizedBox(height: 8),
-          _PlayerBar(player: me, color: myColor, game: g, tick: _tick, placeholder: 'Kamu', isMe: true),
+          _PlayerBar(
+            player: me,
+            color: myColor,
+            game: g,
+            tick: _tick,
+            placeholder: _isSpectator(g) ? 'Putih' : 'Kamu',
+            isMe: !_isSpectator(g),
+          ),
           const SizedBox(height: 12),
           if (_voice != null) ...[
             ChessVoiceBar(call: _voice!, opponentName: opp?.username ?? 'Lawan', tick: _tick),
@@ -616,6 +670,36 @@ class _ChessGameScreenState extends ConsumerState<ChessGameScreen> with WidgetsB
   }
 
   List<Widget> _activeExtras(ChessGame g) {
+    if (_isSpectator(g)) {
+      final side = g.turn == 'w' ? (g.white?.username ?? 'Putih') : (g.black?.username ?? 'Hitam');
+      return [
+        Center(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(30),
+              color: Colors.white.withValues(alpha: 0.06),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.visibility_rounded, size: 16, color: AppColors.textSecondary),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    g.inCheck ? 'Kamu menonton · Skak! Giliran $side' : 'Kamu menonton · Giliran $side',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: AppColors.textWhite, fontSize: 13.5, fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ];
+    }
     final out = <Widget>[];
     final oppOffer = g.drawOfferBy != null && g.drawOfferBy != g.myColor;
     if (oppOffer) {
@@ -809,6 +893,43 @@ class _ChessGameScreenState extends ConsumerState<ChessGameScreen> with WidgetsB
   }
 
   Widget _resultCard(ChessGame g) {
+    if (_isSpectator(g)) {
+      final title = switch (g.result) {
+        '1-0' => '${g.white?.username ?? 'Putih'} menang',
+        '0-1' => '${g.black?.username ?? 'Hitam'} menang',
+        '1/2-1/2' => 'Remis',
+        _ => g.status == ChessStatus.aborted ? 'Dibatalkan' : 'Selesai',
+      };
+      return Container(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          color: AppColors.surfaceCard,
+          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.flag_rounded, color: AppColors.textSecondary, size: 24),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(color: AppColors.textWhite, fontSize: 20, fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(chessEndText(g), style: const TextStyle(color: AppColors.textSecondary, fontSize: 13.5)),
+            const SizedBox(height: 14),
+            _SmallButton(label: 'Kembali ke lobby', onTap: () => Navigator.of(context).maybePop()),
+          ],
+        ),
+      );
+    }
     final outcome = g.outcomeFor(g.myColor);
     final title = switch (outcome) {
       'win' => 'Kamu menang!',

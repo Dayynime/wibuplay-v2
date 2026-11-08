@@ -34,6 +34,9 @@ class _ChessLobbyScreenState extends ConsumerState<ChessLobbyScreen> with Widget
   Timer? _poll;
 
   ChessLobby? _lobby;
+
+  /// Permainan orang lain yang sedang berlangsung (bisa ditonton).
+  List<ChessGame> _live = const [];
   String? _error;
   bool _busy = false;
   bool _inGame = false;
@@ -58,7 +61,9 @@ class _ChessLobbyScreenState extends ConsumerState<ChessLobbyScreen> with Widget
       _rt!.start();
     }
     _poll = Timer.periodic(const Duration(seconds: 20), (_) {
-      if (!_inGame && !(_rt?.isJoined ?? false)) _load(silent: true);
+      if (_inGame) return;
+      if (!(_rt?.isJoined ?? false)) _load(silent: true);
+      _loadLive();
     });
   }
 
@@ -84,7 +89,17 @@ class _ChessLobbyScreenState extends ConsumerState<ChessLobbyScreen> with Widget
     _debounce = Timer(const Duration(milliseconds: 250), () => _load(silent: true));
   }
 
+  Future<void> _loadLive() async {
+    try {
+      final live = await _repo.live();
+      if (mounted) setState(() => _live = live);
+    } catch (_) {
+      // Daftar tontonan cuma pelengkap.
+    }
+  }
+
   Future<void> _load({bool silent = false}) async {
+    unawaited(_loadLive());
     final seq = ++_loadSeq;
     try {
       final lobby = await _repo.lobby();
@@ -191,6 +206,7 @@ class _ChessLobbyScreenState extends ConsumerState<ChessLobbyScreen> with Widget
             _joinRow(),
             const SizedBox(height: 22),
             ..._sections(),
+            ..._liveSection(),
             const SizedBox(height: 28),
             const _ChessSignature(),
           ],
@@ -402,6 +418,55 @@ class _ChessLobbyScreenState extends ConsumerState<ChessLobbyScreen> with Widget
     });
 
     return out;
+  }
+
+  /// "Tonton langsung": permainan orang lain yang sedang berjalan. Bebas
+  /// masuk sebagai penonton (tanpa kode), tidak bisa menggerakkan bidak.
+  List<Widget> _liveSection() {
+    if (_live.isEmpty) return const [];
+    return [
+      const SizedBox(height: 8),
+      Row(
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: const BoxDecoration(color: Color(0xFFFF4D6A), shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            'Tonton langsung · ${_live.length}',
+            style: const TextStyle(color: AppColors.textWhite, fontSize: 15, fontWeight: FontWeight.w800),
+          ),
+        ],
+      ),
+      const SizedBox(height: 8),
+      for (final g in _live) ...[
+        _GameRow(
+          game: g,
+          player: g.white,
+          title: '${g.white?.username ?? 'Putih'} vs ${g.black?.username ?? 'Hitam'}',
+          subtitle: '${_timeLabel(g)} · langkah ke-${(g.ply ~/ 2) + 1}',
+          trailing: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              color: AppColors.accentViolet.withValues(alpha: 0.18),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.visibility_rounded, size: 15, color: AppColors.accentVioletLight),
+                SizedBox(width: 5),
+                Text('Tonton', style: TextStyle(color: AppColors.accentVioletLight, fontWeight: FontWeight.w800, fontSize: 12.5)),
+              ],
+            ),
+          ),
+          onTap: () => _open(g),
+        ),
+        const SizedBox(height: 8),
+      ],
+    ];
   }
 
   static String _timeLabel(ChessGame g) {
