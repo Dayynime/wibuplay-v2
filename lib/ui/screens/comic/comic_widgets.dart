@@ -282,7 +282,7 @@ class _ComicPosterCardState extends State<ComicPosterCard> {
                             end: Alignment.bottomCenter,
                             colors: [
                               Colors.transparent,
-                              const Color(0xFF0B0E14).withValues(alpha: 0.92),
+                              const Color(0xFF06111D).withValues(alpha: 0.92),
                             ],
                           ),
                         ),

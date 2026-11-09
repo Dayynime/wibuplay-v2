@@ -123,7 +123,7 @@ class MenuScreen extends ConsumerWidget {
               icon: Icons.groups_rounded,
               accent: const Color(0xFF22C55E),
               gradient: const LinearGradient(
-                colors: [Color(0xFF0F2A1C), Color(0xFF151A23)],
+                colors: [Color(0xFF0F2A1C), Color(0xFF0D1C2D)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -136,7 +136,7 @@ class MenuScreen extends ConsumerWidget {
               icon: Icons.dynamic_feed_rounded,
               accent: const Color(0xFF8B5CF6),
               gradient: const LinearGradient(
-                colors: [Color(0xFF1E1533), Color(0xFF151A23)],
+                colors: [Color(0xFF1E1533), Color(0xFF0D1C2D)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),

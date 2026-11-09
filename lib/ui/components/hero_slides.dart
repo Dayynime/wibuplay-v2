@@ -437,25 +437,24 @@ class _GlassPanelState extends State<_GlassPanel> {
       onPointerCancel: (_) => _touch.value = null,
       child: ClipRRect(
         borderRadius: radius,
-        child: BackdropFilter(
-          filter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-          child: DecoratedBox(
-            decoration: const BoxDecoration(
-              borderRadius: radius,
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0x8C161C29), Color(0xA60D111A)],
-              ),
+        // Tanpa BackdropFilter: blur di carousel yang terus bergerak mahal di
+        // GPU. Panel cukup gelap-bening, kilau specular tetap ada.
+        child: DecoratedBox(
+          decoration: const BoxDecoration(
+            borderRadius: radius,
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xC70D1C2D), Color(0xE006111D)],
             ),
-            child: CustomPaint(
-              foregroundPainter: _GlassSheenPainter(
-                loop: widget.loop,
-                touch: _touch,
-                accent: widget.accent,
-              ),
-              child: widget.child,
+          ),
+          child: CustomPaint(
+            foregroundPainter: _GlassSheenPainter(
+              loop: widget.loop,
+              touch: _touch,
+              accent: widget.accent,
             ),
+            child: widget.child,
           ),
         ),
       ),
@@ -638,7 +637,7 @@ Widget _rankBadge(int rank, {double size = 14}) {
     decoration: BoxDecoration(
       color: _rankColor(rank),
       shape: BoxShape.circle,
-      border: Border.all(color: const Color(0xFF10141D), width: 1.5),
+      border: Border.all(color: const Color(0xFF0A1726), width: 1.5),
     ),
     child: Text(
       '$rank',

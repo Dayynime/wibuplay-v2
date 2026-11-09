@@ -706,7 +706,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       width: 28,
                       height: 28,
                       decoration: const BoxDecoration(
-                        color: Color(0xB30B0E14),
+                        color: Color(0xB306111D),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
@@ -1053,7 +1053,7 @@ class ProfileClanPill extends ConsumerWidget {
     final info = ref.watch(userClanInfoProvider(uid)).valueOrNull;
     if (info == null || info.name.isEmpty) return const SizedBox.shrink();
     return Material(
-      color: const Color(0x8C0B0E14),
+      color: const Color(0x8C06111D),
       shape: StadiumBorder(side: BorderSide(color: Colors.white.withValues(alpha: 0.18))),
       clipBehavior: Clip.antiAlias,
       child: InkWell(

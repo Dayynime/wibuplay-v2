@@ -283,7 +283,7 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen>
             _QuickItem(
               icon: Icons.wallpaper_rounded,
               label: 'Wallpaper',
-              colors: const [Color(0xFFE4344A), Color(0xFFFF7A59)],
+              colors: const [Color(0xFF1FB6F5), Color(0xFF4BE3C1)],
               onTap: () => _push(const WallpaperScreen()),
             ),
             _QuickItem(
@@ -531,7 +531,7 @@ class _AccountHero extends StatelessWidget {
           gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFF2A1520), AppColors.surfaceCard, AppColors.surfaceDark],
+            colors: [Color(0xFF0E2A44), AppColors.surfaceCard, AppColors.surfaceDark],
             stops: [0, 0.55, 1],
           ),
         ),
@@ -676,7 +676,7 @@ class _GuestHero extends StatelessWidget {
           gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFF2A1520), AppColors.surfaceCard],
+            colors: [Color(0xFF0E2A44), AppColors.surfaceCard],
           ),
         ),
         child: Stack(

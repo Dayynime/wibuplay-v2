@@ -143,7 +143,7 @@ class WpEventChatCard extends ConsumerWidget {
                               gradient: LinearGradient(
                                 begin: Alignment.topCenter,
                                 end: Alignment.bottomCenter,
-                                colors: [Color(0x99000000), Color(0x22000000), Color(0xCC0B0E14)],
+                                colors: [Color(0x99000000), Color(0x22000000), Color(0xCC06111D)],
                                 stops: [0, 0.35, 0.8],
                               ),
                             ),

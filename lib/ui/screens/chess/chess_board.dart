@@ -17,10 +17,10 @@ class ChessPalette {
   static const Color light = Color(0xFF8A94AA);
   static const Color dark = Color(0xFF555F76);
   static const Color lastMove = Color(0x73F59E0B); // amber transparan
-  static const Color selected = Color(0x8CE4344A); // crimson transparan
+  static const Color selected = Color(0x8C1FB6F5); // crimson transparan
   static const Color whiteFill = Color(0xFFF4EFE6);
   static const Color whiteLine = Color(0xFF1B1F2A);
-  static const Color blackFill = Color(0xFF151A23);
+  static const Color blackFill = Color(0xFF0D1C2D);
   static const Color blackLine = Color(0xFFE9E3D8);
   static const Color coordOnLight = Color(0xFF555F76);
   static const Color coordOnDark = Color(0xFF8A94AA);

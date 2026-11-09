@@ -29,10 +29,18 @@ bool _has(String? s) => s != null && s.trim().isNotEmpty;
 /// lalu jumlah views & favorit. Lebar kartu ~62% layar supaya kartu berikutnya
 /// mengintip. Port AnimeCoverBannerSection (Zenime).
 class AnimeCoverBannerRow extends StatelessWidget {
-  const AnimeCoverBannerRow({super.key, required this.items, required this.onAnimeClick});
+  const AnimeCoverBannerRow({
+    super.key,
+    required this.items,
+    required this.onAnimeClick,
+    this.showRank = false,
+  });
 
   final List<AnimeItem> items;
   final ValueChanged<String> onAnimeClick;
+
+  /// Tampilkan nomor urut besar bergaris di pojok cover (Sedang Hangat).
+  final bool showRank;
 
   @override
   Widget build(BuildContext context) {
@@ -51,6 +59,7 @@ class AnimeCoverBannerRow extends StatelessWidget {
           return _CoverBannerCard(
             anime: anime,
             width: cardWidth,
+            rank: showRank ? i + 1 : null,
             onTap: () {
               final id = anime.id;
               if (id == null) return;
@@ -65,11 +74,17 @@ class AnimeCoverBannerRow extends StatelessWidget {
 }
 
 class _CoverBannerCard extends StatelessWidget {
-  const _CoverBannerCard({required this.anime, required this.width, required this.onTap});
+  const _CoverBannerCard({
+    required this.anime,
+    required this.width,
+    required this.onTap,
+    this.rank,
+  });
 
   final AnimeItem anime;
   final double width;
   final VoidCallback onTap;
+  final int? rank;
 
   @override
   Widget build(BuildContext context) {
@@ -87,9 +102,41 @@ class _CoverBannerCard extends StatelessWidget {
               aspectRatio: 16 / 9,
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(16),
-                child: ColoredBox(
-                  color: AppColors.surfaceCard,
-                  child: NetImage(anime.coverUrl),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    ColoredBox(
+                      color: AppColors.surfaceCard,
+                      child: NetImage(anime.coverUrl),
+                    ),
+                    if (rank != null) ...[
+                      const DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topRight,
+                            end: Alignment.center,
+                            colors: [Color(0x8C000000), Color(0x00000000)],
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        right: 10,
+                        top: 2,
+                        child: Text(
+                          '$rank',
+                          style: TextStyle(
+                            fontSize: 44,
+                            height: 1.1,
+                            fontWeight: FontWeight.w900,
+                            foreground: Paint()
+                              ..style = PaintingStyle.stroke
+                              ..strokeWidth = 1.6
+                              ..color = const Color(0xD9FFFFFF),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
             ),
@@ -138,7 +185,7 @@ class _CoverBannerCard extends StatelessWidget {
                         Row(
                           children: [
                             if (views != null) ...[
-                              const Icon(Icons.play_arrow, size: 13, color: Color(0xFFE53935)),
+                              const Icon(Icons.play_arrow, size: 13, color: AppColors.accentViolet),
                               const SizedBox(width: 2),
                               Text(
                                 views,
@@ -301,7 +348,7 @@ class _RankedCard extends StatelessWidget {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.play_arrow, size: 13, color: Color(0xFFE53935)),
+                              const Icon(Icons.play_arrow, size: 13, color: AppColors.accentViolet),
                               const SizedBox(width: 2),
                               Text(
                                 views,

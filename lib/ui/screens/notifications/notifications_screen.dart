@@ -344,7 +344,7 @@ class _FriendRequestShortcut extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0x40E4344A), Color(0x14E4344A)],
+          colors: [Color(0x401FB6F5), Color(0x141FB6F5)],
         ),
         borderRadius: BorderRadius.circular(14),
       ),

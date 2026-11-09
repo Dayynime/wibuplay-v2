@@ -383,7 +383,7 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
             colors: [
               Color(0x80000000),
               Color(0x00000000),
-              Color(0xB30B0E14),
+              Color(0xB306111D),
               AppColors.backgroundDark,
             ],
           ),

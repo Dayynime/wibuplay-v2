@@ -801,7 +801,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
-                color: const Color(0x990B0E14),
+                color: const Color(0x9906111D),
                 borderRadius: AppShapes.pill,
               ),
               child: Row(
@@ -838,7 +838,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
       alignment: Alignment.centerRight,
       child: Container(
         width: 280,
-        color: const Color(0xF20B0E14),
+        color: const Color(0xF206111D),
         child: SafeArea(
           left: false,
           child: Column(
@@ -1311,7 +1311,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                   decoration: BoxDecoration(
-                    color: const Color(0x990B0E14),
+                    color: const Color(0x9906111D),
                     borderRadius: AppShapes.pill,
                   ),
                   child: Text(
@@ -1860,7 +1860,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
 
   Widget _errorOverlay() {
     return ColoredBox(
-      color: const Color(0xDD0B0E14),
+      color: const Color(0xDD06111D),
       child: Center(
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -1896,7 +1896,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
 
   Widget _countdownOverlay(int countdown) {
     return ColoredBox(
-      color: const Color(0xBB0B0E14),
+      color: const Color(0xBB06111D),
       child: Center(
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

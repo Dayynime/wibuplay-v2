@@ -57,7 +57,7 @@ class _ZenimeGamesScreenState extends ConsumerState<ZenimeGamesScreen>
       title: 'Catur',
       subtitle: 'Mabar 1 lawan 1 dengan temanmu',
       icon: Icons.grid_on_rounded,
-      colors: const [Color(0xFF141B2B), Color(0xFF3B4A6B), Color(0xFFE4344A)],
+      colors: const [Color(0xFF141B2B), Color(0xFF3B4A6B), Color(0xFF1FB6F5)],
       page: () => const ChessLobbyScreen(),
       preview: () => const ChessBoardPreview(),
     ),

@@ -951,7 +951,7 @@ class CommentWallpaperFrame extends StatelessWidget {
                   gradient: LinearGradient(
                     begin: Alignment.centerLeft,
                     end: Alignment.centerRight,
-                    colors: [Color(0xE00B0E14), Color(0xA60B0E14), Color(0x590B0E14)],
+                    colors: [Color(0xE006111D), Color(0xA606111D), Color(0x5906111D)],
                     stops: [0, 0.55, 1],
                   ),
                 ),

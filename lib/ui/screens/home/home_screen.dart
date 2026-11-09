@@ -297,9 +297,9 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(height: 16),
+          const SizedBox(height: 22),
           SectionHeader(title: title, actionText: actionText, onActionClick: onAction),
-          if (gapAfterHeader) const SizedBox(height: 8),
+          if (gapAfterHeader) const SizedBox(height: 10),
           child,
         ],
       );
@@ -479,6 +479,7 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
               child: AnimeCoverBannerRow(
                 items: data.hot,
                 onAnimeClick: widget.onAnimeClick,
+                showRank: true,
               ),
             );
           },
