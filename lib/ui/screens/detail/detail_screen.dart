@@ -13,6 +13,7 @@ import '../../../data/models/media_item.dart';
 import '../../../providers.dart';
 import '../../app_routes.dart';
 import '../../components/common_components.dart';
+import '../../components/home_section_cards.dart' show compactCount;
 import '../../components/net_image.dart';
 import '../../components/poster_holder.dart';
 import '../download/download_actions.dart';
@@ -74,7 +75,7 @@ class _CurtainClipper extends CustomClipper<Rect> {
 }
 
 /// Garis pemisah / outline kartu Zenime (CardOutlineBorder).
-const Color _kOutline = Color(0xFF2A2F3A);
+const Color _kOutline = Color(0xFF183049);
 
 /// Port DetailScreen.kt (layout Zenime): hero cover penuh 360dp dengan judul,
 /// tombol favorit dan tombol play crimson bulat; baris tab Info | Episode |
@@ -455,6 +456,14 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
                   targetEpisodeId: targetEpisodeId,
                 ),
               ),
+              // Ringkasan + tombol tonton (redesain Samudra).
+              SliverToBoxAdapter(
+                child: _fadeIn(
+                  0.25,
+                  0.6,
+                  _summary(anime, targetEpisodeId, history != null, isFavorite),
+                ),
+              ),
               // Baris tab terbuka seperti tirai (layout tetap, cuma klipnya).
               SliverToBoxAdapter(
                 child: AnimatedBuilder(
@@ -529,18 +538,7 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
                     child: const Icon(Icons.arrow_back, color: Colors.white, size: 22),
                   ),
                 ),
-                _pop(
-                  0.08,
-                  _circleButton(
-                    onTap: () => _notifier.toggleFavorite(),
-                    tooltip: 'Favorit',
-                    child: Icon(
-                      isFavorite ? Icons.bookmark : Icons.bookmark_border,
-                      color: isFavorite ? AppColors.accentViolet : Colors.white,
-                      size: 22,
-                    ),
-                  ),
-                ),
+                const SizedBox(width: 1),
               ],
             ),
           ),
@@ -548,7 +546,7 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
           // Judul + metadata di kiri bawah.
           Positioned(
             left: 20,
-            right: 96,
+            right: 20,
             bottom: 12,
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -601,38 +599,6 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
             ),
           ),
 
-          // Tombol play crimson bulat besar di kanan bawah: memegas masuk
-          // sambil ikon play berputar ke posisinya.
-          if (targetEpisodeId.isNotEmpty)
-            Positioned(
-              right: 20,
-              bottom: 12,
-              child: AnimatedBuilder(
-                animation: _contentIn,
-                builder: (context, child) {
-                  final v = _iv(_contentIn.value, 0.2, 0.55, _springy);
-                  return Transform.scale(
-                    scale: v,
-                    child: Transform.rotate(angle: (1 - v) * -0.8, child: child),
-                  );
-                },
-                child: Material(
-                  color: AppColors.accentViolet,
-                  shape: const CircleBorder(),
-                  elevation: 14,
-                  shadowColor: AppColors.accentViolet,
-                  child: InkWell(
-                    customBorder: const CircleBorder(),
-                    onTap: () => widget.onWatchEpisode(widget.movieId, targetEpisodeId),
-                    child: const SizedBox(
-                      width: 64,
-                      height: 64,
-                      child: Icon(Icons.play_arrow, color: Colors.white, size: 36),
-                    ),
-                  ),
-                ),
-              ),
-            ),
         ],
       ),
     );
@@ -641,60 +607,152 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
   // --------------------------------------------------------------- tab row
 
   Widget _tabRow(DetailUiState ui) {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Row(
-            children: [
-              for (var i = 0; i < _tabs.length; i++)
-                Expanded(
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(8),
-                    onTap: () => _selectTab(i),
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 12),
-                      child: Column(
-                        children: [
-                          AnimatedDefaultTextStyle(
-                            duration: const Duration(milliseconds: 220),
-                            maxLines: 1,
-                            style: TextStyle(
-                              color: ui.selectedTab == i
-                                  ? AppColors.accentViolet
-                                  : AppColors.textSecondary,
-                              fontSize: 12,
-                              fontWeight:
-                                  ui.selectedTab == i ? FontWeight.w700 : FontWeight.w500,
-                            ),
-                            child: Text(_tabs[i]),
-                          ),
-                          const SizedBox(height: 8),
-                          // Garis bawah "tumbuh" dari tengah saat tab dipilih.
-                          LayoutBuilder(
-                            builder: (context, c) => AnimatedContainer(
-                              duration: const Duration(milliseconds: 260),
-                              height: 3,
-                              width: ui.selectedTab == i ? c.maxWidth : 0,
-                              decoration: const BoxDecoration(
-                                color: AppColors.accentViolet,
-                                borderRadius: BorderRadius.only(
-                                  topLeft: Radius.circular(3),
-                                  topRight: Radius.circular(3),
+    // Tab bergaya pill yang bisa digeser (6 tab: Info, Episode, Season, ...).
+    return SizedBox(
+      height: 40,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: _tabs.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 8),
+        itemBuilder: (context, i) {
+          final on = ui.selectedTab == i;
+          return GestureDetector(
+            onTap: () => _selectTab(i),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 240),
+              curve: Curves.easeOutQuint,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: on ? AppColors.accentViolet.withValues(alpha: 0.16) : AppColors.surfaceDark,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: on ? AppColors.accentViolet.withValues(alpha: 0.55) : const Color(0x12FFFFFF),
+                ),
+              ),
+              child: Text(
+                _tabs[i],
+                style: TextStyle(
+                  color: on ? AppColors.accentVioletLight : AppColors.textSecondary,
+                  fontSize: 13,
+                  fontWeight: on ? FontWeight.w700 : FontWeight.w600,
+                ),
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  /// Kartu ringkasan (views, favorit, tahun, studio) + tombol tonton lebar
+  /// dan tombol simpan, sesuai preview redesain.
+  Widget _summary(AnimeItem? anime, String targetEpisodeId, bool resume, bool isFavorite) {
+    final views = compactCount(anime?.views);
+    final favs = compactCount(anime?.favorites);
+    final stats = <(String, String)>[
+      if (views != null) (views, 'Ditonton'),
+      if (favs != null) (favs, 'Favorit'),
+      if (!_blank(anime?.year)) (anime!.year!.trim(), 'Rilis'),
+      if (!_blank(anime?.studio)) (anime!.studio!.trim(), 'Studio'),
+    ];
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+      child: Column(
+        children: [
+          if (stats.isNotEmpty)
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceDark,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0x12FFFFFF)),
+              ),
+              child: IntrinsicHeight(
+                child: Row(
+                  children: [
+                    for (var i = 0; i < stats.length; i++) ...[
+                      if (i > 0) const VerticalDivider(width: 1, thickness: 1, color: Color(0x14FFFFFF)),
+                      Expanded(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                stats[i].$1,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: AppColors.textWhite,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w800,
                                 ),
                               ),
-                            ),
+                              const SizedBox(height: 2),
+                              Text(
+                                stats[i].$2,
+                                style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+                              ),
+                            ],
                           ),
-                        ],
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              if (targetEpisodeId.isNotEmpty) ...[
+                Expanded(
+                  child: SizedBox(
+                    height: 46,
+                    child: FilledButton.icon(
+                      onPressed: () => widget.onWatchEpisode(widget.movieId, targetEpisodeId),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppColors.accentViolet,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                      icon: const Icon(Icons.play_arrow_rounded, size: 24),
+                      label: Text(
+                        resume ? 'Lanjutkan Menonton' : 'Mulai Menonton',
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
                       ),
                     ),
                   ),
                 ),
+                const SizedBox(width: 8),
+              ] else
+                const Spacer(),
+              Material(
+                color: AppColors.surfaceDark,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  side: const BorderSide(color: Color(0x12FFFFFF)),
+                ),
+                child: InkWell(
+                  customBorder: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  onTap: () => _notifier.toggleFavorite(),
+                  child: SizedBox(
+                    width: 46,
+                    height: 46,
+                    child: Icon(
+                      isFavorite ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
+                      color: isFavorite ? AppColors.accentViolet : AppColors.textWhite,
+                      size: 22,
+                    ),
+                  ),
+                ),
+              ),
             ],
           ),
-        ),
-        Container(height: 1, color: _kOutline),
-      ],
+        ],
+      ),
     );
   }
 

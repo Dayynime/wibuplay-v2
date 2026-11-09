@@ -4,10 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_theme.dart';
 import '../../components/cards.dart';
 import '../../components/common_components.dart';
 import '../../components/shimmer.dart';
+import '../../../data/models/genre_item.dart';
 import 'explore_controller.dart';
 import '../../glass/glass.dart';
 
@@ -101,73 +101,94 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
         bottom: false,
         child: Column(
           children: [
-            // Kolom cari + tombol filter
+            // Judul + tombol filter (redesain Samudra)
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Expanded(
-                    child: SizedBox(
-                      height: 48,
-                      child: TextField(
-                        controller: _search,
-                        onChanged: (v) => _notifier.onQueryChange(v),
-                        maxLines: 1,
-                        style: const TextStyle(color: AppColors.textWhite, fontSize: 14),
-                        cursorColor: AppColors.accentViolet,
-                        decoration: InputDecoration(
-                          filled: true,
-                          fillColor: AppColors.surfaceDark,
-                          hintText: 'Cari judul anime, genre, dll...',
-                          hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 13),
-                          prefixIcon: const Icon(
-                            Icons.search,
-                            size: 20,
-                            color: AppColors.textSecondary,
-                          ),
-                          suffixIcon: ui.query.isNotEmpty
-                              ? IconButton(
-                                  onPressed: () => _notifier.onQueryChange(''),
-                                  icon: const Icon(
-                                    Icons.close,
-                                    size: 18,
-                                    color: AppColors.textSecondary,
-                                  ),
-                                )
-                              : null,
-                          contentPadding: EdgeInsets.zero,
-                          border: OutlineInputBorder(
-                            borderRadius: AppShapes.pill,
-                            borderSide: BorderSide.none,
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: AppShapes.pill,
-                            borderSide: BorderSide.none,
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: AppShapes.pill,
-                            borderSide: BorderSide.none,
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '探す',
+                          style: TextStyle(
+                            color: AppColors.accentVioletLight,
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 2,
                           ),
                         ),
-                      ),
+                        Text(
+                          'Jelajah',
+                          style: TextStyle(
+                            color: AppColors.textWhite,
+                            fontSize: 26,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.5,
+                            height: 1.1,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 10),
                   GestureDetector(
                     onTap: _openFilterSheet,
-                    child: Container(
-                      width: 48,
-                      height: 48,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      width: 44,
+                      height: 44,
                       decoration: BoxDecoration(
-                        color: ui.hasActiveFilter
-                            ? AppColors.accentViolet
-                            : AppColors.surfaceDark,
-                        shape: BoxShape.circle,
+                        color: ui.hasActiveFilter ? AppColors.accentViolet : AppColors.surfaceDark,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: const Color(0x12FFFFFF)),
                       ),
-                      child: const Icon(Icons.tune, color: AppColors.textWhite, size: 20),
+                      child: const Icon(Icons.tune_rounded, color: AppColors.textWhite, size: 20),
                     ),
                   ),
                 ],
+              ),
+            ),
+            // Kolom cari besar
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+              child: SizedBox(
+                height: 50,
+                child: TextField(
+                  controller: _search,
+                  onChanged: (v) => _notifier.onQueryChange(v),
+                  maxLines: 1,
+                  textInputAction: TextInputAction.search,
+                  style: const TextStyle(color: AppColors.textWhite, fontSize: 14),
+                  cursorColor: AppColors.accentViolet,
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: AppColors.surfaceDark,
+                    hintText: 'Cari judul, studio, atau genre',
+                    hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 13.5),
+                    prefixIcon: const Icon(Icons.search_rounded, size: 21, color: AppColors.textSecondary),
+                    suffixIcon: ui.query.isNotEmpty
+                        ? IconButton(
+                            onPressed: () => _notifier.onQueryChange(''),
+                            icon: const Icon(Icons.close_rounded, size: 18, color: AppColors.textSecondary),
+                          )
+                        : null,
+                    contentPadding: EdgeInsets.zero,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: const BorderSide(color: Color(0x12FFFFFF)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: const BorderSide(color: Color(0x12FFFFFF)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: const BorderSide(color: AppColors.accentViolet, width: 1.2),
+                    ),
+                  ),
+                ),
               ),
             ),
 
@@ -249,9 +270,58 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
             ),
           );
         }
+        // Tanpa pencarian/filter: tampilkan tile genre dulu (gaya preview).
+        final browsing = ui.query.isEmpty && !ui.hasActiveFilter && ui.selectedGenreId == null;
+        final tiles = browsing ? ui.genres.where((g) => g.id != null).take(6).toList() : const <GenreItem>[];
+        String? genreName;
+        for (final g in ui.genres) {
+          if (g.id == ui.selectedGenreId) genreName = g.name;
+        }
+        final listTitle = ui.query.isNotEmpty
+            ? 'Hasil Pencarian'
+            : (genreName != null && genreName.isNotEmpty ? genreName : 'Semua Anime');
         return CustomScrollView(
           controller: _scroll,
           slivers: [
+            if (tiles.isNotEmpty)
+              SliverToBoxAdapter(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const SizedBox(height: 10),
+                    const SectionHeader(title: 'Genre'),
+                    const SizedBox(height: 8),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: GridView.count(
+                        crossAxisCount: 2,
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        mainAxisSpacing: 10,
+                        crossAxisSpacing: 10,
+                        childAspectRatio: 2.05,
+                        children: [
+                          for (var i = 0; i < tiles.length; i++)
+                            _GenreTile(
+                              name: tiles[i].name ?? '',
+                              index: i,
+                              onTap: () => _notifier.onGenreSelected(tiles[i].id),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.only(top: 14, bottom: 4),
+                child: SectionHeader(
+                  title: listTitle,
+                  eyebrow: ui.query.isNotEmpty ? '検索結果' : '作品一覧',
+                ),
+              ),
+            ),
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
               sliver: SliverGrid.builder(
@@ -299,6 +369,69 @@ class _ExploreScreenState extends ConsumerState<ExploreScreen> {
   }
 }
 
+
+/// Tile genre berwarna dengan nama Jepang kecil (gaya preview Jelajah).
+class _GenreTile extends StatelessWidget {
+  const _GenreTile({required this.name, required this.index, required this.onTap});
+
+  final String name;
+  final int index;
+  final VoidCallback onTap;
+
+  static const Map<String, String> _jp = {
+    'action': 'アクション', 'aksi': 'アクション', 'adventure': '冒険', 'petualangan': '冒険',
+    'comedy': 'コメディ', 'komedi': 'コメディ', 'drama': 'ドラマ', 'fantasy': 'ファンタジー',
+    'fantasi': 'ファンタジー', 'romance': 'ロマンス', 'romansa': 'ロマンス', 'isekai': '異世界',
+    'mystery': 'ミステリー', 'misteri': 'ミステリー', 'horror': 'ホラー', 'sci-fi': 'SF',
+    'slice of life': '日常', 'sports': 'スポーツ', 'olahraga': 'スポーツ', 'school': '学園',
+    'supernatural': '超常', 'music': '音楽', 'mecha': 'メカ', 'psychological': '心理',
+    'thriller': 'スリラー', 'shounen': '少年', 'shoujo': '少女', 'seinen': '青年', 'harem': 'ハーレム',
+  };
+
+  // Rona tiap tile (derajat HSL), bergiliran.
+  static const List<double> _hues = [200, 340, 160, 28, 265, 190];
+
+  @override
+  Widget build(BuildContext context) {
+    final h = _hues[index % _hues.length];
+    final jp = _jp[name.toLowerCase().trim()];
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              HSLColor.fromAHSL(1, h, 0.62, 0.42).toColor(),
+              HSLColor.fromAHSL(1, (h + 35) % 360, 0.65, 0.16).toColor(),
+            ],
+          ),
+        ),
+        alignment: Alignment.bottomLeft,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (jp != null)
+              Text(
+                jp,
+                style: const TextStyle(color: Color(0xB3FFFFFF), fontSize: 10.5, letterSpacing: 1.2),
+              ),
+            Text(
+              name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.w800, letterSpacing: -0.2),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 /// Sheet filter: Status, Tipe, Genre, Tahun, Urutkan. Pilihan disimpan
 /// sementara dan baru diterapkan lewat tombol "Terapkan" (satu kali muat).

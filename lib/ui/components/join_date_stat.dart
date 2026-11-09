@@ -39,8 +39,8 @@ class JoinDateStat extends ConsumerWidget {
 
   static const _valueStyle = TextStyle(
     color: AppColors.textWhite,
-    fontSize: 19,
-    fontWeight: FontWeight.w700,
+    fontSize: 18,
+    fontWeight: FontWeight.w800,
   );
 
   @override

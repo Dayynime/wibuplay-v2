@@ -10,7 +10,6 @@ import '../../components/shimmer.dart';
 import 'schedule_controller.dart';
 
 const Color _outline = AppColors.surfaceVariantDark;
-const Color _timeColor = Color(0xFFFFC107);
 
 // Tinggi tiap baris dibuat tetap supaya posisi scroll tiap hari bisa dihitung
 // langsung (dipakai tombol navigasi hari & penanda hari di atas).
@@ -157,6 +156,19 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
     });
   }
 
+  /// Hari sebelum hari ini = sudah tayang; hari ini = jam tayang sudah lewat
+  /// (jam HP). Dipakai untuk meredupkan kartu, seperti di preview.
+  bool _isAired(int day, int today, AnimeItem anime) {
+    if (day < today) return true;
+    if (day > today) return false;
+    final t = formatKeyTime(anime.keyTime);
+    if (t == '--:--') return false;
+    final now = DateTime.now();
+    final h = int.tryParse(t.substring(0, 2)), m = int.tryParse(t.substring(3, 5));
+    if (h == null || m == null) return false;
+    return h * 60 + m <= now.hour * 60 + now.minute;
+  }
+
   @override
   Widget build(BuildContext context) {
     final ui = ref.watch(scheduleControllerProvider);
@@ -182,7 +194,12 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
       _scheduleInitialJump(ui.todayIndex);
       body = Column(
         children: [
-          _DayHeader(current: _currentDay, sections: ui.sections),
+          _WeekStrip(
+            current: _currentDay,
+            sections: ui.sections,
+            todayIndex: ui.todayIndex,
+            onSelect: _jumpToDay,
+          ),
           Expanded(
             child: ListView.builder(
               controller: _scroll,
@@ -195,6 +212,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
                   child: switch (row) {
                     _Entry() => _TimelineEntry(
                         anime: row.anime,
+                        aired: _isAired(row.day, ui.todayIndex, row.anime),
                         onTap: () {
                           final id = row.anime.id;
                           if (id != null) widget.onAnimeClick(id);
@@ -231,22 +249,28 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
             const Align(
               alignment: Alignment.centerLeft,
               child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                padding: EdgeInsets.fromLTRB(16, 8, 16, 10),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Jadwal Rilis',
+                      '放送予定',
                       style: TextStyle(
-                        color: AppColors.textWhite,
-                        fontSize: 24,
+                        color: AppColors.accentVioletLight,
+                        fontSize: 10.5,
                         fontWeight: FontWeight.w700,
-                        letterSpacing: -0.5,
+                        letterSpacing: 2,
                       ),
                     ),
                     Text(
-                      'Jadwal penayangan episode baru setiap harinya',
-                      style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+                      'Jadwal Tayang',
+                      style: TextStyle(
+                        color: AppColors.textWhite,
+                        fontSize: 26,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.5,
+                        height: 1.1,
+                      ),
                     ),
                   ],
                 ),
@@ -260,56 +284,45 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
   }
 }
 
-/// Pil hari yang sedang terlihat + jumlah anime. Ikut berubah saat di-scroll.
-class _DayHeader extends StatelessWidget {
-  const _DayHeader({required this.current, required this.sections});
+/// Strip 7 hari bertanggal (gaya preview). Hari yang sedang terlihat saat
+/// scroll ikut tersorot; hari ini diberi titik. Ketuk = lompat ke hari itu.
+class _WeekStrip extends StatelessWidget {
+  const _WeekStrip({
+    required this.current,
+    required this.sections,
+    required this.todayIndex,
+    required this.onSelect,
+  });
 
   final ValueNotifier<int> current;
   final List<DaySection> sections;
+  final int todayIndex;
+  final ValueChanged<int> onSelect;
 
   @override
   Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final monday = DateTime(now.year, now.month, now.day).subtract(Duration(days: todayIndex));
     return ValueListenableBuilder<int>(
       valueListenable: current,
       builder: (context, day, _) {
-        final i = day.clamp(0, sections.length - 1);
-        final count = sections[i].anime.length;
         return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          padding: const EdgeInsets.fromLTRB(16, 2, 16, 10),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-                decoration: const BoxDecoration(
-                  color: AppColors.accentViolet,
-                  shape: BoxShape.rectangle,
-                  borderRadius: BorderRadius.all(Radius.circular(100)),
-                ),
-                child: Text(
-                  sections[i].dayName,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
+              for (var i = 0; i < ScheduleController.dayNames.length; i++) ...[
+                if (i > 0) const SizedBox(width: 6),
+                Expanded(
+                  child: _DayCell(
+                    label: ScheduleController.dayNames[i].substring(0, 3),
+                    date: monday.add(Duration(days: i)).day,
+                    selected: i == day,
+                    isToday: i == todayIndex,
+                    empty: i < sections.length && sections[i].anime.isEmpty,
+                    onTap: () => onSelect(i),
                   ),
                 ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceCard,
-                  borderRadius: BorderRadius.circular(100),
-                  border: Border.all(color: _outline),
-                ),
-                child: Text(
-                  '$count Anime',
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 12,
-                  ),
-                ),
-              ),
+              ],
             ],
           ),
         );
@@ -318,11 +331,84 @@ class _DayHeader extends StatelessWidget {
   }
 }
 
+class _DayCell extends StatelessWidget {
+  const _DayCell({
+    required this.label,
+    required this.date,
+    required this.selected,
+    required this.isToday,
+    required this.empty,
+    required this.onTap,
+  });
+
+  final String label;
+  final int date;
+  final bool selected;
+  final bool isToday;
+  final bool empty;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOutQuint,
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.accentViolet : AppColors.surfaceDark,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: selected ? Colors.transparent : const Color(0x12FFFFFF)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color: selected ? const Color(0xCCFFFFFF) : AppColors.textMuted,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              '$date',
+              style: TextStyle(
+                color: selected
+                    ? Colors.white
+                    : (empty ? AppColors.textMuted : AppColors.textSecondary),
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 3),
+            Container(
+              width: 4,
+              height: 4,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isToday
+                    ? (selected ? Colors.white : AppColors.accentViolet)
+                    : Colors.transparent,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _TimelineEntry extends StatelessWidget {
-  const _TimelineEntry({required this.anime, required this.onTap});
+  const _TimelineEntry({required this.anime, required this.onTap, this.aired = false});
 
   final AnimeItem anime;
   final VoidCallback onTap;
+
+  /// Sudah tayang: kartu & titik diredupkan.
+  final bool aired;
 
   @override
   Widget build(BuildContext context) {
@@ -347,18 +433,19 @@ class _TimelineEntry extends StatelessWidget {
                   Text(
                     time,
                     style: TextStyle(
-                      color: noTime ? AppColors.textSecondary : _timeColor,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
+                      color: noTime || aired ? AppColors.textMuted : AppColors.textWhite,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
                   const SizedBox(height: 6),
                   Container(
                     width: 9,
                     height: 9,
-                    decoration: const BoxDecoration(
-                      color: AppColors.accentViolet,
+                    decoration: BoxDecoration(
+                      color: aired ? AppColors.textMuted : AppColors.accentViolet,
                       shape: BoxShape.circle,
+                      border: Border.all(color: AppColors.backgroundDark, width: 2),
                     ),
                   ),
                 ],
@@ -370,7 +457,11 @@ class _TimelineEntry extends StatelessWidget {
         Expanded(
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 6),
-            child: ScheduleAnimeCard(anime: anime, onTap: onTap),
+            child: AnimatedOpacity(
+              opacity: aired ? 0.62 : 1,
+              duration: const Duration(milliseconds: 200),
+              child: ScheduleAnimeCard(anime: anime, onTap: onTap),
+            ),
           ),
         ),
       ],
@@ -518,7 +609,7 @@ class ScheduleAnimeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final radius = BorderRadius.circular(12);
+    final radius = BorderRadius.circular(16);
     return Material(
       color: AppColors.surfaceCard,
       shape: RoundedRectangleBorder(

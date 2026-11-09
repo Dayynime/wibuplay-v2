@@ -252,9 +252,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ],
                 ),
               const SizedBox(height: 18),
-              // Stat row flat: angka besar, label kecil, garis pemisah tipis.
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
+              // Statistik dalam satu kartu (redesain Samudra).
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceDark.withValues(alpha: 0.92),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0x12FFFFFF)),
+                ),
                 child: Row(
                   children: [
                     JoinDateStat(firebaseUid: uid, fallback: user?.metadata.creationTime?.toLocal()),
@@ -395,8 +401,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               '$v',
               style: const TextStyle(
                 color: AppColors.textWhite,
-                fontSize: 19,
-                fontWeight: FontWeight.w700,
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
               ),
             ),
           ),
@@ -413,61 +419,75 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
-  Widget _statDivider() => Container(width: 1, height: 26, color: const Color(0x40FFFFFF));
+  Widget _statDivider() => Container(width: 1, height: 28, color: const Color(0x14FFFFFF));
 
   // -------------------------------------------------------------------- tab
 
-  /// Tab 5 sama lebar; indikator pendek 28dp di bawah label terpilih, plus
-  /// garis tipis di dasar (sama seperti tab Zenime).
+  /// Tab bergaya segmented (redesain Samudra): indikator pill yang bergeser
+  /// halus ke tab terpilih.
   Widget _buildTabs() {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: Row(
-            children: [
-              for (var i = 0; i < _tabs.length; i++)
-                Expanded(
-                  child: InkWell(
-                    onTap: () => setState(() => _selectedTab = i),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      child: Column(
-                        children: [
-                          FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Text(
-                              _tabs[i],
-                              style: TextStyle(
-                                color: _selectedTab == i
-                                    ? AppColors.textWhite
-                                    : const Color(0x80FFFFFF),
-                                fontSize: 13.5,
-                                fontWeight:
-                                    _selectedTab == i ? FontWeight.w700 : FontWeight.w400,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            height: 3,
-                            width: _selectedTab == i ? 28 : 0,
-                            decoration: BoxDecoration(
-                              color: AppColors.accentViolet,
-                              borderRadius: BorderRadius.circular(2),
-                            ),
-                          ),
-                        ],
-                      ),
+    final n = _tabs.length;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        height: 44,
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceDark,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0x12FFFFFF)),
+        ),
+        child: LayoutBuilder(
+          builder: (context, c) {
+            final w = c.maxWidth / n;
+            return Stack(
+              children: [
+                AnimatedPositioned(
+                  duration: const Duration(milliseconds: 260),
+                  curve: Curves.easeOutQuint,
+                  left: _selectedTab * w,
+                  top: 0,
+                  bottom: 0,
+                  width: w,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceElevated,
+                      borderRadius: BorderRadius.circular(11),
                     ),
                   ),
                 ),
-            ],
-          ),
+                Row(
+                  children: [
+                    for (var i = 0; i < n; i++)
+                      Expanded(
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => setState(() => _selectedTab = i),
+                          child: Center(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 4),
+                                child: Text(
+                                  _tabs[i],
+                                  style: TextStyle(
+                                    color: _selectedTab == i ? AppColors.textWhite : AppColors.textMuted,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            );
+          },
         ),
-        Container(height: 1, color: const Color(0x14FFFFFF)),
-      ],
+      ),
     );
   }
 

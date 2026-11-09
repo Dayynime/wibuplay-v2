@@ -8,7 +8,6 @@ import '../../../data/models/account_models.dart' show formatZCoin;
 import '../../../providers.dart';
 import '../../app_routes.dart';
 import '../library/library_screens.dart';
-import '../profile/profile_controller.dart';
 import '../store/coin_screen.dart';
 import '../store/premium_screen.dart';
 import '../games/zenime_games_screen.dart';
@@ -31,8 +30,6 @@ class MenuScreen extends ConsumerWidget {
     final uid = ref.watch(authUserProvider).valueOrNull?.uid;
     final coins = uid == null ? null : ref.watch(coinBalanceProvider(uid)).valueOrNull;
     final premium = uid == null ? null : ref.watch(premiumProvider(uid)).valueOrNull;
-    final historyCount = ref.watch(profileHistoryProvider).length;
-    final favoriteCount = ref.watch(profileFavoritesProvider).length;
     // Thumbnail klip teratas jadi gambar kartu Cuplix (gagal -> pakai ikon).
     final cuplixThumb = ref
         .watch(homeCuplixProvider)
@@ -49,19 +46,33 @@ class MenuScreen extends ConsumerWidget {
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 130),
           children: [
             const Padding(
-              padding: EdgeInsets.fromLTRB(4, 6, 4, 2),
-              child: Text(
-                'Menu',
-                style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w700),
+              padding: EdgeInsets.fromLTRB(2, 6, 2, 14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'メニュー',
+                    style: TextStyle(
+                      color: AppColors.accentVioletLight,
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 2,
+                    ),
+                  ),
+                  Text(
+                    'Menu',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 26,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.5,
+                      height: 1.1,
+                    ),
+                  ),
+                ],
               ),
             ),
-            const Padding(
-              padding: EdgeInsets.fromLTRB(4, 0, 4, 16),
-              child: Text(
-                'Konten lain selain anime',
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
-              ),
-            ),
+            // Dompet: ZCoin & Premium.
             Row(
               children: [
                 Expanded(
@@ -69,7 +80,7 @@ class MenuScreen extends ConsumerWidget {
                     title: 'ZCoin',
                     value: coins == null ? 'Top up' : formatZCoin(coins),
                     caption: 'Top up ZCoin',
-                    accent: const Color(0xFF8B5CF6),
+                    accent: const Color(0xFFF6BE4F),
                     leading: Image.asset('assets/images/ic_zcoin_badge.png', width: 26, height: 26),
                     // di-await supaya saldo di-refresh setelah kembali dari top up
                     onTap: () => Navigator.of(context).push<void>(fadeRoute(const CoinScreen())),
@@ -90,59 +101,74 @@ class MenuScreen extends ConsumerWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            Row(
+            const SizedBox(height: 20),
+            // Grid fitur 4 kolom (gaya preview): satu ketukan ke semua fitur.
+            GridView.count(
+              crossAxisCount: 4,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              mainAxisSpacing: 14,
+              crossAxisSpacing: 6,
+              childAspectRatio: 0.82,
               children: [
-                Expanded(
-                  child: _ShopTile(
-                    title: 'Riwayat',
-                    value: historyCount == 0 ? 'Kosong' : '$historyCount',
-                    caption: historyCount == 0 ? 'Belum ada tontonan' : 'Lanjut nonton',
-                    accent: const Color(0xFFF59E0B),
-                    leading: const Icon(Icons.history, color: Color(0xFFF59E0B), size: 26),
-                    onTap: () => Navigator.of(context).push<void>(fadeRoute(const HistoryScreen())),
-                  ),
+                _MenuIcon(
+                  label: 'Nobar',
+                  icon: Icons.groups_rounded,
+                  accent: const Color(0xFF22C55E),
+                  onTap: () => Navigator.of(context).push<void>(fadeRoute(const NobarLobbyScreen())),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _ShopTile(
-                    title: 'Favorit',
-                    value: favoriteCount == 0 ? 'Kosong' : '$favoriteCount',
-                    caption: favoriteCount == 0 ? 'Belum ada favorit' : 'Anime favoritmu',
-                    accent: const Color(0xFFEC4899),
-                    leading: const Icon(Icons.favorite, color: Color(0xFFEC4899), size: 26),
-                    onTap: () => Navigator.of(context).push<void>(fadeRoute(const FavoritesScreen())),
-                  ),
+                _MenuIcon(
+                  label: 'Feed',
+                  icon: Icons.dynamic_feed_rounded,
+                  accent: const Color(0xFF8B5CF6),
+                  onTap: () => Navigator.of(context).push<void>(fadeRoute(const FeedScreen())),
+                ),
+                _MenuIcon(
+                  label: 'Cuplix',
+                  icon: Icons.slow_motion_video_rounded,
+                  accent: const Color(0xFFF97316),
+                  onTap: () => openCuplix(context),
+                ),
+                _MenuIcon(
+                  label: 'Games',
+                  icon: Icons.sports_esports_rounded,
+                  accent: const Color(0xFFA855F7),
+                  onTap: () => Navigator.of(context).push<void>(fadeRoute(const ZenimeGamesScreen())),
+                ),
+                _MenuIcon(
+                  label: 'Donghua',
+                  icon: Icons.movie_filter_outlined,
+                  accent: const Color(0xFFEF4444),
+                  onTap: () => openDonghua(context),
+                ),
+                _MenuIcon(
+                  label: 'Komik',
+                  icon: Icons.menu_book_outlined,
+                  accent: const Color(0xFF3B82F6),
+                  onTap: () => openComic(context),
+                ),
+                _MenuIcon(
+                  label: 'Riwayat',
+                  icon: Icons.history_rounded,
+                  accent: const Color(0xFFF59E0B),
+                  onTap: () => Navigator.of(context).push<void>(fadeRoute(const HistoryScreen())),
+                ),
+                _MenuIcon(
+                  label: 'Favorit',
+                  icon: Icons.favorite_rounded,
+                  accent: const Color(0xFFEC4899),
+                  onTap: () => Navigator.of(context).push<void>(fadeRoute(const FavoritesScreen())),
                 ),
               ],
             ),
-            const SizedBox(height: 14),
-            _MenuCard(
-              title: 'Nobar',
-              subtitle: 'Nonton bareng maks 5 orang + voice chat',
-              icon: Icons.groups_rounded,
-              accent: const Color(0xFF22C55E),
-              gradient: const LinearGradient(
-                colors: [Color(0xFF0F2A1C), Color(0xFF0D1C2D)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+            const SizedBox(height: 22),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(2, 0, 2, 10),
+              child: Text(
+                'Sorotan',
+                style: TextStyle(color: Colors.white, fontSize: 19, fontWeight: FontWeight.w800),
               ),
-              onTap: () => Navigator.of(context).push<void>(fadeRoute(const NobarLobbyScreen())),
             ),
-            const SizedBox(height: 14),
-            _MenuCard(
-              title: 'Feed',
-              subtitle: 'Postingan & cerita dari pengguna Zenime',
-              icon: Icons.dynamic_feed_rounded,
-              accent: const Color(0xFF8B5CF6),
-              gradient: const LinearGradient(
-                colors: [Color(0xFF1E1533), Color(0xFF0D1C2D)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              onTap: () => Navigator.of(context).push<void>(fadeRoute(const FeedScreen())),
-            ),
-            const SizedBox(height: 14),
             _MenuCard(
               title: 'Cuplix',
               subtitle: 'Klip pendek momen anime terbaik',
@@ -170,14 +196,6 @@ class MenuScreen extends ConsumerWidget {
               accent: const Color(0xFF3B82F6),
               imageUrl: _kComicPoster,
               onTap: () => openComic(context),
-            ),
-            const SizedBox(height: 14),
-            _MenuCard(
-              title: 'Zenime Games',
-              subtitle: 'Gacha, Pohon ZCoin, Border Avatar & Efek Profil',
-              icon: Icons.sports_esports_rounded,
-              accent: const Color(0xFFA855F7),
-              onTap: () => Navigator.of(context).push<void>(fadeRoute(const ZenimeGamesScreen())),
             ),
           ],
         ),
@@ -215,7 +233,7 @@ class _MenuCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(20),
         child: Ink(
-          height: 132,
+          height: 112,
           decoration: BoxDecoration(
             color: AppColors.surfaceDark,
             gradient: gradient,
@@ -314,6 +332,51 @@ class _MenuCard extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Ikon fitur di grid Menu: kotak warna lembut + label.
+class _MenuIcon extends StatelessWidget {
+  const _MenuIcon({
+    required this.label,
+    required this.icon,
+    required this.accent,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final Color accent;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: 0.16),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: accent.withValues(alpha: 0.28)),
+            ),
+            child: Icon(icon, color: Color.lerp(accent, Colors.white, 0.25), size: 26),
+          ),
+          const SizedBox(height: 7),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: AppColors.textSecondary, fontSize: 11.5, fontWeight: FontWeight.w600),
+          ),
+        ],
       ),
     );
   }

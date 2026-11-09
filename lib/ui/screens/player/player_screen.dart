@@ -1403,7 +1403,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(12),
                           child: SizedBox(
                             width: 80,
                             child: AspectRatio(
@@ -1426,8 +1426,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
                                   color: AppColors.textWhite,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w700,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: -0.2,
+                                  height: 1.2,
                                 ),
                               ),
                               const SizedBox(height: 4),
@@ -1545,10 +1547,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                   ),
                 ),
 
-                // 4. Baris tombol aksi
+                // 4. Baris tombol aksi (ubin ikon di atas label, gaya preview)
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.only(bottom: 20),
+                    padding: const EdgeInsets.only(bottom: 22),
                     child: SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
                       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1629,25 +1631,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                           ),
                           if (hasNext) ...[
                             const SizedBox(width: 10),
-                            FilledButton.icon(
-                              onPressed: () {
+                            _ActionIconButton(
+                              icon: Icons.skip_next_rounded,
+                              label: 'Berikutnya',
+                              tint: Colors.white,
+                              filled: true,
+                              onTap: () {
                                 final id = nextEp?.id;
                                 if (id != null) _notifier.loadEpisodeStream(id);
                               },
-                              style: FilledButton.styleFrom(
-                                backgroundColor: AppColors.accentViolet,
-                                foregroundColor: AppColors.textWhite,
-                                shape: const StadiumBorder(),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 10,
-                                ),
-                              ),
-                              icon: const Icon(Icons.skip_next, size: 18),
-                              label: const Text(
-                                'Next',
-                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-                              ),
                             ),
                           ],
                         ],
@@ -1661,16 +1653,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                        child: Text(
-                          'Daftar Episode (${ui.episodes.length})',
-                          style: const TextStyle(
-                            color: AppColors.textWhite,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
+                      SectionHeader(
+                        title: 'Daftar Episode (${ui.episodes.length})',
+                        eyebrow: 'エピソード',
                       ),
                       SingleChildScrollView(
                         controller: _epScroll,
@@ -2322,22 +2307,23 @@ class _SkipIntroPill extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
         decoration: BoxDecoration(
-          color: AppColors.surfaceDark,
-          borderRadius: AppShapes.pill,
+          color: const Color(0xF2FFFFFF),
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: const [BoxShadow(color: Color(0x66000000), blurRadius: 10, offset: Offset(0, 3))],
         ),
         child: const Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.fast_forward, size: 14, color: AppColors.accentViolet),
-            SizedBox(width: 4),
+            Icon(Icons.fast_forward_rounded, size: 15, color: AppColors.backgroundDark),
+            SizedBox(width: 5),
             Text(
               'Lewati Intro',
               style: TextStyle(
-                color: AppColors.textWhite,
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
+                color: AppColors.backgroundDark,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
               ),
             ),
           ],
@@ -2347,13 +2333,14 @@ class _SkipIntroPill extends StatelessWidget {
   }
 }
 
-/// Chip aksi di bawah video (gaya PlayerActionChip Zenime).
+/// Ubin aksi di bawah video (redesain Samudra): ikon di atas label.
 class _ActionIconButton extends StatelessWidget {
   const _ActionIconButton({
     required this.icon,
     required this.label,
     required this.tint,
     required this.onTap,
+    this.filled = false,
   });
 
   final IconData icon;
@@ -2361,24 +2348,35 @@ class _ActionIconButton extends StatelessWidget {
   final Color tint;
   final VoidCallback onTap;
 
+  /// Ubin utama berwarna aksen (mis. Episode Berikutnya).
+  final bool filled;
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        width: 74,
+        padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
-          color: AppColors.surfaceVariantDark,
-          borderRadius: AppShapes.pill,
+          color: filled ? AppColors.accentViolet : AppColors.surfaceDark,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: filled ? Colors.transparent : const Color(0x12FFFFFF)),
         ),
-        child: Row(
+        child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 16, color: tint),
-            const SizedBox(width: 6),
+            Icon(icon, size: 21, color: tint),
+            const SizedBox(height: 5),
             Text(
               label,
-              style: TextStyle(color: tint, fontSize: 12, fontWeight: FontWeight.w500),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: filled ? Colors.white : AppColors.textSecondary,
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ],
         ),
