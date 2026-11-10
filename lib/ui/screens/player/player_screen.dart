@@ -2513,6 +2513,20 @@ class _SkipIntroPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Muncul naik + memudar (animasi "rise" preview).
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 420),
+      curve: Curves.easeOutQuint,
+      builder: (context, v, child) => Opacity(
+        opacity: v,
+        child: Transform.translate(offset: Offset(0, 8 * (1 - v)), child: child),
+      ),
+      child: _pill(),
+    );
+  }
+
+  Widget _pill() {
     return GestureDetector(
       onTap: onTap,
       child: Container(

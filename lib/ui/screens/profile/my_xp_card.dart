@@ -44,28 +44,14 @@ class _MyXpCardState extends ConsumerState<MyXpCard>
     final totalXp = xp?.totalXp ?? 0;
     final p = XpLevelFormula.progress(totalXp, level);
 
-    // Gaya preview: kartu bergradien biru tipis, "Level N" + angka XP di
-    // atas, bar 8px membulat dengan kilau pelan. Tap = buka leaderboard.
+    // "Level N" + angka XP di atas, bar 8px membulat dengan kilau pelan.
+    // Tanpa kartu (transparan). Tap = buka leaderboard.
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => Navigator.of(context).push<void>(fadeRoute(const XpLeaderboardScreen())),
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            stops: const [0, 0.6, 1],
-            colors: [
-              AppColors.accentViolet.withValues(alpha: 0.18),
-              AppColors.accentTeal.withValues(alpha: 0.06),
-              AppColors.surfaceDark,
-            ],
-          ),
-          border: Border.all(color: AppColors.accentViolet.withValues(alpha: 0.25)),
-        ),
+        // Transparan: tanpa latar/garis, cuma isi.
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [

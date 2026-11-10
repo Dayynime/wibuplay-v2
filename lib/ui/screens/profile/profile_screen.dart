@@ -162,6 +162,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ? NetImage(backdrop!)
               : const ColoredBox(color: AppColors.surfaceVariantDark),
         ),
+        // Tekstur titik ala manga di pojok banner.
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          height: MediaQuery.paddingOf(context).top + 200,
+          child: const ZScreentone(opacity: 0.18),
+        ),
         const Positioned.fill(
           child: DecoratedBox(
             decoration: BoxDecoration(
@@ -185,8 +193,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Avatar kiri + tombol Edit Profil di kanan (tata letak preview).
-              // Tombol memanggil sheet Edit Profil yang sama dengan di Pengaturan.
+              // Avatar rata kiri (tombol Edit Profil ada di baris nama).
               Padding(
                 padding: const EdgeInsets.only(left: 8, right: 16),
                 child: Row(
@@ -199,46 +206,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       label: name,
                       showXpRing: true,
                     ),
-                    const Spacer(),
-                    if (user != null)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: ZPress(
-                          onTap: () => showEditProfileSheet(
-                            context,
-                            user: user!,
-                            profile: profile,
-                            fallbackName: name,
-                            fallbackAvatar: avatarUrl,
-                            premium: premium,
-                          ),
-                          child: Container(
-                            height: 38,
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              color: AppColors.surfaceVariantDark,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: const Color(0x1AFFFFFF)),
-                            ),
-                            child: const Text(
-                              'Edit Profil',
-                              style: TextStyle(
-                                color: AppColors.textWhite,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
                   ],
                 ),
               ),
               const SizedBox(height: 10),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 18),
+                padding: const EdgeInsets.only(left: 18, right: 16),
                 child: Row(
+                  children: [
+                Expanded(
+                  child: Row(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
@@ -296,6 +273,48 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     ],
                   ],
                 ),
+                ),
+                    // Edit Profil sejajar nama (memanggil sheet yang sama
+                    // dengan di Pengaturan).
+                    if (user != null) ...[
+                      const SizedBox(width: 10),
+                      ZPress(
+                        onTap: () => showEditProfileSheet(
+                          context,
+                          user: user!,
+                          profile: profile,
+                          fallbackName: name,
+                          fallbackAvatar: avatarUrl,
+                          premium: premium,
+                        ),
+                        child: Container(
+                          height: 36,
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                          decoration: BoxDecoration(
+                            color: AppColors.accentViolet.withValues(alpha: 0.16),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppColors.accentViolet.withValues(alpha: 0.35)),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.edit_rounded, size: 15, color: AppColors.accentVioletLight),
+                              SizedBox(width: 6),
+                              Text(
+                                'Edit Profil',
+                                style: TextStyle(
+                                  color: AppColors.accentVioletLight,
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ),
               const SizedBox(height: 10),
               // Nama clan + role. Top XP / Top Giver ada di samping pin level.
@@ -315,15 +334,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ),
                 ),
               const SizedBox(height: 18),
-              // Statistik dalam satu kartu (redesain Samudra).
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 16),
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceDark.withValues(alpha: 0.92),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0x12FFFFFF)),
-                ),
+              // Statistik tanpa kartu (transparan, banner tetap kelihatan).
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                 child: Row(
                   children: [
                     JoinDateStat(firebaseUid: uid, fallback: user?.metadata.creationTime?.toLocal()),
@@ -479,22 +492,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           TweenAnimationBuilder<int>(
             tween: IntTween(begin: 0, end: value),
             duration: const Duration(milliseconds: 1200),
-            builder: (context, v, _) => Text(
-              '$v',
-              style: const TextStyle(
-                color: AppColors.textWhite,
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
+            builder: (context, v, _) => Text('$v', style: ZFont.display(size: 20, height: 1.1)),
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 3),
           Text(
             label,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: Color(0xB3FFFFFF), fontSize: 11),
+            style: const TextStyle(color: AppColors.textMuted, fontSize: 11, fontWeight: FontWeight.w500),
           ),
         ],
       ),
@@ -1252,17 +1258,43 @@ class ProfilePillButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return OutlinedButton.icon(
-      onPressed: onTap,
-      style: OutlinedButton.styleFrom(
-        foregroundColor: color,
-        side: BorderSide(color: borderColor),
-        shape: const StadiumBorder(),
-        minimumSize: const Size.fromHeight(44),
+    // Gaya baru: kotak gelap dengan ikon di kotak warna lembut (bukan
+    // tombol garis tepi bulat). [borderColor] dipakai sebagai warna tepi tipis.
+    final tint = color == Colors.white ? AppColors.accentVioletLight : color;
+    return ZPress(
+      onTap: onTap,
+      child: Container(
+        height: 64,
         padding: const EdgeInsets.symmetric(horizontal: 10),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceDark,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: borderColor.withValues(alpha: 0.25)),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: tint.withValues(alpha: 0.16),
+                borderRadius: BorderRadius.circular(9),
+              ),
+              child: Icon(icon, size: 16, color: tint),
+            ),
+            const SizedBox(height: 5),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                label,
+                maxLines: 1,
+                style: const TextStyle(color: AppColors.textWhite, fontSize: 12, fontWeight: FontWeight.w700),
+              ),
+            ),
+          ],
+        ),
       ),
-      icon: Icon(icon, size: 16),
-      label: FittedBox(fit: BoxFit.scaleDown, child: Text(label, maxLines: 1)),
     );
   }
 }
@@ -1280,16 +1312,17 @@ class ProfileSectionHeader extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       child: Row(
         children: [
-          Icon(icon, color: AppColors.accentViolet, size: 20),
-          const SizedBox(width: 8),
-          Text(
-            title,
-            style: const TextStyle(
-              color: AppColors.textWhite,
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: AppColors.accentViolet.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(9),
             ),
+            child: Icon(icon, color: AppColors.accentVioletLight, size: 16),
           ),
+          const SizedBox(width: 10),
+          Text(title, style: ZFont.display(size: 17)),
           const Spacer(),
           if (trailing != null)
             Text(trailing!, style: const TextStyle(color: Color(0x80FFFFFF), fontSize: 11)),

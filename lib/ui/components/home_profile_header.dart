@@ -534,7 +534,10 @@ class _PremiumBanner extends StatelessWidget {
             child: _Pressable(
               onTap: onPremiumClick,
               scale: 0.97,
-              child: Container(
+              // Kilau menyapu tiap 3,2 dtk (preview).
+              child: ZSheen(
+                radius: BorderRadius.circular(16),
+                child: Container(
                 height: 46,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
@@ -570,6 +573,7 @@ class _PremiumBanner extends StatelessWidget {
                     ),
                   ],
                 ),
+              ),
               ),
             ),
           ),
@@ -646,16 +650,10 @@ class _RingAvatar extends ConsumerWidget {
         );
       }
     }
-    return Container(
-      width: 56,
-      height: 56,
-      padding: const EdgeInsets.all(2),
-      decoration: const BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: SweepGradient(
-          colors: [AppColors.accentViolet, AppColors.warningAmber, AppColors.accentViolet],
-        ),
-      ),
+    // Tanpa border: cincin gradien berputar pelan (preview).
+    return ZSpinRing(
+      size: 56,
+      width: 2,
       child: Container(
         padding: const EdgeInsets.all(2),
         decoration: const BoxDecoration(

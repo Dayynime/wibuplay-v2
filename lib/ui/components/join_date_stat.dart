@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../providers.dart';
+import '../redesign/z_kit.dart';
 
 /// Lama bergabung dalam bulan kalender penuh (14 Agu -> 16 Okt = 2).
 int monthsSince(DateTime join, [DateTime? now]) {
@@ -37,11 +38,7 @@ class JoinDateStat extends ConsumerWidget {
   final String firebaseUid;
   final DateTime? fallback;
 
-  static const _valueStyle = TextStyle(
-    color: AppColors.textWhite,
-    fontSize: 18,
-    fontWeight: FontWeight.w800,
-  );
+  static TextStyle get _valueStyle => ZFont.display(size: 20, height: 1.1);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -73,7 +70,7 @@ class JoinDateStat extends ConsumerWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: Color(0xB3FFFFFF), fontSize: 11),
+            style: const TextStyle(color: AppColors.textMuted, fontSize: 11, fontWeight: FontWeight.w500),
           ),
         ],
       ),

@@ -151,7 +151,6 @@ class _AnimatedTabState extends State<_AnimatedTab>
   @override
   Widget build(BuildContext context) {
     final hidden = !widget.active && _c.isDismissed;
-    final dir = widget.active ? widget.direction : -widget.direction;
     return Visibility(
       visible: !hidden,
       maintainState: true,
@@ -160,11 +159,12 @@ class _AnimatedTabState extends State<_AnimatedTab>
         child: RepaintBoundary(
           child: FadeTransition(
             opacity: _curve,
+            // Naik pelan 10px sambil muncul (animasi "rise" preview).
             child: AnimatedBuilder(
               animation: _curve,
               child: widget.child,
-              builder: (context, child) => FractionalTranslation(
-                translation: Offset(dir * 0.05 * (1 - _curve.value), 0),
+              builder: (context, child) => Transform.translate(
+                offset: Offset(0, 10 * (1 - _curve.value)),
                 child: child,
               ),
             ),

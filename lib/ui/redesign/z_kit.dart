@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../core/decor_tick.dart';
 import '../../core/theme/app_colors.dart';
 
 // =============================================================================
@@ -243,3 +244,149 @@ const LinearGradient zBottomShade = LinearGradient(
   stops: [0.3, 1],
   colors: [Color(0x0006111D), Color(0xEB06111D)],
 );
+
+/// Kilau yang menyapu terus di atas [child] (tombol Premium di preview:
+/// pita putih 35% bergerak kiri ke kanan tiap [period]). Digambar ulang
+/// maks DecorTick.fps; berhenti kalau HP diset "hapus animasi".
+class ZSheen extends StatefulWidget {
+  const ZSheen({
+    super.key,
+    required this.child,
+    this.radius = BorderRadius.zero,
+    this.period = const Duration(milliseconds: 3200),
+    this.opacity = 0.35,
+  });
+
+  final Widget child;
+  final BorderRadius radius;
+  final Duration period;
+  final double opacity;
+
+  @override
+  State<ZSheen> createState() => _ZSheenState();
+}
+
+class _ZSheenState extends State<ZSheen> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: widget.period);
+  late final Animation<double> _t = DecorAnimation(_c);
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _c.stop();
+    } else if (!_c.isAnimating) {
+      _c.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final white = Color.fromRGBO(255, 255, 255, widget.opacity);
+    return ClipRRect(
+      borderRadius: widget.radius,
+      child: Stack(
+        children: [
+          widget.child,
+          Positioned.fill(
+            child: IgnorePointer(
+              child: RepaintBoundary(
+                child: AnimatedBuilder(
+                  animation: _t,
+                  builder: (context, child) => FractionalTranslation(
+                    translation: Offset(-1 + 2 * Curves.easeInOut.transform(_c.value), 0),
+                    child: child,
+                  ),
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: const Alignment(-1, -0.3),
+                        end: const Alignment(1, 0.3),
+                        stops: const [0.3, 0.5, 0.7],
+                        colors: [white.withValues(alpha: 0), white, white.withValues(alpha: 0)],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Cincin gradien yang berputar pelan (5 dtk/putaran) di belakang [child],
+/// seperti cincin avatar di preview. [child] sendiri tidak ikut berputar.
+class ZSpinRing extends StatefulWidget {
+  const ZSpinRing({super.key, required this.size, required this.child, this.width = 2.5});
+
+  final double size;
+  final double width;
+  final Widget child;
+
+  @override
+  State<ZSpinRing> createState() => _ZSpinRingState();
+}
+
+class _ZSpinRingState extends State<ZSpinRing> with SingleTickerProviderStateMixin {
+  late final AnimationController _c =
+      AnimationController(vsync: this, duration: const Duration(seconds: 5));
+  late final Animation<double> _t = DecorAnimation(_c);
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _c.stop();
+    } else if (!_c.isAnimating) {
+      _c.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: widget.size,
+      height: widget.size,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          RepaintBoundary(
+            child: RotationTransition(
+              turns: _t,
+              child: const DecoratedBox(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: SweepGradient(
+                    colors: [
+                      AppColors.accentViolet,
+                      Color(0xFFF6BE4F),
+                      AppColors.accentTeal,
+                      AppColors.accentViolet,
+                    ],
+                  ),
+                ),
+                child: SizedBox.expand(),
+              ),
+            ),
+          ),
+          Padding(padding: EdgeInsets.all(widget.width), child: widget.child),
+        ],
+      ),
+    );
+  }
+}
