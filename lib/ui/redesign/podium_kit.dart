@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' show FontFeature;
 
@@ -261,13 +260,10 @@ class _ZPodiumState extends State<ZPodium> with TickerProviderStateMixin {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (MediaQuery.disableAnimationsOf(context)) {
-      _intro.value = 1;
-      _loop.stop();
-    } else {
-      if (_intro.isDismissed) _intro.forward();
-      if (!_loop.isAnimating) _loop.repeat();
-    }
+    // Statis: tanpa animasi masuk berurutan dan tanpa kilau berulang,
+    // supaya halaman peringkat ringan.
+    _intro.value = 1;
+    _loop.stop();
   }
 
   @override
@@ -396,26 +392,6 @@ class _ZPodiumCard extends StatelessWidget {
                               ),
                             ),
                           ),
-                        ),
-                        // Kilau diagonal berkala (juara 1 lebih terang).
-                        AnimatedBuilder(
-                          animation: loop,
-                          builder: (context, _) {
-                            final v = loop.value;
-                            return DecoratedBox(
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment(-3 + 6 * v, -1),
-                                  end: Alignment(-2 + 6 * v, 1),
-                                  colors: [
-                                    Colors.white.withValues(alpha: 0),
-                                    Colors.white.withValues(alpha: rank == 1 ? 0.16 : 0.08),
-                                    Colors.white.withValues(alpha: 0),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
                         ),
                       ],
                     ),
@@ -588,45 +564,10 @@ class ZStaggerIn extends StatefulWidget {
   State<ZStaggerIn> createState() => _ZStaggerInState();
 }
 
-class _ZStaggerInState extends State<ZStaggerIn> with SingleTickerProviderStateMixin {
-  late final bool _animate = widget.index < 10;
-  late final AnimationController _c = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 460),
-  );
-  late final Animation<double> _curve = CurvedAnimation(parent: _c, curve: Curves.easeOutCubic);
-  Timer? _timer;
-
+class _ZStaggerInState extends State<ZStaggerIn> {
+  // Baris langsung tampil (tanpa muncul satu per satu) supaya daftar ringan.
   @override
-  void initState() {
-    super.initState();
-    if (_animate) {
-      // Mulai setelah podium hampir selesai naik.
-      _timer = Timer(Duration(milliseconds: 650 + widget.index * 60), () {
-        if (mounted) _c.forward();
-      });
-    }
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    _c.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (!_animate) return widget.child;
-    return AnimatedBuilder(
-      animation: _curve,
-      child: widget.child,
-      builder: (context, child) => Opacity(
-        opacity: _curve.value,
-        child: Transform.translate(offset: Offset(0, 12 * (1 - _curve.value)), child: child),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => widget.child;
 }
 
 /// Satu baris panel peringkat 4+: avatar, nama, nilai + badge, karangan daun.

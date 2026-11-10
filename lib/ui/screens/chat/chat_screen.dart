@@ -414,7 +414,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
               ? Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [Text('Chat Global', style: ZFont.display(size: 18)), const OnlineCountLabel()],
+                  children: [Text('Chat Global', style: ZFont.display(size: 17, height: 1.15)), const OnlineCountLabel()],
                 )
               : Text(_tab == 1 ? 'Chat Teman' : 'Chat Clan', style: ZFont.display(size: 18)),
           actions: [
@@ -478,9 +478,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     const labels = ['Global', 'Teman', 'Clan'];
     final badges = [0, privateBadge, clanBadge];
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
       child: Container(
-        height: 42,
+        height: 44,
         padding: const EdgeInsets.all(4),
         decoration: BoxDecoration(
           color: AppColors.backgroundDarkSecondary,
@@ -521,8 +521,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         child: GestureDetector(
                           behavior: HitTestBehavior.opaque,
                           onTap: () => _setTab(i),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
+                          // Center: label & angka tepat di tengah pil (vertikal).
+                          child: Center(
+                            child: Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
                               AnimatedDefaultTextStyle(
                                 duration: const Duration(milliseconds: 200),
@@ -535,6 +537,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                               ),
                               _TabBadge(count: badges[i]),
                             ],
+                          ),
                           ),
                         ),
                       ),
