@@ -5,6 +5,7 @@ import '../../data/models/anime_item.dart';
 import '../../data/models/cuplix_item.dart';
 import 'net_image.dart';
 import 'poster_holder.dart';
+import '../redesign/z_kit.dart';
 
 /// 1.874.111 -> "1,9jt", 24.803 -> "24,8rb"; null kalau bukan angka.
 String? compactCount(String? raw) {
@@ -25,9 +26,8 @@ String? _firstGenre(String? genre) {
 bool _has(String? s) => s != null && s.trim().isNotEmpty;
 
 /// Section bergaya banner ("Sedang Hangat" dan "Jas Por Yu"): kartu cover 16:9
-/// yang bergulir ke samping; di bawah tiap cover ada poster mini, genre, judul,
-/// lalu jumlah views & favorit. Lebar kartu ~62% layar supaya kartu berikutnya
-/// mengintip. Port AnimeCoverBannerSection (Zenime).
+/// yang bergulir ke samping, judul di atas gambar (redesain Samudra). Lebar
+/// kartu ~68% layar supaya kartu berikutnya mengintip.
 class AnimeCoverBannerRow extends StatelessWidget {
   const AnimeCoverBannerRow({
     super.key,
@@ -39,21 +39,19 @@ class AnimeCoverBannerRow extends StatelessWidget {
   final List<AnimeItem> items;
   final ValueChanged<String> onAnimeClick;
 
-  /// Tampilkan nomor urut besar bergaris di pojok cover (Sedang Hangat).
+  /// Tampilkan nomor urut besar bergaris + chip "Hangat" (Sedang Hangat).
   final bool showRank;
 
   @override
   Widget build(BuildContext context) {
-    final cardWidth = MediaQuery.of(context).size.width * 0.62;
-    // cover 16:9 + jarak + poster mini (46 x 69) + napas
-    final height = cardWidth * 9 / 16 + 10 + 69 + 8;
+    final cardWidth = (MediaQuery.sizeOf(context).width * 0.68).clamp(220.0, 340.0);
     return SizedBox(
-      height: height,
+      height: cardWidth * 9 / 16,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         itemCount: items.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 14),
+        separatorBuilder: (_, _) => const SizedBox(width: 12),
         itemBuilder: (context, i) {
           final anime = items[i];
           return _CoverBannerCard(
@@ -73,6 +71,8 @@ class AnimeCoverBannerRow extends StatelessWidget {
   }
 }
 
+/// Kartu cover lebar 16:9 (gaya preview): judul & genre di atas gambar,
+/// chip di kiri atas, nomor peringkat bergaris di kanan atas.
 class _CoverBannerCard extends StatelessWidget {
   const _CoverBannerCard({
     required this.anime,
@@ -89,143 +89,81 @@ class _CoverBannerCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final views = compactCount(anime.views);
-    final favorites = compactCount(anime.favorites);
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
+    final meta = [
+      if (_has(anime.genre)) anime.genre!.split(',').take(2).map((e) => e.trim()).join(' · '),
+      if (_has(anime.year)) anime.year!.trim(),
+    ].join(' · ');
+    return ZPress(
       onTap: onTap,
       child: SizedBox(
         width: width,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            AspectRatio(
-              aspectRatio: 16 / 9,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: Stack(
-                  fit: StackFit.expand,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              ColoredBox(
+                color: AppColors.surfaceCard,
+                child: NetImage(_has(anime.coverUrl) ? anime.coverUrl : anime.posterUrl),
+              ),
+              const ZScreentone(opacity: 0.12),
+              const DecoratedBox(decoration: BoxDecoration(gradient: zBottomShade)),
+              Positioned(
+                left: 10,
+                top: 10,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    ColoredBox(
-                      color: AppColors.surfaceCard,
-                      child: NetImage(anime.coverUrl),
-                    ),
+                    if (views != null) ZChip(views, icon: Icons.play_arrow_rounded, tone: ZTone.scrim),
                     if (rank != null) ...[
-                      const DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topRight,
-                            end: Alignment.center,
-                            colors: [Color(0x8C000000), Color(0x00000000)],
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        right: 10,
-                        top: 2,
-                        child: Text(
-                          '$rank',
-                          style: TextStyle(
-                            fontSize: 44,
-                            height: 1.1,
-                            fontWeight: FontWeight.w900,
-                            foreground: Paint()
-                              ..style = PaintingStyle.stroke
-                              ..strokeWidth = 1.6
-                              ..color = const Color(0xD9FFFFFF),
-                          ),
-                        ),
-                      ),
+                      if (views != null) const SizedBox(width: 6),
+                      const ZChip('Hangat', icon: Icons.local_fire_department_rounded, tone: ZTone.brand),
                     ],
                   ],
                 ),
               ),
-            ),
-            const SizedBox(height: 10),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(
-                  width: 46,
-                  height: 69,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: ColoredBox(
-                      color: AppColors.surfaceCard,
-                      child: NetImage(anime.posterUrl),
+              if (rank != null)
+                Positioned(
+                  right: 10,
+                  top: 4,
+                  child: ZRankNumber(rank!, size: 44, color: const Color(0xC7FFFFFF)),
+                ),
+              Positioned(
+                left: 12,
+                right: 12,
+                bottom: 10,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      anime.title ?? 'Tanpa Judul',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: ZFont.display(size: 16, color: Colors.white),
                     ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (_has(anime.genre))
-                        Text(
-                          anime.genre!,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: AppColors.accentVioletLight,
-                            fontSize: 11,
-                          ),
-                        ),
+                    if (meta.isNotEmpty)
                       Text(
-                        anime.title ?? 'Tanpa Judul',
-                        maxLines: 2,
+                        meta,
+                        maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppColors.textWhite,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                        ),
+                        style: const TextStyle(color: Color(0xC7FFFFFF), fontSize: 11.5),
                       ),
-                      if (views != null || favorites != null) ...[
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            if (views != null) ...[
-                              const Icon(Icons.play_arrow, size: 13, color: AppColors.accentViolet),
-                              const SizedBox(width: 2),
-                              Text(
-                                views,
-                                style: const TextStyle(
-                                  color: AppColors.textSecondary,
-                                  fontSize: 11,
-                                ),
-                              ),
-                            ],
-                            if (views != null && favorites != null) const SizedBox(width: 10),
-                            if (favorites != null) ...[
-                              const Icon(Icons.star, size: 13, color: Color(0xFFFFB300)),
-                              const SizedBox(width: 2),
-                              Text(
-                                favorites,
-                                style: const TextStyle(
-                                  color: AppColors.textSecondary,
-                                  fontSize: 11,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ],
-                    ],
-                  ),
+                  ],
                 ),
-              ],
-            ),
-          ],
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-/// Section "tangga lagu" ("Terpopuler"): poster besar dengan nomor peringkat
-/// raksasa di kiri bawah (1-3 emas/perak/perunggu), views di kanan bawah, lalu
-/// judul, genre, dan favorit di bawah poster. Port AnimeRankedSection (Zenime).
-class AnimeRankedRow extends StatelessWidget {
+/// Section "Terpopuler" (gaya preview): daftar peringkat vertikal dengan
+/// angka besar bergaris. Tampil 5 dulu; "Tampilkan lebih banyak" membuka
+/// sisanya sampai [maxItems], jadi tidak ada judul yang hilang.
+class AnimeRankedRow extends StatefulWidget {
   const AnimeRankedRow({
     super.key,
     required this.items,
@@ -237,33 +175,50 @@ class AnimeRankedRow extends StatelessWidget {
   final ValueChanged<String> onAnimeClick;
   final int maxItems;
 
-  static const double _cardWidth = 148;
+  @override
+  State<AnimeRankedRow> createState() => _AnimeRankedRowState();
+}
+
+class _AnimeRankedRowState extends State<AnimeRankedRow> {
+  bool _expanded = false;
 
   @override
   Widget build(BuildContext context) {
-    final ranked = items.take(maxItems).toList();
-    // poster 2:3 + judul 2 baris + baris genre/favorit
-    const height = _cardWidth * 3 / 2 + 8 + 36 + 22;
-    return SizedBox(
-      height: height,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        itemCount: ranked.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 14),
-        itemBuilder: (context, i) {
-          final anime = ranked[i];
-          return _RankedCard(
-            rank: i + 1,
-            anime: anime,
-            onTap: () {
-              final id = anime.id;
-              if (id == null) return;
-              PosterTransitionHolder.url = anime.posterUrl;
-              onAnimeClick(id);
-            },
-          );
-        },
+    final all = widget.items.take(widget.maxItems).toList();
+    final shown = _expanded ? all : all.take(5).toList();
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeOutQuint,
+      alignment: Alignment.topCenter,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Column(
+          children: [
+            for (var i = 0; i < shown.length; i++)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _RankedCard(
+                  rank: i + 1,
+                  anime: shown[i],
+                  onTap: () {
+                    final id = shown[i].id;
+                    if (id == null) return;
+                    PosterTransitionHolder.url = shown[i].posterUrl;
+                    widget.onAnimeClick(id);
+                  },
+                ),
+              ),
+            if (all.length > 5)
+              TextButton(
+                onPressed: () => setState(() => _expanded = !_expanded),
+                style: TextButton.styleFrom(foregroundColor: AppColors.textSecondary),
+                child: Text(
+                  _expanded ? 'Tampilkan lebih sedikit' : 'Tampilkan lebih banyak',
+                  style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -278,133 +233,70 @@ class _RankedCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final rankColor = switch (rank) {
-      1 => const Color(0xFFFFC107),
-      2 => const Color(0xFFE0E0E0),
-      3 => const Color(0xFFCD7F32),
-      _ => Colors.white,
-    };
     final views = compactCount(anime.views);
     final favorites = compactCount(anime.favorites);
     final genre = _firstGenre(anime.genre);
+    final sub = [
+      if (genre != null) genre,
+      if (views != null) '$views ditonton',
+    ].join(' · ');
 
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
+    return ZPress(
       onTap: onTap,
-      child: SizedBox(
-        width: AnimeRankedRow._cardWidth,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            AspectRatio(
-              aspectRatio: 2 / 3,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(18),
-                child: ColoredBox(
-                  color: AppColors.surfaceCard,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      NetImage(anime.posterUrl),
-                      const Positioned(
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        height: 96,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [Colors.transparent, Color(0xD9000000)],
-                            ),
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        left: 10,
-                        bottom: 4,
-                        child: Text(
-                          '$rank',
-                          style: TextStyle(
-                            color: rankColor,
-                            fontSize: 46,
-                            fontWeight: FontWeight.w900,
-                            height: 1.1,
-                            shadows: const [
-                              Shadow(
-                                color: Color(0x99000000),
-                                offset: Offset(0, 4),
-                                blurRadius: 10,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      if (views != null)
-                        Positioned(
-                          right: 10,
-                          bottom: 12,
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.play_arrow, size: 13, color: AppColors.accentViolet),
-                              const SizedBox(width: 2),
-                              Text(
-                                views,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 44,
+            child: Center(
+              child: ZRankNumber(
+                rank,
+                size: 40,
+                color: rank == 1 ? const Color(0xFFF6BE4F) : AppColors.textMuted,
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              anime.title ?? 'Tanpa Judul',
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: AppColors.textWhite,
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-              ),
+          ),
+          const SizedBox(width: 10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: SizedBox(
+              width: 52,
+              height: 70,
+              child: ColoredBox(color: AppColors.surfaceCard, child: NetImage(anime.posterUrl)),
             ),
-            const SizedBox(height: 2),
-            Row(
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (genre != null)
-                  Flexible(
-                    child: Text(
-                      genre,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.accentVioletLight,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ),
-                if (favorites != null) ...[
-                  if (genre != null) const SizedBox(width: 8),
-                  const Icon(Icons.star, size: 12, color: Color(0xFFFFB300)),
-                  const SizedBox(width: 2),
+                Text(
+                  anime.title ?? 'Tanpa Judul',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: AppColors.textWhite, fontSize: 14, fontWeight: FontWeight.w700),
+                ),
+                if (sub.isNotEmpty) ...[
+                  const SizedBox(height: 2),
                   Text(
-                    favorites,
-                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
+                    sub,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
                   ),
                 ],
               ],
             ),
+          ),
+          if (favorites != null) ...[
+            const SizedBox(width: 8),
+            const Icon(Icons.star_rounded, size: 14, color: Color(0xFFF6BE4F)),
+            const SizedBox(width: 2),
+            Text(
+              favorites,
+              style: const TextStyle(color: AppColors.textSecondary, fontSize: 11.5, fontWeight: FontWeight.w700),
+            ),
           ],
-        ),
+        ],
       ),
     );
   }

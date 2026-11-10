@@ -33,6 +33,7 @@ import 'player_gestures.dart';
 import 'player_settings_sheet.dart';
 import 'quality_sheet.dart';
 import '../../glass/glass.dart';
+import '../../redesign/z_kit.dart';
 import 'package:wibuplay/core/review_prompter.dart';
 
 /// Link donasi Trakteer (sama dengan Zenime).
@@ -1648,6 +1649,27 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                   ),
                 ),
 
+                // 4b. Kartu "Selanjutnya" (gaya preview): thumbnail + ring
+                // hitung mundur saat auto-lanjut berjalan, dan sakelar
+                // lanjut otomatis (pengaturan "lewati outro" yang sudah ada).
+                if (hasNext)
+                  SliverToBoxAdapter(
+                    child: _NextEpisodeCard(
+                      thumbUrl: !_blank(nextEp?.image) ? nextEp!.image! : posterUrl,
+                      title: [
+                        if (!_blank(nextEp?.index)) 'EP ${nextEp!.index}',
+                        if (!_blank(nextEp?.title)) nextEp!.title!,
+                      ].join(' · '),
+                      countdown: ui.autoNextCountdown,
+                      autoNext: ref.watch(localStoreProvider.select((s) => s.autoSkipOutro)),
+                      onAutoNext: (v) => ref.read(localStoreProvider).setAutoSkipOutro(v),
+                      onTap: () {
+                        final id = nextEp?.id;
+                        if (id != null) _notifier.loadEpisodeStream(id);
+                      },
+                    ),
+                  ),
+
                 // 5. Daftar episode (tetap seperti sebelumnya)
                 SliverToBoxAdapter(
                   child: Column(
@@ -1925,6 +1947,142 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
 
 // ---------------------------------------------------------------- komponen
 
+/// Kartu "Selanjutnya" di bawah tombol aksi (preview).
+class _NextEpisodeCard extends StatelessWidget {
+  const _NextEpisodeCard({
+    required this.thumbUrl,
+    required this.title,
+    required this.countdown,
+    required this.autoNext,
+    required this.onAutoNext,
+    required this.onTap,
+  });
+
+  final String thumbUrl;
+  final String title;
+  final int? countdown;
+  final bool autoNext;
+  final ValueChanged<bool> onAutoNext;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = countdown;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
+      child: ZPress(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceDark,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0x12FFFFFF)),
+          ),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: SizedBox(
+                  width: 112,
+                  height: 63,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      if (thumbUrl.isNotEmpty)
+                        NetImage(thumbUrl)
+                      else
+                        const ColoredBox(color: AppColors.surfaceVariantDark),
+                      const ColoredBox(color: Color(0x5906111D)),
+                      Center(
+                        child: SizedBox(
+                          width: 34,
+                          height: 34,
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              if (c != null)
+                                TweenAnimationBuilder<double>(
+                                  tween: Tween<double>(end: c / 5),
+                                  duration: const Duration(milliseconds: 900),
+                                  builder: (_, v, __) => CircularProgressIndicator(
+                                    value: v,
+                                    strokeWidth: 2.5,
+                                    color: Colors.white,
+                                    backgroundColor: const Color(0x40FFFFFF),
+                                  ),
+                                ),
+                              Icon(
+                                c != null ? Icons.skip_next_rounded : Icons.play_arrow_rounded,
+                                color: Colors.white,
+                                size: 20,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            c != null ? 'Selanjutnya · $c dtk' : 'Selanjutnya',
+                            style: const TextStyle(
+                              color: AppColors.accentVioletLight,
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        SizedBox(
+                          height: 24,
+                          child: FittedBox(
+                            child: Switch(
+                              value: autoNext,
+                              onChanged: onAutoNext,
+                              activeColor: Colors.white,
+                              activeTrackColor: AppColors.accentViolet,
+                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      title.isEmpty ? 'Episode berikutnya' : title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.textWhite,
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      autoNext ? 'Lanjut otomatis menyala' : 'Lanjut otomatis mati',
+                      style: const TextStyle(color: AppColors.textMuted, fontSize: 11.5),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Port PlayerControlsOverlay.
 class PlayerControlsOverlay extends StatefulWidget {
   const PlayerControlsOverlay({
@@ -2024,7 +2182,16 @@ class PlayerControlsOverlayState extends State<PlayerControlsOverlay> {
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  const ColoredBox(color: Color(0x88000000)),
+                  const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        stops: [0, 0.35, 0.65, 1],
+                        colors: [Color(0xA6000000), Color(0x4D000000), Color(0x4D000000), Color(0xB3000000)],
+                      ),
+                    ),
+                  ),
                   // Bar atas: back, judul, chip kualitas
                   Align(
                     alignment: Alignment.topCenter,
@@ -2165,10 +2332,10 @@ class PlayerControlsOverlayState extends State<PlayerControlsOverlay> {
                         GestureDetector(
                       onTap: widget.onTogglePlay,
                       child: Container(
-                        width: 56,
-                        height: 56,
+                        width: 58,
+                        height: 58,
                         decoration: const BoxDecoration(
-                          color: Color(0x66000000),
+                          color: Color(0x29FFFFFF),
                           shape: BoxShape.circle,
                         ),
                         child: Center(
@@ -2198,29 +2365,90 @@ class PlayerControlsOverlayState extends State<PlayerControlsOverlay> {
                       ],
                     ),
                   ),
-                  // Bawah: waktu, fullscreen, seek bar
+                  // Bawah (gaya preview): Lewati Intro mengambang di kanan,
+                  // timeline dengan penanda Opening, lalu waktu + fullscreen.
                   Align(
                     alignment: Alignment.bottomCenter,
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
+                          if (widget.showSkipIntro) ...[
+                            _SkipIntroPill(onTap: widget.onSkipIntro),
+                            const SizedBox(height: 6),
+                          ],
+                          SizedBox(
+                            height: 20,
+                            child: Stack(
+                              children: [
+                                // Penanda Opening: perkiraan intro yang sama
+                                // dengan tombol Lewati Intro (0..90 dtk).
+                                if (dur > _kMinDurationForSkipMs)
+                                  Positioned.fill(
+                                    child: LayoutBuilder(
+                                      builder: (context, tc) {
+                                        // Track Slider menjorok 6px (radius thumb).
+                                        final w = tc.maxWidth - 12;
+                                        return Align(
+                                          alignment: Alignment.centerLeft,
+                                          child: Padding(
+                                            padding: const EdgeInsets.only(left: 6),
+                                            child: Container(
+                                              width: w * (_kIntroSkipMs / dur).clamp(0.0, 1.0),
+                                              height: 4,
+                                              decoration: BoxDecoration(
+                                                color: const Color(0x99F6BE4F),
+                                                borderRadius: BorderRadius.circular(4),
+                                              ),
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                SliderTheme(
+                                  data: SliderTheme.of(context).copyWith(
+                                    trackHeight: 4,
+                                    thumbColor: Colors.white,
+                                    activeTrackColor: AppColors.accentViolet,
+                                    inactiveTrackColor: const Color(0x38FFFFFF),
+                                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                                    overlayShape: SliderComponentShape.noOverlay,
+                                  ),
+                                  child: Slider(
+                                    value: sliderValue,
+                                    min: 0,
+                                    max: sliderMax,
+                                    onChanged: (v) => widget.onSeek(v.toInt()),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                           Row(
                             children: [
                               Text(
-                                '${formatTime(pb.positionMs)} / ${formatTime(pb.durationMs)}',
+                                formatTime(pb.positionMs),
                                 style: const TextStyle(
                                   color: AppColors.textWhite,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w500,
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w600,
+                                  fontFeatures: [FontFeature.tabularFigures()],
                                 ),
                               ),
                               const Spacer(),
-                              if (widget.showSkipIntro) ...[
-                                _SkipIntroPill(onTap: widget.onSkipIntro),
-                                const SizedBox(width: 8),
-                              ],
+                              Text(
+                                formatTime(pb.durationMs),
+                                style: const TextStyle(
+                                  color: Color(0xCCFFFFFF),
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w600,
+                                  fontFeatures: [FontFeature.tabularFigures()],
+                                ),
+                              ),
+                              const SizedBox(width: 6),
                               SizedBox(
                                 width: 32,
                                 height: 32,
@@ -2232,30 +2460,11 @@ class PlayerControlsOverlayState extends State<PlayerControlsOverlay> {
                                         ? Icons.fullscreen_exit
                                         : Icons.fullscreen,
                                     color: AppColors.textWhite,
-                                    size: 24,
+                                    size: 22,
                                   ),
                                 ),
                               ),
                             ],
-                          ),
-                          SizedBox(
-                            height: 20,
-                            child: SliderTheme(
-                              data: SliderTheme.of(context).copyWith(
-                                trackHeight: 3,
-                                thumbColor: AppColors.accentViolet,
-                                activeTrackColor: AppColors.accentViolet,
-                                inactiveTrackColor: const Color(0x66FFFFFF),
-                                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                                overlayShape: SliderComponentShape.noOverlay,
-                              ),
-                              child: Slider(
-                                value: sliderValue,
-                                min: 0,
-                                max: sliderMax,
-                                onChanged: (v) => widget.onSeek(v.toInt()),
-                              ),
-                            ),
                           ),
                         ],
                       ),

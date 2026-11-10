@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/local/entities.dart';
 import 'net_image.dart';
+import '../redesign/z_kit.dart';
+import 'common_components.dart';
 
 /// Section "Riwayat Tontonan" di Beranda (menggantikan section Cuplix).
 ///
@@ -44,59 +46,9 @@ class WatchHistorySection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 18),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 10, 10),
-          child: Row(
-            children: [
-              Container(
-                width: 3,
-                height: 16,
-                decoration: BoxDecoration(
-                  color: AppColors.accentViolet,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(width: 8),
-              const Expanded(
-                child: Text(
-                  'Riwayat Tontonan',
-                  style: TextStyle(
-                    color: AppColors.textWhite,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: -0.2,
-                  ),
-                ),
-              ),
-              Material(
-                type: MaterialType.transparency,
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(100),
-                  onTap: onSeeAll,
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'Lihat semua',
-                          style: TextStyle(
-                            color: AppColors.textSecondary,
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        SizedBox(width: 2),
-                        Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary, size: 18),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
+        const SizedBox(height: 22),
+        SectionHeader(title: 'Riwayat Tontonan', actionText: 'Lihat semua', onActionClick: onSeeAll),
+        const SizedBox(height: 10),
         SizedBox(
           height: _HistoryCard.height,
           child: ListView.separated(
@@ -119,8 +71,9 @@ class WatchHistorySection extends StatelessWidget {
 class _HistoryCard extends StatefulWidget {
   const _HistoryCard({super.key, required this.entry, required this.onTap});
 
-  static const double height = 100;
-  static const double width = 272;
+  // Thumbnail 16:9 (236 x 133) + judul + label sisa waktu.
+  static const double width = 236;
+  static const double height = 133 + 50;
 
   final WatchHistoryEntity entry;
   final VoidCallback onTap;
@@ -130,7 +83,6 @@ class _HistoryCard extends StatefulWidget {
 }
 
 class _HistoryCardState extends State<_HistoryCard> {
-  bool _pressed = false;
 
   String get _episodeLabel {
     final h = widget.entry;
@@ -170,139 +122,82 @@ class _HistoryCardState extends State<_HistoryCard> {
     final progress = h.progressFraction;
     final done = progress >= 0.95;
 
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTapDown: (_) => setState(() => _pressed = true),
-      onTapUp: (_) => setState(() => _pressed = false),
-      onTapCancel: () => setState(() => _pressed = false),
+    // Kartu "Lanjut Nonton" gaya preview: thumbnail lebar, chip episode,
+    // tombol play putih, bar progres di dasar gambar.
+    return ZPress(
       onTap: widget.onTap,
-      child: AnimatedScale(
-        scale: _pressed ? 0.97 : 1.0,
-        duration: const Duration(milliseconds: 140),
-        curve: Curves.easeOut,
-        child: Container(
-          width: _HistoryCard.width,
-          height: _HistoryCard.height,
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: AppColors.surfaceDark,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: const Color(0x0FFFFFFF)),
-          ),
-          child: Row(
-            children: [
-              // Poster kecil 2:3
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: SizedBox(
-                  width: 56,
-                  height: 84,
-                  child: ColoredBox(
-                    color: AppColors.surfaceCard,
-                    child: NetImage(h.moviePoster, alignment: Alignment.topCenter),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        h.movieTitle.isEmpty ? 'Tanpa judul' : h.movieTitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppColors.textWhite,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: -0.1,
+      child: SizedBox(
+        width: _HistoryCard.width,
+        height: _HistoryCard.height,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: SizedBox(
+                width: _HistoryCard.width,
+                height: 133,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    ColoredBox(
+                      color: AppColors.surfaceCard,
+                      child: NetImage(h.moviePoster, alignment: const Alignment(0, -0.4)),
+                    ),
+                    const ZScreentone(opacity: 0.12),
+                    const DecoratedBox(decoration: BoxDecoration(gradient: zBottomShade)),
+                    Positioned(top: 9, right: 9, child: ZChip(_episodeLabel, tone: ZTone.scrim)),
+                    Positioned(
+                      left: 10,
+                      bottom: 12,
+                      child: Container(
+                        width: 32,
+                        height: 32,
+                        decoration: const BoxDecoration(color: Color(0xEBFFFFFF), shape: BoxShape.circle),
+                        child: Icon(
+                          done ? Icons.replay_rounded : Icons.play_arrow_rounded,
+                          color: AppColors.backgroundDark,
+                          size: 20,
                         ),
                       ),
-                      const SizedBox(height: 3),
-                      Text.rich(
-                        TextSpan(
-                          children: [
-                            TextSpan(
-                              text: _episodeLabel,
-                              style: const TextStyle(
-                                color: AppColors.accentVioletLight,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            if (ago.isNotEmpty)
-                              TextSpan(
-                                text: '  ·  $ago',
-                                style: const TextStyle(color: AppColors.textMuted),
-                              ),
-                          ],
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 11.5),
-                      ),
-                      const Spacer(),
-                      // Bar progres tipis
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(100),
-                        child: SizedBox(
-                          width: double.infinity,
-                          height: 4,
-                          child: Stack(
-                            children: [
-                              const Positioned.fill(
-                                child: ColoredBox(color: AppColors.surfaceElevated),
-                              ),
-                              FractionallySizedBox(
-                                widthFactor: progress == 0 ? 0.03 : progress,
-                                heightFactor: 1,
-                                child: DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      colors: done
-                                          ? const [AppColors.successGreen, AppColors.successGreen]
-                                          : const [AppColors.accentVioletDark, AppColors.accentVioletLight],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
+                    ),
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      height: 4,
+                      child: Stack(
+                        children: [
+                          const Positioned.fill(child: ColoredBox(color: Color(0x2EFFFFFF))),
+                          FractionallySizedBox(
+                            widthFactor: progress == 0 ? 0.03 : progress.clamp(0.0, 1.0),
+                            heightFactor: 1,
+                            child: ColoredBox(color: done ? AppColors.successGreen : AppColors.accentViolet),
                           ),
-                        ),
+                        ],
                       ),
-                      const SizedBox(height: 6),
-                      Text(
-                        _remainingLabel,
-                        style: TextStyle(
-                          color: done ? AppColors.successGreen : AppColors.textSecondary,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(width: 10),
-              // Tombol lanjut
-              Container(
-                width: 36,
-                height: 36,
-                decoration: const BoxDecoration(
-                  color: AppColors.accentVioletSubtle,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(
-                  done ? Icons.replay_rounded : Icons.play_arrow_rounded,
-                  color: AppColors.accentVioletLight,
-                  size: 22,
-                ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              h.movieTitle.isEmpty ? 'Tanpa judul' : h.movieTitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: AppColors.textWhite, fontSize: 13.5, fontWeight: FontWeight.w700),
+            ),
+            Text(
+              ago.isEmpty ? _remainingLabel : '$_remainingLabel  ·  $ago',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: done ? AppColors.successGreen : AppColors.textMuted,
+                fontSize: 12,
               ),
-              const SizedBox(width: 4),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

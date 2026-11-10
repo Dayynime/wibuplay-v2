@@ -19,6 +19,7 @@ import '../../components/poster_holder.dart';
 import '../download/download_actions.dart';
 import 'detail_controller.dart';
 import '../../glass/glass.dart';
+import '../../redesign/z_kit.dart';
 
 bool _blank(String? s) => s == null || s.trim().isEmpty;
 
@@ -509,11 +510,11 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
     required bool isFavorite,
     required String targetEpisodeId,
   }) {
+    // Status & tipe sudah tampil sebagai chip; meta = tahun + studio.
     final meta = [
       anime?.year,
-      anime?.type,
-      anime?.status,
-    ].where((e) => !_blank(e)).map((e) => e!.trim()).join(' • ');
+      anime?.studio,
+    ].where((e) => !_blank(e)).map((e) => e!.trim()).join(' · ');
 
     return SizedBox(
       height: _heroHeight + topInset,
@@ -543,58 +544,93 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
             ),
           ),
 
-          // Judul + metadata di kiri bawah.
+          // Poster menimpa backdrop di kiri bawah + chip, judul, meta (preview).
           Positioned(
-            left: 20,
-            right: 20,
-            bottom: 12,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+            left: 16,
+            right: 16,
+            bottom: 4,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                _titleWipe(
-                  Text(
-                    anime?.title ?? 'Tanpa Judul',
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 26,
-                      fontWeight: FontWeight.w800,
-                      height: 32 / 26,
+                _fadeIn(
+                  0.1,
+                  0.45,
+                  dx: 0,
+                  dy: 16,
+                  Container(
+                    width: 104,
+                    height: 156,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0x1AFFFFFF)),
+                      boxShadow: const [
+                        BoxShadow(color: Color(0xCC000000), blurRadius: 24, offset: Offset(0, 14), spreadRadius: -10),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(15),
+                      child: ColoredBox(
+                        color: AppColors.surfaceCard,
+                        child: NetImage(anime?.posterUrl ?? heroUrl),
+                      ),
                     ),
                   ),
                 ),
-                if (meta.isNotEmpty || !_blank(anime?.views)) ...[
-                  const SizedBox(height: 6),
-                  _fadeIn(0.3, 0.6, dx: -12, dy: 0, Row(
-                    children: [
-                      if (meta.isNotEmpty)
-                        Flexible(
-                          child: Text(
-                            meta,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Color(0xD9FFFFFF),
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                            ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _fadeIn(
+                          0.2,
+                          0.5,
+                          dx: -10,
+                          dy: 0,
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 6,
+                            children: [
+                              if (!_blank(anime?.status))
+                                ZChip(
+                                  anime!.status!.trim(),
+                                  tone: anime!.status!.toLowerCase().contains('ongoing') ? ZTone.jade : ZTone.glass,
+                                  live: anime!.status!.toLowerCase().contains('ongoing'),
+                                ),
+                              if (!_blank(anime?.type)) ZChip(anime!.type!.trim(), tone: ZTone.ghost),
+                            ],
                           ),
                         ),
-                      if (!_blank(anime?.views)) ...[
-                        const SizedBox(width: 10),
-                        const Icon(Icons.visibility_outlined,
-                            size: 13, color: Color(0xB3FFFFFF)),
-                        const SizedBox(width: 3),
-                        Text(
-                          anime!.views!,
-                          style: const TextStyle(color: Color(0xB3FFFFFF), fontSize: 11),
+                        const SizedBox(height: 8),
+                        _titleWipe(
+                          Text(
+                            anime?.title ?? 'Tanpa Judul',
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                            style: ZFont.display(size: 24, color: Colors.white, height: 1.05),
+                          ),
                         ),
+                        if (meta.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          _fadeIn(
+                            0.3,
+                            0.6,
+                            dx: -12,
+                            dy: 0,
+                            Text(
+                              meta,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(color: Color(0xB3FFFFFF), fontSize: 12, fontWeight: FontWeight.w500),
+                            ),
+                          ),
+                        ],
                       ],
-                    ],
-                  )),
-                ],
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
@@ -649,6 +685,11 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
   /// Kartu ringkasan (views, favorit, tahun, studio) + tombol tonton lebar
   /// dan tombol simpan, sesuai preview redesain.
   Widget _summary(AnimeItem? anime, String targetEpisodeId, bool resume, bool isFavorite) {
+    final synopsis = (anime?.synopsis ?? '')
+        .replaceAll('\r\n', '\n')
+        .replaceAll('\r', '\n')
+        .replaceAll(RegExp(r'\n{3,}'), '\n\n')
+        .trim();
     final views = compactCount(anime?.views);
     final favs = compactCount(anime?.favorites);
     final stats = <(String, String)>[
@@ -751,6 +792,72 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
               ),
             ],
           ),
+          if (!_blank(anime?.genre)) ...[
+            const SizedBox(height: 14),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (final g in anime!.genre!.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty))
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceVariantDark,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        g,
+                        style: const TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+          // Sinopsis di atas tab (preview): 3 baris, bisa dibuka.
+          if (synopsis.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            AnimatedSize(
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeOut,
+              alignment: Alignment.topCenter,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: synopsis.length > 160
+                    ? () => setState(() => _synopsisExpanded = !_synopsisExpanded)
+                    : null,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      synopsis,
+                      maxLines: _synopsisExpanded ? null : 3,
+                      overflow: _synopsisExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 13,
+                        height: 21 / 13,
+                      ),
+                    ),
+                    if (synopsis.length > 160)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Text(
+                          _synopsisExpanded ? 'Tutup' : 'Selengkapnya',
+                          style: const TextStyle(
+                            color: AppColors.accentVioletLight,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -864,16 +971,6 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
 
   Widget _infoTab(AnimeItem? anime) {
     if (anime == null) return _centerMessage('Info belum tersedia');
-    final genres = (anime.genre ?? '')
-        .split(',')
-        .map((e) => e.trim())
-        .where((e) => e.isNotEmpty)
-        .toList();
-    final synopsis = (anime.synopsis ?? '')
-        .replaceAll('\r\n', '\n')
-        .replaceAll('\r', '\n')
-        .replaceAll(RegExp(r'\n{3,}'), '\n\n')
-        .trim();
     final rows = _infoRows(anime);
 
     Widget section(String title, Widget child) => Column(
@@ -897,56 +994,6 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (genres.isNotEmpty) ...[
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [for (final g in genres) _OutlineChip(text: g)],
-            ),
-            const SizedBox(height: 20),
-          ],
-          if (synopsis.isNotEmpty) ...[
-            section(
-              'Sinopsis',
-              AnimatedSize(
-                duration: const Duration(milliseconds: 250),
-                curve: Curves.easeOut,
-                alignment: Alignment.topCenter,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      synopsis,
-                      maxLines: _synopsisExpanded ? null : 5,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 13,
-                        height: 21 / 13,
-                      ),
-                    ),
-                    if (synopsis.length > 220)
-                      GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: () => setState(() => _synopsisExpanded = !_synopsisExpanded),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          child: Text(
-                            _synopsisExpanded ? 'Tutup' : 'Baca selengkapnya',
-                            style: const TextStyle(
-                              color: AppColors.accentViolet,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-          ],
           if (rows.isNotEmpty)
             section(
               'Informasi',
@@ -967,8 +1014,7 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
                 ),
               ),
             ),
-          if (genres.isEmpty && synopsis.isEmpty && rows.isEmpty)
-            _centerMessage('Info belum tersedia'),
+          if (rows.isEmpty) _centerMessage('Info belum tersedia'),
         ],
       ),
     );
@@ -996,15 +1042,12 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
       return [SliverToBoxAdapter(child: _centerMessage('Episode belum tersedia'))];
     }
     return [
+      // Daftar episode berupa baris (gaya preview): thumbnail 16:9, nomor,
+      // judul, dan status di kanan.
       SliverPadding(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        sliver: SliverGrid.builder(
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 3,
-            mainAxisSpacing: 12,
-            crossAxisSpacing: 12,
-            childAspectRatio: 1,
-          ),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        sliver: SliverList.separated(
+          separatorBuilder: (_, _) => const SizedBox(height: 10),
           itemCount: ui.episodes.length,
           itemBuilder: (context, i) {
             final ep = ui.episodes[i];
@@ -1310,113 +1353,100 @@ class _EpisodeGridCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final shape = BorderRadius.circular(20);
     final badge = _topLeftBadge();
-    return Material(
-      color: AppColors.surfaceVariantDark,
-      borderRadius: shape,
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        // Episode terkunci Premium tidak bisa di-download.
-        onLongPress: isLocked || (download?.isActive ?? false) ? null : onLongPress,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            if (imageUrl.isNotEmpty)
-              NetImage(imageUrl)
-            else
-              const Center(
-                child: Icon(Icons.play_arrow, size: 44, color: Color(0x669AA0AC)),
-              ),
-            if (isLocked) const ColoredBox(color: Color(0x66000000)),
-            if (badge != null) Align(alignment: Alignment.topLeft, child: badge),
-            if (isNew) const Align(alignment: Alignment.topRight, child: _NewRibbon()),
-            // Nomor episode: "tab" berwarna sama dengan latar halaman, jadi
-            // tampak seperti potongan kartu.
-            Align(
-              alignment: Alignment.bottomRight,
-              child: Container(
-                padding: const EdgeInsets.only(left: 14, right: 12, top: 6, bottom: 4),
-                decoration: const BoxDecoration(
-                  color: AppColors.backgroundDark,
-                  borderRadius: BorderRadius.only(topLeft: Radius.circular(18)),
-                ),
-                child: Text(
-                  (episode.index ?? '').isEmpty ? '?' : episode.index!,
-                  maxLines: 1,
-                  style: TextStyle(
-                    color: isWatched ? AppColors.accentViolet : AppColors.textWhite,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                  ),
+    final num = (episode.index ?? '').isEmpty ? '?' : episode.index!;
+    final title = (episode.title ?? '').trim();
+    final views = (episode.views ?? '').trim();
+    final IconData stateIcon = isLocked
+        ? Icons.lock_rounded
+        : (isWatched ? Icons.check_rounded : Icons.play_arrow_rounded);
+    return ZPress(
+      onTap: onTap,
+      // Episode terkunci Premium / sedang diunduh tidak bisa di-long-press.
+      onLongPress: isLocked || (download?.isActive ?? false) ? null : onLongPress,
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: SizedBox(
+              width: 124,
+              height: 70,
+              child: ColoredBox(
+                color: AppColors.surfaceVariantDark,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    if (imageUrl.isNotEmpty)
+                      NetImage(imageUrl)
+                    else
+                      const Center(child: Icon(Icons.play_arrow_rounded, size: 30, color: Color(0x669AA0AC))),
+                    if (isLocked) const ColoredBox(color: Color(0x80000000)),
+                    if (badge != null) Align(alignment: Alignment.topLeft, child: badge),
+                    if (isNew)
+                      const Positioned(top: 6, right: 6, child: ZChip('Baru', tone: ZTone.brand)),
+                    // Episode terakhir ditonton: garis progres penuh di dasar.
+                    if (isWatched)
+                      const Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        height: 3,
+                        child: ColoredBox(color: AppColors.accentViolet),
+                      ),
+                  ],
                 ),
               ),
             ),
-            // Episode yang terakhir ditonton diberi bingkai.
-            if (isWatched)
-              IgnorePointer(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    borderRadius: shape,
-                    border: Border.all(color: AppColors.accentViolet, width: 2),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isWatched ? 'EP $num · Terakhir ditonton' : 'EP $num',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: isWatched ? AppColors.accentVioletLight : AppColors.textWhite,
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Pita segitiga "NEW" di pojok kanan atas.
-class _NewRibbon extends StatelessWidget {
-  const _NewRibbon();
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 54,
-      height: 54,
-      child: Stack(
-        children: [
-          CustomPaint(size: const Size(54, 54), painter: _RibbonPainter()),
-          Positioned(
-            left: 29,
-            top: 8,
-            child: Transform.rotate(
-              angle: math.pi / 4,
-              child: const Text(
-                'NEW',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 9,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
+                if (title.isNotEmpty || views.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    title.isNotEmpty ? title : '$views ditonton',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            width: 30,
+            height: 30,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: isWatched
+                  ? const Color(0x262FD3A2)
+                  : (isLocked ? AppColors.accentVioletSubtle : AppColors.surfaceVariantDark),
+            ),
+            child: Icon(
+              stateIcon,
+              size: 16,
+              color: isWatched
+                  ? const Color(0xFF2FD3A2)
+                  : (isLocked ? AppColors.accentVioletLight : AppColors.textSecondary),
             ),
           ),
         ],
       ),
     );
   }
-}
-
-class _RibbonPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final path = Path()
-      ..moveTo(w * 0.28, 0)
-      ..lineTo(w, 0)
-      ..lineTo(w, w * 0.72)
-      ..close();
-    canvas.drawPath(path, Paint()..color = AppColors.accentViolet);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 /// Kartu season 16:9 (port SeasonCard Zenime).
@@ -1540,31 +1570,6 @@ class _SeasonCard extends StatelessWidget {
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _OutlineChip extends StatelessWidget {
-  const _OutlineChip({required this.text});
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(50),
-        border: Border.all(color: _kOutline),
-      ),
-      child: Text(
-        text,
-        style: const TextStyle(
-          color: AppColors.textWhite,
-          fontSize: 12,
-          fontWeight: FontWeight.w500,
         ),
       ),
     );

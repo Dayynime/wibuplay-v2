@@ -13,6 +13,7 @@ import '../../data/models/support_models.dart';
 import '../../data/models/xp_models.dart';
 import 'hero_slides.dart';
 import 'net_image.dart';
+import '../redesign/z_kit.dart';
 
 bool _blank(String? s) => s == null || s.trim().isEmpty;
 bool _isNone(String? s) => s != null && s.toLowerCase() == 'none';
@@ -160,15 +161,16 @@ class _HeroBannerState extends State<HeroBanner> with SingleTickerProviderStateM
     final supportPage = widget.topSupport.isNotEmpty ? next++ : -1;
     final pageCount = next;
 
-    return Column(
-      children: [
-        SizedBox(
-          height: 220,
-          child: ClipRRect(
-            borderRadius: AppShapes.card,
-            child: ColoredBox(
-              color: AppColors.surfaceCard,
-              child: NotificationListener<ScrollNotification>(
+    return SizedBox(
+      height: 220,
+      child: ClipRRect(
+        borderRadius: AppShapes.card,
+        child: ColoredBox(
+          color: AppColors.surfaceCard,
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: NotificationListener<ScrollNotification>(
                 onNotification: _onScroll,
                 child: PageView.builder(
                   controller: _pager,
@@ -225,60 +227,45 @@ class _HeroBannerState extends State<HeroBanner> with SingleTickerProviderStateM
                   },
                 ),
               ),
-            ),
-          ),
-        ),
-        // Slide leaderboard/support yang datanya menyusul tidak "nongol":
-        // baris indikator membesar halus dan jumlah bar berganti dengan fade.
-        AnimatedSize(
-          duration: const Duration(milliseconds: 320),
-          curve: Curves.easeOutCubic,
-          alignment: Alignment.topCenter,
-          child: pageCount <= 1
-              ? const SizedBox(width: double.infinity)
-              : Column(
-        children: [
-          const SizedBox(height: 4),
-          // Indikator ala Stories: satu bar per slide. Bar slide poster anime
-          // terisi mengikuti jam rotasi poster; slide lain penuh saat aktif.
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 320),
-            child: Padding(
-            key: ValueKey('hero-dots-$pageCount'),
-            padding: const EdgeInsets.symmetric(horizontal: 28),
-            child: Row(
-              children: [
-                for (var i = 0; i < pageCount; i++)
-                  Expanded(
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: () => _pager.animateToPage(
-                        i,
-                        duration: const Duration(milliseconds: 420),
-                        curve: Curves.easeOutCubic,
-                      ),
-                      child: SizedBox(
-                        height: 22,
-                        child: Center(
+              ),
+              // Indikator titik (gaya preview): titik aktif memanjang.
+              if (pageCount > 1)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 10,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      for (var i = 0; i < pageCount; i++)
+                        GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => _pager.animateToPage(
+                            i,
+                            duration: const Duration(milliseconds: 420),
+                            curve: Curves.easeOutCubic,
+                          ),
                           child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 3),
-                            child: _ProgressSegment(
-                              active: i == _page,
-                              progress: (i == 0 && items.length > 1) ? _rotation : null,
+                            padding: const EdgeInsets.symmetric(horizontal: 2.5, vertical: 6),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 280),
+                              curve: Curves.easeOutCubic,
+                              width: i == _page ? 18 : 6,
+                              height: 6,
+                              decoration: BoxDecoration(
+                                color: i == _page ? Colors.white : const Color(0x59FFFFFF),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    ),
+                    ],
                   ),
-              ],
-            ),
+                ),
+            ],
           ),
-          ),
-        ],
-              ),
         ),
-      ],
+      ),
     );
   }
 }
@@ -404,7 +391,7 @@ class _AutoPosterSlide extends StatelessWidget {
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                stops: const [0, 0.28, 0.5, 1],
+                stops: const [0, 0.25, 0.45, 1],
                 colors: [
                   Colors.black.withValues(alpha: 0.35),
                   Colors.transparent,
@@ -414,55 +401,12 @@ class _AutoPosterSlide extends StatelessWidget {
               ),
             ),
           ),
-          // 3. Chip views (kiri atas).
-          Positioned(
-            left: 12,
-            top: 12,
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 400),
-              reverseDuration: const Duration(milliseconds: 250),
-              child: _blank(anime.views)
-                  ? SizedBox.shrink(key: ValueKey('views_none_$index'))
-                  : _ViewsChip(key: ValueKey('views_$index'), views: anime.views!),
-            ),
-          ),
-          // 4. Indikator rotasi (kanan atas): ini poster ke berapa.
-          if (items.length > 1)
-            Positioned(
-              right: 12,
-              top: 12,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    for (var i = 0; i < items.length; i++)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 2),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 300),
-                          width: i == index ? 16 : 5,
-                          height: 4,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: i == index ? 0.95 : 0.35),
-                            borderRadius: AppShapes.pill,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
           // 5. Peringkat + judul (tengah bawah), naik pelan tiap ganti anime.
           Positioned(
             left: 0,
             right: 0,
             bottom: 0,
-            height: 124,
+            height: 170,
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 500),
               reverseDuration: const Duration(milliseconds: 250),
@@ -491,6 +435,7 @@ class _AutoPosterSlide extends StatelessWidget {
                 key: ValueKey('hero_caption_$index'),
                 anime: anime,
                 rank: index + 1,
+                onTap: onTap,
               ),
             ),
           ),
@@ -518,43 +463,12 @@ class _KenBurnsImage extends StatelessWidget {
   }
 }
 
-class _ViewsChip extends StatelessWidget {
-  const _ViewsChip({super.key, required this.views});
-
-  final String views;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.visibility, size: 14, color: Colors.white),
-          const SizedBox(width: 5),
-          Text(
-            '$views views',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _Caption extends StatelessWidget {
-  const _Caption({super.key, required this.anime, required this.rank});
+  const _Caption({super.key, required this.anime, required this.rank, required this.onTap});
 
   final AnimeItem anime;
   final int rank;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -563,106 +477,59 @@ class _Caption extends StatelessWidget {
         (!_blank(title) && !_isNone(title) && title!.toLowerCase() != 'anime')
             ? title!
             : 'Tanpa Judul';
-    final meta = [anime.type, anime.status]
-        .where((e) => !_blank(e) && !_isNone(e))
-        .join(' \u2022 ');
+    final status = (!_blank(anime.status) && !_isNone(anime.status)) ? anime.status! : null;
+    final type = (!_blank(anime.type) && !_isNone(anime.type)) ? anime.type! : null;
+    final ongoing = status != null && status.toLowerCase().contains('ongoing');
 
+    // Gaya preview: rata kiri, baris chip, judul besar, tombol Tonton.
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 18),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 28),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         mainAxisAlignment: MainAxisAlignment.end,
-        crossAxisAlignment: CrossAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-            decoration: BoxDecoration(
-              color: Colors.black.withValues(alpha: 0.55),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: heroGold.withValues(alpha: 0.35)),
-            ),
-            child: Text(
-              '#$rank',
-              style: const TextStyle(
-                color: heroGold,
-                fontSize: 15,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              ZChip('#$rank', tone: ZTone.gold),
+              if (status != null) ZChip(status, tone: ongoing ? ZTone.jade : ZTone.glass, live: ongoing),
+              if (type != null) ZChip(type),
+              if (!_blank(anime.views)) ZChip('${anime.views}', icon: Icons.visibility_rounded),
+            ],
           ),
           const SizedBox(height: 8),
           Text(
             displayTitle,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: AppColors.textWhite,
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-              height: 26 / 20,
-            ),
+            style: ZFont.display(size: 22, height: 1.15),
           ),
-          if (meta.isNotEmpty) ...[
-            const SizedBox(height: 4),
-            Text(
-              meta.toUpperCase(),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Color(0xB3FFFFFF),
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-                letterSpacing: 0.8,
+          const SizedBox(height: 10),
+          GestureDetector(
+            onTap: onTap,
+            child: Container(
+              height: 36,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(
+                color: AppColors.accentViolet,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.play_arrow_rounded, size: 18, color: Colors.white),
+                  SizedBox(width: 4),
+                  Text(
+                    'Tonton',
+                    style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w700),
+                  ),
+                ],
               ),
             ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-/// Satu bar indikator slide (gaya Stories). [progress] diisi untuk slide yang
-/// punya jam sendiri (poster anime); tanpa itu bar penuh saat [active].
-class _ProgressSegment extends StatelessWidget {
-  const _ProgressSegment({required this.active, this.progress});
-
-  final bool active;
-  final Animation<double>? progress;
-
-  @override
-  Widget build(BuildContext context) {
-    final p = progress;
-    Widget fill(double v) => FractionallySizedBox(
-          alignment: Alignment.centerLeft,
-          widthFactor: v.clamp(0.0, 1.0).toDouble(),
-          heightFactor: 1,
-          child: const DecoratedBox(
-            decoration: BoxDecoration(
-              color: Color(0xEBFFFFFF),
-              borderRadius: BorderRadius.all(Radius.circular(2)),
-            ),
           ),
-        );
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(2),
-      child: SizedBox(
-        width: double.infinity,
-        height: 3,
-        child: ColoredBox(
-          color: const Color(0x24FFFFFF),
-          child: !active
-              ? const SizedBox.expand()
-              : p == null
-                  ? TweenAnimationBuilder<double>(
-                      tween: Tween<double>(begin: 0, end: 1),
-                      duration: const Duration(milliseconds: 450),
-                      curve: Curves.easeOutCubic,
-                      builder: (context, v, _) => fill(v),
-                    )
-                  : AnimatedBuilder(animation: p, builder: (context, _) => fill(p.value)),
-        ),
+        ],
       ),
     );
   }

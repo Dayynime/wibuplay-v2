@@ -7,6 +7,7 @@ import '../../data/models/anime_item.dart';
 import '../../data/models/episode_item.dart';
 import 'net_image.dart';
 import 'poster_holder.dart';
+import '../redesign/z_kit.dart';
 
 bool _blank(String? s) => s == null || s.trim().isEmpty;
 
@@ -39,191 +40,112 @@ class AnimePosterCard extends StatefulWidget {
 }
 
 class _AnimePosterCardState extends State<AnimePosterCard> {
-  bool _pressed = false;
-
+  // Kartu poster redesain Samudra (sama dengan preview): sudut 14, tekstur
+  // screentone, chip EP / Baru / status di atas, views di kiri bawah.
   @override
   Widget build(BuildContext context) {
     final anime = widget.anime;
     final badgeText = anime.status ?? anime.type;
     final subtext = anime.genre ?? anime.year;
+    final hasEp = !_blank(widget.episodeLabel);
 
-    return GestureDetector(
-      onTapDown: (_) => setState(() => _pressed = true),
-      onTapUp: (_) => setState(() => _pressed = false),
-      onTapCancel: () => setState(() => _pressed = false),
+    return ZPress(
       onTap: () {
         PosterTransitionHolder.url = widget.anime.posterUrl;
         widget.onTap();
       },
-      child: AnimatedScale(
-        scale: _pressed ? 0.96 : 1.0,
-        duration: const Duration(milliseconds: 150),
-        curve: Curves.easeOutBack,
-        child: SizedBox(
-          width: widget.width,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              AspectRatio(
-                aspectRatio: 2 / 3,
-                child: ClipRRect(
-                  borderRadius: AppShapes.card,
-                  child: ColoredBox(
-                    color: AppColors.surfaceCard,
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        NetImage(anime.posterUrl),
-                        // Gradien bawah
+      child: SizedBox(
+        width: widget.width,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AspectRatio(
+              aspectRatio: 2 / 3,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: ColoredBox(
+                  color: AppColors.surfaceCard,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      NetImage(anime.posterUrl),
+                      const ZScreentone(opacity: 0.12),
+                      const Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        height: 56,
+                        child: DecoratedBox(decoration: BoxDecoration(gradient: zBottomShade)),
+                      ),
+                      // Kiri atas: peringkat atau label episode.
+                      if (widget.showRank != null)
+                        Positioned(top: 7, left: 7, child: ZChip('#${widget.showRank}', tone: ZTone.brand))
+                      else if (hasEp)
                         Positioned(
-                          left: 0,
-                          right: 0,
-                          bottom: 0,
-                          height: 60,
-                          child: DecoratedBox(
-                            decoration: const BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                                colors: [Colors.transparent, Color(0xCC06111D)],
-                              ),
-                            ),
+                          top: 7,
+                          left: 7,
+                          right: widget.showNewBadge ? 52 : 7,
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: ZChip(widget.episodeLabel!.trim(), tone: ZTone.scrim),
                           ),
                         ),
-                        // Badge status / tipe kanan atas
-                        if (!_blank(badgeText))
-                          Positioned(
-                            top: 8,
-                            right: 8,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                              decoration: BoxDecoration(
-                                color: const Color(0xCC06111D),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                badgeText!,
-                                style: const TextStyle(
-                                  color: AppColors.textWhite,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
+                      // Kanan atas: "Baru" atau status/tipe.
+                      if (widget.showNewBadge)
+                        const Positioned(top: 7, right: 7, child: ZChip('Baru', tone: ZTone.brand))
+                      else if (!_blank(badgeText) && !hasEp)
+                        Positioned(top: 7, right: 7, child: ZChip(badgeText!.trim(), tone: ZTone.scrim)),
+                      // Kiri bawah: jumlah ditonton.
+                      if (!_blank(anime.views))
+                        Positioned(
+                          left: 7,
+                          bottom: 7,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0xB806111D),
+                              borderRadius: BorderRadius.circular(8),
                             ),
-                          ),
-                        // Label episode (Episode Baru) menggantikan views
-                        if (!_blank(widget.episodeLabel))
-                          Positioned(
-                            left: 8,
-                            right: 8,
-                            bottom: 8,
-                            child: Text(
-                              widget.episodeLabel!,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: AppColors.textWhite,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          )
-                        // Views kiri bawah
-                        else if (!_blank(anime.views))
-                          Positioned(
-                            left: 8,
-                            bottom: 8,
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(
-                                  Icons.visibility_outlined,
-                                  size: 12,
-                                  color: AppColors.textSecondary,
-                                ),
-                                const SizedBox(width: 4),
+                                const Icon(Icons.visibility_rounded, size: 11, color: AppColors.accentVioletLight),
+                                const SizedBox(width: 3),
                                 Text(
                                   anime.views!,
-                                  style: const TextStyle(
-                                    color: AppColors.textSecondary,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w500,
-                                  ),
+                                  style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w700),
                                 ),
                               ],
                             ),
                           ),
-                        if (widget.showNewBadge)
-                          Positioned(
-                            top: 8,
-                            left: 8,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF2F8BFF),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: const Text(
-                                'New',
-                                style: TextStyle(
-                                  color: AppColors.textWhite,
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                          ),
-                        // Rank opsional
-                        if (widget.showRank != null)
-                          Positioned(
-                            top: 8,
-                            left: 8,
-                            child: Container(
-                              width: 26,
-                              height: 26,
-                              alignment: Alignment.center,
-                              decoration: const BoxDecoration(
-                                color: AppColors.accentViolet,
-                                shape: BoxShape.circle,
-                              ),
-                              child: Text(
-                                '${widget.showRank}',
-                                style: const TextStyle(
-                                  color: AppColors.textWhite,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
+                        ),
+                    ],
                   ),
                 ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                anime.title ?? 'Anime',
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: AppColors.textWhite,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  height: 17 / 13,
-                ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              anime.title ?? 'Anime',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: AppColors.textWhite,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                height: 1.3,
               ),
-              if (!_blank(subtext)) ...[
-                const SizedBox(height: 2),
-                Text(
-                  subtext!,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
-                ),
-              ],
+            ),
+            if (!_blank(subtext)) ...[
+              const SizedBox(height: 2),
+              Text(
+                subtext!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: AppColors.textMuted, fontSize: 11.5),
+              ),
             ],
-          ),
+          ],
         ),
       ),
     );
@@ -273,30 +195,23 @@ class _ContinueWatchingCardState extends State<ContinueWatchingCard> {
               SizedBox(
                 height: 124,
                 child: ClipRRect(
-                  borderRadius: AppShapes.card,
+                  borderRadius: BorderRadius.circular(16),
                   child: ColoredBox(
                     color: AppColors.surfaceCard,
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
                         NetImage(widget.posterUrl),
-                        // Overlay gelap + tombol play
-                        ColoredBox(
-                          color: const Color(0x55000000),
-                          child: Center(
-                            child: Container(
-                              width: 38,
-                              height: 38,
-                              decoration: BoxDecoration(
-                                color: AppColors.accentViolet.withValues(alpha: 0.9),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.play_arrow,
-                                color: AppColors.textWhite,
-                                size: 22,
-                              ),
-                            ),
+                        const DecoratedBox(decoration: BoxDecoration(gradient: zBottomShade)),
+                        // Tombol play putih kiri bawah (gaya preview)
+                        Positioned(
+                          left: 10,
+                          bottom: 12,
+                          child: Container(
+                            width: 32,
+                            height: 32,
+                            decoration: const BoxDecoration(color: Color(0xEBFFFFFF), shape: BoxShape.circle),
+                            child: const Icon(Icons.play_arrow_rounded, color: AppColors.backgroundDark, size: 20),
                           ),
                         ),
                         // Bar progres di bawah
@@ -304,12 +219,12 @@ class _ContinueWatchingCardState extends State<ContinueWatchingCard> {
                           left: 0,
                           right: 0,
                           bottom: 0,
-                          height: 3.5,
+                          height: 4,
                           child: LinearProgressIndicator(
                             value: widget.progress.clamp(0.05, 1.0).toDouble(),
                             color: AppColors.accentViolet,
-                            backgroundColor: AppColors.surfaceElevated,
-                            minHeight: 3.5,
+                            backgroundColor: const Color(0x2EFFFFFF),
+                            minHeight: 4,
                           ),
                         ),
                       ],

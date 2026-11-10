@@ -8,6 +8,7 @@ import '../../components/net_image.dart';
 import '../../components/poster_holder.dart';
 import '../../components/shimmer.dart';
 import 'schedule_controller.dart';
+import '../../redesign/z_kit.dart';
 
 const Color _outline = AppColors.surfaceVariantDark;
 
@@ -17,6 +18,7 @@ const double _entryHeight = 122;
 const double _emptyHeight = 56;
 const double _navHeight = 64;
 const double _gutter = 56;
+const double _nowHeight = 26;
 
 sealed class _Row {
   const _Row(this.day);
@@ -36,6 +38,14 @@ class _Empty extends _Row {
   const _Empty(super.day);
   @override
   double get height => _emptyHeight;
+}
+
+/// Garis "Sekarang · HH:MM" di antara jadwal hari ini (preview).
+class _Now extends _Row {
+  const _Now(super.day, this.label);
+  final String label;
+  @override
+  double get height => _nowHeight;
 }
 
 class _Nav extends _Row {
@@ -59,6 +69,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
   final ValueNotifier<int> _currentDay = ValueNotifier<int>(0);
 
   List<DaySection>? _builtFor;
+  int _builtMinute = -1;
   List<_Row> _rows = const [];
   List<double> _offsets = const []; // offset awal tiap baris
   final Map<int, double> _dayStart = {};
@@ -78,18 +89,31 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
     super.dispose();
   }
 
-  void _build(List<DaySection> sections) {
-    if (identical(_builtFor, sections)) return;
+  void _build(List<DaySection> sections, int todayIndex) {
+    // Dibangun ulang juga tiap ganti menit supaya garis "Sekarang" ikut maju.
+    final now = DateTime.now();
+    final minute = now.hour * 60 + now.minute;
+    if (identical(_builtFor, sections) && _builtMinute == minute) return;
     _builtFor = sections;
+    _builtMinute = minute;
+    final nowLabel =
+        'Sekarang · ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
     final rows = <_Row>[];
     for (var s = 0; s < sections.length; s++) {
       final section = sections[s];
       if (section.anime.isEmpty) {
         rows.add(_Empty(section.dayIndex));
       } else {
+        var placed = section.dayIndex != todayIndex;
         for (var i = 0; i < section.anime.length; i++) {
-          rows.add(_Entry(section.anime[i], section.dayIndex, i == 0));
+          final a = section.anime[i];
+          if (!placed && !_isAired(section.dayIndex, todayIndex, a)) {
+            rows.add(_Now(section.dayIndex, nowLabel));
+            placed = true;
+          }
+          rows.add(_Entry(a, section.dayIndex, i == 0));
         }
+        if (!placed) rows.add(_Now(section.dayIndex, nowLabel));
       }
       if (s != sections.length - 1) rows.add(_Nav(section.dayIndex));
     }
@@ -98,7 +122,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
     _dayStart.clear();
     for (final r in rows) {
       offsets.add(y);
-      if ((r is _Entry && r.isFirstOfDay) || r is _Empty) {
+      if ((r is _Entry && r.isFirstOfDay) || r is _Empty || r is _Now) {
         _dayStart.putIfAbsent(r.day, () => y);
       }
       y += r.height;
@@ -190,7 +214,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
         ),
       );
     } else {
-      _build(ui.sections);
+      _build(ui.sections, ui.todayIndex);
       _scheduleInitialJump(ui.todayIndex);
       body = Column(
         children: [
@@ -218,6 +242,7 @@ class _ScheduleScreenState extends ConsumerState<ScheduleScreen> {
                           if (id != null) widget.onAnimeClick(id);
                         },
                       ),
+                    _Now() => _NowLine(label: row.label),
                     _Empty() => _EmptyDayRow(
                         name: ScheduleController.dayNames[row.day],
                       ),
@@ -401,6 +426,48 @@ class _DayCell extends StatelessWidget {
   }
 }
 
+/// Garis waktu sekarang: teks biru + garis memudar ke kanan.
+class _NowLine extends StatelessWidget {
+  const _NowLine({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        const SizedBox(width: _gutter / 2 - 4),
+        Container(
+          width: 9,
+          height: 9,
+          decoration: const BoxDecoration(color: AppColors.accentViolet, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 8),
+        Text(
+          label,
+          style: const TextStyle(
+            color: AppColors.accentVioletLight,
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.4,
+          ),
+        ),
+        const SizedBox(width: 8),
+        const Expanded(
+          child: SizedBox(
+            height: 1,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(colors: [AppColors.accentViolet, Color(0x001FB6F5)]),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _TimelineEntry extends StatelessWidget {
   const _TimelineEntry({required this.anime, required this.onTap, this.aired = false});
 
@@ -460,7 +527,7 @@ class _TimelineEntry extends StatelessWidget {
             child: AnimatedOpacity(
               opacity: aired ? 0.62 : 1,
               duration: const Duration(milliseconds: 200),
-              child: ScheduleAnimeCard(anime: anime, onTap: onTap),
+              child: ScheduleAnimeCard(anime: anime, onTap: onTap, aired: aired),
             ),
           ),
         ),
@@ -600,10 +667,13 @@ class _NavPill extends StatelessWidget {
 
 /// Port ScheduleHorizontalCard (Zenime).
 class ScheduleAnimeCard extends StatelessWidget {
-  const ScheduleAnimeCard({super.key, required this.anime, required this.onTap});
+  const ScheduleAnimeCard({super.key, required this.anime, required this.onTap, this.aired});
 
   final AnimeItem anime;
   final VoidCallback onTap;
+
+  /// null = tidak tampilkan status; true/false = chip Sudah/Akan tayang.
+  final bool? aired;
 
   bool _has(String? s) => s != null && s.trim().isNotEmpty;
 
@@ -627,11 +697,11 @@ class ScheduleAnimeCard extends StatelessWidget {
           child: Row(
             children: [
               SizedBox(
-                width: 60,
+                width: 52,
                 child: AspectRatio(
-                  aspectRatio: 2 / 3,
+                  aspectRatio: 52 / 70,
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(10),
                     child: ColoredBox(
                       color: AppColors.surfaceVariantDark,
                       child: NetImage(anime.posterUrl),
@@ -647,11 +717,11 @@ class ScheduleAnimeCard extends StatelessWidget {
                   children: [
                     Text(
                       anime.title ?? 'Tanpa Judul',
-                      maxLines: 2,
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: AppColors.textWhite,
-                        fontSize: 14,
+                        fontSize: 13.5,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -659,24 +729,7 @@ class ScheduleAnimeCard extends StatelessWidget {
                     Row(
                       children: [
                         if (_has(anime.type)) ...[
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 5,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppColors.accentViolet,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              anime.type!,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 9,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
+                          ZChip(anime.type!.trim(), tone: ZTone.ghost),
                           const SizedBox(width: 8),
                         ],
                         if (_has(anime.status))
@@ -693,7 +746,12 @@ class ScheduleAnimeCard extends StatelessWidget {
                           ),
                       ],
                     ),
-                    if (_has(anime.time)) ...[
+                    if (aired != null) ...[
+                      const SizedBox(height: 6),
+                      aired!
+                          ? const ZChip('Sudah tayang', icon: Icons.check_rounded, tone: ZTone.glass)
+                          : const ZChip('Akan tayang', icon: Icons.notifications_none_rounded, tone: ZTone.ghost),
+                    ] else if (_has(anime.time)) ...[
                       const SizedBox(height: 2),
                       Text(
                         anime.time!,

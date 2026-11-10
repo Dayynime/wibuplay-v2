@@ -10,6 +10,7 @@ import '../../providers.dart';
 import 'game_badges.dart';
 import 'avatar_frame.dart';
 import 'net_image.dart';
+import '../redesign/z_kit.dart';
 import 'user_level_badge.dart';
 
 /// Warna tombol pill Premium, sama dengan ZenimeInfoBlue di Zenime.
@@ -157,186 +158,220 @@ class _ProfileCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final radius = BorderRadius.circular(26);
+    // Tata letak preview: banner di atas (tombol cari & lonceng di pojok),
+    // avatar menimpa banner di kiri, nama + level + ID/kode, lalu dua kotak
+    // Premium & ZCoin berdampingan.
+    final radius = BorderRadius.circular(24);
     final days = premium.daysLeft;
     final hasBanner = bannerUrl != null && bannerUrl!.isNotEmpty;
 
     final premiumValue = premium.isPremium
         ? (days != null ? 'Sisa $days hari' : 'Premium aktif')
         : 'Aktifkan Premium';
-    final premiumHint = premium.isPremium ? 'Premium' : 'Buka semua fitur';
+    final idLine = [
+      if (userNumber != null) 'ID #$userNumber',
+      if (zenimeCode != null && zenimeCode!.isNotEmpty) '#$zenimeCode',
+    ].join('   ');
+
+    final nameText = Text(
+      username,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: ZFont.display(size: 19),
+    );
 
     return ClipRRect(
       borderRadius: radius,
       child: DecoratedBox(
         decoration: BoxDecoration(
+          color: AppColors.surfaceDark,
           borderRadius: radius,
           border: Border.all(color: Colors.white.withValues(alpha: 0.07)),
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [Color(0xFF0E2A44), AppColors.surfaceCard, AppColors.surfaceDark],
-            stops: [0, 0.55, 1],
-          ),
         ),
+        // Stack: banner di belakang, isi mulai di y=72 supaya avatar menimpa
+        // banner tanpa menyisakan ruang kosong di bawah kartu.
         child: Stack(
           children: [
-            // Latar: banner Premium, atau cahaya crimson lembut.
-            if (hasBanner)
-              Positioned.fill(
-                child: Opacity(opacity: 0.55, child: NetImage(bannerUrl!)),
-              )
-            else ...[
-              const Positioned(top: -60, right: -40, child: _GlowOrb(size: 180, alpha: 0.30)),
-              const Positioned(bottom: -70, left: -50, child: _GlowOrb(size: 160, alpha: 0.12)),
-            ],
-            Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      AppColors.backgroundDark.withValues(alpha: hasBanner ? 0.25 : 0),
-                      AppColors.backgroundDark.withValues(alpha: hasBanner ? 0.92 : 0.35),
-                    ],
+            // Banner
+            SizedBox(
+              height: 112,
+              width: double.infinity,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  if (hasBanner)
+                    NetImage(bannerUrl!)
+                  else
+                    const DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [Color(0xFF0E3A5C), Color(0xFF0D1C2D)],
+                        ),
+                      ),
+                      child: Stack(
+                        children: [
+                          Positioned(top: -60, right: -40, child: _GlowOrb(size: 200, alpha: 0.38)),
+                          Positioned(bottom: -80, left: 20, child: _GlowOrb(size: 160, alpha: 0.14)),
+                        ],
+                      ),
+                    ),
+                  const ZScreentone(opacity: 0.16),
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        stops: const [0, 0.5, 1],
+                        colors: [
+                          Colors.black.withValues(alpha: 0.05),
+                          Colors.black.withValues(alpha: 0.25),
+                          AppColors.surfaceDark,
+                        ],
+                      ),
+                    ),
                   ),
-                ),
+                  Positioned(
+                    top: 10,
+                    right: 10,
+                    child: Row(
+                      children: [
+                        _CircleIconButton(
+                          icon: Icons.search_rounded,
+                          tooltip: 'Cari Anime',
+                          onTap: onSearchClick,
+                        ),
+                        const SizedBox(width: 8),
+                        _CircleIconButton(
+                          icon: Icons.notifications_rounded,
+                          tooltip: 'Notifikasi',
+                          onTap: onNotificationClick,
+                          badgeCount: friendRequests,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 18, 16, 14),
+              padding: const EdgeInsets.only(top: 72, bottom: 14),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Row(
+            // Avatar menimpa banner + identitas
+            Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                child: _Pressable(
+                  onTap: onProfileClick,
+                  scale: 0.98,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
+                      Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: const BoxDecoration(color: AppColors.surfaceDark, shape: BoxShape.circle),
+                        child: _RingAvatar(uid: uid, username: username, url: avatarUrl),
+                      ),
+                      const SizedBox(width: 12),
                       Expanded(
-                        child: _Pressable(
-                          onTap: onProfileClick,
-                          scale: 0.98,
-                          child: Row(
+                        child: Padding(
+                          padding: const EdgeInsets.only(bottom: 2),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              _RingAvatar(uid: uid, username: username, url: avatarUrl),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Flexible(
-                                          child: Text(
-                                            username,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(
-                                              color: AppColors.textWhite,
-                                              fontSize: 17,
-                                              fontWeight: FontWeight.w800,
-                                              letterSpacing: -0.2,
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 6),
-                                        UserLevelBadge(uid: uid, level: level, animate: true),
-                                      ],
-                                    ),
-                                    if (userNumber != null) ...[
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        'ID #$userNumber',
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          color: AppColors.textWhite.withValues(alpha: 0.6),
-                                          fontSize: 11.5,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ],
-                                    if (zenimeCode != null && zenimeCode!.isNotEmpty) ...[
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        '#$zenimeCode',
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          color: AppColors.textWhite.withValues(alpha: 0.45),
-                                          fontSize: 11,
-                                          letterSpacing: 0.3,
-                                        ),
-                                      ),
-                                    ],
-                                  ],
-                                ),
+                              Row(
+                                children: [
+                                  Flexible(
+                                    child: premium.isPremium
+                                        // Premium: nama bergradien emas-toska.
+                                        ? ShaderMask(
+                                            blendMode: BlendMode.srcIn,
+                                            shaderCallback: (r) => const LinearGradient(
+                                              colors: [Color(0xFFF6BE4F), Color(0xFF4BE3C1)],
+                                            ).createShader(r),
+                                            child: nameText,
+                                          )
+                                        : nameText,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  UserLevelBadge(uid: uid, level: level, animate: true),
+                                ],
                               ),
+                              if (idLine.isNotEmpty) ...[
+                                const SizedBox(height: 3),
+                                Text(
+                                  idLine,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: AppColors.textWhite.withValues(alpha: 0.5),
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      _CircleIconButton(
-                        icon: Icons.notifications_rounded,
-                        tooltip: 'Notifikasi',
-                        onTap: onNotificationClick,
-                        badgeCount: friendRequests,
-                      ),
-                      const SizedBox(width: 8),
-                      _CircleIconButton(
-                        icon: Icons.search_rounded,
-                        tooltip: 'Cari Anime',
-                        onTap: onSearchClick,
-                      ),
                     ],
                   ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _StatTile(
-                          onTap: onPremiumClick,
-                          highlight: premium.isPremium,
-                          icon: const PremiumCheckBadge(size: 16),
-                          value: Text(
-                            premiumValue,
-                            key: ValueKey(premiumValue),
+                ),
+              ),
+            const SizedBox(height: 12),
+            // Dua kotak berdampingan: Premium & ZCoin
+            Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _StatTile(
+                        onTap: onPremiumClick,
+                        highlight: premium.isPremium,
+                        icon: const PremiumCheckBadge(size: 16),
+                        iconBg: const Color(0x2E3B82F6),
+                        value: Text(
+                          premiumValue,
+                          key: ValueKey(premiumValue),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: _StatTile.valueStyle.copyWith(
+                            color: premium.isPremium ? AppColors.textWhite : AppColors.textSecondary,
+                          ),
+                        ),
+                        hint: 'Premium',
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _StatTile(
+                        onTap: onCoinClick,
+                        iconBg: const Color(0x2EF6BE4F),
+                        icon: Image.asset(
+                          'assets/images/ic_zcoin_badge.png',
+                          width: 16,
+                          height: 16,
+                          filterQuality: FilterQuality.medium,
+                        ),
+                        value: TweenAnimationBuilder<double>(
+                          tween: Tween(begin: 0, end: coins.toDouble()),
+                          duration: const Duration(milliseconds: 900),
+                          curve: Curves.easeOutCubic,
+                          builder: (_, v, __) => Text(
+                            formatZCoin(v.round()),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: _StatTile.valueStyle.copyWith(
-                              color: premium.isPremium
-                                  ? AppColors.textWhite
-                                  : AppColors.textSecondary,
-                            ),
+                            style: _StatTile.valueStyle,
                           ),
-                          hint: premiumHint,
                         ),
+                        hint: 'ZCoin',
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _StatTile(
-                          onTap: onCoinClick,
-                          icon: Image.asset(
-                            'assets/images/ic_zcoin_badge.png',
-                            width: 16,
-                            height: 16,
-                            filterQuality: FilterQuality.medium,
-                          ),
-                          value: TweenAnimationBuilder<double>(
-                            tween: Tween(begin: 0, end: coins.toDouble()),
-                            duration: const Duration(milliseconds: 900),
-                            curve: Curves.easeOutCubic,
-                            builder: (_, v, __) => Text(
-                              formatZCoin(v.round()),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: _StatTile.valueStyle,
-                            ),
-                          ),
-                          hint: 'ZCoin',
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
+                ),
+              ),
                 ],
               ),
             ),
@@ -371,8 +406,8 @@ class _GlowOrb extends StatelessWidget {
       );
 }
 
-/// Kotak stat (sama dengan kartu akun di Pengaturan): ikon kecil di atas,
-/// nilai tebal, lalu keterangan kecil.
+/// Kotak kecil di header (gaya preview): ikon dalam kotak warna di kiri,
+/// keterangan kecil di atas nilai tebal.
 class _StatTile extends StatelessWidget {
   const _StatTile({
     required this.onTap,
@@ -380,13 +415,14 @@ class _StatTile extends StatelessWidget {
     required this.value,
     required this.hint,
     this.highlight = false,
+    this.iconBg = const Color(0x1FFFFFFF),
   });
 
   static const TextStyle valueStyle = TextStyle(
     color: AppColors.textWhite,
-    fontSize: 14.5,
+    fontSize: 13.5,
     fontWeight: FontWeight.w800,
-    letterSpacing: -0.2,
+    letterSpacing: -0.1,
   );
 
   final VoidCallback onTap;
@@ -394,50 +430,53 @@ class _StatTile extends StatelessWidget {
   final Widget value;
   final String hint;
   final bool highlight;
+  final Color iconBg;
 
   @override
   Widget build(BuildContext context) {
     return _Pressable(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
         decoration: BoxDecoration(
-          color: Colors.black.withValues(alpha: 0.22),
-          borderRadius: BorderRadius.circular(16),
+          color: AppColors.surfaceVariantDark,
+          borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: highlight
                 ? const Color(0xFF3B82F6).withValues(alpha: 0.35)
-                : Colors.white.withValues(alpha: 0.07),
+                : Colors.white.withValues(alpha: 0.05),
           ),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
           children: [
-            Row(
-              children: [
-                icon,
-                const Spacer(),
-                Icon(
-                  Icons.chevron_right_rounded,
-                  size: 16,
-                  color: AppColors.textWhite.withValues(alpha: 0.35),
-                ),
-              ],
+            Container(
+              width: 30,
+              height: 30,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(color: iconBg, borderRadius: BorderRadius.circular(10)),
+              child: icon,
             ),
-            const SizedBox(height: 10),
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 250),
-              child: value,
-            ),
-            const SizedBox(height: 1),
-            Text(
-              hint,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: AppColors.textWhite.withValues(alpha: 0.5),
-                fontSize: 10.5,
-                fontWeight: FontWeight.w500,
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    hint,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: AppColors.textWhite.withValues(alpha: 0.5),
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 250),
+                    child: value,
+                  ),
+                ],
               ),
             ),
           ],

@@ -39,6 +39,7 @@ import '../../components/join_date_stat.dart';
 import '../../../data/models/avatar_frame_models.dart';
 import '../../glass/glass.dart';
 import '../../components/clan_tag_badge.dart';
+import '../../redesign/z_kit.dart';
 
 /// Profil Saya ala Zenime: banner full-bleed menyatu dengan avatar, identitas
 /// + cincin XP & pin level di avatar, tag clan di depan nama, role + pencapaian di bawahnya, stat row 4 kolom, tombol pill
@@ -150,6 +151,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         uid.isEmpty ? 0 : (ref.watch(myCommentCountProvider(uid)).valueOrNull ?? 0);
     final uniqueAnime = history.map((h) => h.movieId).toSet().length;
     final topPad = MediaQuery.paddingOf(context).top;
+    final topXpChip = uid.isEmpty ? null : ProfileAchievementBadges.topXpChip(ref, uid);
+    final topGiverChip = uid.isEmpty ? null : ProfileAchievementBadges.topGiverChip(ref, uid);
+    final hasAchievements = topXpChip != null || topGiverChip != null;
 
     return Stack(
       children: [
@@ -164,9 +168,10 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
+                stops: [0, 0.32, 0.62],
                 colors: [
-                  Color(0x26000000),
-                  Color(0x73000000),
+                  Color(0x14000000),
+                  Color(0x8C06111D),
                   AppColors.backgroundDark,
                 ],
               ),
@@ -174,21 +179,65 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ),
         ),
         Padding(
-          padding: EdgeInsets.only(top: topPad + 28, bottom: 20),
+          // Banner terlihat di atas, avatar & identitas rata kiri di bawahnya
+          // (tata letak preview).
+          padding: EdgeInsets.only(top: topPad + 84, bottom: 20),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              ProfileHeroAvatar(
-                uid: uid,
-                url: avatarUrl,
-                seed: uid.isEmpty ? name : uid,
-                label: name,
-                showXpRing: true,
-                leading: ProfileAchievementBadges.topXpChip(ref, uid),
-                trailing: ProfileAchievementBadges.topGiverChip(ref, uid),
+              // Avatar kiri + tombol Edit Profil di kanan (tata letak preview).
+              // Tombol memanggil sheet Edit Profil yang sama dengan di Pengaturan.
+              Padding(
+                padding: const EdgeInsets.only(left: 8, right: 16),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    ProfileHeroAvatar(
+                      uid: uid,
+                      url: avatarUrl,
+                      seed: uid.isEmpty ? name : uid,
+                      label: name,
+                      showXpRing: true,
+                    ),
+                    const Spacer(),
+                    if (user != null)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: ZPress(
+                          onTap: () => showEditProfileSheet(
+                            context,
+                            user: user!,
+                            profile: profile,
+                            fallbackName: name,
+                            fallbackAvatar: avatarUrl,
+                            premium: premium,
+                          ),
+                          child: Container(
+                            height: 38,
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: AppColors.surfaceVariantDark,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0x1AFFFFFF)),
+                            ),
+                            child: const Text(
+                              'Edit Profil',
+                              style: TextStyle(
+                                color: AppColors.textWhite,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
               const SizedBox(height: 10),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
+                padding: const EdgeInsets.symmetric(horizontal: 18),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.end,
@@ -201,16 +250,26 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       const SizedBox(width: 6),
                     ],
                     Flexible(
-                      child: Text(
-                        name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppColors.textWhite,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
+                      child: premium
+                          // Premium: nama bergradien emas-senja (preview).
+                          ? ShaderMask(
+                              blendMode: BlendMode.srcIn,
+                              shaderCallback: (r) => const LinearGradient(
+                                colors: [Color(0xFFF6BE4F), Color(0xFF4BE3C1)],
+                              ).createShader(r),
+                              child: Text(
+                                name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: ZFont.display(size: 24),
+                              ),
+                            )
+                          : Text(
+                              name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: ZFont.display(size: 24),
+                            ),
                     ),
                     if (profile?.userNumber != null) ...[
                       const SizedBox(width: 6),
@@ -241,15 +300,19 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               const SizedBox(height: 10),
               // Nama clan + role. Top XP / Top Giver ada di samping pin level.
               if (uid.isNotEmpty)
-                Wrap(
-                  alignment: WrapAlignment.center,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [
-                    ProfileClanPill(uid: uid),
-                    RoleBadge(firebaseUid: uid, height: 22, rounded: true),
-                  ],
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 18),
+                  child: Wrap(
+                    alignment: WrapAlignment.start,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      ProfileClanPill(uid: uid),
+                      // Role ikut baris Lencana kalau baris itu tampil.
+                      if (!hasAchievements) RoleBadge(firebaseUid: uid, height: 22, rounded: true),
+                    ],
+                  ),
                 ),
               const SizedBox(height: 18),
               // Statistik dalam satu kartu (redesain Samudra).
@@ -278,6 +341,25 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               if (uid.isNotEmpty) ...[
                 MyXpCard(firebaseUid: uid),
                 const SizedBox(height: 12),
+              ],
+              // Lencana (gaya preview): chip yang bisa digeser.
+              if (hasAchievements) ...[
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 2),
+                  child: SectionHeader(title: 'Lencana', eyebrow: 'バッジ'),
+                ),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    children: [
+                      if (topXpChip != null) ...[topXpChip, const SizedBox(width: 8)],
+                      if (topGiverChip != null) ...[topGiverChip, const SizedBox(width: 8)],
+                      RoleBadge(firebaseUid: uid, height: 22, rounded: true),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
               ],
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),

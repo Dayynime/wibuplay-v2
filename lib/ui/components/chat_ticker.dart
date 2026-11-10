@@ -111,19 +111,20 @@ class _ChatTickerState extends ConsumerState<ChatTicker>
         height: 46,
         padding: const EdgeInsets.symmetric(horizontal: 6),
         decoration: BoxDecoration(
-          color: AppColors.surfaceCard,
-          borderRadius: BorderRadius.circular(23),
+          color: AppColors.surfaceDark,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0x12FFFFFF)),
         ),
         child: Row(
           children: [
             Container(
               width: 34,
               height: 34,
-              decoration: const BoxDecoration(
-                color: AppColors.accentViolet,
-                shape: BoxShape.circle,
+              decoration: BoxDecoration(
+                color: AppColors.accentViolet.withValues(alpha: 0.16),
+                borderRadius: BorderRadius.circular(10),
               ),
-              child: const Icon(Icons.chat_bubble_outline, size: 17, color: AppColors.textWhite),
+              child: const Icon(Icons.chat_bubble_outline_rounded, size: 17, color: AppColors.accentVioletLight),
             ),
             const SizedBox(width: 8),
             Expanded(

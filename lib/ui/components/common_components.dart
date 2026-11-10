@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
+import '../redesign/z_kit.dart';
 
 /// Judul section (redesain Samudra): label Jepang kecil di atas judul tebal,
 /// tombol aksi abu-abu dengan panah. Label Jepang otomatis untuk judul yang
@@ -55,29 +56,13 @@ class SectionHeader extends StatelessWidget {
                 if (label != null)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 2),
-                    child: Text(
-                      label,
-                      maxLines: 1,
-                      style: const TextStyle(
-                        color: AppColors.accentVioletLight,
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 2,
-                        height: 1.2,
-                      ),
-                    ),
+                    child: Text(label, maxLines: 1, style: ZFont.jp()),
                   ),
                 Text(
                   title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: AppColors.textWhite,
-                    fontSize: 19,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.3,
-                    height: 1.15,
-                  ),
+                  style: ZFont.display(size: 19, height: 1.15),
                 ),
               ],
             ),

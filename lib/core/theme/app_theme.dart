@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import 'app_colors.dart';
 
@@ -19,6 +20,14 @@ TextStyle _ts(FontWeight w, double size, double lineHeight, double spacing, Colo
     letterSpacing: spacing,
     color: c,
   );
+}
+
+TextTheme _withBodyFont(TextTheme t) {
+  try {
+    return GoogleFonts.plusJakartaSansTextTheme(t);
+  } catch (_) {
+    return t;
+  }
 }
 
 /// Port Theme.kt + Type.kt. Zenime (Flutter) hanya punya tema gelap.
@@ -65,7 +74,8 @@ ThemeData buildAppTheme({bool glass = false}) {
     colorScheme: scheme,
     scaffoldBackgroundColor: AppColors.backgroundDark,
     canvasColor: AppColors.backgroundDark,
-    textTheme: textTheme,
+    // Plus Jakarta Sans untuk seluruh teks (redesain Samudra).
+    textTheme: _withBodyFont(textTheme),
     bottomSheetTheme: const BottomSheetThemeData(
       backgroundColor: Colors.transparent,
       modalBackgroundColor: Colors.transparent,
