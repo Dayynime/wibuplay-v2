@@ -1,3 +1,5 @@
+import 'dart:ui' show FontFeature;
+
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -14,6 +16,29 @@ import '../../core/theme/app_colors.dart';
 //    tanpa gelembung.
 // =============================================================================
 
+/// Posisi pesan dalam satu rombongan (pesan beruntun dari orang yang sama).
+enum ZGroupPos { single, first, mid, last }
+
+extension ZGroupPosX on ZGroupPos {
+  /// Pesan pertama rombongan: tampilkan avatar + nama + badge.
+  bool get isHead => this == ZGroupPos.single || this == ZGroupPos.first;
+}
+
+/// Hitung posisi dari tetangga: [olderSame] = pesan sebelumnya (lebih lama)
+/// dari orang yang sama dan masih dekat waktunya; [newerSame] sebaliknya.
+ZGroupPos zGroupPos({required bool olderSame, required bool newerSame}) {
+  if (olderSame && newerSame) return ZGroupPos.mid;
+  if (olderSame) return ZGroupPos.last;
+  if (newerSame) return ZGroupPos.first;
+  return ZGroupPos.single;
+}
+
+/// Dua pesan satu rombongan kalau pengirimnya sama dan jaraknya <= 3 menit.
+bool zSameGroup(String uidA, DateTime? a, String uidB, DateTime? b) {
+  if (uidA.isEmpty || uidA != uidB || a == null || b == null) return false;
+  return a.difference(b).inSeconds.abs() <= 180;
+}
+
 /// Gelembung: biru bergradien (milikku) atau biru-abu (orang lain).
 class ZChatBubble extends StatelessWidget {
   const ZChatBubble({
@@ -23,10 +48,18 @@ class ZChatBubble extends StatelessWidget {
     this.highlighted = false,
     this.bare = false,
     this.joinedTop = false,
+    this.pos = ZGroupPos.single,
+    this.time,
   });
 
   final bool mine;
   final Widget child;
+
+  /// Posisi dalam rombongan: menentukan sudut yang menyambung.
+  final ZGroupPos pos;
+
+  /// Jam kecil di pojok kanan bawah (di dalam gelembung / di atas kartu).
+  final String? time;
 
   /// Disorot sebentar (lompat dari kutipan balasan).
   final bool highlighted;
@@ -41,14 +74,28 @@ class ZChatBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tail = joinedTop ? const Radius.circular(18) : const Radius.circular(6);
     const r = Radius.circular(18);
+    const t = Radius.circular(6);
+    // Sisi avatar: atas berekor (6); kalau ada pesan sesudahnya, bawah juga 6
+    // supaya gelembung terlihat menyambung.
+    final topSide = joinedTop && pos == ZGroupPos.single ? r : t;
+    final bottomSide = pos == ZGroupPos.first || pos == ZGroupPos.mid ? t : r;
     final radius = BorderRadius.only(
-      topLeft: mine ? r : tail,
-      topRight: mine ? tail : r,
-      bottomLeft: r,
-      bottomRight: r,
+      topLeft: mine ? r : topSide,
+      topRight: mine ? topSide : r,
+      bottomLeft: mine ? r : bottomSide,
+      bottomRight: mine ? bottomSide : r,
     );
+    final timeText = time == null
+        ? null
+        : Text(
+            time!,
+            style: TextStyle(
+              color: mine ? const Color(0xBFFFFFFF) : AppColors.textMuted,
+              fontSize: 10,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          );
     if (bare) {
       return AnimatedContainer(
         duration: const Duration(milliseconds: 300),
@@ -59,12 +106,34 @@ class ZChatBubble extends StatelessWidget {
             width: 1.5,
           ),
         ),
-        child: child,
+        child: time == null
+            ? child
+            : Stack(
+                children: [
+                  child,
+                  // Jam ditempel di pojok kartu / stiker.
+                  Positioned(
+                    right: 8,
+                    bottom: 8,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: const Color(0xA606111D),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        time!,
+                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
       );
     }
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
-      padding: const EdgeInsets.fromLTRB(12, 9, 12, 9),
+      padding: const EdgeInsets.fromLTRB(12, 8, 11, 7),
       decoration: BoxDecoration(
         borderRadius: radius,
         color: mine ? null : (highlighted ? const Color(0xFF1D3853) : others),
@@ -92,7 +161,18 @@ class ZChatBubble extends StatelessWidget {
       ),
       child: DefaultTextStyle.merge(
         style: TextStyle(color: mine ? Colors.white : AppColors.textWhite),
-        child: child,
+        // Jam satu baris dengan teks kalau muat, kalau tidak turun ke kanan.
+        child: timeText == null
+            ? child
+            : Wrap(
+                alignment: WrapAlignment.end,
+                crossAxisAlignment: WrapCrossAlignment.end,
+                spacing: 8,
+                children: [
+                  child,
+                  Padding(padding: const EdgeInsets.only(bottom: 1), child: timeText),
+                ],
+              ),
       ),
     );
   }
@@ -160,6 +240,7 @@ class ZChatRow extends StatelessWidget {
     this.footer,
     this.maxBubbleWidth,
     this.compact = false,
+    this.pos = ZGroupPos.single,
   });
 
   final bool mine;
@@ -179,22 +260,32 @@ class ZChatRow extends StatelessWidget {
   /// Pesan lanjutan: jarak atas lebih rapat.
   final bool compact;
 
+  /// Posisi dalam rombongan: kepala menampilkan avatar & kepala pesan,
+  /// lanjutan hanya gelembung (avatar diganti ruang kosong).
+  final ZGroupPos pos;
+
   @override
   Widget build(BuildContext context) {
     final screen = MediaQuery.sizeOf(context).width;
     final maxW = maxBubbleWidth ?? (screen * 0.72).clamp(200.0, 320.0);
     final align = mine ? CrossAxisAlignment.end : CrossAxisAlignment.start;
+    final head = pos.isHead;
     final column = Column(
       crossAxisAlignment: align,
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (header != null)
+        if (header != null && head)
           Padding(
             padding: const EdgeInsets.only(left: 4, right: 4, bottom: 4),
             child: header,
           ),
         ConstrainedBox(constraints: BoxConstraints(maxWidth: maxW), child: bubble),
-        if (below != null) below!,
+        // Reaksi menempel di tepi bawah gelembung.
+        if (below != null)
+          Transform.translate(
+            offset: const Offset(0, -5),
+            child: Padding(padding: const EdgeInsets.symmetric(horizontal: 8), child: below),
+          ),
         if (footer != null)
           Padding(
             padding: const EdgeInsets.only(left: 6, right: 6, top: 3),
@@ -202,16 +293,18 @@ class ZChatRow extends StatelessWidget {
           ),
       ],
     );
+    // Lanjutan rombongan: avatar tidak diulang, cukup ruang selebar avatar.
+    final side = head ? RepaintBoundary(child: avatar) : const SizedBox(width: 36);
     return Padding(
-      padding: EdgeInsets.only(top: compact ? 2 : 10, bottom: 2),
+      padding: EdgeInsets.only(top: compact || !head ? 3 : 12, bottom: 0),
       child: Row(
         mainAxisAlignment: mine ? MainAxisAlignment.end : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: mine
             // Border avatar animasi di lapisan sendiri: gelembung & badge
             // tidak ikut digambar ulang tiap frame border berganti.
-            ? [Flexible(child: column), const SizedBox(width: 8), RepaintBoundary(child: avatar)]
-            : [RepaintBoundary(child: avatar), const SizedBox(width: 8), Flexible(child: column)],
+            ? [Flexible(child: column), const SizedBox(width: 8), side]
+            : [side, const SizedBox(width: 8), Flexible(child: column)],
       ),
     );
   }
@@ -406,6 +499,52 @@ class ZChatRoundButton extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(left: 6),
       child: tooltip == null ? button : Tooltip(message: tooltip!, child: button),
+    );
+  }
+}
+
+
+/// Kepala pesan: baris nama (nama, centang, #ID) + satu baris badge yang
+/// tidak pernah turun ke baris baru (kelebihan terpotong rapi).
+class ZChatHeader extends StatelessWidget {
+  const ZChatHeader({super.key, required this.mine, required this.nameRow, this.badges = const []});
+
+  final bool mine;
+  final List<Widget> nameRow;
+  final List<Widget> badges;
+
+  @override
+  Widget build(BuildContext context) {
+    final align = mine ? MainAxisAlignment.end : MainAxisAlignment.start;
+    return Column(
+      crossAxisAlignment: mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(mainAxisSize: MainAxisSize.min, mainAxisAlignment: align, children: nameRow),
+        if (badges.isNotEmpty) ...[
+          const SizedBox(height: 3),
+          LayoutBuilder(
+            builder: (context, c) => ClipRect(
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                physics: const NeverScrollableScrollPhysics(),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minWidth: c.maxWidth.isFinite ? c.maxWidth : 0),
+                  child: Row(
+                    mainAxisAlignment: align,
+                    children: [
+                      for (var i = 0; i < badges.length; i++) ...[
+                        if (i > 0) const SizedBox(width: 4),
+                        badges[i],
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ],
     );
   }
 }

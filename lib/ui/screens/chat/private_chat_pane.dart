@@ -344,12 +344,20 @@ class _PrivateChatPaneState extends ConsumerState<PrivateChatPane> {
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                       itemCount: msgs.length,
                       itemBuilder: (context, i) {
-                        final m = msgs[msgs.length - 1 - i];
+                        final idx = msgs.length - 1 - i;
+                        final m = msgs[idx];
                         final own = m.senderUid == widget.myUid;
+                        // Rombongan: pesan beruntun dari orang yang sama (<= 3 menit).
+                        bool same(int j) =>
+                            j >= 0 &&
+                            j < msgs.length &&
+                            zSameGroup(m.senderUid, DateTime.tryParse(m.createdAt), msgs[j].senderUid,
+                                DateTime.tryParse(msgs[j].createdAt));
                         return _DmBubble(
                           key: ValueKey(m.id),
                           message: m,
                           isOwn: own,
+                          pos: zGroupPos(olderSame: same(idx - 1), newerSame: same(idx + 1)),
                           name: own ? widget.myUsername : friend.username,
                           uid: own ? widget.myUid : friend.firebaseUid,
                           avatarUrl: own ? widget.myAvatarUrl : friend.avatarUrl,
@@ -495,9 +503,11 @@ class _DmBubble extends StatelessWidget {
     required this.onReply,
     required this.onLongPress,
     this.onAvatarTap,
+    this.pos = ZGroupPos.single,
   });
 
   final PrivateMessage message;
+  final ZGroupPos pos;
   final bool isOwn;
   final String name;
   final String uid;
@@ -541,24 +551,31 @@ class _DmBubble extends StatelessWidget {
           onTap: onAvatarTap,
           child: UserAvatar(username: name, url: avatarUrl, size: 36, frameUid: uid),
         ),
-        header: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 180),
-          child: Text(
-            name,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: AppColors.accentVioletLight,
-              fontSize: 12.5,
-              fontWeight: FontWeight.w700,
+        pos: pos,
+        header: ZChatHeader(
+          mine: isOwn,
+          nameRow: [
+            Flexible(
+              child: Text(
+                name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: AppColors.accentVioletLight,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ),
-          ),
+          ],
         ),
         bubble: GestureDetector(
           onLongPress: onLongPress,
           child: ZChatBubble(
             mine: isOwn,
             bare: bare,
+            pos: pos,
+            time: _dmTime(m),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
@@ -574,7 +591,6 @@ class _DmBubble extends StatelessWidget {
             ),
           ),
         ),
-        footer: ZChatFooter(time: _dmTime(m), actions: [('Balas', onReply)]),
       ),
     );
   }

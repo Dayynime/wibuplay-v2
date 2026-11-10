@@ -260,6 +260,16 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 Clipboard.setData(ClipboardData(text: m.message));
               },
             ),
+            // Hapus pindah dari bawah gelembung ke menu ini (aturan izin sama).
+            if ((m.firebaseUid == s.myUid || s.canDeleteOthers) && !m.isGift && !m.isGiveaway)
+              ListTile(
+                leading: const Icon(Icons.delete_outline_rounded, color: AppColors.errorRed),
+                title: const Text('Hapus pesan', style: TextStyle(color: AppColors.errorRed)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _confirmDelete(m);
+                },
+              ),
             if (m.firebaseUid != s.myUid && s.myUid.isNotEmpty)
               ListTile(
                 leading: const Icon(Icons.card_giftcard, color: Color(0xFFF5B73B)),
@@ -581,10 +591,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       itemCount: msgs.length,
       itemBuilder: (context, i) {
-        final m = msgs[msgs.length - 1 - i];
+        final idx = msgs.length - 1 - i;
+        final m = msgs[idx];
         if (m.isWpEvent) return WpEventChatCard(key: ValueKey(m.id), message: m);
+        // Rombongan: pesan beruntun dari orang yang sama (<= 3 menit).
+        bool same(int j) =>
+            j >= 0 && j < msgs.length && !msgs[j].isWpEvent && zSameGroup(m.firebaseUid, m.time, msgs[j].firebaseUid, msgs[j].time);
         final bubble = ChatMessageBubble(
           key: ValueKey(m.id),
+          groupPos: zGroupPos(olderSame: same(idx - 1), newerSame: same(idx + 1)),
           message: m,
           reactions: ChatReactionChips(channel: 'global', id: m.id),
           mine: m.firebaseUid == s.myUid,
@@ -695,9 +710,13 @@ class ChatMessageBubble extends StatelessWidget {
     this.onProfileTap,
     this.onOwnAvatarTap,
     this.reactions,
+    this.groupPos = ZGroupPos.single,
   });
 
   final ChatMessage message;
+
+  /// Posisi dalam rombongan pesan beruntun (avatar & kepala hanya di awal).
+  final ZGroupPos groupPos;
 
   /// Chip reaksi emoji di bawah isi pesan (null = tidak ada).
   final Widget? reactions;
@@ -736,18 +755,14 @@ class ChatMessageBubble extends StatelessWidget {
     final bare = !hasReply && (m.isGiveaway || m.isGift || chess || sticker != null);
     final textColor = mine ? Colors.white : AppColors.textWhite;
 
-    // Kepala: nama (warna pilihan user) > centang > #ID > clan > level > Top Giver.
-    // Pesanku juga lengkap, dicerminkan ke kanan.
-    final header = Wrap(
-      alignment: mine ? WrapAlignment.end : WrapAlignment.start,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      spacing: 4,
-      runSpacing: 3,
-      children: [
-        GestureDetector(
-          onTap: mine ? onOwnAvatarTap : onProfileTap,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 150),
+    // Kepala: baris nama (nama > centang > #ID) lalu SATU baris badge
+    // (clan > level > Top Giver). Pesanku juga lengkap, dicerminkan ke kanan.
+    final header = ZChatHeader(
+      mine: mine,
+      nameRow: [
+        Flexible(
+          child: GestureDetector(
+            onTap: mine ? onOwnAvatarTap : onProfileTap,
             child: Text(
               m.username,
               maxLines: 1,
@@ -760,11 +775,16 @@ class ChatMessageBubble extends StatelessWidget {
             ),
           ),
         ),
+        const SizedBox(width: 4),
         // Centang: warna role (developer, admin, moderator) menang atas
         // Premium biru; hilang kalau bukan keduanya.
         UserCheckBadge(firebaseUid: m.firebaseUid, isPremium: isPremium, size: 14),
-        if (userNumber != null)
+        if (userNumber != null) ...[
+          const SizedBox(width: 4),
           Text('#$userNumber', style: const TextStyle(color: AppColors.textMuted, fontSize: 10)),
+        ],
+      ],
+      badges: [
         if (clanTag != null) ClanTagBadge(text: clanTag!),
         if (level != null) UserLevelBadge(uid: m.firebaseUid, level: level!),
         TopGiverBadge(firebaseUid: m.firebaseUid, height: 16),
@@ -807,6 +827,8 @@ class ChatMessageBubble extends StatelessWidget {
         mine: mine,
         bare: bare,
         highlighted: highlighted,
+        pos: groupPos,
+        time: _timeLabel(m),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
@@ -856,19 +878,14 @@ class ChatMessageBubble extends StatelessWidget {
 
     return SwipeToReply(
       onReply: onReply,
+      // Balas & Hapus lewat tahan pesan (menu) atau geser untuk balas.
       child: ZChatRow(
         mine: mine,
+        pos: groupPos,
         avatar: avatar,
         header: header,
         bubble: bubble,
         below: reactions,
-        footer: ZChatFooter(
-          time: _timeLabel(m),
-          actions: [
-            ('Balas', onReply),
-            if (onDelete != null) ('Hapus', onDelete!),
-          ],
-        ),
       ),
     );
   }

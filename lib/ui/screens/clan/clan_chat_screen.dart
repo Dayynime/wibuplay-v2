@@ -221,6 +221,16 @@ class _ClanChatPaneState extends ConsumerState<ClanChatPane> with WidgetsBinding
                 Clipboard.setData(ClipboardData(text: m.message));
               },
             ),
+            // Hapus pindah dari bawah gelembung ke menu ini (aturan izin sama).
+            if ((own || _canModerate) && !_giveawayRe.hasMatch(m.message.trim()))
+              ListTile(
+                leading: const Icon(Icons.delete_outline_rounded, color: AppColors.errorRed),
+                title: const Text('Hapus pesan', style: TextStyle(color: AppColors.errorRed)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _requestDelete(m, own);
+                },
+              ),
             if (!own && myUid.isNotEmpty) ...[
               ListTile(
                 leading: const Icon(Icons.flag_outlined, color: AppColors.errorRed),
@@ -356,12 +366,17 @@ class _ClanChatPaneState extends ConsumerState<ClanChatPane> with WidgetsBinding
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       itemCount: msgs.length,
       itemBuilder: (context, i) {
-        final m = msgs[msgs.length - 1 - i];
+        final idx = msgs.length - 1 - i;
+        final m = msgs[idx];
         final own = m.firebaseUid == myUid;
+        // Rombongan: pesan beruntun dari orang yang sama (<= 3 menit).
+        bool same(int j) =>
+            j >= 0 && j < msgs.length && zSameGroup(m.firebaseUid, m.createdAt, msgs[j].firebaseUid, msgs[j].createdAt);
         final p = s.profiles[m.firebaseUid];
         final replied = m.replyToId == null ? null : byId[m.replyToId];
         final bubble = ChatMessageBubble(
           key: ValueKey('cm-${m.id}'),
+          groupPos: zGroupPos(olderSame: same(idx - 1), newerSame: same(idx + 1)),
           message: _toChat(s, m, replied),
           reactions: ChatReactionChips(channel: 'clan', id: m.id),
           mine: own,
