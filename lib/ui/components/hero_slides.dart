@@ -328,10 +328,9 @@ class _GlassStage extends StatelessWidget {
               gradient: LinearGradient(
                 begin: Alignment.topRight,
                 end: Alignment.bottomLeft,
-                colors: [
-                  Color.lerp(AppColors.surfaceVariantDark, accent, 0.10)!,
-                  AppColors.surfaceDark,
-                ],
+                // Latar sama untuk semua slide (biru laut), tanpa rona warna
+                // per slide, seperti preview.
+                colors: [AppColors.surfaceVariantDark, AppColors.surfaceDark],
               ),
             ),
           ),
@@ -927,7 +926,7 @@ class HeroSupportSlide extends StatelessWidget {
                           i: i,
                           rank: top[i].rank,
                           t: enter,
-                          accent: _rose,
+                          accent: AppColors.accentViolet,
                           avatar: UserAvatar(
                             username: top[i].name,
                             url: top[i].avatarUrl,

@@ -643,41 +643,69 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
   // --------------------------------------------------------------- tab row
 
   Widget _tabRow(DetailUiState ui) {
-    // Tab bergaya pill yang bisa digeser (6 tab: Info, Episode, Season, ...).
-    return SizedBox(
-      height: 40,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: _tabs.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 8),
-        itemBuilder: (context, i) {
-          final on = ui.selectedTab == i;
-          return GestureDetector(
-            onTap: () => _selectTab(i),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 240),
-              curve: Curves.easeOutQuint,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: on ? AppColors.accentViolet.withValues(alpha: 0.16) : AppColors.surfaceDark,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: on ? AppColors.accentViolet.withValues(alpha: 0.55) : const Color(0x12FFFFFF),
+    // Segmented (gaya preview): wadah gelap, indikator bergeser halus.
+    final n = _tabs.length;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        height: 44,
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceDark,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0x12FFFFFF)),
+        ),
+        child: LayoutBuilder(
+          builder: (context, c) {
+            final w = c.maxWidth / n;
+            return Stack(
+              children: [
+                AnimatedPositioned(
+                  duration: const Duration(milliseconds: 260),
+                  curve: Curves.easeOutQuint,
+                  left: ui.selectedTab * w,
+                  top: 0,
+                  bottom: 0,
+                  width: w,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceElevated,
+                      borderRadius: BorderRadius.circular(11),
+                    ),
+                  ),
                 ),
-              ),
-              child: Text(
-                _tabs[i],
-                style: TextStyle(
-                  color: on ? AppColors.accentVioletLight : AppColors.textSecondary,
-                  fontSize: 13,
-                  fontWeight: on ? FontWeight.w700 : FontWeight.w600,
+                Row(
+                  children: [
+                    for (var i = 0; i < n; i++)
+                      Expanded(
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => _selectTab(i),
+                          child: Center(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 3),
+                                child: AnimatedDefaultTextStyle(
+                                  duration: const Duration(milliseconds: 200),
+                                  style: TextStyle(
+                                    color: ui.selectedTab == i ? AppColors.textWhite : AppColors.textMuted,
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                  child: Text(_tabs[i]),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
-              ),
-            ),
-          );
-        },
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -702,9 +730,11 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
       child: Column(
         children: [
+          // Baris angka gaya preview: angka utama besar di kiri, lalu
+          // pasangan nilai/label kecil dipisah garis tipis.
           if (stats.isNotEmpty)
             Container(
-              padding: const EdgeInsets.symmetric(vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
                 color: AppColors.surfaceDark,
                 borderRadius: BorderRadius.circular(16),
@@ -713,31 +743,45 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
               child: IntrinsicHeight(
                 child: Row(
                   children: [
-                    for (var i = 0; i < stats.length; i++) ...[
-                      if (i > 0) const VerticalDivider(width: 1, thickness: 1, color: Color(0x14FFFFFF)),
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 6),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                stats[i].$1,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: AppColors.textWhite,
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.w800,
-                                ),
+                    Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(stats.first.$1, style: ZFont.display(size: 28, height: 1)),
+                        const SizedBox(height: 2),
+                        Text(
+                          stats.first.$2,
+                          style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+                        ),
+                      ],
+                    ),
+                    for (var i = 1; i < stats.length; i++) ...[
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 12),
+                        child: VerticalDivider(width: 1, thickness: 1, color: Color(0x14FFFFFF)),
+                      ),
+                      Flexible(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              stats[i].$1,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: AppColors.textWhite,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
                               ),
-                              const SizedBox(height: 2),
-                              Text(
-                                stats[i].$2,
-                                style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
-                              ),
-                            ],
-                          ),
+                            ),
+                            const SizedBox(height: 1),
+                            Text(
+                              stats[i].$2,
+                              maxLines: 1,
+                              style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -750,8 +794,19 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
             children: [
               if (targetEpisodeId.isNotEmpty) ...[
                 Expanded(
-                  child: SizedBox(
-                    height: 46,
+                  child: Container(
+                    height: 44,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.accentViolet.withValues(alpha: 0.45),
+                          blurRadius: 24,
+                          offset: const Offset(0, 10),
+                          spreadRadius: -12,
+                        ),
+                      ],
+                    ),
                     child: FilledButton.icon(
                       onPressed: () => widget.onWatchEpisode(widget.movieId, targetEpisodeId),
                       style: FilledButton.styleFrom(
@@ -780,8 +835,8 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
                   customBorder: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   onTap: () => _notifier.toggleFavorite(),
                   child: SizedBox(
-                    width: 46,
-                    height: 46,
+                    width: 44,
+                    height: 44,
                     child: Icon(
                       isFavorite ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
                       color: isFavorite ? AppColors.accentViolet : AppColors.textWhite,
@@ -847,7 +902,7 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
                         child: Text(
                           _synopsisExpanded ? 'Tutup' : 'Selengkapnya',
                           style: const TextStyle(
-                            color: AppColors.accentVioletLight,
+                            color: AppColors.textWhite,
                             fontSize: 13,
                             fontWeight: FontWeight.w700,
                           ),

@@ -29,6 +29,8 @@ import 'profile_screen.dart';
 import 'profile_card.dart';
 import '../../glass/glass.dart';
 import '../../components/clan_tag_badge.dart';
+import '../../components/common_components.dart';
+import '../../redesign/z_kit.dart';
 
 /// Buka profil publik user lain (dari Chat Global, Chat Teman, layar Teman).
 /// Port rute `profile/{targetUid}` di Zenime.
@@ -276,6 +278,19 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
     final uniqueAnime = history.map((h) => h.movieId).toSet().length;
     final topPad = MediaQuery.paddingOf(context).top;
 
+    final topXpChip = ProfileAchievementBadges.topXpChip(ref, uid);
+    final topGiverChip = ProfileAchievementBadges.topGiverChip(ref, uid);
+    final hasAchievements = topXpChip != null || topGiverChip != null;
+    final nameText = Text(
+      name,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: ZFont.display(size: 24),
+    );
+
+    // Tata letak sama dengan Profil Saya (redesain): banner, avatar rata
+    // kiri, nama (gradien kalau Premium), status, statistik transparan,
+    // Lencana, tombol Clan/Pohon/Leaderboard, lalu tombol teman.
     return Stack(
       children: [
         Positioned.fill(
@@ -283,16 +298,24 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
               ? NetImage(backdrop!)
               : const ColoredBox(color: AppColors.surfaceVariantDark),
         ),
-
+        // Tekstur titik ala manga di pojok banner.
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          height: topPad + 200,
+          child: const ZScreentone(opacity: 0.18),
+        ),
         const Positioned.fill(
           child: DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
+                stops: [0, 0.32, 0.62],
                 colors: [
-                  Color(0x26000000),
-                  Color(0x73000000),
+                  Color(0x14000000),
+                  Color(0x8C06111D),
                   AppColors.backgroundDark,
                 ],
               ),
@@ -308,21 +331,23 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
             child: BannerRarityBadge(rarity: wpBanner.rarity),
           ),
         Padding(
-          padding: EdgeInsets.only(top: topPad + 28, bottom: 20),
+          padding: EdgeInsets.only(top: topPad + 84, bottom: 20),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              ProfileHeroAvatar(
-                uid: uid,
-                url: avatarUrl,
-                seed: uid,
-                label: name,
-                showXpRing: true,
-                leading: ProfileAchievementBadges.topXpChip(ref, uid),
-                trailing: ProfileAchievementBadges.topGiverChip(ref, uid),
+              Padding(
+                padding: const EdgeInsets.only(left: 8),
+                child: ProfileHeroAvatar(
+                  uid: uid,
+                  url: avatarUrl,
+                  seed: uid,
+                  label: name,
+                  showXpRing: true,
+                ),
               ),
               const SizedBox(height: 10),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
+                padding: const EdgeInsets.symmetric(horizontal: 18),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.end,
@@ -335,16 +360,16 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
                       const SizedBox(width: 6),
                     ],
                     Flexible(
-                      child: Text(
-                        name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppColors.textWhite,
-                          fontSize: 22,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
+                      child: premium
+                          // Premium: nama bergradien emas-toska.
+                          ? ShaderMask(
+                              blendMode: BlendMode.srcIn,
+                              shaderCallback: (r) => const LinearGradient(
+                                colors: [Color(0xFFF6BE4F), Color(0xFF4BE3C1)],
+                              ).createShader(r),
+                              child: nameText,
+                            )
+                          : nameText,
                     ),
                     const SizedBox(width: 6),
                     Padding(
@@ -367,22 +392,47 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
                 ),
               ),
               const SizedBox(height: 6),
-              ActivityStatus(uid: uid),
-              const SizedBox(height: 10),
-              // Nama clan + role. Top XP / Top Giver ada di samping pin level.
-              Wrap(
-                alignment: WrapAlignment.center,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: 6,
-                runSpacing: 6,
-                children: [
-                  ProfileClanPill(uid: uid),
-                  RoleBadge(firebaseUid: uid, height: 22, rounded: true),
-                ],
-              ),
-              const SizedBox(height: 18),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
+                padding: const EdgeInsets.symmetric(horizontal: 18),
+                child: ActivityStatus(uid: uid),
+              ),
+              const SizedBox(height: 10),
+              // Nama clan + role (role pindah ke Lencana kalau baris itu tampil).
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 18),
+                child: Wrap(
+                  alignment: WrapAlignment.start,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    ProfileClanPill(uid: uid),
+                    if (!hasAchievements) RoleBadge(firebaseUid: uid, height: 22, rounded: true),
+                  ],
+                ),
+              ),
+              if (!_isMe) ...[
+                const SizedBox(height: 16),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: _buildFriendActions(),
+                ),
+              ],
+              if (_error != null) ...[
+                const SizedBox(height: 10),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Text(
+                    _error!,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: AppColors.errorRed, fontSize: 12.5),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 16),
+              // Statistik tanpa kartu (transparan).
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                 child: Row(
                   children: [
                     JoinDateStat(firebaseUid: uid),
@@ -396,6 +446,25 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
                 ),
               ),
               const SizedBox(height: 18),
+              // Lencana (gaya preview): chip yang bisa digeser.
+              if (hasAchievements) ...[
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 2),
+                  child: SectionHeader(title: 'Lencana', eyebrow: 'バッジ'),
+                ),
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    children: [
+                      if (topXpChip != null) ...[topXpChip, const SizedBox(width: 8)],
+                      if (topGiverChip != null) ...[topGiverChip, const SizedBox(width: 8)],
+                      RoleBadge(firebaseUid: uid, height: 22, rounded: true),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+              ],
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Row(
@@ -434,24 +503,6 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
                   ],
                 ),
               ),
-              if (!_isMe) ...[
-                const SizedBox(height: 14),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: _buildFriendActions(),
-                ),
-              ],
-              if (_error != null) ...[
-                const SizedBox(height: 10),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Text(
-                    _error!,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: AppColors.errorRed, fontSize: 12.5),
-                  ),
-                ),
-              ],
             ],
           ),
         ),
@@ -466,29 +517,22 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
           TweenAnimationBuilder<int>(
             tween: IntTween(begin: 0, end: value),
             duration: const Duration(milliseconds: 1200),
-            builder: (context, v, _) => Text(
-              '$v',
-              style: const TextStyle(
-                color: AppColors.textWhite,
-                fontSize: 19,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
+            builder: (context, v, _) => Text('$v', style: ZFont.display(size: 20, height: 1.1)),
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 3),
           Text(
             label,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: Color(0xB3FFFFFF), fontSize: 11),
+            style: const TextStyle(color: AppColors.textMuted, fontSize: 11, fontWeight: FontWeight.w500),
           ),
         ],
       ),
     );
   }
 
-  Widget _statDivider() => Container(width: 1, height: 26, color: const Color(0x40FFFFFF));
+  Widget _statDivider() => Container(width: 1, height: 28, color: const Color(0x14FFFFFF));
 
   /// Pohon: profil sendiri -> pohonku; teman -> mampir ke pohonnya.
   void _openTree(String name, String? avatarUrl) {
@@ -544,12 +588,12 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
 
     Widget filled(IconData icon, String label, VoidCallback? onTap) => SizedBox(
           width: double.infinity,
-          height: 52,
+          height: 46,
           child: FilledButton.icon(
             onPressed: _busy ? null : onTap,
             style: FilledButton.styleFrom(
               backgroundColor: AppColors.accentViolet,
-              shape: const StadiumBorder(),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             ),
             icon: Icon(icon, size: 18),
             label: Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
@@ -560,13 +604,14 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
             {Color color = Colors.white}) =>
         SizedBox(
           width: double.infinity,
-          height: 52,
+          height: 46,
           child: OutlinedButton.icon(
             onPressed: _busy ? null : onTap,
             style: OutlinedButton.styleFrom(
               foregroundColor: color,
-              side: BorderSide(color: color.withValues(alpha: 0.4)),
-              shape: const StadiumBorder(),
+              backgroundColor: color.withValues(alpha: 0.10),
+              side: BorderSide(color: color.withValues(alpha: 0.35)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             ),
             icon: Icon(icon, size: 18),
             label: Text(label, style: const TextStyle(fontWeight: FontWeight.w700)),
@@ -646,54 +691,68 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
   // ------------------------------------------------------------------- tab
 
   Widget _buildTabs() {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: Row(
-            children: [
-              for (var i = 0; i < _tabs.length; i++)
-                Expanded(
-                  child: InkWell(
-                    onTap: () => setState(() => _selectedTab = i),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      child: Column(
-                        children: [
-                          FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Text(
-                              _tabs[i],
-                              style: TextStyle(
-                                color: _selectedTab == i
-                                    ? AppColors.textWhite
-                                    : const Color(0x80FFFFFF),
-                                fontSize: 13.5,
-                                fontWeight:
-                                    _selectedTab == i ? FontWeight.w700 : FontWeight.w400,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            height: 3,
-                            width: _selectedTab == i ? 28 : 0,
-                            decoration: BoxDecoration(
-                              color: AppColors.accentViolet,
-                              borderRadius: BorderRadius.circular(2),
-                            ),
-                          ),
-                        ],
-                      ),
+    final n = _tabs.length;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        height: 44,
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceDark,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0x12FFFFFF)),
+        ),
+        child: LayoutBuilder(
+          builder: (context, c) {
+            final w = c.maxWidth / n;
+            return Stack(
+              children: [
+                AnimatedPositioned(
+                  duration: const Duration(milliseconds: 260),
+                  curve: Curves.easeOutQuint,
+                  left: _selectedTab * w,
+                  top: 0,
+                  bottom: 0,
+                  width: w,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceElevated,
+                      borderRadius: BorderRadius.circular(11),
                     ),
                   ),
                 ),
-            ],
-          ),
+                Row(
+                  children: [
+                    for (var i = 0; i < n; i++)
+                      Expanded(
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => setState(() => _selectedTab = i),
+                          child: Center(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 4),
+                                child: Text(
+                                  _tabs[i],
+                                  style: TextStyle(
+                                    color: _selectedTab == i ? AppColors.textWhite : AppColors.textMuted,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            );
+          },
         ),
-        Container(height: 1, color: const Color(0x14FFFFFF)),
-      ],
+      ),
     );
   }
 
