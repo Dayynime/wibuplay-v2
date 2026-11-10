@@ -208,8 +208,10 @@ class ZChatRow extends StatelessWidget {
         mainAxisAlignment: mine ? MainAxisAlignment.end : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: mine
-            ? [Flexible(child: column), const SizedBox(width: 8), avatar]
-            : [avatar, const SizedBox(width: 8), Flexible(child: column)],
+            // Border avatar animasi di lapisan sendiri: gelembung & badge
+            // tidak ikut digambar ulang tiap frame border berganti.
+            ? [Flexible(child: column), const SizedBox(width: 8), RepaintBoundary(child: avatar)]
+            : [RepaintBoundary(child: avatar), const SizedBox(width: 8), Flexible(child: column)],
       ),
     );
   }

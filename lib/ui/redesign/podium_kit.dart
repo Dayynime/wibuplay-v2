@@ -88,7 +88,10 @@ class ZLaurelRank extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
+    // Lapisan sendiri: digambar sekali lalu dipakai ulang, tidak ikut
+    // digambar ulang saat border avatar animasi di sebelahnya berganti frame.
+    return RepaintBoundary(
+      child: SizedBox(
       width: size,
       height: size,
       child: CustomPaint(
@@ -124,6 +127,7 @@ class ZLaurelRank extends StatelessWidget {
           ),
         ),
       ),
+    ),
     );
   }
 }
@@ -146,12 +150,14 @@ class _LaurelPainter extends CustomPainter {
       ..strokeWidth = math.max(1.0, w * 0.025)
       ..strokeCap = StrokeCap.round;
     if (glow) {
+      // Cahaya lembut tanpa blur (blur mahal di GPU).
       canvas.drawCircle(
         c,
-        r * 1.1,
+        r * 1.25,
         Paint()
-          ..color = color.withValues(alpha: 0.28)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10),
+          ..shader = RadialGradient(
+            colors: [color.withValues(alpha: 0.30), color.withValues(alpha: 0)],
+          ).createShader(Rect.fromCircle(center: c, radius: r * 1.25)),
       );
     }
 
@@ -417,11 +423,15 @@ class _ZPodiumCard extends StatelessWidget {
                   right: 0,
                   bottom: 10,
                   child: Center(
-                    child: UserAvatar(
-                      username: item.username,
-                      url: item.avatarUrl,
-                      size: avatarSize,
-                      frameUid: item.uid,
+                    // Border avatar bisa animasi: lapisan sendiri supaya kartu
+                    // (gradien, karangan daun) tidak ikut digambar ulang.
+                    child: RepaintBoundary(
+                      child: UserAvatar(
+                        username: item.username,
+                        url: item.avatarUrl,
+                        size: avatarSize,
+                        frameUid: item.uid,
+                      ),
                     ),
                   ),
                 ),
@@ -633,7 +643,10 @@ class ZRankRow extends StatelessWidget {
           ),
           child: Row(
             children: [
-              avatar ?? UserAvatar(username: username, url: avatarUrl, size: 46, frameUid: uid),
+              // Border avatar animasi di lapisan sendiri (baris tidak ikut digambar ulang).
+              RepaintBoundary(
+                child: avatar ?? UserAvatar(username: username, url: avatarUrl, size: 46, frameUid: uid),
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
