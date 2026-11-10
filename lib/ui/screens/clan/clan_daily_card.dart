@@ -3,10 +3,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../redesign/z_kit.dart';
 import '../../../data/repository/clan_daily_repository.dart';
 import '../../../providers.dart';
 
-const Color _gold = Color(0xFFF5B301);
+// Warna utama kartu (redesain Samudra: toska, bukan emas).
+const Color _gold = Color(0xFF4BE3C1);
 const Color _green = Color(0xFF22C55E);
 
 /// Kartu "Absen Harian" di halaman clan (hanya untuk anggota clan itu).
@@ -104,9 +106,10 @@ class _ClanDailyCardState extends ConsumerState<ClanDailyCard> {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF2A2210), AppColors.surfaceCard],
+          stops: [0, 0.55, 1],
+          colors: [Color(0x241FB6F5), Color(0x0D4BE3C1), AppColors.surfaceDark],
         ),
-        border: Border.all(color: _gold.withValues(alpha: 0.35)),
+        border: Border.all(color: AppColors.accentViolet.withValues(alpha: 0.25)),
       ),
       child: body,
     );
@@ -125,10 +128,7 @@ class _ClanDailyCardState extends ConsumerState<ClanDailyCard> {
           children: [
             const Icon(Icons.event_available_rounded, color: _gold, size: 20),
             const SizedBox(width: 8),
-            const Text(
-              'Absen Harian',
-              style: TextStyle(color: AppColors.textWhite, fontSize: 15, fontWeight: FontWeight.w800),
-            ),
+            Text('Absen Harian', style: ZFont.display(size: 15.5)),
             const Spacer(),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -170,7 +170,7 @@ class _ClanDailyCardState extends ConsumerState<ClanDailyCard> {
             child: FilledButton(
               style: FilledButton.styleFrom(
                 backgroundColor: s.checkedIn ? Colors.white.withValues(alpha: 0.08) : _gold,
-                foregroundColor: s.checkedIn ? AppColors.textSecondary : const Color(0xFF241A00),
+                foregroundColor: s.checkedIn ? AppColors.textSecondary : const Color(0xFF032A22),
                 disabledBackgroundColor: Colors.white.withValues(alpha: 0.08),
                 disabledForegroundColor: AppColors.textSecondary,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -284,17 +284,20 @@ class _DayDot extends StatelessWidget {
       children: [
         AnimatedContainer(
           duration: const Duration(milliseconds: 300),
-          width: 34,
-          height: 34,
+          width: 36,
+          height: 36,
           decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: done ? _gold : Colors.transparent,
-            border: Border.all(color: color, width: today ? 2 : 1.5),
-            boxShadow: today ? [BoxShadow(color: _gold.withValues(alpha: 0.35), blurRadius: 10)] : null,
+            borderRadius: BorderRadius.circular(11),
+            color: done ? _gold.withValues(alpha: 0.18) : const Color(0x0AFFFFFF),
+            border: Border.all(
+              color: today ? AppColors.accentViolet : (done ? _gold.withValues(alpha: 0.4) : color.withValues(alpha: 0.6)),
+              width: today ? 1.5 : 1,
+            ),
+            boxShadow: today ? [BoxShadow(color: AppColors.accentViolet.withValues(alpha: 0.25), blurRadius: 8)] : null,
           ),
           alignment: Alignment.center,
           child: done
-              ? const Icon(Icons.check_rounded, size: 18, color: Color(0xFF241A00))
+              ? const Icon(Icons.check_rounded, size: 18, color: _gold)
               : Text(
                   '$amount',
                   style: TextStyle(

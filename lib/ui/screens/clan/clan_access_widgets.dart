@@ -85,35 +85,35 @@ class _ClanJoinSettingsCardState extends ConsumerState<ClanJoinSettingsCard> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: clanSurface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: clanBorder),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Row(
-            children: [
-              Icon(Icons.admin_panel_settings_rounded, size: 18, color: AppColors.accentVioletLight),
-              SizedBox(width: 8),
-              Text(
-                'Akses Bergabung',
-                style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w800),
-              ),
-            ],
+    // Pilihan mode dalam kisi 2 x 2 (gaya preview).
+    Widget mode(String m) => Expanded(
+          child: _ModeOption(
+            mode: m,
+            selected: _mode == m,
+            onTap: _saving ? null : () => setState(() => _mode = m),
           ),
-          const SizedBox(height: 12),
-          for (final m in ClanJoinMode.all) ...[
-            _ModeOption(
-              mode: m,
-              selected: _mode == m,
-              onTap: _saving ? null : () => setState(() => _mode = m),
+        );
+    final modes = ClanJoinMode.all;
+    return ClanSectionCard(
+      icon: Icons.meeting_room_rounded,
+      title: 'Akses Bergabung',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (var r = 0; r < modes.length; r += 2) ...[
+            if (r > 0) const SizedBox(height: 8),
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  mode(modes[r]),
+                  const SizedBox(width: 8),
+                  if (r + 1 < modes.length) mode(modes[r + 1]) else const Expanded(child: SizedBox()),
+                ],
+              ),
             ),
-            const SizedBox(height: 8),
           ],
+          const SizedBox(height: 4),
           AnimatedSize(
             duration: const Duration(milliseconds: 220),
             curve: Curves.easeOutCubic,
@@ -229,44 +229,42 @@ class _ModeOption extends StatelessWidget {
         onTap: onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+          padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
-            color: selected ? AppColors.accentViolet.withValues(alpha: 0.16) : const Color(0x0AFFFFFF),
+            color: selected ? AppColors.accentViolet.withValues(alpha: 0.12) : AppColors.backgroundDarkSecondary,
             border: Border.all(
               color: selected ? AppColors.accentViolet : Colors.white.withValues(alpha: 0.06),
               width: selected ? 1.5 : 1,
             ),
           ),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(_icon(mode), size: 20, color: selected ? AppColors.accentVioletLight : AppColors.textMuted),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
+              Row(
+                children: [
+                  Icon(_icon(mode), size: 16, color: selected ? AppColors.accentVioletLight : AppColors.textMuted),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
                       ClanJoinMode.label(mode),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: selected ? Colors.white : AppColors.textSecondary,
-                        fontSize: 14,
+                        color: selected ? AppColors.accentVioletLight : AppColors.textWhite,
+                        fontSize: 12.5,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      ClanJoinMode.description(mode),
-                      style: const TextStyle(color: AppColors.textMuted, fontSize: 11.5),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 8),
-              AnimatedOpacity(
-                duration: const Duration(milliseconds: 200),
-                opacity: selected ? 1 : 0,
-                child: const Icon(Icons.check_circle_rounded, size: 20, color: AppColors.accentVioletLight),
+              const SizedBox(height: 4),
+              Text(
+                ClanJoinMode.description(mode),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: AppColors.textMuted, fontSize: 10.5, height: 1.35),
               ),
             ],
           ),
@@ -287,10 +285,10 @@ class _StepBtn extends StatelessWidget {
     return Opacity(
       opacity: onTap == null ? 0.35 : 1,
       child: Material(
-        color: const Color(0x14FFFFFF),
-        shape: const CircleBorder(),
+        color: AppColors.surfaceVariantDark,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(11)),
         child: InkWell(
-          customBorder: const CircleBorder(),
+          borderRadius: BorderRadius.circular(11),
           onTap: onTap,
           child: SizedBox(width: 40, height: 40, child: Icon(icon, color: Colors.white)),
         ),

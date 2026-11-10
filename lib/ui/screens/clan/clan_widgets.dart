@@ -4,6 +4,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../data/models/clan_models.dart';
 import '../../components/hero_slides.dart' show heroGold;
 import '../../components/net_image.dart';
+import '../../redesign/z_kit.dart';
 
 /// Warna role clan (sama dengan Zenime).
 Color clanRoleColor(String role) {
@@ -22,7 +23,7 @@ Color clanRoleColor(String role) {
 }
 
 const Color clanGemBlue = Color(0xFF4FC3F7);
-const Color clanSurface = Color(0xFF171E36);
+const Color clanSurface = Color(0xFF0D1C2D); // Samudra surface
 const Color clanBorder = Color(0x14FFFFFF);
 
 /// 1.2K / 3.4M / 5.6B, dibulatkan satu desimal dan ".0" dibuang.
@@ -69,7 +70,7 @@ class ClanAvatar extends StatelessWidget {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF5A1B26), Color(0xFF3A1219)],
+          colors: [Color(0xFFFFD36A), Color(0xFFE08A1E)],
         ),
       ),
       clipBehavior: Clip.antiAlias,
@@ -78,11 +79,7 @@ class ClanAvatar extends StatelessWidget {
           ? SizedBox.expand(child: NetImage(url!))
           : Text(
               tag.isEmpty ? '?' : tag.substring(0, tag.length < 2 ? tag.length : 2).toUpperCase(),
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: size * 0.34,
-                fontWeight: FontWeight.w800,
-              ),
+              style: ZFont.display(size: size * 0.32, color: const Color(0xFF1B1200), height: 1),
             ),
     );
   }
@@ -162,12 +159,16 @@ class ClanGradientButton extends StatelessWidget {
     required this.icon,
     required this.onTap,
     this.loading = false,
+    this.gold = false,
   });
 
   final String text;
   final IconData icon;
   final VoidCallback? onTap;
   final bool loading;
+
+  /// Varian emas (donasi / beli pakai saldo).
+  final bool gold;
 
   @override
   Widget build(BuildContext context) {
@@ -183,14 +184,19 @@ class ClanGradientButton extends StatelessWidget {
             height: 50,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
-              gradient: const LinearGradient(
-                colors: [AppColors.accentViolet, Color(0xFFFF6B4A)],
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: gold
+                    ? const [Color(0xFFF6BE4F), Color(0xFFE08A1E)]
+                    : const [AppColors.accentViolet, AppColors.accentVioletDark],
               ),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.accentViolet.withValues(alpha: 0.35),
-                  blurRadius: 14,
-                  offset: const Offset(0, 5),
+                  color: (gold ? const Color(0xFFF6BE4F) : AppColors.accentViolet).withValues(alpha: 0.35),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                  spreadRadius: -8,
                 ),
               ],
             ),
@@ -204,14 +210,18 @@ class ClanGradientButton extends StatelessWidget {
                   : Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(icon, size: 18, color: Colors.white),
+                        Icon(icon, size: 18, color: gold ? const Color(0xFF2B1800) : Colors.white),
                         const SizedBox(width: 8),
-                        Text(
-                          text,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w800,
+                        Flexible(
+                          child: Text(
+                            text,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: gold ? const Color(0xFF2B1800) : Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
                         ),
                       ],
@@ -255,6 +265,172 @@ class ClanGlow extends StatelessWidget {
           shape: BoxShape.circle,
           gradient: RadialGradient(
             colors: [color.withValues(alpha: 0.16), color.withValues(alpha: 0)],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+
+/// Kartu bagian (redesain): judul dengan ikon di kotak warna lembut.
+class ClanSectionCard extends StatelessWidget {
+  const ClanSectionCard({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.child,
+    this.color = AppColors.accentViolet,
+    this.danger = false,
+    this.trailing,
+  });
+
+  final IconData icon;
+  final String title;
+  final Widget child;
+  final Color color;
+  final bool danger;
+  final Widget? trailing;
+
+  static const Color dangerColor = Color(0xFFFF6F91);
+
+  @override
+  Widget build(BuildContext context) {
+    final c = danger ? dangerColor : color;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: clanSurface,
+        gradient: danger
+            ? LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [dangerColor.withValues(alpha: 0.07), clanSurface],
+              )
+            : null,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: danger ? dangerColor.withValues(alpha: 0.28) : clanBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: c.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: Icon(icon, size: 16, color: Color.lerp(c, Colors.white, 0.25)),
+              ),
+              const SizedBox(width: 9),
+              Expanded(child: Text(title, style: ZFont.display(size: 15.5))),
+              if (trailing != null) trailing!,
+            ],
+          ),
+          const SizedBox(height: 12),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+/// Segmented 2-3 pilihan dengan indikator meluncur (Clan & Kelola Clan).
+class ClanSegment extends StatelessWidget {
+  const ClanSegment({super.key, required this.labels, required this.selected, required this.onChanged});
+
+  final List<String> labels;
+  final int selected;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 44,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: AppColors.backgroundDarkSecondary,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: clanBorder),
+      ),
+      child: LayoutBuilder(
+        builder: (context, c) {
+          final w = c.maxWidth / labels.length;
+          return Stack(
+            children: [
+              AnimatedPositioned(
+                duration: const Duration(milliseconds: 380),
+                curve: Curves.easeOutQuint,
+                left: selected * w,
+                top: 0,
+                bottom: 0,
+                width: w,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceElevated,
+                    borderRadius: BorderRadius.circular(11),
+                  ),
+                ),
+              ),
+              Row(
+                children: [
+                  for (var i = 0; i < labels.length; i++)
+                    Expanded(
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => onChanged(i),
+                        child: Center(
+                          child: AnimatedDefaultTextStyle(
+                            duration: const Duration(milliseconds: 200),
+                            style: TextStyle(
+                              color: i == selected ? AppColors.textWhite : AppColors.textMuted,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                            ),
+                            child: Text(labels[i], maxLines: 1, overflow: TextOverflow.ellipsis),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// Tombol kotak 46x46 (ikon) dengan tepi tipis.
+class ClanSquareButton extends StatelessWidget {
+  const ClanSquareButton({super.key, required this.icon, required this.onTap, required this.tooltip, this.color});
+
+  final IconData icon;
+  final VoidCallback? onTap;
+  final String tooltip;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: clanSurface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(15),
+          side: const BorderSide(color: clanBorder),
+        ),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(15),
+          onTap: onTap,
+          child: SizedBox(
+            width: 50,
+            height: 50,
+            child: Icon(icon, size: 20, color: color ?? AppColors.textSecondary),
           ),
         ),
       ),

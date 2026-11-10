@@ -15,6 +15,7 @@ import '../../components/game_badges.dart';
 import 'clan_access_widgets.dart';
 import 'clan_badge_shop_screen.dart';
 import 'clan_widgets.dart';
+import '../../redesign/z_kit.dart';
 import '../../glass/glass.dart';
 
 String _thousands(int v) {
@@ -99,7 +100,7 @@ class _ClanManageScreenState extends ConsumerState<ClanManageScreen> {
         backgroundColor: AppColors.backgroundDark,
         foregroundColor: AppColors.textWhite,
         elevation: 0,
-        title: const Text('Kelola Clan', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 20)),
+        title: Text('Kelola Clan', style: ZFont.display(size: 18)),
       ),
       body: Column(
         children: [
@@ -172,49 +173,17 @@ class _Tabs extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final labels = [
-      requestCount == null ? 'Request' : 'Request ($requestCount)',
+      requestCount == null ? 'Request' : 'Request · $requestCount',
       if (showSettings) 'Pengaturan',
     ];
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: clanSurface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: clanBorder),
-      ),
-      child: Row(
-        children: [
-          for (var i = 0; i < labels.length; i++)
-            Expanded(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => onChanged(i),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 220),
-                  height: 40,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    gradient: i == selected
-                        ? const LinearGradient(
-                            colors: [AppColors.accentViolet, Color(0xFFFF6B4A)],
-                          )
-                        : null,
-                  ),
-                  child: Text(
-                    labels[i],
-                    style: TextStyle(
-                      color: i == selected ? Colors.white : AppColors.textSecondary,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
+    if (labels.length == 1) {
+      // Bukan leader: cuma satu tab, tampil sebagai judul kecil.
+      return Align(
+        alignment: Alignment.centerLeft,
+        child: Text(labels.first, style: ZFont.display(size: 16)),
+      );
+    }
+    return ClanSegment(labels: labels, selected: selected, onChanged: onChanged);
   }
 }
 
@@ -263,60 +232,65 @@ class _RequestsTab extends StatelessWidget {
             ),
           );
         }
-        return ListView.separated(
+        return ListView.builder(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
           itemCount: list.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 8),
           itemBuilder: (context, i) {
             final r = list[i];
             final busy = busyId == r.requestId;
+            // Satu panel: sudut membulat di baris pertama/terakhir + garis pemisah.
             return Container(
-              padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
               decoration: BoxDecoration(
                 color: clanSurface,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: clanBorder),
+                borderRadius: BorderRadius.vertical(
+                  top: i == 0 ? const Radius.circular(18) : Radius.zero,
+                  bottom: i == list.length - 1 ? const Radius.circular(18) : Radius.zero,
+                ),
               ),
-              child: Row(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  UserAvatar(username: r.username, url: r.avatarUrl, size: 44, frameUid: r.firebaseUid),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      r.username,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14.5,
-                        fontWeight: FontWeight.w800,
-                      ),
+                  if (i > 0) const Divider(height: 1, thickness: 1, indent: 12, endIndent: 12, color: clanBorder),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
+                    child: Row(
+                      children: [
+                        RepaintBoundary(
+                          child: UserAvatar(username: r.username, url: r.avatarUrl, size: 42, frameUid: r.firebaseUid),
+                        ),
+                        const SizedBox(width: 11),
+                        Expanded(
+                          child: Text(
+                            r.username,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(color: AppColors.textWhite, fontSize: 14, fontWeight: FontWeight.w700),
+                          ),
+                        ),
+                        if (busy)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 14),
+                            child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+                          )
+                        else ...[
+                          _RoundAction(
+                            icon: Icons.close_rounded,
+                            color: const Color(0xFFFF6F91),
+                            tooltip: 'Tolak',
+                            onTap: () => onReject(r),
+                          ),
+                          const SizedBox(width: 6),
+                          _RoundAction(
+                            icon: Icons.check_rounded,
+                            color: AppColors.accentTeal,
+                            tooltip: 'Terima',
+                            filled: true,
+                            onTap: () => onApprove(r),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
-                  if (busy)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 14),
-                      child: SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    )
-                  else ...[
-                    _RoundAction(
-                      icon: Icons.close_rounded,
-                      color: const Color(0xFFFF8A98),
-                      tooltip: 'Tolak',
-                      onTap: () => onReject(r),
-                    ),
-                    const SizedBox(width: 6),
-                    _RoundAction(
-                      icon: Icons.check_rounded,
-                      color: AppColors.successGreen,
-                      tooltip: 'Terima',
-                      onTap: () => onApprove(r),
-                    ),
-                  ],
                 ],
               ),
             );
@@ -333,6 +307,7 @@ class _RoundAction extends StatelessWidget {
     required this.color,
     required this.tooltip,
     required this.onTap,
+    this.filled = false,
   });
 
   final IconData icon;
@@ -340,17 +315,24 @@ class _RoundAction extends StatelessWidget {
   final String tooltip;
   final VoidCallback onTap;
 
+  /// Terisi penuh (aksi utama "Terima").
+  final bool filled;
+
   @override
   Widget build(BuildContext context) {
     return Tooltip(
       message: tooltip,
       child: Material(
-        color: color.withValues(alpha: 0.14),
-        shape: CircleBorder(side: BorderSide(color: color.withValues(alpha: 0.4))),
+        color: filled ? color : color.withValues(alpha: 0.13),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         child: InkWell(
-          customBorder: const CircleBorder(),
+          borderRadius: BorderRadius.circular(12),
           onTap: onTap,
-          child: SizedBox(width: 40, height: 40, child: Icon(icon, color: color, size: 22)),
+          child: SizedBox(
+            width: 38,
+            height: 38,
+            child: Icon(icon, color: filled ? const Color(0xFF032A22) : color, size: 20),
+          ),
         ),
       ),
     );
@@ -607,7 +589,7 @@ class _SettingsTabState extends ConsumerState<_SettingsTab> {
         labelText: label,
         labelStyle: const TextStyle(color: AppColors.textMuted),
         filled: true,
-        fillColor: clanSurface,
+        fillColor: AppColors.backgroundDarkSecondary,
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
           borderSide: const BorderSide(color: clanBorder),
@@ -628,140 +610,189 @@ class _SettingsTabState extends ConsumerState<_SettingsTab> {
     final canAfford = clan.treasuryBalance >= cost;
     final maxed = maxPacks == 0;
 
+    // Urutan kartu: Identitas, Akses Bergabung, Kuota Member, Badge, Zona Bahaya.
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 28),
       children: [
-        Center(
-          child: _PhotoButton(
-            tag: clan.tag,
-            url: clan.photoUrl,
-            uploading: _uploadingPhoto,
-            onTap: _changePhoto,
-          ),
-        ),
-        const SizedBox(height: 18),
-        TextField(
-          controller: _name,
-          enabled: !_saving,
-          style: const TextStyle(color: Colors.white),
-          cursorColor: AppColors.accentViolet,
-          decoration: _decoration('Nama Clan'),
-        ),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _tag,
-          enabled: !_saving,
-          textCapitalization: TextCapitalization.characters,
-          inputFormatters: [
-            LengthLimitingTextInputFormatter(4),
-            TextInputFormatter.withFunction(
-              (old, v) => v.copyWith(text: v.text.toUpperCase()),
-            ),
-          ],
-          style: const TextStyle(color: Colors.white),
-          cursorColor: AppColors.accentViolet,
-          decoration: _decoration('Tag (3-4 huruf)'),
-        ),
-        if (_feedback != null) ...[
-          const SizedBox(height: 10),
-          Text(
-            _feedback!,
-            style: TextStyle(
-              color: _feedbackError ? const Color(0xFFFF8A98) : AppColors.accentVioletLight,
-              fontSize: 12.5,
-            ),
-          ),
-        ],
-        const SizedBox(height: 16),
-        ClanGradientButton(
-          text: 'Simpan',
-          icon: Icons.save_rounded,
-          loading: _saving,
-          onTap: _save,
-        ),
-        const SizedBox(height: 24),
-        // Kartu Kuota Member
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: clanSurface,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: clanBorder),
-          ),
+        ClanSectionCard(
+          icon: Icons.badge_rounded,
+          title: 'Identitas Clan',
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Row(
+              Row(
                 children: [
-                  Icon(Icons.groups_rounded, size: 18, color: AppColors.accentVioletLight),
-                  SizedBox(width: 8),
-                  Text(
-                    'Kuota Member',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
+                  _PhotoButton(
+                    tag: clan.tag,
+                    url: clan.photoUrl,
+                    uploading: _uploadingPhoto,
+                    onTap: _changePhoto,
+                  ),
+                  const SizedBox(width: 14),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Ganti foto clan',
+                          style: TextStyle(color: AppColors.textWhite, fontSize: 13.5, fontWeight: FontWeight.w700),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          'Ketuk lambang untuk pilih dari galeri',
+                          style: TextStyle(color: AppColors.textMuted, fontSize: 11.5),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
-              Text(
-                'Kuota sekarang ${clan.memberCount}/${clan.memberLimit} (maks ${ClanSlotShop.maxMemberLimit})',
-                style: const TextStyle(color: AppColors.textSecondary, fontSize: 12.5),
+              const SizedBox(height: 14),
+              TextField(
+                controller: _name,
+                enabled: !_saving,
+                style: const TextStyle(color: Colors.white),
+                cursorColor: AppColors.accentViolet,
+                decoration: _decoration('Nama Clan'),
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _tag,
+                enabled: !_saving,
+                textCapitalization: TextCapitalization.characters,
+                inputFormatters: [
+                  LengthLimitingTextInputFormatter(4),
+                  TextInputFormatter.withFunction(
+                    (old, v) => v.copyWith(text: v.text.toUpperCase()),
+                  ),
+                ],
+                style: const TextStyle(color: Colors.white, letterSpacing: 2),
+                cursorColor: AppColors.accentViolet,
+                decoration: _decoration('Tag (3-4 huruf)'),
+              ),
+              if (_feedback != null) ...[
+                const SizedBox(height: 10),
+                Text(
+                  _feedback!,
+                  style: TextStyle(
+                    color: _feedbackError ? const Color(0xFFFF8A98) : AppColors.accentVioletLight,
+                    fontSize: 12.5,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 12),
+              ClanGradientButton(
+                text: 'Simpan',
+                icon: Icons.save_rounded,
+                loading: _saving,
+                onTap: _save,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        // Mode join + level minimal
+        ClanJoinSettingsCard(clan: clan, onChanged: widget.onChanged),
+        const SizedBox(height: 12),
+        ClanSectionCard(
+          icon: Icons.groups_rounded,
+          title: 'Kuota Member',
+          color: const Color(0xFFF6BE4F),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
               Row(
                 children: [
-                  const Icon(Icons.diamond_rounded, size: 13, color: clanGemBlue),
-                  const SizedBox(width: 4),
+                  const Expanded(
+                    child: Text('Terisi', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                  ),
                   Text(
-                    'Saldo donasi clan: ${_thousands(clan.treasuryBalance)} ZCoin',
-                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 12.5),
+                    '${clan.memberCount} / ${clan.memberLimit}',
+                    style: const TextStyle(color: AppColors.textWhite, fontSize: 12.5, fontWeight: FontWeight.w800),
                   ),
                 ],
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: 6),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: LinearProgressIndicator(
+                  value: clan.memberLimit <= 0 ? 0 : (clan.memberCount / clan.memberLimit).clamp(0.0, 1.0),
+                  minHeight: 8,
+                  color: const Color(0xFFF6BE4F),
+                  backgroundColor: const Color(0x14FFFFFF),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Batas maksimal ${_thousands(ClanSlotShop.maxMemberLimit)} member',
+                style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: const Color(0x14F6BE4F),
+                  borderRadius: BorderRadius.circular(13),
+                  border: Border.all(color: const Color(0x38F6BE4F)),
+                ),
+                child: Row(
+                  children: [
+                    const Expanded(
+                      child: Text('Saldo donasi clan', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                    ),
+                    Text(
+                      '${_thousands(clan.treasuryBalance)} ZCoin',
+                      style: ZFont.display(size: 15, color: const Color(0xFFF6BE4F)),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
               Text(
                 '${ClanSlotShop.slotsPerPack} kuota = ${_thousands(ClanSlotShop.pricePerPack)} ZCoin dari saldo donasi. Level clan tidak berkurang.',
                 style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 12),
               if (maxed)
                 const Text(
                   'Kuota sudah mencapai batas maksimal.',
                   style: TextStyle(color: AppColors.accentVioletLight, fontSize: 12.5),
                 )
               else ...[
-                Row(
-                  children: [
-                    _Stepper(
-                      icon: Icons.remove_rounded,
-                      onTap: packs > 1 && !_buying ? () => setState(() => _packs = packs - 1) : null,
-                    ),
-                    Expanded(
-                      child: Text(
-                        '$packs paket (+$slots kuota)',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
+                Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: AppColors.backgroundDarkSecondary,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: clanBorder),
+                  ),
+                  child: Row(
+                    children: [
+                      _Stepper(
+                        icon: Icons.remove_rounded,
+                        onTap: packs > 1 && !_buying ? () => setState(() => _packs = packs - 1) : null,
+                      ),
+                      Expanded(
+                        child: Text(
+                          '$packs paket (+$slots kuota)',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: Colors.white, fontSize: 13.5, fontWeight: FontWeight.w700),
                         ),
                       ),
-                    ),
-                    _Stepper(
-                      icon: Icons.add_rounded,
-                      onTap: packs < maxPacks && !_buying ? () => setState(() => _packs = packs + 1) : null,
-                    ),
-                  ],
+                      _Stepper(
+                        icon: Icons.add_rounded,
+                        onTap: packs < maxPacks && !_buying ? () => setState(() => _packs = packs + 1) : null,
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
                 ClanGradientButton(
                   text: canAfford
                       ? 'Beli +$slots kuota (${_thousands(cost)} ZCoin)'
                       : 'Saldo donasi belum cukup',
                   icon: Icons.shopping_cart_rounded,
+                  gold: true,
                   loading: _buying,
                   onTap: canAfford ? _buy : null,
                 ),
@@ -779,42 +810,21 @@ class _SettingsTabState extends ConsumerState<_SettingsTab> {
             ],
           ),
         ),
-        const SizedBox(height: 16),
-        // Mode join + level minimal
-        ClanJoinSettingsCard(clan: clan, onChanged: widget.onChanged),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         // Kartu Badge Clan
         _BadgeEntry(clan: clan),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         // Zona bahaya: bubarkan clan (khusus leader, dicek lagi di server).
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: const Color(0x14FF5468),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: const Color(0x55FF5468)),
-          ),
+        ClanSectionCard(
+          icon: Icons.warning_amber_rounded,
+          title: 'Zona Bahaya',
+          danger: true,
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Row(
-                children: [
-                  Icon(Icons.warning_amber_rounded, size: 18, color: Color(0xFFFF8A98)),
-                  SizedBox(width: 8),
-                  Text(
-                    'Zona Bahaya',
-                    style: TextStyle(
-                      color: Color(0xFFFF8A98),
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
               const Text(
                 'Bubarkan clan menghapus clan, semua member, chat, dan saldo donasi secara permanen.',
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 12.5),
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 12.5, height: 1.45),
               ),
               if (_deleteError != null) ...[
                 const SizedBox(height: 10),
@@ -824,24 +834,22 @@ class _SettingsTabState extends ConsumerState<_SettingsTab> {
                 ),
               ],
               const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: _deleting ? null : _deleteClan,
-                  icon: _deleting
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFFF8A98)),
-                        )
-                      : const Icon(Icons.delete_forever_rounded, size: 18),
-                  label: const Text('Bubarkan Clan'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFFFF8A98),
-                    side: const BorderSide(color: Color(0x88FF5468)),
-                    minimumSize: const Size.fromHeight(46),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  ),
+              OutlinedButton.icon(
+                onPressed: _deleting ? null : _deleteClan,
+                icon: _deleting
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFFF8A98)),
+                      )
+                    : const Icon(Icons.delete_forever_rounded, size: 18),
+                label: const Text('Bubarkan Clan', style: TextStyle(fontWeight: FontWeight.w800)),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFFFF8A98),
+                  backgroundColor: const Color(0x1FFF6F91),
+                  side: const BorderSide(color: Color(0x59FF6F91)),
+                  minimumSize: const Size.fromHeight(46),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 ),
               ),
             ],
@@ -868,7 +876,7 @@ class _PhotoButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const size = 84.0;
+    const size = 64.0;
     return GestureDetector(
       onTap: uploading ? null : onTap,
       child: SizedBox(
@@ -926,12 +934,12 @@ class _Stepper extends StatelessWidget {
     return Opacity(
       opacity: onTap == null ? 0.35 : 1,
       child: Material(
-        color: const Color(0x14FFFFFF),
-        shape: const CircleBorder(),
+        color: AppColors.surfaceVariantDark,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         child: InkWell(
-          customBorder: const CircleBorder(),
+          borderRadius: BorderRadius.circular(10),
           onTap: onTap,
-          child: SizedBox(width: 40, height: 40, child: Icon(icon, color: Colors.white)),
+          child: SizedBox(width: 36, height: 36, child: Icon(icon, color: Colors.white, size: 20)),
         ),
       ),
     );
@@ -947,60 +955,46 @@ class _BadgeEntry extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final style = clanBadgeStyleOrNull(clan.badgeStyle);
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: () => Navigator.of(context).push<void>(fadeRoute(ClanBadgeShopScreen(clanId: clan.id))),
-        child: Ink(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: clanSurface,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: clanBorder),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Row(
-                      children: [
-                        Icon(Icons.workspace_premium_rounded, size: 18, color: AppColors.accentVioletLight),
-                        SizedBox(width: 8),
-                        Text(
-                          'Badge Clan',
-                          style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w800),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Row(
-                      children: [
-                        ClanTagBadge.known(text: clan.tag, styleId: clan.badgeStyle, height: 22),
-                        const SizedBox(width: 10),
-                        Flexible(
-                          child: Text(
-                            style?.label ?? 'Pelangi (bawaan)',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(color: AppColors.textSecondary, fontSize: 12.5),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    const Text(
-                      'Beli dan pasang badge pakai saldo donasi clan.',
-                      style: TextStyle(color: AppColors.textMuted, fontSize: 11),
-                    ),
-                  ],
-                ),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => Navigator.of(context).push<void>(fadeRoute(ClanBadgeShopScreen(clanId: clan.id))),
+      child: ClanSectionCard(
+        icon: Icons.workspace_premium_rounded,
+        title: 'Badge Clan',
+        color: const Color(0xFFF6BE4F),
+        trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppColors.backgroundDarkSecondary,
+                borderRadius: BorderRadius.circular(13),
+                border: Border.all(color: clanBorder),
               ),
-              const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
-            ],
-          ),
+              child: Row(
+                children: [
+                  ClanTagBadge.known(text: clan.tag, styleId: clan.badgeStyle, height: 22),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      style?.label ?? 'Pelangi (bawaan)',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.end,
+                      style: const TextStyle(color: AppColors.textSecondary, fontSize: 12.5),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Beli dan pasang badge pakai saldo donasi clan. Ketuk untuk buka toko badge.',
+              style: TextStyle(color: AppColors.textMuted, fontSize: 11.5),
+            ),
+          ],
         ),
       ),
     );
