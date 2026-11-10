@@ -187,6 +187,8 @@ class _ClanBrowseScreenState extends ConsumerState<ClanBrowseScreen> {
                   return ZStaggerIn(
                     key: ValueKey('${_mode.name}-${c.id}'),
                     index: idx,
+                    // Clan: tanpa animasi muncul satu per satu.
+                    enabled: false,
                     child: ZRankRow(
                       rank: idx + 1,
                       uid: c.id,
