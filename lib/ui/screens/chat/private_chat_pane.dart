@@ -15,6 +15,9 @@ import '../chess/chess_invite.dart';
 import '../../../data/models/sticker_models.dart';
 import '../sticker/sticker_widgets.dart';
 import '../../glass/glass.dart';
+import '../../components/game_badges.dart';
+import '../../redesign/chat_kit.dart';
+import '../../redesign/z_kit.dart';
 
 String _two(int n) => n.toString().padLeft(2, '0');
 
@@ -32,9 +35,15 @@ class PrivateChatPane extends ConsumerStatefulWidget {
     super.key,
     required this.myUid,
     required this.onFriendProfileClick,
+    this.myUsername = 'Kamu',
+    this.myAvatarUrl,
   });
 
   final String myUid;
+
+  /// Nama & foto sendiri (pesanku tampil lengkap seperti Chat Global).
+  final String myUsername;
+  final String? myAvatarUrl;
   final ValueChanged<String> onFriendProfileClick;
 
   @override
@@ -207,36 +216,51 @@ class _PrivateChatPaneState extends ConsumerState<PrivateChatPane> {
     return Column(
       children: [
         Container(
-          color: AppColors.surfaceDark,
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+          margin: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceDark,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0x12FFFFFF)),
+          ),
           child: Row(
             children: [
               IconButton(
                 tooltip: 'Kembali ke daftar chat',
                 onPressed: _controller.closeChat,
-                icon: const Icon(Icons.arrow_back, color: Colors.white),
+                icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
               ),
               Expanded(
                 child: InkWell(
+                  borderRadius: BorderRadius.circular(12),
                   onTap: () => widget.onFriendProfileClick(friend.firebaseUid),
                   child: Row(
                     children: [
-                      FriendAvatar(
+                      UserAvatar(
+                        username: friend.username,
                         url: friend.avatarUrl,
-                        seed: friend.firebaseUid,
-                        label: friend.username,
-                        size: 32,
+                        size: 36,
+                        frameUid: friend.firebaseUid,
                       ),
                       const SizedBox(width: 10),
                       Expanded(
-                        child: Text(
-                          friend.username,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
-                          ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              friend.username,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: ZFont.display(size: 15.5),
+                            ),
+                            const Text(
+                              'Chat pribadi · ketuk untuk lihat profil',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(color: AppColors.textMuted, fontSize: 11),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -321,10 +345,15 @@ class _PrivateChatPaneState extends ConsumerState<PrivateChatPane> {
                       itemCount: msgs.length,
                       itemBuilder: (context, i) {
                         final m = msgs[msgs.length - 1 - i];
+                        final own = m.senderUid == widget.myUid;
                         return _DmBubble(
                           key: ValueKey(m.id),
                           message: m,
-                          isOwn: m.senderUid == widget.myUid,
+                          isOwn: own,
+                          name: own ? widget.myUsername : friend.username,
+                          uid: own ? widget.myUid : friend.firebaseUid,
+                          avatarUrl: own ? widget.myAvatarUrl : friend.avatarUrl,
+                          onAvatarTap: own ? null : () => widget.onFriendProfileClick(friend.firebaseUid),
                           replyAuthor: (m.replyToMessage == null)
                               ? null
                               : _author(m.replyToSenderUid, friend),
@@ -459,125 +488,93 @@ class _DmBubble extends StatelessWidget {
     super.key,
     required this.message,
     required this.isOwn,
+    required this.name,
+    required this.uid,
+    required this.avatarUrl,
     required this.replyAuthor,
     required this.onReply,
     required this.onLongPress,
+    this.onAvatarTap,
   });
 
   final PrivateMessage message;
   final bool isOwn;
+  final String name;
+  final String uid;
+  final String? avatarUrl;
   final String? replyAuthor;
   final VoidCallback onReply;
   final VoidCallback onLongPress;
+  final VoidCallback? onAvatarTap;
 
   @override
   Widget build(BuildContext context) {
     final m = message;
-    final quoteAccent = isOwn ? Colors.white : const Color(0xFFFFB3BB);
-    final bubble = GestureDetector(
-      onLongPress: onLongPress,
-      child: Container(
-        constraints: const BoxConstraints(maxWidth: 280),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: isOwn ? AppColors.accentViolet : AppColors.surfaceDark,
-          borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(16),
-            topRight: const Radius.circular(16),
-            bottomLeft: Radius.circular(isOwn ? 16 : 4),
-            bottomRight: Radius.circular(isOwn ? 4 : 16),
-          ),
-        ),
-        // IntrinsicWidth: lebar bubble mengikuti isi (pendek = sempit), baru
-        // mentok di 280, seperti bubble DM di Zenime. Tanpa ini Align jam
-        // memenuhi lebar maksimum sehingga semua bubble jadi lebar.
-        child: IntrinsicWidth(
-          child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (replyAuthor != null) ...[
-              // Kutipan reply: bar aksen di kiri + background gelap.
-              ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: Container(
-                  color: const Color(0x8C0B0B12),
-                  child: IntrinsicHeight(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Container(width: 3, color: quoteAccent),
-                        Expanded(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  replyAuthor!,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: quoteAccent,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                                Text(
-                                  stickerPreviewText(m.replyToMessage ?? ''),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color: Color(0xD9FFFFFF),
-                                    fontSize: 11,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 6),
-            ],
-            if (m.isGift)
-              GiftBubbleCard(
-                days: m.giftDays!,
-                title: isOwn ? 'Kamu memberi Premium' : 'Kamu menerima Premium!',
-              )
-            else if (chessInviteCode(m.message) != null)
-              ChessInviteCard(message: m.message, mine: isOwn)
-            else if (stickerCodeOf(m.message) case final code?)
-              StickerView(code: code)
-            else
-              Text(
-                m.message,
-                style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.3),
-              ),
-            Align(
-              alignment: Alignment.centerRight,
-              child: Text(
-                _dmTime(m),
-                style: const TextStyle(color: Color(0x99FFFFFF), fontSize: 10),
-              ),
-            ),
-          ],
-          ),
-        ),
-      ),
-    );
+    // Gaya sama dengan Chat Global & Clan (chat_kit): avatar + nama di
+    // kedua sisi, gelembung biru untuk pesanku.
+    final sticker = stickerCodeOf(m.message);
+    final chess = chessInviteCode(m.message) != null;
+    final bare = replyAuthor == null && (m.isGift || chess || sticker != null);
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 3),
-      child: SwipeToReply(
-        onReply: onReply,
-        child: Row(
-          mainAxisAlignment: isOwn ? MainAxisAlignment.end : MainAxisAlignment.start,
-          children: [Flexible(child: bubble)],
+    final Widget content;
+    if (m.isGift) {
+      content = GiftBubbleCard(
+        days: m.giftDays!,
+        title: isOwn ? 'Kamu memberi Premium' : 'Kamu menerima Premium!',
+      );
+    } else if (chess) {
+      content = ChessInviteCard(message: m.message, mine: isOwn);
+    } else if (sticker != null) {
+      content = StickerView(code: sticker);
+    } else {
+      content = Text(
+        m.message,
+        style: TextStyle(color: isOwn ? Colors.white : AppColors.textWhite, fontSize: 14, height: 1.35),
+      );
+    }
+
+    return SwipeToReply(
+      onReply: onReply,
+      child: ZChatRow(
+        mine: isOwn,
+        avatar: GestureDetector(
+          onTap: onAvatarTap,
+          child: UserAvatar(username: name, url: avatarUrl, size: 36, frameUid: uid),
         ),
+        header: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 180),
+          child: Text(
+            name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: AppColors.accentVioletLight,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        bubble: GestureDetector(
+          onLongPress: onLongPress,
+          child: ZChatBubble(
+            mine: isOwn,
+            bare: bare,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (replyAuthor != null)
+                  ZChatQuote(
+                    author: replyAuthor!,
+                    text: stickerPreviewText(m.replyToMessage ?? ''),
+                    mine: isOwn,
+                  ),
+                content,
+              ],
+            ),
+          ),
+        ),
+        footer: ZChatFooter(time: _dmTime(m), actions: [('Balas', onReply)]),
       ),
     );
   }
@@ -595,46 +592,8 @@ class _ReplyPreviewBar extends StatelessWidget {
   final VoidCallback onCancel;
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: AppColors.surfaceDark,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
-        children: [
-          Container(width: 3, height: 30, color: AppColors.accentViolet),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Membalas $username',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: AppColors.accentVioletLight,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                Text(
-                  message,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
-                ),
-              ],
-            ),
-          ),
-          IconButton(
-            visualDensity: VisualDensity.compact,
-            onPressed: onCancel,
-            icon: const Icon(Icons.close, size: 18, color: AppColors.textMuted),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget build(BuildContext context) =>
+      ZChatReplyBar(name: username, text: message, onClose: onCancel);
 }
 
 class _DmInputBar extends StatelessWidget {
@@ -654,69 +613,39 @@ class _DmInputBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: AppColors.backgroundDarkSecondary,
-      padding: const EdgeInsets.fromLTRB(4, 8, 8, 8),
-      child: SafeArea(
-        top: false,
-        child: Row(
-          children: [
-            StickerButton(enabled: enabled && !isSending, onPicked: onSticker),
-            Expanded(
-              child: TextField(
-                controller: controller,
-                enabled: enabled,
-                maxLines: 4,
-                minLines: 1,
-                maxLength: 1000,
-                textCapitalization: TextCapitalization.sentences,
-                style: const TextStyle(color: AppColors.textWhite, fontSize: 14),
-                cursorColor: AppColors.accentViolet,
-                decoration: InputDecoration(
-                  counterText: '',
-                  filled: true,
-                  fillColor: AppColors.surfaceDark,
-                  hintText: enabled ? 'Tulis pesan...' : 'Pilih chat untuk lanjut percakapan',
-                  hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 13),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(22),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 6),
-            SizedBox(
-              width: 46,
-              height: 46,
-              child: ValueListenableBuilder<TextEditingValue>(
-                valueListenable: controller,
-                builder: (context, value, _) {
-                  final canSend = enabled && value.text.trim().isNotEmpty && !isSending;
-                  return IconButton.filled(
-                    onPressed: canSend ? onSend : null,
-                    style: IconButton.styleFrom(
-                      backgroundColor: AppColors.accentViolet,
-                      disabledBackgroundColor: AppColors.surfaceElevated,
-                    ),
-                    icon: isSending
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: AppColors.textWhite,
-                            ),
-                          )
-                        : const Icon(Icons.send_rounded, size: 20, color: AppColors.textWhite),
-                  );
-                },
-              ),
-            ),
-          ],
+    return ZChatComposer(
+      children: [
+        StickerButton(enabled: enabled && !isSending, onPicked: onSticker),
+        Expanded(
+          child: TextField(
+            controller: controller,
+            enabled: enabled,
+            maxLines: 4,
+            minLines: 1,
+            maxLength: 1000,
+            textCapitalization: TextCapitalization.sentences,
+            style: const TextStyle(color: AppColors.textWhite, fontSize: 14),
+            cursorColor: AppColors.accentViolet,
+            decoration: zChatInputDecoration(enabled ? 'Tulis pesan...' : 'Pilih chat untuk lanjut percakapan'),
+          ),
         ),
-      ),
+        ValueListenableBuilder<TextEditingValue>(
+          valueListenable: controller,
+          builder: (context, value, _) {
+            final canSend = enabled && value.text.trim().isNotEmpty && !isSending;
+            return ZChatRoundButton(
+              onPressed: canSend ? onSend : null,
+              child: isSending
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.textWhite),
+                    )
+                  : const Icon(Icons.send_rounded, size: 20, color: Colors.white),
+            );
+          },
+        ),
+      ],
     );
   }
 }

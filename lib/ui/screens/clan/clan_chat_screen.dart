@@ -19,6 +19,7 @@ import '../chat/chat_mute.dart';
 import '../chat/chat_reactions.dart';
 import '../chat/chat_mention.dart';
 import '../gift/giveaway.dart' show showCreateGiveawaySheet;
+import '../../redesign/chat_kit.dart';
 
 /// Chat internal clan sebagai layar penuh (tombol Chat Clan di halaman Clan).
 class ClanChatScreen extends StatelessWidget {
@@ -391,117 +392,52 @@ class _ClanChatPaneState extends ConsumerState<ClanChatPane> with WidgetsBinding
 
   Widget _buildReplyBar(ClanChatState s) {
     final target = s.replyTarget!;
-    return Container(
-      color: AppColors.surfaceDark,
-      padding: const EdgeInsets.fromLTRB(14, 8, 6, 8),
-      child: Row(
-        children: [
-          Container(width: 3, height: 32, color: AppColors.accentViolet),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Membalas ${_nameOf(s, target.firebaseUid)}',
-                  style: const TextStyle(
-                    color: AppColors.accentVioletLight,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                Text(
-                  stickerPreviewText(target.message),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
-                ),
-              ],
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.close, size: 18, color: AppColors.textMuted),
-            onPressed: () =>
-                ref.read(clanChatControllerProvider.notifier).setReplyTarget(null),
-          ),
-        ],
-      ),
+    return ZChatReplyBar(
+      name: _nameOf(s, target.firebaseUid),
+      text: stickerPreviewText(target.message),
+      onClose: () => ref.read(clanChatControllerProvider.notifier).setReplyTarget(null),
     );
   }
 
   Widget _buildInput(ClanChatState s) {
-    return Container(
-      color: AppColors.backgroundDarkSecondary,
-      padding: const EdgeInsets.fromLTRB(4, 8, 8, 8),
-      child: SafeArea(
-        top: false,
-        child: Row(
-          children: [
-            StickerButton(
-              enabled: !s.isSending,
-              onPicked: (t) => ref.read(clanChatControllerProvider.notifier).send(t),
-            ),
-            Expanded(
-              child: TextField(
-                controller: _input,
-                focusNode: _focus,
-                maxLines: 4,
-                minLines: 1,
-                maxLength: kClanChatMaxLength,
-                textCapitalization: TextCapitalization.sentences,
-                style: const TextStyle(color: AppColors.textWhite, fontSize: 14),
-                cursorColor: AppColors.accentViolet,
-                decoration: InputDecoration(
-                  counterText: '',
-                  filled: true,
-                  fillColor: AppColors.surfaceDark,
-                  hintText: 'Tulis pesan...',
-                  hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 13),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(22),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 6),
-            // Giveaway Premium khusus anggota clan (mahkota).
-            SizedBox(
-              width: 46,
-              height: 46,
-              child: IconButton.filled(
-                tooltip: 'Giveaway Clan',
-                onPressed: () => showCreateGiveawaySheet(context, clan: true),
-                style: IconButton.styleFrom(backgroundColor: const Color(0xFFE6A817)),
-                icon: const Icon(Icons.workspace_premium, size: 22, color: Colors.black),
-              ),
-            ),
-            const SizedBox(width: 6),
-            SizedBox(
-              width: 46,
-              height: 46,
-              child: IconButton.filled(
-                onPressed: s.isSending ? null : _send,
-                style: IconButton.styleFrom(
-                  backgroundColor: AppColors.accentViolet,
-                  disabledBackgroundColor: AppColors.surfaceElevated,
-                ),
-                icon: s.isSending
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: AppColors.textWhite,
-                        ),
-                      )
-                    : const Icon(Icons.send_rounded, size: 20, color: AppColors.textWhite),
-              ),
-            ),
-          ],
+    return ZChatComposer(
+      children: [
+        StickerButton(
+          enabled: !s.isSending,
+          onPicked: (t) => ref.read(clanChatControllerProvider.notifier).send(t),
         ),
-      ),
+        Expanded(
+          child: TextField(
+            controller: _input,
+            focusNode: _focus,
+            maxLines: 4,
+            minLines: 1,
+            maxLength: kClanChatMaxLength,
+            textCapitalization: TextCapitalization.sentences,
+            style: const TextStyle(color: AppColors.textWhite, fontSize: 14),
+            cursorColor: AppColors.accentViolet,
+            decoration: zChatInputDecoration('Tulis pesan...'),
+          ),
+        ),
+        // Giveaway Premium khusus anggota clan (mahkota).
+        ZChatRoundButton(
+          tooltip: 'Giveaway Clan',
+          color: const Color(0xFFF6BE4F),
+          glow: false,
+          onPressed: () => showCreateGiveawaySheet(context, clan: true),
+          child: const Icon(Icons.workspace_premium, size: 22, color: Color(0xFF2B1800)),
+        ),
+        ZChatRoundButton(
+          onPressed: s.isSending ? null : _send,
+          child: s.isSending
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.textWhite),
+                )
+              : const Icon(Icons.send_rounded, size: 20, color: Colors.white),
+        ),
+      ],
     );
   }
 }

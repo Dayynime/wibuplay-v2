@@ -43,6 +43,8 @@ import '../../components/avatar_frame.dart';
 import '../../glass/glass.dart';
 import '../../components/clan_tag_badge.dart';
 import '../../components/user_level_badge.dart';
+import '../../redesign/chat_kit.dart';
+import '../../redesign/z_kit.dart';
 
 Color? parseChatHex(String? hex) {
   if (hex == null) return null;
@@ -409,12 +411,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           backgroundColor: AppColors.backgroundDark,
           elevation: 0,
           title: _tab == 0
-              ? const Column(
+              ? Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [Text('Chat Global'), OnlineCountLabel()],
+                  children: [Text('Chat Global', style: ZFont.display(size: 18)), const OnlineCountLabel()],
                 )
-              : Text(_tab == 1 ? 'Chat Teman' : 'Chat Clan'),
+              : Text(_tab == 1 ? 'Chat Teman' : 'Chat Clan', style: ZFont.display(size: 18)),
           actions: [
             if (_tab == 1)
               IconButton(
@@ -460,6 +462,8 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       ? const ClanChatTab()
                       : PrivateChatPane(
                       myUid: s.myUid,
+                      myUsername: s.myUsername.isEmpty ? 'Kamu' : s.myUsername,
+                      myAvatarUrl: s.avatarUrls[s.myUid] ?? s.myAvatarUrl,
                       onFriendProfileClick: (uid) => openPublicProfile(context, uid),
                     ),
             ),
@@ -469,55 +473,78 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
     );
   }
 
-  /// Tab Global / Teman di bawah app bar (indikator pendek, gaya Zenime).
+  /// Tab Global / Teman / Clan: segmented dengan indikator biru yang meluncur.
   Widget _buildChatTabs(int privateBadge, int clanBadge) {
     const labels = ['Global', 'Teman', 'Clan'];
     final badges = [0, privateBadge, clanBadge];
-    return Column(
-      children: [
-        Row(
-          children: [
-            for (var i = 0; i < labels.length; i++)
-              Expanded(
-                child: InkWell(
-                  onTap: () => _setTab(i),
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 10, bottom: 6),
-                    child: Column(
-                      children: [
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              labels[i],
-                              style: TextStyle(
-                                color: _tab == i ? AppColors.textWhite : const Color(0x80FFFFFF),
-                                fontSize: 14,
-                                fontWeight: _tab == i ? FontWeight.w700 : FontWeight.w400,
-                              ),
-                            ),
-                            _TabBadge(count: badges[i]),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          height: 3,
-                          width: _tab == i ? 28 : 0,
-                          decoration: BoxDecoration(
-                            color: AppColors.accentViolet,
-                            borderRadius: BorderRadius.circular(2),
-                          ),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+      child: Container(
+        height: 42,
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: AppColors.backgroundDarkSecondary,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0x12FFFFFF)),
+        ),
+        child: LayoutBuilder(
+          builder: (context, c) {
+            final w = c.maxWidth / labels.length;
+            return Stack(
+              children: [
+                AnimatedPositioned(
+                  duration: const Duration(milliseconds: 380),
+                  curve: Curves.easeOutQuint,
+                  left: _tab * w,
+                  top: 0,
+                  bottom: 0,
+                  width: w,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: AppColors.accentViolet,
+                      borderRadius: BorderRadius.circular(10),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.accentViolet.withValues(alpha: 0.4),
+                          blurRadius: 14,
+                          spreadRadius: -6,
+                          offset: const Offset(0, 4),
                         ),
                       ],
                     ),
                   ),
                 ),
-              ),
-          ],
+                Row(
+                  children: [
+                    for (var i = 0; i < labels.length; i++)
+                      Expanded(
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => _setTab(i),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              AnimatedDefaultTextStyle(
+                                duration: const Duration(milliseconds: 200),
+                                style: TextStyle(
+                                  color: _tab == i ? Colors.white : AppColors.textMuted,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                                child: Text(labels[i]),
+                              ),
+                              _TabBadge(count: badges[i]),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            );
+          },
         ),
-        Container(height: 1, color: const Color(0x14FFFFFF)),
-      ],
+      ),
     );
   }
 
@@ -591,138 +618,59 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   }
 
   Widget _buildReplyBar(ChatMessage target) {
-    return Container(
-      color: AppColors.surfaceDark,
-      padding: const EdgeInsets.fromLTRB(14, 8, 6, 8),
-      child: Row(
-        children: [
-          Container(width: 3, height: 32, color: AppColors.accentViolet),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Membalas ${target.username}',
-                  style: const TextStyle(
-                    color: AppColors.accentVioletLight,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                Text(
-                  target.message,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
-                ),
-              ],
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.close, size: 18, color: AppColors.textMuted),
-            onPressed: _controller.clearReplyTarget,
-          ),
-        ],
-      ),
+    return ZChatReplyBar(
+      name: target.username,
+      text: stickerPreviewText(target.message),
+      onClose: _controller.clearReplyTarget,
     );
   }
 
   Widget _buildInput(ChatUiState s) {
     final blocked = s.cooldownSeconds > 0 || s.isSending;
-    return Container(
-      color: AppColors.backgroundDarkSecondary,
-      padding: const EdgeInsets.fromLTRB(4, 8, 8, 8),
-      child: SafeArea(
-        top: false,
-        child: Row(
-          children: [
-            StickerButton(
-              enabled: !blocked && s.myUid.isNotEmpty,
-              onPicked: (t) => _controller.send(t),
-            ),
-            Expanded(
-              child: TextField(
-                controller: _input,
-                maxLines: 4,
-                minLines: 1,
-                maxLength: 300,
-                textCapitalization: TextCapitalization.sentences,
-                style: const TextStyle(color: AppColors.textWhite, fontSize: 14),
-                cursorColor: AppColors.accentViolet,
-                decoration: InputDecoration(
-                  counterText: '',
-                  filled: true,
-                  fillColor: AppColors.surfaceDark,
-                  hintText: 'Tulis pesan...',
-                  hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 13),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(22),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 6),
-            // Giveaway Premium (mahkota)
-            SizedBox(
-              width: 46,
-              height: 46,
-              child: IconButton.filled(
-                tooltip: 'Buat Giveaway',
-                onPressed: s.myUid.isEmpty ? null : () => showCreateGiveawaySheet(context),
-                style: IconButton.styleFrom(backgroundColor: const Color(0xFFE6A817)),
-                icon: const Icon(Icons.workspace_premium, size: 22, color: Colors.black),
-              ),
-            ),
-            const SizedBox(width: 6),
-            SizedBox(
-              width: 46,
-              height: 46,
-              child: IconButton.filled(
-                onPressed: blocked ? null : _send,
-                style: IconButton.styleFrom(
-                  backgroundColor: AppColors.accentViolet,
-                  disabledBackgroundColor: AppColors.surfaceElevated,
-                ),
-                icon: s.isSending
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: AppColors.textWhite,
-                        ),
-                      )
-                    : s.cooldownSeconds > 0
-                        ? Text(
-                            '${s.cooldownSeconds}',
-                            style: const TextStyle(
-                              color: AppColors.textSecondary,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          )
-                        : const Icon(Icons.send_rounded, size: 20, color: AppColors.textWhite),
-              ),
-            ),
-          ],
+    return ZChatComposer(
+      children: [
+        StickerButton(
+          enabled: !blocked && s.myUid.isNotEmpty,
+          onPicked: (t) => _controller.send(t),
         ),
-      ),
+        Expanded(
+          child: TextField(
+            controller: _input,
+            maxLines: 4,
+            minLines: 1,
+            maxLength: 300,
+            textCapitalization: TextCapitalization.sentences,
+            style: const TextStyle(color: AppColors.textWhite, fontSize: 14),
+            cursorColor: AppColors.accentViolet,
+            decoration: zChatInputDecoration('Tulis pesan...'),
+          ),
+        ),
+        // Giveaway Premium (mahkota)
+        ZChatRoundButton(
+          tooltip: 'Buat Giveaway',
+          color: const Color(0xFFF6BE4F),
+          glow: false,
+          onPressed: s.myUid.isEmpty ? null : () => showCreateGiveawaySheet(context),
+          child: const Icon(Icons.workspace_premium, size: 22, color: Color(0xFF2B1800)),
+        ),
+        ZChatRoundButton(
+          onPressed: blocked ? null : _send,
+          child: s.isSending
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.textWhite),
+                )
+              : s.cooldownSeconds > 0
+                  ? Text(
+                      '${s.cooldownSeconds}',
+                      style: const TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w700),
+                    )
+                  : const Icon(Icons.send_rounded, size: 20, color: Colors.white),
+        ),
+      ],
     );
   }
-}
-
-/// Lebar bubble chat TETAP (270dp seperti Zenime) supaya semua bubble
-/// seragam, apa pun panjang pesannya. Di layar sempit dikecilkan supaya
-/// tidak meluap (sisakan ruang avatar + margin).
-const double _kBubbleMaxWidth = 270;
-
-double _bubbleWidth(BuildContext context) {
-  final screen = MediaQuery.sizeOf(context).width;
-  // 24 padding list + 32 avatar + 8 jarak + 16 ruang kosong di sisi lain.
-  final available = screen - 24 - 32 - 8 - 16;
-  return available < _kBubbleMaxWidth ? available : _kBubbleMaxWidth;
 }
 
 class ChatMessageBubble extends StatelessWidget {
@@ -779,228 +727,144 @@ class ChatMessageBubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final m = message;
     final hasReply = (m.replyToUsername ?? '').isNotEmpty;
-    // Warna bubble sendiri sama dengan bubble orang lain (seperti Zenime);
-    // bedanya cuma posisi (kanan) dan avatar ada di kanan bubble.
-    const bubbleColor = AppColors.surfaceCard;
+    // Kartu (stiker / hadiah / giveaway / undangan catur) tampil tanpa gelembung.
+    final sticker = stickerCodeOf(m.message);
+    final chess = chessInviteCode(m.message) != null;
+    final bare = !hasReply && (m.isGiveaway || m.isGift || chess || sticker != null);
+    final textColor = mine ? Colors.white : AppColors.textWhite;
+
+    // Kepala: nama (warna pilihan user) > centang > #ID > clan > level > Top Giver.
+    // Pesanku juga lengkap, dicerminkan ke kanan.
+    final header = Wrap(
+      alignment: mine ? WrapAlignment.end : WrapAlignment.start,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 4,
+      runSpacing: 3,
+      children: [
+        GestureDetector(
+          onTap: mine ? onOwnAvatarTap : onProfileTap,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 150),
+            child: Text(
+              m.username,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: nameColor ?? AppColors.accentVioletLight,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ),
+        // Centang: warna role (developer, admin, moderator) menang atas
+        // Premium biru; hilang kalau bukan keduanya.
+        UserCheckBadge(firebaseUid: m.firebaseUid, isPremium: isPremium, size: 14),
+        if (userNumber != null)
+          Text('#$userNumber', style: const TextStyle(color: AppColors.textMuted, fontSize: 10)),
+        if (clanTag != null) ClanTagBadge(text: clanTag!),
+        if (level != null) UserLevelBadge(uid: m.firebaseUid, level: level!),
+        TopGiverBadge(firebaseUid: m.firebaseUid, height: 16),
+      ],
+    );
+
+    final Widget content;
+    if (m.isGiveaway) {
+      content = Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (m.message.trim().isNotEmpty && !m.message.startsWith('🎁 Giveaway Premium'))
+            Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Text(m.message, style: TextStyle(color: textColor, fontSize: 14, height: 1.35)),
+            ),
+          GiveawayCard(giveawayId: m.giveawayId!, days: m.giftDays ?? 1),
+        ],
+      );
+    } else if (m.isGift) {
+      content = GiftBubbleCard(
+        days: m.giftDays!,
+        title: 'memberi Premium ke ${m.giftRecipientUsername ?? 'pengguna'}',
+      );
+    } else if (chess) {
+      content = ChessInviteCard(message: m.message, mine: mine);
+    } else if (sticker != null) {
+      content = StickerView(code: sticker);
+    } else {
+      content = MentionText(
+        m.message,
+        style: TextStyle(color: textColor, fontSize: 14, height: 1.35),
+      );
+    }
 
     final bubble = GestureDetector(
       onLongPress: onLongPress,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        width: _bubbleWidth(context),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: highlighted ? const Color(0xFF3A2430) : bubbleColor,
-          borderRadius: AppShapes.card,
-          border: Border.all(
-            color: highlighted ? AppColors.accentViolet : Colors.transparent,
-            width: 1.5,
-          ),
-        ),
+      child: ZChatBubble(
+        mine: mine,
+        bare: bare,
+        highlighted: highlighted,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            // Baris 1: username > centang Premium > #ID (urutan sama dengan Zenime).
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Flexible(
-                  child: GestureDetector(
-                    onTap: onProfileTap,
-                    child: Text(
-                      m.username,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: nameColor ?? AppColors.accentVioletLight,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ),
-                // Centang: warna role (developer merah, admin hijau, moderator
-                // ungu) menang atas Premium biru; hilang kalau bukan keduanya.
-                Padding(
-                  padding: const EdgeInsets.only(left: 3),
-                  child: UserCheckBadge(
-                    firebaseUid: m.firebaseUid,
-                    isPremium: isPremium,
-                    size: 15,
-                  ),
-                ),
-                if (userNumber != null) ...[
-                  const SizedBox(width: 4),
-                  Text(
-                    '#$userNumber',
-                    style: const TextStyle(color: AppColors.textMuted, fontSize: 10),
-                  ),
-                ],
-              ],
-            ),
-            // Baris 2: badge clan + level + Top Giver, di bawah username.
-            if (clanTag != null || level != null || m.firebaseUid.isNotEmpty) ...[
-              const SizedBox(height: 3),
-              Wrap(
-                spacing: 4,
-                runSpacing: 3,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  if (clanTag != null) ClanTagBadge(text: clanTag!),
-                  if (level != null) UserLevelBadge(uid: m.firebaseUid, level: level!),
-                  TopGiverBadge(firebaseUid: m.firebaseUid, height: 16),
-                ],
-              ),
-            ],
-            if (hasReply) ...[
-              const SizedBox(height: 4),
-              GestureDetector(
-                behavior: HitTestBehavior.opaque,
+            if (hasReply)
+              ZChatQuote(
+                author: m.replyToUsername!,
+                text: stickerPreviewText(m.replyToMessage ?? ''),
+                mine: mine,
                 onTap: onReplyTap,
-                child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
-                decoration: BoxDecoration(
-                  color: Colors.black26,
-                  borderRadius: BorderRadius.circular(8),
-                  border: const Border(
-                    left: BorderSide(color: AppColors.accentViolet, width: 3),
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      m.replyToUsername!,
-                      style: const TextStyle(
-                        color: AppColors.accentVioletLight,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    Text(
-                      stickerPreviewText(m.replyToMessage ?? ''),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
-                    ),
-                  ],
-                ),
-                ),
               ),
-            ],
-            const SizedBox(height: 4),
-            if (m.isGiveaway) ...[
-              if (m.message.trim().isNotEmpty && !m.message.startsWith('🎁 Giveaway Premium'))
-                Text(
-                  m.message,
-                  style: const TextStyle(color: AppColors.textWhite, fontSize: 14, height: 1.3),
-                ),
-              GiveawayCard(giveawayId: m.giveawayId!, days: m.giftDays ?? 1),
-            ] else if (m.isGift)
-              GiftBubbleCard(
-                days: m.giftDays!,
-                title: 'memberi Premium ke ${m.giftRecipientUsername ?? 'pengguna'}',
-              )
-            else if (chessInviteCode(m.message) != null)
-              ChessInviteCard(message: m.message, mine: mine)
-            else if (stickerCodeOf(m.message) case final code?)
-              StickerView(code: code)
-            else
-              MentionText(
-                m.message,
-                style: const TextStyle(color: AppColors.textWhite, fontSize: 14, height: 1.3),
-              ),
+            content,
             if (m.isVoice)
-              const Padding(
-                padding: EdgeInsets.only(top: 2),
+              Padding(
+                padding: const EdgeInsets.only(top: 3),
                 child: Text(
                   'Pesan suara (belum bisa diputar di versi ini)',
-                  style: TextStyle(color: AppColors.textMuted, fontSize: 10),
+                  style: TextStyle(color: mine ? const Color(0xB3FFFFFF) : AppColors.textMuted, fontSize: 10.5),
                 ),
               ),
-            if (reactions != null) reactions!,
-            const SizedBox(height: 4),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  _timeLabel(m),
-                  style: const TextStyle(color: AppColors.textMuted, fontSize: 10),
-                ),
-                const SizedBox(width: 10),
-                _FooterAction(label: 'Balas', onTap: onReply),
-                if (onDelete != null) ...[
-                  const SizedBox(width: 10),
-                  _FooterAction(label: 'Hapus', onTap: onDelete!),
-                ],
-              ],
-            ),
           ],
         ),
       ),
     );
 
-    final avatar = FramedAvatar(
-      uid: m.firebaseUid,
-      size: 32,
-      child: CircleAvatar(
-        radius: 16,
-        backgroundColor: AppColors.surfaceVariantDark,
-        backgroundImage: (avatarUrl != null && avatarUrl!.isNotEmpty)
-            ? ResizeImage.resizeIfNeeded(
-                LiteMode.px(context, 32), null, CachedNetworkImageProvider(avatarUrl!, cacheManager: AppImageCache.images))
-            : null,
-        child: (avatarUrl == null || avatarUrl!.isEmpty)
-            ? Text(
-                m.username.isEmpty ? '?' : m.username.characters.first.toUpperCase(),
-                style: const TextStyle(color: AppColors.textWhite, fontSize: 13),
-              )
-            : null,
-      ),
-    );
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: SwipeToReply(
-        onReply: onReply,
-        child: Row(
-          mainAxisAlignment: mine ? MainAxisAlignment.end : MainAxisAlignment.start,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: mine
-              ? [
-                  bubble,
-                  const SizedBox(width: 8),
-                  GestureDetector(onTap: onOwnAvatarTap, child: avatar),
-                ]
-              : [
-                  GestureDetector(onTap: onProfileTap, child: avatar),
-                  const SizedBox(width: 8),
-                  Flexible(child: bubble),
-                ],
+    final avatar = GestureDetector(
+      onTap: mine ? onOwnAvatarTap : onProfileTap,
+      child: FramedAvatar(
+        uid: m.firebaseUid,
+        size: 36,
+        child: CircleAvatar(
+          radius: 18,
+          backgroundColor: AppColors.surfaceVariantDark,
+          backgroundImage: (avatarUrl != null && avatarUrl!.isNotEmpty)
+              ? ResizeImage.resizeIfNeeded(
+                  LiteMode.px(context, 36), null, CachedNetworkImageProvider(avatarUrl!, cacheManager: AppImageCache.images))
+              : null,
+          child: (avatarUrl == null || avatarUrl!.isEmpty)
+              ? Text(
+                  m.username.isEmpty ? '?' : m.username.characters.first.toUpperCase(),
+                  style: const TextStyle(color: AppColors.textWhite, fontSize: 14, fontWeight: FontWeight.w700),
+                )
+              : null,
         ),
       ),
     );
-  }
-}
 
-/// Teks aksi kecil di footer bubble ("Balas" / "Hapus"), sama seperti Zenime.
-class _FooterAction extends StatelessWidget {
-  const _FooterAction({required this.label, required this.onTap});
-
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(4),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
-        child: Text(
-          label,
-          style: const TextStyle(color: AppColors.textSecondary, fontSize: 10),
+    return SwipeToReply(
+      onReply: onReply,
+      child: ZChatRow(
+        mine: mine,
+        avatar: avatar,
+        header: header,
+        bubble: bubble,
+        below: reactions,
+        footer: ZChatFooter(
+          time: _timeLabel(m),
+          actions: [
+            ('Balas', onReply),
+            if (onDelete != null) ('Hapus', onDelete!),
+          ],
         ),
       ),
     );
