@@ -5,13 +5,14 @@ import '../../../core/theme/app_colors.dart';
 import '../../../data/models/clan_models.dart';
 import '../../../providers.dart';
 import '../../app_routes.dart';
-import '../../components/game_badges.dart';
 import '../auth/login_screen.dart';
 import 'clan_screen.dart';
 import 'create_clan_screen.dart';
 import 'clan_widgets.dart';
 import '../../glass/glass.dart';
 import '../../components/clan_tag_badge.dart';
+import '../../redesign/podium_kit.dart';
+import '../../redesign/z_kit.dart';
 
 enum ClanBrowseMode { all, leaderboard, mine }
 
@@ -55,10 +56,65 @@ class _ClanBrowseScreenState extends ConsumerState<ClanBrowseScreen> {
     await Navigator.of(context).push<void>(fadeRoute(ClanScreen(clanId: clanId)));
   }
 
+  static const _modes = [ClanBrowseMode.all, ClanBrowseMode.leaderboard, ClanBrowseMode.mine];
+
   @override
   Widget build(BuildContext context) {
     final clans = ref.watch(allClansProvider);
     final myClanId = ref.watch(myClanMembershipProvider).valueOrNull?.clanId;
+
+    // Isi panel: pesan (loading/gagal/kosong) atau baris clan.
+    Widget? message;
+    List<Clan> list = const [];
+    var ranked = false;
+    clans.when<void>(
+      loading: () {
+        message = const Padding(
+        padding: EdgeInsets.symmetric(vertical: 40),
+        child: Center(child: CircularProgressIndicator(color: AppColors.accentViolet, strokeWidth: 3)),
+        );
+      },
+      error: (e, _) {
+        message = Padding(
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        child: _RetryView(
+          message: 'Gagal ambil daftar clan',
+          onRetry: () => ref.invalidate(allClansProvider),
+        ),
+        );
+      },
+      data: (all) {
+        final q = _query.trim().toLowerCase();
+        list = all.where((c) {
+          if (_mode == ClanBrowseMode.mine && c.id != myClanId) return false;
+          // Clan khusus (mis. admin) tidak ikut diperingkat.
+          if (_mode == ClanBrowseMode.leaderboard && c.leaderboardHidden) return false;
+          return q.isEmpty || c.name.toLowerCase().contains(q) || c.tag.toLowerCase().contains(q);
+        }).toList();
+        ranked = _mode == ClanBrowseMode.leaderboard && q.isEmpty;
+        if (list.isEmpty) {
+          message = Padding(
+            padding: const EdgeInsets.symmetric(vertical: 32),
+            child: Center(
+              child: Text(
+                _mode == ClanBrowseMode.mine && myClanId == null
+                    ? 'Kamu belum gabung clan mana pun.'
+                    : 'Clan tidak ditemukan.',
+                style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
+              ),
+            ),
+          );
+        }
+      },
+    );
+
+    final dividerText = switch (_mode) {
+      ClanBrowseMode.leaderboard => 'Peringkat Teratas',
+      ClanBrowseMode.all => 'Semua Clan',
+      ClanBrowseMode.mine => 'Clan Saya',
+    };
+    // 0 kepala panel, 1 segmen, 2 judul pemisah, lalu isi, terakhir kaki panel.
+    final bodyCount = message != null ? 1 : list.length;
 
     return GlassScaffold(
       backgroundColor: AppColors.backgroundDark,
@@ -66,7 +122,9 @@ class _ClanBrowseScreenState extends ConsumerState<ClanBrowseScreen> {
         backgroundColor: AppColors.backgroundDark,
         foregroundColor: AppColors.textWhite,
         elevation: 0,
-        title: const Text('Clan', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 20)),
+        scrolledUnderElevation: 0,
+        centerTitle: true,
+        title: Text('Clan', style: ZFont.display(size: 18)),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _openCreateClan,
@@ -78,7 +136,7 @@ class _ClanBrowseScreenState extends ConsumerState<ClanBrowseScreen> {
       body: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
             child: TextField(
               onChanged: (v) => setState(() => _query = v),
               style: const TextStyle(color: Colors.white, fontSize: 14),
@@ -88,7 +146,7 @@ class _ClanBrowseScreenState extends ConsumerState<ClanBrowseScreen> {
                 hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 14),
                 prefixIcon: const Icon(Icons.search_rounded, color: AppColors.textMuted),
                 filled: true,
-                fillColor: clanSurface,
+                fillColor: AppColors.surfaceDark,
                 contentPadding: const EdgeInsets.symmetric(vertical: 12),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(16),
@@ -101,241 +159,64 @@ class _ClanBrowseScreenState extends ConsumerState<ClanBrowseScreen> {
               ),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: _ModeSwitch(
-              mode: _mode,
-              onChanged: (m) => setState(() => _mode = m),
-            ),
-          ),
-          const SizedBox(height: 10),
           Expanded(
-            child: clans.when(
-              loading: () => const Center(
-                child: CircularProgressIndicator(color: AppColors.accentViolet, strokeWidth: 3),
-              ),
-              error: (e, _) => _RetryView(
-                message: 'Gagal ambil daftar clan',
-                onRetry: () => ref.invalidate(allClansProvider),
-              ),
-              data: (all) {
-                final q = _query.trim().toLowerCase();
-                var list = all.where((c) {
-                  if (_mode == ClanBrowseMode.mine && c.id != myClanId) return false;
-                  // Clan khusus (mis. admin) tidak ikut diperingkat.
-                  if (_mode == ClanBrowseMode.leaderboard && c.leaderboardHidden) return false;
-                  return q.isEmpty ||
-                      c.name.toLowerCase().contains(q) ||
-                      c.tag.toLowerCase().contains(q);
-                }).toList();
-                if (list.isEmpty) {
-                  return Center(
-                    child: Text(
-                      _mode == ClanBrowseMode.mine && myClanId == null
-                          ? 'Kamu belum gabung clan mana pun.'
-                          : 'Clan tidak ditemukan.',
-                      style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
-                    ),
-                  );
-                }
-                final ranked = _mode == ClanBrowseMode.leaderboard && q.isEmpty;
-                return RefreshIndicator(
-                  color: AppColors.accentViolet,
-                  onRefresh: () async => ref.refresh(allClansProvider.future),
-                  child: ListView.separated(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(16, 2, 16, 24),
-                    itemCount: list.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 8),
-                    itemBuilder: (context, i) => _ClanCard(
-                      clan: list[i],
-                      rank: ranked ? i + 1 : null,
-                      isMine: list[i].id == myClanId,
+            child: RefreshIndicator(
+              color: AppColors.accentViolet,
+              onRefresh: () async => ref.refresh(allClansProvider.future),
+              child: ListView.builder(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 96),
+                itemCount: 3 + bodyCount + 1,
+                itemBuilder: (context, i) {
+                  if (i == 0) return const ZPanelTop();
+                  if (i == 1) {
+                    return ZPanelBody(
+                      child: ZPanelSegment(
+                        labels: const ['Semua Clan', 'Leaderboard', 'Clan Saya'],
+                        index: _modes.indexOf(_mode),
+                        onChanged: (k) => setState(() => _mode = _modes[k]),
+                      ),
+                    );
+                  }
+                  if (i == 2) return ZPanelBody(child: ZPanelDivider(dividerText));
+                  if (i == 3 + bodyCount) return const ZPanelBottom();
+                  if (message != null) return ZPanelBody(child: message!);
+                  final idx = i - 3;
+                  final c = list[idx];
+                  final isMine = c.id == myClanId;
+                  return ZStaggerIn(
+                    key: ValueKey('${_mode.name}-${c.id}'),
+                    index: idx,
+                    child: ZRankRow(
+                      rank: idx + 1,
+                      uid: c.id,
+                      username: c.name,
+                      isMe: isMine,
+                      last: idx == list.length - 1,
+                      avatar: ClanAvatar(tag: c.tag, url: c.photoUrl, size: 46),
+                      nameTrailing: isMine ? const ZChip('KAMU', tone: ZTone.brand) : null,
+                      value: ZGemValue(zGroupInt(c.totalXp), icon: Icons.shield_rounded),
+                      badges: [
+                        ClanTagBadge.known(text: c.tag, styleId: c.badgeStyle),
+                        Text(
+                          'Lv ${c.level} · ${c.memberCount}/${c.memberLimit}',
+                          style: const TextStyle(color: AppColors.textMuted, fontSize: 11.5),
+                        ),
+                      ],
+                      // Tidak diperingkat (Semua/Clan Saya/hasil cari): panah biasa.
+                      trailing: ranked
+                          ? null
+                          : const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
                       onTap: () => Navigator.of(context).push<void>(
-                        fadeRoute(ClanScreen(clanId: list[i].id)),
+                        fadeRoute(ClanScreen(clanId: c.id)),
                       ),
                     ),
-                  ),
-                );
-              },
+                  );
+                },
+              ),
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _ModeSwitch extends StatelessWidget {
-  const _ModeSwitch({required this.mode, required this.onChanged});
-
-  final ClanBrowseMode mode;
-  final ValueChanged<ClanBrowseMode> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    const items = [
-      (ClanBrowseMode.all, 'Semua Clan'),
-      (ClanBrowseMode.leaderboard, 'Leaderboard'),
-      (ClanBrowseMode.mine, 'Clan Saya'),
-    ];
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: clanSurface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: clanBorder),
-      ),
-      child: Row(
-        children: [
-          for (final (m, label) in items)
-            Expanded(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => onChanged(m),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 220),
-                  height: 38,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    gradient: m == mode
-                        ? const LinearGradient(
-                            colors: [AppColors.accentViolet, Color(0xFFFF6B4A)],
-                          )
-                        : null,
-                  ),
-                  child: Text(
-                    label,
-                    style: TextStyle(
-                      color: m == mode ? Colors.white : AppColors.textSecondary,
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ClanCard extends StatelessWidget {
-  const _ClanCard({
-    required this.clan,
-    required this.rank,
-    required this.isMine,
-    required this.onTap,
-  });
-
-  final Clan clan;
-  final int? rank;
-  final bool isMine;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final medal = rank == null ? null : clanMedal(rank!);
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: onTap,
-        child: Ink(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: clanSurface,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: isMine ? AppColors.accentViolet.withValues(alpha: 0.7) : clanBorder,
-            ),
-          ),
-          child: Row(
-            children: [
-              if (rank != null) ...[
-                Container(
-                  width: 26,
-                  height: 26,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: medal ?? Colors.transparent,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Text(
-                    '$rank',
-                    style: TextStyle(
-                      color: medal != null ? const Color(0xFF1B1200) : AppColors.textMuted,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-              ],
-              ClanAvatar(tag: clan.tag, url: clan.photoUrl, size: 52),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            clan.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
-                        if (isMine) ...[
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: AppColors.accentViolet.withValues(alpha: 0.25),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: const Text(
-                              'KAMU',
-                              style: TextStyle(
-                                color: AppColors.accentVioletLight,
-                                fontSize: 8,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        ClanTagBadge.known(text: clan.tag, styleId: clan.badgeStyle),
-                        const SizedBox(width: 8),
-                        Flexible(
-                          child: Text(
-                            'Lv ${clan.level} · ${clan.memberCount}/${clan.memberLimit} member',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
-            ],
-          ),
-        ),
       ),
     );
   }
