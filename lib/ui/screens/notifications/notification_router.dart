@@ -12,6 +12,10 @@ import '../feed/feed_screen.dart';
 import '../nobar/nobar_invite.dart';
 import '../sticker/sticker_upload_screen.dart';
 import '../chat/chat_screen.dart';
+import '../affinity/affinity_detail_screen.dart';
+import '../affinity/affinity_providers.dart';
+import '../affinity/affinity_requests_sheet.dart';
+import '../affinity/affinity_screen.dart';
 
 /// Buka halaman tujuan sebuah notifikasi (dari lonceng, banner in-app, atau
 /// tap push di status bar). [data] = payload notif (`clan_id`, dll).
@@ -77,6 +81,22 @@ Future<void> openNotificationTarget(
       await handleClanInviteNotification(ref, data);
       return;
 
+    case 'affinity_request':
+      await handleAffinityRequestNotification(ref, data);
+      return;
+
+    case 'affinity_accepted':
+    case 'affinity_level':
+    case 'affinity_broken':
+      final me = ref.read(authRepositoryProvider).currentUser?.uid ?? '';
+      if (me.isEmpty) return;
+      final affId = data['affinity_id']?.toString() ?? '';
+      ref.invalidate(affinityListProvider(me));
+      await nav.push<void>(fadeRoute(
+        type != 'affinity_broken' && affId.isNotEmpty ? AffinityDetailScreen(id: affId) : AffinityScreen(uid: me),
+      ));
+      return;
+
     case 'sticker_reviewed':
       ref.invalidate(stickerCatalogProvider);
       await nav.push<void>(fadeRoute(const StickerUploadScreen()));
@@ -95,5 +115,9 @@ IconData notificationIcon(String type) => switch (type) {
       'private_message' => Icons.chat_bubble_rounded,
       'nobar_invite' => Icons.groups_rounded,
       'nobar_declined' => Icons.group_off_rounded,
+      'affinity_request' => Icons.favorite_rounded,
+      'affinity_accepted' => Icons.favorite_rounded,
+      'affinity_level' => Icons.auto_awesome_rounded,
+      'affinity_broken' => Icons.heart_broken_rounded,
       _ => Icons.notifications_rounded,
     };

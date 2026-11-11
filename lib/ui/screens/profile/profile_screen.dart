@@ -1,3 +1,5 @@
+import 'dart:ui' show ImageFilter;
+
 import 'profile_card.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -40,6 +42,7 @@ import '../../../data/models/avatar_frame_models.dart';
 import '../../glass/glass.dart';
 import '../../components/clan_tag_badge.dart';
 import '../../redesign/z_kit.dart';
+import '../affinity/affinity_strip.dart';
 
 /// Profil Saya ala Zenime: banner full-bleed menyatu dengan avatar, identitas
 /// + cincin XP & pin level di avatar, tag clan di depan nama, role + pencapaian di bawahnya, stat row 4 kolom, tombol pill
@@ -187,8 +190,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 seed: uid.isEmpty ? name : uid,
                 label: name,
                 showXpRing: true,
-                leading: ProfileAchievementBadges.topXpChip(ref, uid),
-                trailing: ProfileAchievementBadges.topGiverChip(ref, uid),
               ),
               const SizedBox(height: 10),
               Padding(
@@ -226,45 +227,21 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                               style: ZFont.display(size: 24, height: 1.1),
                             ),
                     ),
-                    if (profile?.userNumber != null) ...[
+                    // Badge role (Developer, dll.) di kanan nama.
+                    if (uid.isNotEmpty) ...[
                       const SizedBox(width: 6),
                       Padding(
-                        padding: const EdgeInsets.only(bottom: 3),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'ID #${profile!.userNumber}',
-                              style: const TextStyle(color: Color(0xB3FFFFFF), fontSize: 11),
-                            ),
-                            const SizedBox(width: 4),
-                            UserCheckBadge(firebaseUid: uid, isPremium: premium, size: 13),
-                          ],
-                        ),
-                      ),
-                    ] else if (uid.isNotEmpty) ...[
-                      const SizedBox(width: 4),
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 3),
-                        child: UserCheckBadge(firebaseUid: uid, isPremium: premium, size: 13),
+                        padding: const EdgeInsets.only(bottom: 2),
+                        child: RoleBadge(firebaseUid: uid, height: 22, rounded: true),
                       ),
                     ],
                   ],
                 ),
               ),
               const SizedBox(height: 10),
-              // Nama clan + role. Top XP / Top Giver ada di samping pin level.
+              // Baris kedua: nama clan, ID + centang, jumlah teman.
               if (uid.isNotEmpty)
-                Wrap(
-                  alignment: WrapAlignment.center,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    ProfileClanPill(uid: uid),
-                    RoleBadge(firebaseUid: uid, height: 22, rounded: true),
-                  ],
-                ),
+                ProfileMetaRow(uid: uid, userNumber: profile?.userNumber, premium: premium),
               const SizedBox(height: 20),
               // Stat row flat (transparan): angka besar, label kecil, garis pemisah tipis.
               Padding(
@@ -327,6 +304,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ],
                 ),
               ),
+              // Afinitas: ringkasan ikatan, ketuk = halaman Afinitas.
+              if (uid.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                AffinityStrip(uid: uid, name: name),
+              ],
               // Edit Profil, Teman, dan Wallpaper Komentar dipindah ke Pengaturan
               // (ikon gear kanan atas). Di sini cuma tombol Masuk saat belum login.
               if (user == null) ...[
@@ -353,12 +335,21 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         ),
         // Badge rarity kalau banner berasal dari wallpaper komentar
         // (kiri atas, sejajar tombol pengaturan; tidak menutupi avatar).
-        if (wpBanner != null)
-          Positioned(
-            top: topPad + 23,
-            left: 16,
-            child: BannerRarityBadge(rarity: wpBanner.rarity),
+        // Kiri atas: badge rarity banner, lalu gelembung Top Giver / Top XP.
+        Positioned(
+          top: topPad + 20,
+          left: 16,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (wpBanner != null) ...[
+                BannerRarityBadge(rarity: wpBanner.rarity),
+                const SizedBox(height: 8),
+              ],
+              ProfileRankBubble(uid: uid, maxWidth: profileRankBubbleMaxWidth(context)),
+            ],
           ),
+        ),
         // Kartu profil (simpan / bagikan sebagai gambar).
         if (uid.isNotEmpty)
           Positioned(
@@ -1080,9 +1071,9 @@ class ProfileClanPill extends ConsumerWidget {
       child: InkWell(
         onTap: () => Navigator.of(context).push<void>(fadeRoute(ClanScreen(clanId: info.id))),
         child: Container(
-          height: 22,
-          constraints: const BoxConstraints(maxWidth: 190),
-          padding: const EdgeInsets.symmetric(horizontal: 9),
+          height: 24,
+          constraints: const BoxConstraints(maxWidth: 170),
+          padding: const EdgeInsets.symmetric(horizontal: 10),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -1106,6 +1097,207 @@ class ProfileClanPill extends ConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Jumlah teman milik [uid] (null = gagal / belum ada data).
+final profileFriendCountProvider = FutureProvider.autoDispose.family<int?, String>((ref, uid) async {
+  if (uid.isEmpty) return null;
+  try {
+    return await ref.watch(friendRepositoryProvider).countFriends(uid);
+  } catch (_) {
+    return null;
+  }
+});
+
+/// Lebar maksimal gelembung peringkat supaya tidak menabrak avatar di tengah.
+double profileRankBubbleMaxWidth(BuildContext context) {
+  final w = MediaQuery.sizeOf(context).width;
+  return (w / 2 - 60 - 16 - 12).clamp(80.0, 150.0).toDouble();
+}
+
+/// Gelembung kaca transparan (seperti pesan) berisi Top Giver & Top XP,
+/// ekor kecil di kanan bawah mengarah ke avatar. Kosong kalau tidak masuk
+/// peringkat mana pun.
+class ProfileRankBubble extends ConsumerWidget {
+  const ProfileRankBubble({super.key, required this.uid, this.maxWidth = 130});
+
+  final String uid;
+  final double maxWidth;
+
+  static const BorderRadius _radius = BorderRadius.only(
+    topLeft: Radius.circular(14),
+    topRight: Radius.circular(14),
+    bottomLeft: Radius.circular(14),
+    bottomRight: Radius.circular(4),
+  );
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (uid.isEmpty) return const SizedBox.shrink();
+    final giver = ref.watch(topGiverRankProvider(uid));
+    final xp = ref.watch(topXpRankProvider(uid));
+    if (giver == null && xp == null) return const SizedBox.shrink();
+
+    Widget row(IconData icon, String label, int rank, Color color) => Row(
+          children: [
+            Icon(icon, size: 13, color: color),
+            const SizedBox(width: 5),
+            Text(
+              label,
+              style: const TextStyle(color: Color(0xFFE6E9F0), fontSize: 10.5, fontWeight: FontWeight.w700),
+            ),
+            const Spacer(),
+            const SizedBox(width: 8),
+            Text(
+              '#$rank',
+              style: TextStyle(color: color, fontSize: 10.5, fontWeight: FontWeight.w800),
+            ),
+          ],
+        );
+
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: maxWidth),
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.centerLeft,
+        child: Padding(
+          padding: const EdgeInsets.only(right: 8),
+          child: CustomPaint(
+            painter: const _BubbleTailPainter(),
+            child: ClipRRect(
+              borderRadius: _radius,
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0x520B0E14),
+                    borderRadius: _radius,
+                    border: Border.all(color: const Color(0x29FFFFFF)),
+                  ),
+                  child: IntrinsicWidth(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (giver != null)
+                          row(Icons.card_giftcard, 'Top Giver', giver, ProfileAchievementBadges.giverColor),
+                        if (giver != null && xp != null) const SizedBox(height: 5),
+                        if (xp != null)
+                          row(Icons.bolt_rounded, 'Top XP', xp, ProfileAchievementBadges.xpColor),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Ekor gelembung di kanan bawah (digambar di luar kotak).
+class _BubbleTailPainter extends CustomPainter {
+  const _BubbleTailPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+    final path = Path()
+      ..moveTo(w - 2, h - 10)
+      ..quadraticBezierTo(w + 1, h - 2, w + 7, h)
+      ..lineTo(w - 4, h)
+      ..close();
+    canvas.drawPath(path, Paint()..color = const Color(0x520B0E14));
+    final edge = Path()
+      ..moveTo(w - 0.5, h - 9)
+      ..quadraticBezierTo(w + 1, h - 2, w + 7, h - 0.5)
+      ..lineTo(w - 4, h - 0.5);
+    canvas.drawPath(
+      edge,
+      Paint()
+        ..color = const Color(0x29FFFFFF)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _BubbleTailPainter oldDelegate) => false;
+}
+
+/// Baris kedua header profil: pil nama clan, pil ID + centang, pil jumlah teman.
+class ProfileMetaRow extends ConsumerWidget {
+  const ProfileMetaRow({super.key, required this.uid, required this.userNumber, required this.premium});
+
+  final String uid;
+  final int? userNumber;
+  final bool premium;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final friends = ref.watch(profileFriendCountProvider(uid)).valueOrNull;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Wrap(
+        alignment: WrapAlignment.center,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          ProfileClanPill(uid: uid),
+          ProfileMetaPill(
+            children: [
+              if (userNumber != null) ...[
+                const Text('ID ', style: TextStyle(color: AppColors.textMuted, fontSize: 11.5, fontWeight: FontWeight.w600)),
+                Text(
+                  '#$userNumber',
+                  style: const TextStyle(color: AppColors.textWhite, fontSize: 11.5, fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(width: 5),
+              ],
+              UserCheckBadge(firebaseUid: uid, isPremium: premium, size: 13),
+            ],
+          ),
+          if (friends != null)
+            ProfileMetaPill(
+              children: [
+                const Icon(Icons.people_alt_rounded, size: 13, color: Color(0xFFE6E9F0)),
+                const SizedBox(width: 5),
+                Text(
+                  '$friends',
+                  style: const TextStyle(color: AppColors.textWhite, fontSize: 11.5, fontWeight: FontWeight.w800),
+                ),
+                const Text(' teman', style: TextStyle(color: AppColors.textMuted, fontSize: 11.5, fontWeight: FontWeight.w600)),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Pil kecil transparan (gaya sama dengan [ProfileClanPill]).
+class ProfileMetaPill extends StatelessWidget {
+  const ProfileMetaPill({super.key, required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 24,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: ShapeDecoration(
+        color: const Color(0x8C0B0E14),
+        shape: StadiumBorder(side: BorderSide(color: Colors.white.withValues(alpha: 0.18))),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: children),
     );
   }
 }
@@ -1187,15 +1379,15 @@ class ProfilePillButton extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 18, color: tint),
-            const SizedBox(width: 6),
+            Icon(icon, size: 17, color: tint),
+            const SizedBox(width: 5),
             Flexible(
               child: FittedBox(
                 fit: BoxFit.scaleDown,
                 child: Text(
                   label,
                   maxLines: 1,
-                  style: TextStyle(color: tint, fontSize: 13.5, fontWeight: FontWeight.w700),
+                  style: TextStyle(color: tint, fontSize: 13, fontWeight: FontWeight.w700),
                 ),
               ),
             ),

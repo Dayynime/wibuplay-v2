@@ -14,7 +14,6 @@ import '../../../providers.dart';
 import '../../components/activity_status.dart';
 import '../../app_routes.dart';
 import '../../components/cards.dart';
-import '../../components/profile_badges.dart';
 import '../../components/net_image.dart';
 import '../../components/role_badges.dart';
 import '../../components/join_date_stat.dart';
@@ -31,6 +30,8 @@ import '../../glass/glass.dart';
 import '../../components/clan_tag_badge.dart';
 import '../../components/common_components.dart';
 import '../../redesign/z_kit.dart';
+import '../affinity/affinity_add_screen.dart';
+import '../affinity/affinity_strip.dart';
 
 /// Buka profil publik user lain (dari Chat Global, Chat Teman, layar Teman).
 /// Port rute `profile/{targetUid}` di Zenime.
@@ -312,6 +313,12 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
             left: 64,
             child: BannerRarityBadge(rarity: wpBanner.rarity),
           ),
+        // Gelembung Top Giver / Top XP di kiri, di bawah tombol kembali.
+        Positioned(
+          top: topPad + 64,
+          left: 16,
+          child: ProfileRankBubble(uid: uid, maxWidth: profileRankBubbleMaxWidth(context)),
+        ),
         Padding(
           padding: EdgeInsets.only(top: topPad + 28, bottom: 20),
           child: Column(
@@ -322,8 +329,6 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
                 seed: uid,
                 label: name,
                 showXpRing: true,
-                leading: ProfileAchievementBadges.topXpChip(ref, uid),
-                trailing: ProfileAchievementBadges.topGiverChip(ref, uid),
               ),
               const SizedBox(height: 10),
               Padding(
@@ -361,22 +366,11 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
                               style: ZFont.display(size: 24, height: 1.1),
                             ),
                     ),
+                    // Badge role (Developer, dll.) di kanan nama.
                     const SizedBox(width: 6),
                     Padding(
-                      padding: const EdgeInsets.only(bottom: 3),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (profile?.userNumber != null) ...[
-                            Text(
-                              'ID #${profile!.userNumber}',
-                              style: const TextStyle(color: Color(0xB3FFFFFF), fontSize: 11),
-                            ),
-                            const SizedBox(width: 4),
-                          ],
-                          UserCheckBadge(firebaseUid: uid, isPremium: premium, size: 13),
-                        ],
-                      ),
+                      padding: const EdgeInsets.only(bottom: 2),
+                      child: RoleBadge(firebaseUid: uid, height: 22, rounded: true),
                     ),
                   ],
                 ),
@@ -384,17 +378,8 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
               const SizedBox(height: 6),
               ActivityStatus(uid: uid),
               const SizedBox(height: 10),
-              // Nama clan + role. Top XP / Top Giver ada di samping pin level.
-              Wrap(
-                alignment: WrapAlignment.center,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  ProfileClanPill(uid: uid),
-                  RoleBadge(firebaseUid: uid, height: 22, rounded: true),
-                ],
-              ),
+              // Baris kedua: nama clan, ID + centang, jumlah teman.
+              ProfileMetaRow(uid: uid, userNumber: profile?.userNumber, premium: premium),
               const SizedBox(height: 18),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -456,6 +441,8 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
                   child: _buildFriendActions(),
                 ),
               ],
+              const SizedBox(height: 12),
+              AffinityStrip(uid: uid, name: name, canInvite: !_isMe && _relation is FriendRelationFriends),
               if (_error != null) ...[
                 const SizedBox(height: 10),
                 Padding(
@@ -612,11 +599,28 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
             ),
           ],
         ),
-      FriendRelationFriends(:final friendshipId) => outlined(
-          Icons.check,
-          'Berteman',
-          () => _confirmRemove(friendshipId),
-          color: AppColors.accentViolet,
+      FriendRelationFriends(:final friendshipId) => Row(
+          children: [
+            Expanded(
+              child: outlined(
+                Icons.check,
+                'Berteman',
+                () => _confirmRemove(friendshipId),
+                color: AppColors.accentViolet,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: filled(Icons.favorite_rounded, 'Ajak Afinitas', () {
+                final p = ref.read(chatProfileProvider(widget.uid)).valueOrNull;
+                Navigator.of(context).push<void>(fadeRoute(AffinityAddScreen(
+                  presetUid: widget.uid,
+                  presetName: p?.username,
+                  presetAvatar: p?.avatarUrl,
+                )));
+              }),
+            ),
+          ],
         ),
     };
   }
