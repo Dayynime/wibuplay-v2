@@ -19,7 +19,6 @@ import '../../../providers.dart';
 import '../../app_routes.dart';
 import '../gift/gift_premium_sheet.dart';
 import '../gift/giveaway.dart';
-import '../../components/activity_status.dart';
 import '../../components/game_badges.dart';
 import '../../components/role_badges.dart';
 import '../../components/top_giver_badge.dart';
@@ -420,13 +419,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
         appBar: GlassAppBar(
           backgroundColor: AppColors.backgroundDark,
           elevation: 0,
-          title: _tab == 0
-              ? Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [Text('Chat Global', style: ZFont.display(size: 17, height: 1.15)), const OnlineCountLabel()],
-                )
-              : Text(_tab == 1 ? 'Chat Teman' : 'Chat Clan', style: ZFont.display(size: 18)),
+          // Jumlah online tidak ditampilkan di Chat Global (status online
+          // per orang di profil tetap ada).
+          title: Text(
+            _tab == 0 ? 'Chat Global' : (_tab == 1 ? 'Chat Teman' : 'Chat Clan'),
+            style: ZFont.display(size: 18),
+          ),
           actions: [
             if (_tab == 1)
               IconButton(
