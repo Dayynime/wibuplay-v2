@@ -14,7 +14,6 @@ import '../../../providers.dart';
 import '../../components/activity_status.dart';
 import '../../app_routes.dart';
 import '../../components/cards.dart';
-import '../../components/profile_badges.dart';
 import '../../components/net_image.dart';
 import '../../components/role_badges.dart';
 import '../../components/join_date_stat.dart';
@@ -312,6 +311,12 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
             left: 64,
             child: BannerRarityBadge(rarity: wpBanner.rarity),
           ),
+        // Gelembung Top Giver / Top XP di kiri, di bawah tombol kembali.
+        Positioned(
+          top: topPad + 64,
+          left: 16,
+          child: ProfileRankBubble(uid: uid, maxWidth: profileRankBubbleMaxWidth(context)),
+        ),
         Padding(
           padding: EdgeInsets.only(top: topPad + 28, bottom: 20),
           child: Column(
@@ -322,8 +327,6 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
                 seed: uid,
                 label: name,
                 showXpRing: true,
-                leading: ProfileAchievementBadges.topXpChip(ref, uid),
-                trailing: ProfileAchievementBadges.topGiverChip(ref, uid),
               ),
               const SizedBox(height: 10),
               Padding(
@@ -361,22 +364,11 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
                               style: ZFont.display(size: 24, height: 1.1),
                             ),
                     ),
+                    // Badge role (Developer, dll.) di kanan nama.
                     const SizedBox(width: 6),
                     Padding(
-                      padding: const EdgeInsets.only(bottom: 3),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (profile?.userNumber != null) ...[
-                            Text(
-                              'ID #${profile!.userNumber}',
-                              style: const TextStyle(color: Color(0xB3FFFFFF), fontSize: 11),
-                            ),
-                            const SizedBox(width: 4),
-                          ],
-                          UserCheckBadge(firebaseUid: uid, isPremium: premium, size: 13),
-                        ],
-                      ),
+                      padding: const EdgeInsets.only(bottom: 2),
+                      child: RoleBadge(firebaseUid: uid, height: 22, rounded: true),
                     ),
                   ],
                 ),
@@ -384,17 +376,8 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
               const SizedBox(height: 6),
               ActivityStatus(uid: uid),
               const SizedBox(height: 10),
-              // Nama clan + role. Top XP / Top Giver ada di samping pin level.
-              Wrap(
-                alignment: WrapAlignment.center,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  ProfileClanPill(uid: uid),
-                  RoleBadge(firebaseUid: uid, height: 22, rounded: true),
-                ],
-              ),
+              // Baris kedua: nama clan, ID + centang, jumlah teman.
+              ProfileMetaRow(uid: uid, userNumber: profile?.userNumber, premium: premium),
               const SizedBox(height: 18),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),

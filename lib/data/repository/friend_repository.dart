@@ -107,6 +107,21 @@ class FriendRepository {
     return out;
   }
 
+  /// Jumlah teman (status accepted) milik [uid]. Dipakai di header profil.
+  Future<int> countFriends(String uid) async {
+    final u = _safe(uid);
+    final res = await _dio.get<dynamic>(
+      'rest/v1/friendships',
+      queryParameters: {
+        'or': '(requester_uid.eq.$u,addressee_uid.eq.$u)',
+        'status': 'eq.${FriendStatus.accepted}',
+        'select': 'id',
+        'limit': 1000,
+      },
+    );
+    return _rows(res.data).length;
+  }
+
   Future<FriendLists> getLists(String myUid) async {
     final me = _safe(myUid);
     final res = await _dio.get<dynamic>(
