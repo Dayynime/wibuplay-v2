@@ -199,7 +199,7 @@ class _LevelIndicator extends StatelessWidget {
         width: 40,
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: const Color(0x9906111D),
+          color: const Color(0x990B0E14),
           borderRadius: AppShapes.pill,
         ),
         child: Column(

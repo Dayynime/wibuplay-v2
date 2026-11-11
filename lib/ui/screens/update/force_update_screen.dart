@@ -363,8 +363,8 @@ class _Logo extends StatelessWidget {
                     shape: BoxShape.circle,
                     gradient: SweepGradient(
                       colors: [
-                        Color(0x006AD3FF),
-                        Color(0xFF6AD3FF),
+                        Color(0x00EE5B6D),
+                        Color(0xFFEE5B6D),
                         Color(0xFF9BE8DA),
                         Color(0x00FFA38F),
                       ],
@@ -656,7 +656,7 @@ class _ProgressPanel extends StatelessWidget {
                         child: DecoratedBox(
                           decoration: const BoxDecoration(
                             gradient: LinearGradient(
-                              colors: [Color(0xFF6AD3FF), Color(0xFF9BE8DA)],
+                              colors: [Color(0xFFEE5B6D), Color(0xFF9BE8DA)],
                             ),
                           ),
                           child: ClipRect(
@@ -694,7 +694,7 @@ class _ProgressPanel extends StatelessWidget {
                             child: const DecoratedBox(
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
-                                  colors: [Color(0xFF6AD3FF), Color(0xFF9BE8DA)],
+                                  colors: [Color(0xFFEE5B6D), Color(0xFF9BE8DA)],
                                 ),
                               ),
                             ),
@@ -745,7 +745,7 @@ class _ActionButton extends StatelessWidget {
         height: 56,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(100),
-          gradient: const LinearGradient(colors: [Color(0xFF6AD3FF), Color(0xFF0B87C4)]),
+          gradient: const LinearGradient(colors: [Color(0xFFEE5B6D), Color(0xFFC42A3E)]),
           boxShadow: [
             BoxShadow(
               color: AppColors.accentViolet.withValues(alpha: 0.45),

@@ -433,7 +433,7 @@ class _FloatingIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: const Color(0x8C06111D),
+      color: const Color(0x8C0B0E14),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(13),
         side: const BorderSide(color: Color(0x1AFFFFFF)),
@@ -639,14 +639,14 @@ class _HeaderCard extends StatelessWidget {
                       NetImage(c.photoUrl!),
                       // Digelapkan supaya teks & tombol tetap terbaca (tanpa Opacity
                       // layer yang mahal).
-                      const ColoredBox(color: Color(0x9906111D)),
+                      const ColoredBox(color: Color(0x990B0E14)),
                     ] else
                       const DecoratedBox(
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
-                            colors: [Color(0xFF10345A), Color(0xFF0B1C33), Color(0xFF07121F)],
+                            colors: [Color(0xFF3A1220), Color(0xFF1E1218), Color(0xFF0B0E14)],
                           ),
                         ),
                       ),
@@ -668,7 +668,7 @@ class _HeaderCard extends StatelessWidget {
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
                           stops: [0, 0.35, 0.75, 1],
-                          colors: [Color(0x5906111D), Color(0x0006111D), Color(0x9906111D), AppColors.backgroundDark],
+                          colors: [Color(0x590B0E14), Color(0x000B0E14), Color(0x990B0E14), AppColors.backgroundDark],
                         ),
                       ),
                     ),

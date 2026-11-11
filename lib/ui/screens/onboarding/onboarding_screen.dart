@@ -40,7 +40,7 @@ const List<_Slide> _slides = [
     'Nonton Anime Tanpa Batas',
     'Tanpa Batas',
     'Ribuan judul favoritmu siap ditonton langsung dari HP Android, kapan aja.',
-    Color(0xFF1FB6F5),
+    Color(0xFFE4344A),
     Color(0xFF9333EA),
   ),
   _Slide(
@@ -69,7 +69,7 @@ const List<_Slide> _slides = [
     'Legenda',
     'Kumpulin XP tiap nonton dan panjat Leaderboard bareng yang lain.',
     Color(0xFFF59E0B),
-    Color(0xFF1FB6F5),
+    Color(0xFFE4344A),
   ),
   _Slide(
     'Upgrade ke Premium',

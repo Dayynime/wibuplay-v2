@@ -261,7 +261,7 @@ class GachaBanner extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [Color(0x66000000), Colors.transparent, Colors.transparent, Color(0xF00D1C2D)],
+              colors: [Color(0x66000000), Colors.transparent, Colors.transparent, Color(0xF0151A23)],
               stops: [0, 0.3, 0.55, 1],
             ),
           ),
@@ -451,7 +451,7 @@ class _GlassTag extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         padding: EdgeInsets.fromLTRB(icon == null ? 10 : 8, 5, trailing == null ? 10 : 6, 5),
         decoration: BoxDecoration(
-          color: const Color(0x8C06111D),
+          color: const Color(0x8C0B0E14),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: const Color(0x2EFFFFFF)),
         ),

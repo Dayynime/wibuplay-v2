@@ -458,7 +458,7 @@ class _NowLine extends StatelessWidget {
             height: 1,
             child: DecoratedBox(
               decoration: BoxDecoration(
-                gradient: LinearGradient(colors: [AppColors.accentViolet, Color(0x001FB6F5)]),
+                gradient: LinearGradient(colors: [AppColors.accentViolet, Color(0x00E4344A)]),
               ),
             ),
           ),

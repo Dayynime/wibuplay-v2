@@ -179,7 +179,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 stops: [0, 0.32, 0.62],
                 colors: [
                   Color(0x14000000),
-                  Color(0x8C06111D),
+                  Color(0x8C0B0E14),
                   AppColors.backgroundDark,
                 ],
               ),
@@ -232,7 +232,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                           ? ShaderMask(
                               blendMode: BlendMode.srcIn,
                               shaderCallback: (r) => const LinearGradient(
-                                colors: [Color(0xFFF6BE4F), Color(0xFF4BE3C1)],
+                                colors: [Color(0xFFF6BE4F), Color(0xFFFF7A59)],
                               ).createShader(r),
                               child: Text(
                                 name,
@@ -814,7 +814,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                       width: 28,
                       height: 28,
                       decoration: const BoxDecoration(
-                        color: Color(0xB306111D),
+                        color: Color(0xB30B0E14),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
@@ -1161,7 +1161,7 @@ class ProfileClanPill extends ConsumerWidget {
     final info = ref.watch(userClanInfoProvider(uid)).valueOrNull;
     if (info == null || info.name.isEmpty) return const SizedBox.shrink();
     return Material(
-      color: const Color(0x8C06111D),
+      color: const Color(0x8C0B0E14),
       shape: StadiumBorder(side: BorderSide(color: Colors.white.withValues(alpha: 0.18))),
       clipBehavior: Clip.antiAlias,
       child: InkWell(

@@ -176,7 +176,7 @@ class _TopHitItemState extends State<_TopHitItem> {
                               gradient: LinearGradient(
                                 begin: Alignment.topCenter,
                                 end: Alignment.bottomCenter,
-                                colors: [Colors.transparent, Color(0xCC06111D)],
+                                colors: [Colors.transparent, Color(0xCC0B0E14)],
                               ),
                             ),
                           ),
@@ -190,7 +190,7 @@ class _TopHitItemState extends State<_TopHitItem> {
                             height: f ? 28 : 24,
                             alignment: Alignment.center,
                             decoration: BoxDecoration(
-                              color: f ? AppColors.accentViolet : const Color(0xAA06111D),
+                              color: f ? AppColors.accentViolet : const Color(0xAA0B0E14),
                               shape: BoxShape.circle,
                             ),
                             child: Text(

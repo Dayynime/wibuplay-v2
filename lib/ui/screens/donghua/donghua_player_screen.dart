@@ -1137,7 +1137,7 @@ class _DonghuaPlayerScreenState extends ConsumerState<DonghuaPlayerScreen>
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
-                color: const Color(0x9906111D),
+                color: const Color(0x990B0E14),
                 borderRadius: BorderRadius.circular(100),
               ),
               child: Row(

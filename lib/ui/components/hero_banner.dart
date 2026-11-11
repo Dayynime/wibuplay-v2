@@ -18,7 +18,7 @@ import '../redesign/z_kit.dart';
 bool _blank(String? s) => s == null || s.trim().isEmpty;
 bool _isNone(String? s) => s != null && s.toLowerCase() == 'none';
 
-const Color _heroInk = Color(0xFF06111D);
+const Color _heroInk = Color(0xFF0B0E14);
 const Duration _rotateEvery = Duration(milliseconds: 4500);
 
 /// Hero carousel gaya "Poster Otomatis" (port FullBleedHeroBannerCarousel di

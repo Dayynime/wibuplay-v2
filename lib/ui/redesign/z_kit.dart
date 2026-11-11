@@ -92,7 +92,7 @@ class ZChip extends StatelessWidget {
       ZTone.jade => (const Color(0x292FD3A2), const Color(0xFF2FD3A2), null),
       ZTone.gold => (const Color(0x29F6BE4F), const Color(0xFFF6BE4F), null),
       ZTone.ghost => (Colors.transparent, AppColors.textWhite, const Color(0x2EFFFFFF)),
-      ZTone.scrim => (const Color(0xB806111D), Colors.white, null),
+      ZTone.scrim => (const Color(0xB80B0E14), Colors.white, null),
       ZTone.glass => (const Color(0x1FFFFFFF), Colors.white, null),
     };
     return Container(
@@ -242,7 +242,7 @@ const LinearGradient zBottomShade = LinearGradient(
   begin: Alignment.topCenter,
   end: Alignment.bottomCenter,
   stops: [0.3, 1],
-  colors: [Color(0x0006111D), Color(0xEB06111D)],
+  colors: [Color(0x000B0E14), Color(0xEB0B0E14)],
 );
 
 /// Kilau yang menyapu terus di atas [child] (tombol Premium di preview:

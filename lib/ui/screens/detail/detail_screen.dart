@@ -76,7 +76,7 @@ class _CurtainClipper extends CustomClipper<Rect> {
 }
 
 /// Garis pemisah / outline kartu Zenime (CardOutlineBorder).
-const Color _kOutline = Color(0xFF183049);
+const Color _kOutline = Color(0xFF2A2F3A);
 
 /// Port DetailScreen.kt (layout Zenime): hero cover penuh 360dp dengan judul,
 /// tombol favorit dan tombol play crimson bulat; baris tab Info | Episode |
@@ -385,7 +385,7 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
             colors: [
               Color(0x80000000),
               Color(0x00000000),
-              Color(0xB306111D),
+              Color(0xB30B0E14),
               AppColors.backgroundDark,
             ],
           ),

@@ -7,8 +7,7 @@ import '../../redesign/z_kit.dart';
 import '../../../data/repository/clan_daily_repository.dart';
 import '../../../providers.dart';
 
-// Warna utama kartu (redesain Samudra: toska, bukan emas).
-const Color _gold = Color(0xFF4BE3C1);
+const Color _gold = Color(0xFFF5B301);
 const Color _green = Color(0xFF22C55E);
 
 /// Kartu "Absen Harian" di halaman clan (hanya untuk anggota clan itu).
@@ -106,10 +105,9 @@ class _ClanDailyCardState extends ConsumerState<ClanDailyCard> {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          stops: [0, 0.55, 1],
-          colors: [Color(0x241FB6F5), Color(0x0D4BE3C1), AppColors.surfaceDark],
+          colors: [Color(0xFF2A2210), AppColors.surfaceCard],
         ),
-        border: Border.all(color: AppColors.accentViolet.withValues(alpha: 0.25)),
+        border: Border.all(color: _gold.withValues(alpha: 0.35)),
       ),
       child: body,
     );
@@ -170,7 +168,7 @@ class _ClanDailyCardState extends ConsumerState<ClanDailyCard> {
             child: FilledButton(
               style: FilledButton.styleFrom(
                 backgroundColor: s.checkedIn ? Colors.white.withValues(alpha: 0.08) : _gold,
-                foregroundColor: s.checkedIn ? AppColors.textSecondary : const Color(0xFF032A22),
+                foregroundColor: s.checkedIn ? AppColors.textSecondary : const Color(0xFF241A00),
                 disabledBackgroundColor: Colors.white.withValues(alpha: 0.08),
                 disabledForegroundColor: AppColors.textSecondary,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

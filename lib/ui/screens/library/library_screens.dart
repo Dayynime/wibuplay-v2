@@ -288,7 +288,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
                                     width: 28,
                                     height: 28,
                                     decoration: const BoxDecoration(
-                                      color: Color(0xB306111D),
+                                      color: Color(0xB30B0E14),
                                       shape: BoxShape.circle,
                                     ),
                                     child: const Icon(

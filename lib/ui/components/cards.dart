@@ -103,7 +103,7 @@ class _AnimePosterCardState extends State<AnimePosterCard> {
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                             decoration: BoxDecoration(
-                              color: const Color(0xB806111D),
+                              color: const Color(0xB80B0E14),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Row(

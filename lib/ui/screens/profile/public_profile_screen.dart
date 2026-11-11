@@ -315,7 +315,7 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
                 stops: [0, 0.32, 0.62],
                 colors: [
                   Color(0x14000000),
-                  Color(0x8C06111D),
+                  Color(0x8C0B0E14),
                   AppColors.backgroundDark,
                 ],
               ),
@@ -365,7 +365,7 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
                           ? ShaderMask(
                               blendMode: BlendMode.srcIn,
                               shaderCallback: (r) => const LinearGradient(
-                                colors: [Color(0xFFF6BE4F), Color(0xFF4BE3C1)],
+                                colors: [Color(0xFFF6BE4F), Color(0xFFFF7A59)],
                               ).createShader(r),
                               child: nameText,
                             )

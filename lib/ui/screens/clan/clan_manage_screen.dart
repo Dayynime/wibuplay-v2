@@ -331,7 +331,7 @@ class _RoundAction extends StatelessWidget {
           child: SizedBox(
             width: 38,
             height: 38,
-            child: Icon(icon, color: filled ? const Color(0xFF032A22) : color, size: 20),
+            child: Icon(icon, color: filled ? const Color(0xFF241A00) : color, size: 20),
           ),
         ),
       ),

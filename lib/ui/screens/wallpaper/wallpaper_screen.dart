@@ -525,7 +525,7 @@ class _WallpaperScreenState extends ConsumerState<WallpaperScreen> {
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Color(0x0006111D), Color(0xE606111D), Color(0xF506111D)],
+          colors: [Color(0x000B0E14), Color(0xE60B0E14), Color(0xF50B0E14)],
           stops: [0, 0.35, 1],
         ),
       ),
@@ -725,7 +725,7 @@ class _CollectionViewState extends State<_CollectionView> {
                           child: Container(
                             height: 8,
                             decoration: const BoxDecoration(
-                              gradient: LinearGradient(colors: [Color(0xFF8B3DFF), Color(0xFF1FB6F5)]),
+                              gradient: LinearGradient(colors: [Color(0xFF8B3DFF), Color(0xFFE4344A)]),
                             ),
                           ),
                         ),
@@ -1107,7 +1107,7 @@ class _SpinButtonState extends State<_SpinButton> {
                   ? const LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [Color(0xFF8B3DFF), Color(0xFF1FB6F5)],
+                      colors: [Color(0xFF8B3DFF), Color(0xFFE4344A)],
                     )
                   : null,
               color: primary ? null : AppColors.surfaceVariantDark,
@@ -1753,7 +1753,7 @@ class _CatalogPageState extends State<_CatalogPage> {
                               child: Container(
                                 height: 8,
                                 decoration: const BoxDecoration(
-                                  gradient: LinearGradient(colors: [Color(0xFF8B3DFF), Color(0xFF1FB6F5)]),
+                                  gradient: LinearGradient(colors: [Color(0xFF8B3DFF), Color(0xFFE4344A)]),
                                 ),
                               ),
                             ),

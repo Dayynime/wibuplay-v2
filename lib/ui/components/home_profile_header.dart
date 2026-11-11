@@ -207,7 +207,7 @@ class _ProfileCard extends StatelessWidget {
                         gradient: LinearGradient(
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
-                          colors: [Color(0xFF0E3A5C), Color(0xFF0D1C2D)],
+                          colors: [Color(0xFF3A1220), Color(0xFF151A23)],
                         ),
                       ),
                       child: Stack(
@@ -289,7 +289,7 @@ class _ProfileCard extends StatelessWidget {
                                         ? ShaderMask(
                                             blendMode: BlendMode.srcIn,
                                             shaderCallback: (r) => const LinearGradient(
-                                              colors: [Color(0xFFF6BE4F), Color(0xFF4BE3C1)],
+                                              colors: [Color(0xFFF6BE4F), Color(0xFFFF7A59)],
                                             ).createShader(r),
                                             child: nameText,
                                           )
@@ -721,7 +721,7 @@ class _CircleIconButton extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: AppColors.errorRed,
                       borderRadius: BorderRadius.circular(9),
-                      border: Border.all(color: const Color(0xFF13273D), width: 2),
+                      border: Border.all(color: const Color(0xFF1A1D26), width: 2),
                     ),
                     child: Text(
                       badgeCount > 9 ? '9+' : '$badgeCount',

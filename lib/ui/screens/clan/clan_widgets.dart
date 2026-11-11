@@ -23,7 +23,7 @@ Color clanRoleColor(String role) {
 }
 
 const Color clanGemBlue = Color(0xFF4FC3F7);
-const Color clanSurface = Color(0xFF0D1C2D); // Samudra surface
+const Color clanSurface = Color(0xFF171E36);
 const Color clanBorder = Color(0x14FFFFFF);
 
 /// 1.2K / 3.4M / 5.6B, dibulatkan satu desimal dan ".0" dibuang.
@@ -70,7 +70,7 @@ class ClanAvatar extends StatelessWidget {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFFFFD36A), Color(0xFFE08A1E)],
+          colors: [Color(0xFF5A1B26), Color(0xFF3A1219)],
         ),
       ),
       clipBehavior: Clip.antiAlias,
@@ -79,7 +79,7 @@ class ClanAvatar extends StatelessWidget {
           ? SizedBox.expand(child: NetImage(url!))
           : Text(
               tag.isEmpty ? '?' : tag.substring(0, tag.length < 2 ? tag.length : 2).toUpperCase(),
-              style: ZFont.display(size: size * 0.32, color: const Color(0xFF1B1200), height: 1),
+              style: ZFont.display(size: size * 0.32, color: Colors.white, height: 1),
             ),
     );
   }
@@ -189,7 +189,7 @@ class ClanGradientButton extends StatelessWidget {
                 end: Alignment.bottomRight,
                 colors: gold
                     ? const [Color(0xFFF6BE4F), Color(0xFFE08A1E)]
-                    : const [AppColors.accentViolet, AppColors.accentVioletDark],
+                    : const [AppColors.accentViolet, Color(0xFFFF6B4A)],
               ),
               boxShadow: [
                 BoxShadow(

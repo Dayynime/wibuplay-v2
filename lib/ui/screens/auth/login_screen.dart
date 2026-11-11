@@ -637,7 +637,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(100),
               gradient: const LinearGradient(
-                colors: [Color(0xFF6AD3FF), Color(0xFF0B87C4)],
+                colors: [Color(0xFFEE5B6D), Color(0xFFC42A3E)],
               ),
               boxShadow: [
                 BoxShadow(
@@ -955,7 +955,7 @@ class _GoogleButton extends StatelessWidget {
   final Animation<double> shine;
   final VoidCallback? onTap;
 
-  static const _ink = Color(0xFF06111D);
+  static const _ink = Color(0xFF0B0E14);
 
   @override
   Widget build(BuildContext context) {

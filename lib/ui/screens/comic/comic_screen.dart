@@ -516,7 +516,7 @@ class _HeroCard extends StatelessWidget {
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [Colors.transparent, Color(0xF206111D)],
+                  colors: [Colors.transparent, Color(0xF20B0E14)],
                   stops: [0.35, 1.0],
                 ),
               ),

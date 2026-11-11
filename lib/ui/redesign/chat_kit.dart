@@ -70,7 +70,7 @@ class ZChatBubble extends StatelessWidget {
   /// Pesan lanjutan dari orang yang sama: sudut atas tidak berekor.
   final bool joinedTop;
 
-  static const Color others = Color(0xFF13273D);
+  static const Color others = Color(0xFF1C222E);
 
   @override
   Widget build(BuildContext context) {
@@ -118,7 +118,7 @@ class ZChatBubble extends StatelessWidget {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                       decoration: BoxDecoration(
-                        color: const Color(0xA606111D),
+                        color: const Color(0xA60B0E14),
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Text(
@@ -136,7 +136,7 @@ class ZChatBubble extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(12, 8, 11, 7),
       decoration: BoxDecoration(
         borderRadius: radius,
-        color: mine ? null : (highlighted ? const Color(0xFF1D3853) : others),
+        color: mine ? null : (highlighted ? const Color(0xFF262D3B) : others),
         gradient: mine
             ? const LinearGradient(
                 begin: Alignment.topLeft,
@@ -434,7 +434,7 @@ class ZChatComposer extends StatelessWidget {
 InputDecoration zChatInputDecoration(String hint) => InputDecoration(
       counterText: '',
       filled: true,
-      fillColor: const Color(0xFF13273D),
+      fillColor: const Color(0xFF1C222E),
       hintText: hint,
       hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 13.5),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),

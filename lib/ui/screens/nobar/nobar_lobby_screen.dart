@@ -151,7 +151,7 @@ class _NobarLobbyScreenState extends ConsumerState<NobarLobbyScreen> {
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [Color(0xFF0E2A44), Color(0xFF0F2034)],
+                  colors: [Color(0xFF2A1220), Color(0xFF181E29)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
