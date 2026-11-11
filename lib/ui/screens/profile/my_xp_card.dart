@@ -7,7 +7,6 @@ import '../../../data/models/xp_models.dart';
 import '../../../providers.dart';
 import '../../app_routes.dart';
 import '../xp/xp_leaderboard_screen.dart';
-import '../../redesign/z_kit.dart';
 
 /// Progress bar XP ke level berikutnya di Profil + angka XP. Tanpa card,
 /// tanpa border radius. Fill beranimasi tiap progress berubah + kilau yang
@@ -25,7 +24,7 @@ class _MyXpCardState extends ConsumerState<MyXpCard>
     with SingleTickerProviderStateMixin {
   late final AnimationController _shine = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 2600),
+    duration: const Duration(milliseconds: 2200),
   )..repeat();
 
   /// Kilau digambar ulang maks DecorTick.fps (animasi tetap jalan).
@@ -44,88 +43,105 @@ class _MyXpCardState extends ConsumerState<MyXpCard>
     final totalXp = xp?.totalXp ?? 0;
     final p = XpLevelFormula.progress(totalXp, level);
 
-    // "Level N" + angka XP di atas, bar 8px membulat dengan kilau pelan.
-    // Tanpa kartu (transparan). Tap = buka leaderboard.
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () => Navigator.of(context).push<void>(fadeRoute(const XpLeaderboardScreen())),
-      child: Container(
-        // Transparan: tanpa latar/garis, cuma isi.
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            TweenAnimationBuilder<int>(
-              tween: IntTween(begin: 0, end: p.xpIntoLevel),
-              duration: const Duration(milliseconds: 1100),
-              curve: Curves.easeOutCubic,
-              builder: (context, into, _) => Row(
-                children: [
-                  Text('Level $level', style: ZFont.display(size: 16)),
-                  const Spacer(),
-                  Text(
-                    '$into / ${p.xpNeededForLevel} XP',
-                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 10),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: SizedBox(
-                height: 8,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    const ColoredBox(color: Color(0x1AFFFFFF)),
-                    TweenAnimationBuilder<double>(
-                      tween: Tween<double>(begin: 0, end: p.fraction),
-                      duration: const Duration(milliseconds: 1100),
-                      curve: Curves.easeOutCubic,
-                      builder: (context, v, _) => FractionallySizedBox(
-                        alignment: Alignment.centerLeft,
-                        widthFactor: v,
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Stack(
-                            fit: StackFit.expand,
-                            children: [
-                              const DecoratedBox(
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => Navigator.of(context)
+            .push<void>(fadeRoute(const XpLeaderboardScreen())),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+          // Bar membulat 8px dengan gradien + kilau (dirapikan).
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: SizedBox(
+            height: 8,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                const ColoredBox(color: Color(0x1AFFFFFF)),
+                TweenAnimationBuilder<double>(
+                  tween: Tween<double>(begin: 0, end: p.fraction),
+                  duration: const Duration(milliseconds: 1100),
+                  curve: Curves.easeOutCubic,
+                  builder: (context, v, _) => FractionallySizedBox(
+                    alignment: Alignment.centerLeft,
+                    widthFactor: v,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          const DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  AppColors.accentVioletDark,
+                                  AppColors.accentViolet,
+                                  AppColors.accentVioletLight,
+                                ],
+                              ),
+                            ),
+                          ),
+                          AnimatedBuilder(
+                            animation: _tick,
+                            builder: (context, _) => FractionallySizedBox(
+                              alignment: Alignment(-1 + 3 * _shine.value, 0),
+                              widthFactor: 0.35,
+                              child: const DecoratedBox(
                                 decoration: BoxDecoration(
                                   gradient: LinearGradient(
-                                    colors: [AppColors.accentViolet, AppColors.accentTeal],
+                                    colors: [
+                                      Color(0x00FFFFFF),
+                                      Color(0x66FFFFFF),
+                                      Color(0x00FFFFFF),
+                                    ],
                                   ),
                                 ),
                               ),
-                              AnimatedBuilder(
-                                animation: _tick,
-                                builder: (context, _) => FractionallySizedBox(
-                                  alignment: Alignment(-1 + 3 * _shine.value, 0),
-                                  widthFactor: 0.35,
-                                  child: const DecoratedBox(
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        colors: [
-                                          Color(0x00FFFFFF),
-                                          Color(0x73FFFFFF),
-                                          Color(0x00FFFFFF),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
+                            ),
                           ),
-                        ),
+                        ],
                       ),
                     ),
-                  ],
+                  ),
                 ),
-              ),
+              ],
             ),
-          ],
+          ),
+          ),
+          const SizedBox(height: 8),
+          TweenAnimationBuilder<int>(
+            tween: IntTween(begin: 0, end: p.xpIntoLevel),
+            duration: const Duration(milliseconds: 1100),
+            curve: Curves.easeOutCubic,
+            builder: (context, into, _) => Row(
+              children: [
+                Text(
+                  '$into / ${p.xpNeededForLevel} XP',
+                  style: const TextStyle(
+                    color: AppColors.textWhite,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                    fontFeatures: [FontFeature.tabularFigures()],
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  '${(p.xpNeededForLevel - into).clamp(0, p.xpNeededForLevel)} XP lagi ke Level ${level + 1}',
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 11.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+            ],
+          ),
         ),
       ),
     );

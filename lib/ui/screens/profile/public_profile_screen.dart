@@ -278,19 +278,6 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
     final uniqueAnime = history.map((h) => h.movieId).toSet().length;
     final topPad = MediaQuery.paddingOf(context).top;
 
-    final topXpChip = ProfileAchievementBadges.topXpChip(ref, uid);
-    final topGiverChip = ProfileAchievementBadges.topGiverChip(ref, uid);
-    final hasAchievements = topXpChip != null || topGiverChip != null;
-    final nameText = Text(
-      name,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-      style: ZFont.display(size: 24),
-    );
-
-    // Tata letak sama dengan Profil Saya (redesain): banner, avatar rata
-    // kiri, nama (gradien kalau Premium), status, statistik transparan,
-    // Lencana, tombol Clan/Pohon/Leaderboard, lalu tombol teman.
     return Stack(
       children: [
         Positioned.fill(
@@ -298,24 +285,19 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
               ? NetImage(backdrop!)
               : const ColoredBox(color: AppColors.surfaceVariantDark),
         ),
-        // Tekstur titik ala manga di pojok banner.
-        Positioned(
-          top: 0,
-          left: 0,
-          right: 0,
-          height: topPad + 200,
-          child: const ZScreentone(opacity: 0.18),
-        ),
+
         const Positioned.fill(
           child: DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                stops: [0, 0.32, 0.62],
+                // Gelap bertahap: banner tetap kelihatan di atas, teks jelas di bawah.
+                stops: [0, 0.3, 0.62, 1],
                 colors: [
-                  Color(0x14000000),
-                  Color(0x8C0B0E14),
+                  Color(0x33000000),
+                  Color(0x40000000),
+                  Color(0xCC0B0E14),
                   AppColors.backgroundDark,
                 ],
               ),
@@ -331,23 +313,21 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
             child: BannerRarityBadge(rarity: wpBanner.rarity),
           ),
         Padding(
-          padding: EdgeInsets.only(top: topPad + 84, bottom: 20),
+          padding: EdgeInsets.only(top: topPad + 28, bottom: 20),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Padding(
-                padding: const EdgeInsets.only(left: 8),
-                child: ProfileHeroAvatar(
-                  uid: uid,
-                  url: avatarUrl,
-                  seed: uid,
-                  label: name,
-                  showXpRing: true,
-                ),
+              ProfileHeroAvatar(
+                uid: uid,
+                url: avatarUrl,
+                seed: uid,
+                label: name,
+                showXpRing: true,
+                leading: ProfileAchievementBadges.topXpChip(ref, uid),
+                trailing: ProfileAchievementBadges.topGiverChip(ref, uid),
               ),
               const SizedBox(height: 10),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 18),
+                padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.end,
@@ -361,15 +341,25 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
                     ],
                     Flexible(
                       child: premium
-                          // Premium: nama bergradien emas-toska.
+                          // Premium: nama bergradien emas.
                           ? ShaderMask(
                               blendMode: BlendMode.srcIn,
                               shaderCallback: (r) => const LinearGradient(
-                                colors: [Color(0xFFF6BE4F), Color(0xFFFF7A59)],
+                                colors: [Color(0xFFFFE08A), Color(0xFFF6BE4F), Color(0xFFFF9F6B)],
                               ).createShader(r),
-                              child: nameText,
+                              child: Text(
+                                name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: ZFont.display(size: 24, height: 1.1),
+                              ),
                             )
-                          : nameText,
+                          : Text(
+                              name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: ZFont.display(size: 24, height: 1.1),
+                            ),
                     ),
                     const SizedBox(width: 6),
                     Padding(
@@ -392,47 +382,22 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
                 ),
               ),
               const SizedBox(height: 6),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 18),
-                child: ActivityStatus(uid: uid),
-              ),
+              ActivityStatus(uid: uid),
               const SizedBox(height: 10),
-              // Nama clan + role (role pindah ke Lencana kalau baris itu tampil).
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 18),
-                child: Wrap(
-                  alignment: WrapAlignment.start,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [
-                    ProfileClanPill(uid: uid),
-                    if (!hasAchievements) RoleBadge(firebaseUid: uid, height: 22, rounded: true),
-                  ],
-                ),
+              // Nama clan + role. Top XP / Top Giver ada di samping pin level.
+              Wrap(
+                alignment: WrapAlignment.center,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  ProfileClanPill(uid: uid),
+                  RoleBadge(firebaseUid: uid, height: 22, rounded: true),
+                ],
               ),
-              if (!_isMe) ...[
-                const SizedBox(height: 16),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: _buildFriendActions(),
-                ),
-              ],
-              if (_error != null) ...[
-                const SizedBox(height: 10),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Text(
-                    _error!,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: AppColors.errorRed, fontSize: 12.5),
-                  ),
-                ),
-              ],
-              const SizedBox(height: 16),
-              // Statistik tanpa kartu (transparan).
+              const SizedBox(height: 18),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Row(
                   children: [
                     JoinDateStat(firebaseUid: uid),
@@ -446,25 +411,6 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
                 ),
               ),
               const SizedBox(height: 18),
-              // Lencana (gaya preview): chip yang bisa digeser.
-              if (hasAchievements) ...[
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 2),
-                  child: SectionHeader(title: 'Lencana', eyebrow: 'バッジ'),
-                ),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Row(
-                    children: [
-                      if (topXpChip != null) ...[topXpChip, const SizedBox(width: 8)],
-                      if (topGiverChip != null) ...[topGiverChip, const SizedBox(width: 8)],
-                      RoleBadge(firebaseUid: uid, height: 22, rounded: true),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 14),
-              ],
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Row(
@@ -503,6 +449,24 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
                   ],
                 ),
               ),
+              if (!_isMe) ...[
+                const SizedBox(height: 14),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: _buildFriendActions(),
+                ),
+              ],
+              if (_error != null) ...[
+                const SizedBox(height: 10),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Text(
+                    _error!,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: AppColors.errorRed, fontSize: 12.5),
+                  ),
+                ),
+              ],
             ],
           ),
         ),

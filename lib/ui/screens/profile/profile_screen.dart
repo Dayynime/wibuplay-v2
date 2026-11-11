@@ -151,9 +151,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         uid.isEmpty ? 0 : (ref.watch(myCommentCountProvider(uid)).valueOrNull ?? 0);
     final uniqueAnime = history.map((h) => h.movieId).toSet().length;
     final topPad = MediaQuery.paddingOf(context).top;
-    final topXpChip = uid.isEmpty ? null : ProfileAchievementBadges.topXpChip(ref, uid);
-    final topGiverChip = uid.isEmpty ? null : ProfileAchievementBadges.topGiverChip(ref, uid);
-    final hasAchievements = topXpChip != null || topGiverChip != null;
 
     return Stack(
       children: [
@@ -162,24 +159,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ? NetImage(backdrop!)
               : const ColoredBox(color: AppColors.surfaceVariantDark),
         ),
-        // Tekstur titik ala manga di pojok banner.
-        Positioned(
-          top: 0,
-          left: 0,
-          right: 0,
-          height: MediaQuery.paddingOf(context).top + 200,
-          child: const ZScreentone(opacity: 0.18),
-        ),
         const Positioned.fill(
           child: DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                stops: [0, 0.32, 0.62],
+                // Gelap bertahap: banner tetap kelihatan di atas, teks jelas di bawah.
+                stops: [0, 0.3, 0.62, 1],
                 colors: [
-                  Color(0x14000000),
-                  Color(0x8C0B0E14),
+                  Color(0x33000000),
+                  Color(0x40000000),
+                  Color(0xCC0B0E14),
                   AppColors.backgroundDark,
                 ],
               ),
@@ -187,35 +178,22 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ),
         ),
         Padding(
-          // Banner terlihat di atas, avatar & identitas rata kiri di bawahnya
-          // (tata letak preview).
-          padding: EdgeInsets.only(top: topPad + 84, bottom: 20),
+          padding: EdgeInsets.only(top: topPad + 28, bottom: 20),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Avatar rata kiri (tombol Edit Profil ada di baris nama).
-              Padding(
-                padding: const EdgeInsets.only(left: 8, right: 16),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    ProfileHeroAvatar(
-                      uid: uid,
-                      url: avatarUrl,
-                      seed: uid.isEmpty ? name : uid,
-                      label: name,
-                      showXpRing: true,
-                    ),
-                  ],
-                ),
+              ProfileHeroAvatar(
+                uid: uid,
+                url: avatarUrl,
+                seed: uid.isEmpty ? name : uid,
+                label: name,
+                showXpRing: true,
+                leading: ProfileAchievementBadges.topXpChip(ref, uid),
+                trailing: ProfileAchievementBadges.topGiverChip(ref, uid),
               ),
               const SizedBox(height: 10),
               Padding(
-                padding: const EdgeInsets.only(left: 18, right: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Row(
-                  children: [
-                Expanded(
-                  child: Row(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
@@ -228,24 +206,24 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     ],
                     Flexible(
                       child: premium
-                          // Premium: nama bergradien emas-senja (preview).
+                          // Premium: nama bergradien emas.
                           ? ShaderMask(
                               blendMode: BlendMode.srcIn,
                               shaderCallback: (r) => const LinearGradient(
-                                colors: [Color(0xFFF6BE4F), Color(0xFFFF7A59)],
+                                colors: [Color(0xFFFFE08A), Color(0xFFF6BE4F), Color(0xFFFF9F6B)],
                               ).createShader(r),
                               child: Text(
                                 name,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: ZFont.display(size: 24),
+                                style: ZFont.display(size: 24, height: 1.1),
                               ),
                             )
                           : Text(
                               name,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: ZFont.display(size: 24),
+                              style: ZFont.display(size: 24, height: 1.1),
                             ),
                     ),
                     if (profile?.userNumber != null) ...[
@@ -273,70 +251,24 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     ],
                   ],
                 ),
-                ),
-                    // Edit Profil sejajar nama (memanggil sheet yang sama
-                    // dengan di Pengaturan).
-                    if (user != null) ...[
-                      const SizedBox(width: 10),
-                      ZPress(
-                        onTap: () => showEditProfileSheet(
-                          context,
-                          user: user!,
-                          profile: profile,
-                          fallbackName: name,
-                          fallbackAvatar: avatarUrl,
-                          premium: premium,
-                        ),
-                        child: Container(
-                          height: 36,
-                          padding: const EdgeInsets.symmetric(horizontal: 14),
-                          decoration: BoxDecoration(
-                            color: AppColors.accentViolet.withValues(alpha: 0.16),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppColors.accentViolet.withValues(alpha: 0.35)),
-                          ),
-                          child: const Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.edit_rounded, size: 15, color: AppColors.accentVioletLight),
-                              SizedBox(width: 6),
-                              Text(
-                                'Edit Profil',
-                                style: TextStyle(
-                                  color: AppColors.accentVioletLight,
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
               ),
               const SizedBox(height: 10),
               // Nama clan + role. Top XP / Top Giver ada di samping pin level.
               if (uid.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 18),
-                  child: Wrap(
-                    alignment: WrapAlignment.start,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: [
-                      ProfileClanPill(uid: uid),
-                      // Role ikut baris Lencana kalau baris itu tampil.
-                      if (!hasAchievements) RoleBadge(firebaseUid: uid, height: 22, rounded: true),
-                    ],
-                  ),
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    ProfileClanPill(uid: uid),
+                    RoleBadge(firebaseUid: uid, height: 22, rounded: true),
+                  ],
                 ),
-              const SizedBox(height: 18),
-              // Statistik tanpa kartu (transparan, banner tetap kelihatan).
+              const SizedBox(height: 20),
+              // Stat row flat (transparan): angka besar, label kecil, garis pemisah tipis.
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Row(
                   children: [
                     JoinDateStat(firebaseUid: uid, fallback: user?.metadata.creationTime?.toLocal()),
@@ -354,25 +286,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               if (uid.isNotEmpty) ...[
                 MyXpCard(firebaseUid: uid),
                 const SizedBox(height: 12),
-              ],
-              // Lencana (gaya preview): chip yang bisa digeser.
-              if (hasAchievements) ...[
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 2),
-                  child: SectionHeader(title: 'Lencana', eyebrow: 'バッジ'),
-                ),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Row(
-                    children: [
-                      if (topXpChip != null) ...[topXpChip, const SizedBox(width: 8)],
-                      if (topGiverChip != null) ...[topGiverChip, const SizedBox(width: 8)],
-                      RoleBadge(firebaseUid: uid, height: 22, rounded: true),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 14),
               ],
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1258,38 +1171,32 @@ class ProfilePillButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Gaya baru: kotak gelap dengan ikon di kotak warna lembut (bukan
-    // tombol garis tepi bulat). [borderColor] dipakai sebagai warna tepi tipis.
-    final tint = color == Colors.white ? AppColors.accentVioletLight : color;
+    // Pil modern: isi warna lembut + tepi tipis + ikon (bentuk pil seperti
+    // semula, lebih bersih). [borderColor] = warna tepi.
+    final tint = color == Colors.white ? AppColors.textWhite : color;
     return ZPress(
       onTap: onTap,
       child: Container(
-        height: 64,
+        height: 46,
         padding: const EdgeInsets.symmetric(horizontal: 10),
         decoration: BoxDecoration(
-          color: AppColors.surfaceDark,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: borderColor.withValues(alpha: 0.25)),
+          color: tint.withValues(alpha: color == Colors.white ? 0.08 : 0.12),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: borderColor.withValues(alpha: 0.45)),
         ),
-        child: Column(
+        child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              width: 28,
-              height: 28,
-              decoration: BoxDecoration(
-                color: tint.withValues(alpha: 0.16),
-                borderRadius: BorderRadius.circular(9),
-              ),
-              child: Icon(icon, size: 16, color: tint),
-            ),
-            const SizedBox(height: 5),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                label,
-                maxLines: 1,
-                style: const TextStyle(color: AppColors.textWhite, fontSize: 12, fontWeight: FontWeight.w700),
+            Icon(icon, size: 18, color: tint),
+            const SizedBox(width: 6),
+            Flexible(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  style: TextStyle(color: tint, fontSize: 13.5, fontWeight: FontWeight.w700),
+                ),
               ),
             ),
           ],
