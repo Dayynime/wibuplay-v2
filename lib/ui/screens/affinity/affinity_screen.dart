@@ -15,6 +15,7 @@ import 'affinity_detail_screen.dart';
 import 'affinity_fx.dart';
 import 'affinity_providers.dart';
 import 'affinity_requests_sheet.dart';
+import 'affinity_tutorial.dart';
 
 const _line = Color(0x14FFFFFF);
 const _line2 = Color(0x0DFFFFFF);
@@ -33,7 +34,7 @@ Future<void> openAffinityScreen(BuildContext context, String uid, {String? name,
 /// Halaman semua afinitas seorang user: Soulmate, ikatan 1 slot, grup 5 slot,
 /// lalu peringkat terdekat. Profil sendiri bisa menambah; profil teman bisa
 /// "Ajak afinitas" kalau [canInvite].
-class AffinityScreen extends ConsumerWidget {
+class AffinityScreen extends ConsumerStatefulWidget {
   const AffinityScreen({super.key, required this.uid, this.name, this.canInvite = false});
 
   final String uid;
@@ -41,7 +42,25 @@ class AffinityScreen extends ConsumerWidget {
   final bool canInvite;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AffinityScreen> createState() => _AffinityScreenState();
+}
+
+class _AffinityScreenState extends ConsumerState<AffinityScreen> {
+  String get uid => widget.uid;
+  String? get name => widget.name;
+  bool get canInvite => widget.canInvite;
+
+  @override
+  void initState() {
+    super.initState();
+    // Tutorial otomatis sekali saat pertama kali membuka halaman Afinitas.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) maybeShowAffinityTutorial(context);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final me = ref.watch(authUserProvider).valueOrNull?.uid ?? '';
     final own = me.isNotEmpty && me == uid;
     final async = ref.watch(affinityListProvider(uid));
@@ -136,6 +155,11 @@ class _AffinityBody extends ConsumerWidget {
               icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20, color: AppColors.textWhite),
             ),
             const Spacer(),
+            IconButton(
+              onPressed: () => showAffinityTutorial(context),
+              tooltip: 'Cara kerja Afinitas',
+              icon: const Icon(Icons.help_outline_rounded, size: 22, color: AppColors.textWhite),
+            ),
             if (own)
               IconButton(
                 onPressed: () => showAffinityOutgoingSheet(context),

@@ -13,7 +13,6 @@ import '../../data/models/xp_models.dart';
 import 'game_badges.dart';
 import '../screens/profile/public_profile_screen.dart';
 import 'clan_tag_badge.dart';
-import '../redesign/z_kit.dart';
 
 // =============================================================================
 // Slide leaderboard di carousel Beranda (Top XP / Top Clan, Top Support,
@@ -34,11 +33,17 @@ const Color heroGold = Color(0xFFFFC107);
 const Color heroPink = Color(0xFFFF5C8A);
 const Color heroTeal = Color(0xFF2DD4BF);
 
+const Color _silver = Color(0xFFC7CDD8);
+const Color _bronze = Color(0xFFCE8946);
+const Color _ink = Color(0xFF15213B);
+const Color _xpBlue = Color(0xFF6CB8FF);
 const Color _clanOrange = Color(0xFFFF8A65);
 const Color _rose = Color(0xFFFF6F91);
 const Color _mint = Color(0xFF34D3B5);
+const Color _mintText = Color(0xFF5EEAD4);
 const Color _muted = Color(0xFF9AA0AC);
 
+const List<Color> _roseTones = [Color(0xFFFF6F91), Color(0xFFC2577A), Color(0xFF8A4565)];
 
 /// Kurva keluar cepat lalu mendarat halus (dipakai hampir semua gerak).
 const Curve _outExpo = Cubic(0.16, 1, 0.3, 1);
@@ -68,6 +73,13 @@ String _groupInt(int v) {
   }
   return b.toString();
 }
+
+Color _rankColor(int rank) => switch (rank) {
+      1 => heroGold,
+      2 => _silver,
+      3 => _bronze,
+      _ => const Color(0xFF2B3550),
+    };
 
 /// Ambil potongan [start]..[end] dari timeline [t] (0..1) lalu lewatkan lewat
 /// [curve]. Hasil 0 sebelum [start], 1 setelah [end].
@@ -140,8 +152,7 @@ class _SlideMotionState extends State<_SlideMotion> with TickerProviderStateMixi
       return;
     }
     if (_enter.status == AnimationStatus.dismissed) _enter.forward();
-    // Loop kilau kaca tidak dipakai lagi (latar polos gaya preview): tidak
-    // dijalankan supaya tidak ada ticker yang berputar sia-sia.
+    if (!_loop.isAnimating) _loop.repeat();
   }
 
   @override
@@ -296,6 +307,44 @@ const _ScenePalette _sceneSupport =
 const _ScenePalette _sceneGiver =
     _ScenePalette(Color(0xFF0D3A3D), Color(0xFF5EEAD4), Color(0xFF145457), Color(0xFF082224), 0.55);
 
+/// Pemandangan sederhana (langit, bulan, dua lapis bukit) yang dibiaskan kaca.
+class _ScenePainter extends CustomPainter {
+  const _ScenePainter(this.p);
+
+  final _ScenePalette p;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+    canvas.drawRect(Offset.zero & size, Paint()..color = p.sky);
+    canvas.drawCircle(Offset(w * p.moonX, h * 0.3), h * 0.26, Paint()..color = p.moon);
+    final far = Path()
+      ..moveTo(0, h * 0.70)
+      ..lineTo(w * 0.20, h * 0.46)
+      ..lineTo(w * 0.38, h * 0.62)
+      ..lineTo(w * 0.62, h * 0.38)
+      ..lineTo(w, h * 0.66)
+      ..lineTo(w, h)
+      ..lineTo(0, h)
+      ..close();
+    canvas.drawPath(far, Paint()..color = p.far);
+    final near = Path()
+      ..moveTo(0, h * 0.83)
+      ..lineTo(w * 0.28, h * 0.62)
+      ..lineTo(w * 0.49, h * 0.78)
+      ..lineTo(w * 0.74, h * 0.64)
+      ..lineTo(w, h * 0.79)
+      ..lineTo(w, h)
+      ..lineTo(0, h)
+      ..close();
+    canvas.drawPath(near, Paint()..color = p.near);
+  }
+
+  @override
+  bool shouldRepaint(_ScenePainter old) => old.p != p;
+}
+
 class _GlassStage extends StatelessWidget {
   const _GlassStage({
     required this.palette,
@@ -315,33 +364,39 @@ class _GlassStage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Gaya preview: latar biru laut polos + tekstur titik di pojok, tanpa
-    // pemandangan/kaca (lebih ringan digambar saat carousel bergeser).
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
       child: Stack(
         fit: StackFit.expand,
         children: [
-          DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topRight,
-                end: Alignment.bottomLeft,
-                // Latar sama untuk semua slide (biru laut), tanpa rona warna
-                // per slide, seperti preview.
-                colors: [AppColors.surfaceVariantDark, AppColors.surfaceDark],
-              ),
+          // Pemandangan sedikit lebih lebar dari kartu supaya parallax tidak
+          // memperlihatkan tepi kosong.
+          Positioned(
+            left: -60,
+            right: -60,
+            top: 0,
+            bottom: 0,
+            child: _ParallaxLayer(
+              offset: pageOffset,
+              depth: 0.22,
+              child: RepaintBoundary(child: CustomPaint(painter: _ScenePainter(palette))),
             ),
           ),
-          const ZScreentone(opacity: 0.12),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+            padding: const EdgeInsets.all(10),
             child: _ParallaxLayer(
               offset: pageOffset,
               depth: 0.06,
               fade: true,
-              child: child,
+              child: _GlassPanel(
+                accent: accent,
+                loop: loop,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 11, 14, 11),
+                  child: child,
+                ),
+              ),
             ),
           ),
         ],
@@ -349,6 +404,131 @@ class _GlassStage extends StatelessWidget {
     );
   }
 }
+
+/// Panel kaca: blur + isi gelap bening, tepi memantulkan cahaya, dan kilau
+/// specular yang mengikuti jari (diam = bergeser pelan sendiri).
+class _GlassPanel extends StatefulWidget {
+  const _GlassPanel({required this.child, required this.accent, required this.loop});
+
+  final Widget child;
+  final Color accent;
+  final Animation<double> loop;
+
+  @override
+  State<_GlassPanel> createState() => _GlassPanelState();
+}
+
+class _GlassPanelState extends State<_GlassPanel> {
+  final ValueNotifier<Offset?> _touch = ValueNotifier<Offset?>(null);
+
+  @override
+  void dispose() {
+    _touch.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const radius = BorderRadius.all(Radius.circular(16));
+    return Listener(
+      onPointerDown: (e) => _touch.value = e.localPosition,
+      onPointerMove: (e) => _touch.value = e.localPosition,
+      onPointerUp: (_) => _touch.value = null,
+      onPointerCancel: (_) => _touch.value = null,
+      child: ClipRRect(
+        borderRadius: radius,
+        child: BackdropFilter(
+          filter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+          child: DecoratedBox(
+            decoration: const BoxDecoration(
+              borderRadius: radius,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0x8C161C29), Color(0xA60D111A)],
+              ),
+            ),
+            child: CustomPaint(
+              foregroundPainter: _GlassSheenPainter(
+                loop: widget.loop,
+                touch: _touch,
+                accent: widget.accent,
+              ),
+              child: widget.child,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _GlassSheenPainter extends CustomPainter {
+  _GlassSheenPainter({required this.loop, required this.touch, required this.accent})
+      : super(repaint: Listenable.merge([loop, touch]));
+
+  final Animation<double> loop;
+  final ValueListenable<Offset?> touch;
+  final Color accent;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (size.isEmpty) return;
+    final rect = Offset.zero & size;
+    final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(16));
+
+    // Kilau specular: ikut jari, kalau tidak disentuh bergeser pelan.
+    final a = loop.value * 2 * math.pi;
+    final center = touch.value ??
+        Offset(size.width * (0.32 + 0.22 * math.sin(a)), size.height * (0.12 + 0.06 * math.cos(a)));
+    final sheen = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          Colors.white.withValues(alpha: 0.15),
+          Colors.white.withValues(alpha: 0.04),
+          Colors.white.withValues(alpha: 0),
+        ],
+        stops: const [0, 0.45, 1],
+      ).createShader(Rect.fromCircle(center: center, radius: 160));
+    canvas.drawRRect(rrect, sheen);
+
+    // Tepi kaca: terang di kiri atas, redup di tengah, sedikit aksen di kanan bawah.
+    final edge = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1
+      ..shader = LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          Colors.white.withValues(alpha: 0.38),
+          Colors.white.withValues(alpha: 0.08),
+          Colors.white.withValues(alpha: 0.03),
+          accent.withValues(alpha: 0.30),
+        ],
+        stops: const [0, 0.35, 0.7, 1],
+      ).createShader(rect);
+    canvas.drawRRect(rrect.deflate(0.5), edge);
+
+    // Garis kilap tipis di tepi atas (kaca tebal memantulkan cahaya).
+    final shine = Paint()
+      ..strokeWidth = 1
+      ..shader = LinearGradient(
+        colors: [
+          Colors.white.withValues(alpha: 0),
+          Colors.white.withValues(alpha: 0.45),
+          Colors.white.withValues(alpha: 0),
+        ],
+      ).createShader(Rect.fromLTWH(14, 0, size.width - 28, 1));
+    canvas.drawLine(const Offset(14, 1), Offset(size.width - 14, 1), shine);
+  }
+
+  @override
+  bool shouldRepaint(_GlassSheenPainter old) => old.accent != accent;
+}
+
+// ---------------------------------------------------------------------------
+// Komponen kecil
+// ---------------------------------------------------------------------------
 
 /// Angka yang bergulir per digit seperti odometer. Karakter selain angka
 /// (titik, huruf, "Rp") tampil diam.
@@ -450,6 +630,43 @@ class _Bar extends StatelessWidget {
   }
 }
 
+Widget _rankBadge(int rank, {double size = 14}) {
+  return Container(
+    width: size,
+    height: size,
+    alignment: Alignment.center,
+    decoration: BoxDecoration(
+      color: _rankColor(rank),
+      shape: BoxShape.circle,
+      border: Border.all(color: const Color(0xFF10141D), width: 1.5),
+    ),
+    child: Text(
+      '$rank',
+      style: TextStyle(
+        color: rank <= 3 ? _ink : const Color(0xBFFFFFFF),
+        fontSize: size * 0.58,
+        fontWeight: FontWeight.w800,
+        height: 1,
+      ),
+    ),
+  );
+}
+
+/// Foto profil + badge peringkat di pojok kiri bawah (seperti versi lama).
+Widget _avatarWithRank({required Widget avatar, required double size, required int rank}) {
+  return SizedBox(
+    width: size,
+    height: size,
+    child: Stack(
+      clipBehavior: Clip.none,
+      children: [
+        avatar,
+        Positioned(left: -4, bottom: -3, child: _rankBadge(rank)),
+      ],
+    ),
+  );
+}
+
 Widget _titleBlock(String title, String subtitle) {
   return Column(
     mainAxisSize: MainAxisSize.min,
@@ -459,14 +676,19 @@ Widget _titleBlock(String title, String subtitle) {
         title,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: ZFont.display(size: 20, height: 1.1),
+        style: const TextStyle(
+          color: AppColors.textWhite,
+          fontSize: 15,
+          fontWeight: FontWeight.w800,
+          height: 1.2,
+        ),
       ),
-      const SizedBox(height: 2),
+      const SizedBox(height: 1),
       Text(
         subtitle,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: const TextStyle(color: AppColors.textMuted, fontSize: 11.5, height: 1.2),
+        style: const TextStyle(color: _muted, fontSize: 11, height: 1.2),
       ),
     ],
   );
@@ -604,141 +826,6 @@ class _LiquidSegmentState extends State<_LiquidSegment> with SingleTickerProvide
 // Slide Top XP / Top Clan
 // ---------------------------------------------------------------------------
 
-// ---------------------------------------------------------------------------
-// Tata letak slide leaderboard (gaya preview): judul + sub di kiri atas,
-// kontrol/chip di kanan, 3 baris peringkat dengan bar, lalu footer.
-// ---------------------------------------------------------------------------
-
-const Color _lbGold = Color(0xFFF6BE4F);
-
-Widget _lbHeader(Animation<double> t, String title, String sub, {Widget? trailing}) {
-  return Row(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Expanded(
-        child: _Reveal(t: t, start: 0, end: 0.3, dy: -6, child: _titleBlock(title, sub)),
-      ),
-      if (trailing != null) ...[const SizedBox(width: 10), trailing],
-    ],
-  );
-}
-
-Widget _lbFooter(Widget left, String action) {
-  return SizedBox(
-    height: 18,
-    child: Row(
-      children: [
-        Expanded(
-          child: DefaultTextStyle.merge(
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
-            child: left,
-          ),
-        ),
-        Text(
-          action,
-          style: const TextStyle(color: AppColors.textWhite, fontSize: 12, fontWeight: FontWeight.w700),
-        ),
-        const Icon(Icons.chevron_right_rounded, size: 16, color: AppColors.textWhite),
-      ],
-    ),
-  );
-}
-
-Widget _lbRow({
-  required int i,
-  required int rank,
-  required Animation<double> t,
-  required Color accent,
-  required Widget avatar,
-  required String name,
-  required double ratio,
-  required String value,
-  Widget? nameTrailing,
-  VoidCallback? onTap,
-}) {
-  final start = 0.06 + i * 0.08;
-  return _Reveal(
-    t: t,
-    start: start,
-    end: start + 0.32,
-    dx: -12,
-    dy: 0,
-    child: _Pressable(
-      onTap: onTap,
-      alignment: Alignment.centerLeft,
-      child: SizedBox(
-        height: 32,
-        child: Row(
-          children: [
-            SizedBox(
-              width: 20,
-              child: Text(
-                '$rank',
-                textAlign: TextAlign.center,
-                style: ZFont.display(size: 15, color: rank == 1 ? _lbGold : AppColors.textMuted, height: 1),
-              ),
-            ),
-            const SizedBox(width: 10),
-            avatar,
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: AppColors.textWhite,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            height: 1.2,
-                          ),
-                        ),
-                      ),
-                      if (nameTrailing != null) ...[const SizedBox(width: 5), nameTrailing],
-                    ],
-                  ),
-                  const SizedBox(height: 5),
-                  _Bar(ratio: ratio, color: accent.withValues(alpha: i == 0 ? 1 : 0.6), t: t, start: start + 0.06),
-                ],
-              ),
-            ),
-            const SizedBox(width: 10),
-            _Odometer(
-              text: value,
-              style: ZFont.display(size: 14),
-              t: t,
-              start: start + 0.04,
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
-}
-
-/// Badan slide: header, daftar (mengisi ruang), footer.
-Widget _lbBody({required Widget header, required Widget list, required Widget footer}) {
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    children: [
-      header,
-      const SizedBox(height: 10),
-      Expanded(child: list),
-      const SizedBox(height: 8),
-      footer,
-    ],
-  );
-}
-
 class HeroLeaderboardSlide extends StatefulWidget {
   const HeroLeaderboardSlide({
     super.key,
@@ -775,7 +862,7 @@ class _HeroLeaderboardSlideState extends State<HeroLeaderboardSlide> {
     final hasXp = widget.entries.isNotEmpty;
     final hasClan = widget.clans.isNotEmpty;
     final clan = hasXp ? (_clanMode && hasClan) : hasClan;
-    final accent = clan ? _clanOrange : AppColors.accentViolet;
+    final accent = clan ? _clanOrange : _xpBlue;
 
     return _SlideMotion(
       active: widget.active,
@@ -787,32 +874,46 @@ class _HeroLeaderboardSlideState extends State<HeroLeaderboardSlide> {
           loop: loop,
           pageOffset: widget.pageOffset,
           onTap: clan ? widget.onClanTap : widget.onTap,
-          child: _lbBody(
-            header: _lbHeader(
-              enter,
-              clan ? 'Top Clan' : 'Top XP',
-              clan ? 'Level clan' : 'Bulan ini',
-              trailing: (hasXp && hasClan)
-                  ? _LiquidSegment(
-                      labels: const ['XP', 'Clan'],
-                      index: clan ? 1 : 0,
-                      onChanged: (i) => setState(() => _clanMode = i == 1),
-                    )
-                  : null,
-            ),
-            // Daftar punya controller sendiri (di-key per mode) supaya ganti
-            // XP <-> Clan memutar ulang odometer & bar dari awal.
-            list: _SlideMotion(
-              key: ValueKey<bool>(clan),
-              active: widget.active,
-              enterDuration: const Duration(milliseconds: 1500),
-              builder: (context, rowsIn, _) =>
-                  clan ? _clanRows(rowsIn, accent) : _xpRows(context, rowsIn, accent),
-            ),
-            footer: _lbFooter(
-              Text(clan ? 'Clan dengan level tertinggi' : 'Peringkat XP bulan ini'),
-              clan ? 'Clan' : 'Leaderboard',
-            ),
+          child: Column(
+            children: [
+              SizedBox(
+                height: 36,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _Reveal(
+                        t: enter,
+                        start: 0,
+                        end: 0.3,
+                        dy: -6,
+                        child: _titleBlock(
+                          clan ? 'Top Clan' : 'Top XP',
+                          clan ? 'Level clan' : 'Bulan ini',
+                        ),
+                      ),
+                    ),
+                    if (hasXp && hasClan)
+                      _LiquidSegment(
+                        labels: const ['XP', 'Clan'],
+                        index: clan ? 1 : 0,
+                        onChanged: (i) => setState(() => _clanMode = i == 1),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 6),
+              // Daftar punya controller sendiri (di-key per mode) supaya ganti
+              // XP <-> Clan memutar ulang odometer & bar dari awal.
+              Expanded(
+                child: _SlideMotion(
+                  key: ValueKey<bool>(clan),
+                  active: widget.active,
+                  enterDuration: const Duration(milliseconds: 1500),
+                  builder: (context, rowsIn, _) =>
+                      clan ? _clanRows(rowsIn, accent) : _xpRows(context, rowsIn, accent),
+                ),
+              ),
+            ],
           ),
         );
       },
@@ -820,22 +921,21 @@ class _HeroLeaderboardSlideState extends State<HeroLeaderboardSlide> {
   }
 
   Widget _xpRows(BuildContext context, Animation<double> t, Color accent) {
-    final list = widget.entries.take(3).toList();
+    final list = widget.entries.take(4).toList();
     if (list.isEmpty) return _empty;
     final max = list.map((e) => e.xp).fold<int>(1, math.max);
     return Column(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         for (var i = 0; i < list.length; i++)
-          _lbRow(
+          _row(
             i: i,
-            rank: i + 1,
             t: t,
             accent: accent,
             avatar: UserAvatar(
               username: list[i].username,
               url: list[i].avatarUrl,
-              size: 30,
+              size: 26,
               frameUid: list[i].firebaseUid,
             ),
             name: list[i].username,
@@ -848,24 +948,93 @@ class _HeroLeaderboardSlideState extends State<HeroLeaderboardSlide> {
   }
 
   Widget _clanRows(Animation<double> t, Color accent) {
-    final list = widget.clans.take(3).toList();
+    final list = widget.clans.take(4).toList();
     if (list.isEmpty) return _empty;
     final max = list.map((e) => e.level).fold<int>(1, math.max);
     return Column(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         for (var i = 0; i < list.length; i++)
-          _lbRow(
+          _row(
             i: i,
-            rank: i + 1,
             t: t,
             accent: accent,
-            avatar: UserAvatar(username: list[i].tag, url: list[i].photoUrl, size: 30),
+            avatar: UserAvatar(username: list[i].tag, url: list[i].photoUrl, size: 26),
             name: list[i].tag,
             ratio: list[i].level / max,
             value: 'Lv ${list[i].level}',
           ),
       ],
+    );
+  }
+
+  Widget _row({
+    required int i,
+    required Animation<double> t,
+    required Color accent,
+    required Widget avatar,
+    required String name,
+    required double ratio,
+    required String value,
+    VoidCallback? onTap,
+  }) {
+    final start = 0.06 + i * 0.08;
+    return _Reveal(
+      t: t,
+      start: start,
+      end: start + 0.32,
+      dx: -12,
+      dy: 0,
+      child: _Pressable(
+        onTap: onTap,
+        alignment: Alignment.centerLeft,
+        child: SizedBox(
+          height: 31,
+          child: Row(
+            children: [
+              _avatarWithRank(avatar: avatar, size: 26, rank: i + 1),
+              const SizedBox(width: 11),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.textWhite,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        height: 1.2,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    _Bar(
+                      ratio: ratio,
+                      color: accent.withValues(alpha: i == 0 ? 1 : 0.55),
+                      t: t,
+                      start: start + 0.06,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              _Odometer(
+                text: value,
+                style: const TextStyle(
+                  color: AppColors.textWhite,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                ),
+                t: t,
+                start: start + 0.04,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -898,7 +1067,6 @@ class HeroSupportSlide extends StatelessWidget {
   Widget build(BuildContext context) {
     final top = supporters.take(3).toList();
     final total = top.fold<int>(0, (a, s) => a + s.totalAmount);
-    final max = top.map((s) => s.totalAmount).fold<int>(1, math.max);
     return _SlideMotion(
       active: active,
       enterDuration: const Duration(milliseconds: 1800),
@@ -909,46 +1077,189 @@ class HeroSupportSlide extends StatelessWidget {
           loop: loop,
           pageOffset: pageOffset,
           onTap: onTap,
-          child: _lbBody(
-            header: _lbHeader(
-              enter,
-              'Top Support',
-              'Donatur teratas',
-              trailing: const ZChip('Terima kasih', icon: Icons.favorite_rounded, tone: ZTone.gold),
-            ),
-            list: top.isEmpty
-                ? _empty
-                : Column(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                height: 36,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: _Reveal(
+                        t: enter,
+                        start: 0,
+                        end: 0.3,
+                        dy: -6,
+                        child: _titleBlock('Top Support', 'Donatur teratas'),
+                      ),
+                    ),
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        _Odometer(
+                          text: _compactRupiah(total),
+                          style: const TextStyle(
+                            color: AppColors.textWhite,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                          ),
+                          t: enter,
+                          start: 0.04,
+                          span: 0.55,
+                        ),
+                        Text(
+                          'total ${top.length} teratas',
+                          style: const TextStyle(color: _muted, fontSize: 10.5, height: 1.1),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              if (top.isEmpty)
+                const Expanded(child: _empty)
+              else ...[
+                _StackedBar(values: [for (final s in top) s.totalAmount], t: enter),
+                const SizedBox(height: 6),
+                Expanded(
+                  child: Column(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
                       for (var i = 0; i < top.length; i++)
-                        _lbRow(
-                          i: i,
-                          rank: top[i].rank,
-                          t: enter,
-                          accent: AppColors.accentViolet,
-                          avatar: UserAvatar(
-                            username: top[i].name,
-                            url: top[i].avatarUrl,
-                            size: 30,
-                            frameUid: top[i].firebaseUid,
-                          ),
-                          name: top[i].name,
-                          ratio: top[i].totalAmount / max,
-                          value: _compactRupiah(top[i].totalAmount),
-                          onTap: (top[i].firebaseUid ?? '').isEmpty
-                              ? null
-                              : () => openPublicProfile(context, top[i].firebaseUid!),
-                        ),
+                        _supportRow(context, i, top[i], total, enter),
                     ],
                   ),
-            footer: _lbFooter(
-              Text('Total ${_compactRupiah(total)} dari ${top.length} teratas'),
-              'Semua',
-            ),
+                ),
+              ],
+            ],
           ),
         );
       },
+    );
+  }
+
+  Widget _supportRow(BuildContext context, int i, TopSupporter s, int total, Animation<double> t) {
+    final uid = s.firebaseUid;
+    final share = total > 0 ? s.totalAmount / total : 0.0;
+    final start = 0.22 + i * 0.14;
+    return _Reveal(
+      t: t,
+      start: start,
+      end: start + 0.3,
+      dx: -10,
+      dy: 0,
+      child: _Pressable(
+        onTap: (uid == null || uid.isEmpty) ? null : () => openPublicProfile(context, uid),
+        alignment: Alignment.centerLeft,
+        child: SizedBox(
+          height: 26,
+          child: Row(
+            children: [
+              Container(
+                width: 9,
+                height: 9,
+                decoration: BoxDecoration(
+                  color: _roseTones[i % _roseTones.length],
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              ),
+              const SizedBox(width: 9),
+              _avatarWithRank(
+                avatar: UserAvatar(username: s.name, url: s.avatarUrl, size: 22, frameUid: uid),
+                size: 22,
+                rank: s.rank,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  s.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppColors.textWhite,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              Text(
+                '${(share * 100).round()}%',
+                style: const TextStyle(
+                  color: _muted,
+                  fontSize: 11.5,
+                  fontFeatures: [ui.FontFeature.tabularFigures()],
+                ),
+              ),
+              const SizedBox(width: 10),
+              ConstrainedBox(
+                constraints: const BoxConstraints(minWidth: 60),
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  widthFactor: 1,
+                  child: _Odometer(
+                    text: _compactRupiah(s.totalAmount),
+                    style: const TextStyle(
+                      color: AppColors.textWhite,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    t: t,
+                    start: start + 0.04,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Satu bar bertumpuk: tiap segmen = porsi donatur dari total, terisi berurutan.
+class _StackedBar extends StatelessWidget {
+  const _StackedBar({required this.values, required this.t});
+
+  final List<int> values;
+  final Animation<double> t;
+
+  @override
+  Widget build(BuildContext context) {
+    final total = values.fold<int>(0, (a, v) => a + v);
+    const gap = 3.0;
+    return SizedBox(
+      height: 10,
+      child: LayoutBuilder(
+        builder: (context, c) {
+          final avail = math.max(0.0, c.maxWidth - gap * (values.length - 1));
+          return AnimatedBuilder(
+            animation: t,
+            builder: (context, _) {
+              return Row(
+                children: [
+                  for (var i = 0; i < values.length; i++) ...[
+                    if (i > 0) const SizedBox(width: gap),
+                    Container(
+                      width: total > 0
+                          ? avail *
+                              (values[i] / total) *
+                              _seg(t.value, 0.08 + i * 0.16, 0.48 + i * 0.16, _outExpo)
+                          : 0.0,
+                      decoration: BoxDecoration(
+                        color: _roseTones[i % _roseTones.length],
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                    ),
+                  ],
+                ],
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }
@@ -976,9 +1287,9 @@ class HeroGiverSlide extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final top = givers.take(3).toList();
-    final totalDays = givers.fold<int>(0, (a, x) => a + x.days);
-    final max = top.map((x) => x.days).fold<int>(1, math.max);
+    final g = givers;
+    final lead = g.isNotEmpty ? g.first : null;
+    final rest = g.skip(1).take(4).toList();
     return _SlideMotion(
       active: active,
       enterDuration: const Duration(milliseconds: 1800),
@@ -989,59 +1300,265 @@ class HeroGiverSlide extends StatelessWidget {
           loop: loop,
           pageOffset: pageOffset,
           onTap: onTap,
-          child: _lbBody(
-            header: _lbHeader(
-              enter,
-              'Top Giver',
-              'Hari Premium yang dibagikan',
-              trailing: const ZChip('Gift', icon: Icons.card_giftcard_rounded, tone: ZTone.brand),
-            ),
-            list: top.isEmpty
-                ? _empty
-                : Column(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      for (var i = 0; i < top.length; i++)
-                        _lbRow(
-                          i: i,
-                          rank: top[i].rank,
-                          t: enter,
-                          accent: _mint,
-                          avatar: UserAvatar(
-                            username: top[i].username,
-                            url: top[i].avatarUrl,
-                            size: 30,
-                            frameUid: top[i].firebaseUid,
-                          ),
-                          name: top[i].username,
-                          nameTrailing: (clanTags[top[i].firebaseUid] ?? '').isEmpty
-                              ? null
-                              : ClanTagBadge(text: clanTags[top[i].firebaseUid]!, height: 14),
-                          ratio: top[i].days / max,
-                          value: '${_groupInt(top[i].days)}h',
-                          onTap: top[i].firebaseUid.isEmpty
-                              ? null
-                              : () => openPublicProfile(context, top[i].firebaseUid),
-                        ),
-                    ],
-                  ),
-            footer: _lbFooter(
-              Text.rich(
-                TextSpan(
-                  text: 'Total dibagikan ',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SizedBox(
+                height: 36,
+                child: Row(
                   children: [
-                    TextSpan(
-                      text: '${_groupInt(totalDays)} hari',
-                      style: const TextStyle(color: AppColors.textWhite, fontWeight: FontWeight.w700),
+                    Expanded(
+                      child: _Reveal(
+                        t: enter,
+                        start: 0,
+                        end: 0.3,
+                        dy: -6,
+                        child: _titleBlock('Top Giver', 'Hari Premium yang dibagikan'),
+                      ),
                     ),
+                    if (onTap != null)
+                      const Icon(Icons.chevron_right_rounded, size: 20, color: _muted),
                   ],
                 ),
               ),
-              'Semua',
-            ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: lead == null
+                    ? _empty
+                    : Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          SizedBox(width: 122, child: _lead(context, lead, enter)),
+                          if (rest.isNotEmpty) ...[
+                            Container(
+                              width: 1,
+                              margin: const EdgeInsets.symmetric(horizontal: 12),
+                              color: const Color(0x1FFFFFFF),
+                            ),
+                            Expanded(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  for (var i = 0; i < rest.length; i++)
+                                    _giverRow(context, i, rest[i], enter),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+              ),
+            ],
           ),
         );
       },
     );
   }
+
+  Widget _lead(BuildContext context, TopGiver x, Animation<double> t) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _Reveal(
+          t: t,
+          start: 0.04,
+          end: 0.34,
+          dy: 8,
+          child: _Pressable(
+            onTap: x.firebaseUid.isEmpty ? null : () => openPublicProfile(context, x.firebaseUid),
+            alignment: Alignment.centerLeft,
+            child: Row(
+              children: [
+                _avatarWithRank(
+                  avatar: UserAvatar(
+                    username: x.username,
+                    url: x.avatarUrl,
+                    size: 30,
+                    frameUid: x.firebaseUid,
+                  ),
+                  size: 30,
+                  rank: x.rank,
+                ),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        x.username,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.textWhite,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          height: 1.2,
+                        ),
+                      ),
+                      _Odometer(
+                        text: '${_groupInt(x.days)} hari',
+                        style: const TextStyle(
+                          color: _mintText,
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w800,
+                        ),
+                        t: t,
+                        start: 0.1,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Expanded(child: _DayGrid(days: x.days, t: t)),
+      ],
+    );
+  }
+
+  Widget _giverRow(BuildContext context, int i, TopGiver x, Animation<double> t) {
+    final clan = clanTags[x.firebaseUid];
+    final start = 0.3 + i * 0.08;
+    return _Reveal(
+      t: t,
+      start: start,
+      end: start + 0.3,
+      dx: 0,
+      dy: 6,
+      child: _Pressable(
+        onTap: x.firebaseUid.isEmpty ? null : () => openPublicProfile(context, x.firebaseUid),
+        alignment: Alignment.centerLeft,
+        child: SizedBox(
+          height: 24,
+          child: Row(
+            children: [
+              SizedBox(
+                width: 12,
+                child: Text(
+                  '${x.rank}',
+                  style: const TextStyle(color: _muted, fontSize: 11.5, fontWeight: FontWeight.w700),
+                ),
+              ),
+              const SizedBox(width: 6),
+              UserAvatar(username: x.username, url: x.avatarUrl, size: 20),
+              const SizedBox(width: 7),
+              Expanded(
+                child: Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        x.username,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: AppColors.textWhite,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                    if ((clan ?? '').isNotEmpty) ...[
+                      const SizedBox(width: 5),
+                      ClanTagBadge(text: clan!, height: 14),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                '${_groupInt(x.days)} hari',
+                style: const TextStyle(
+                  color: Color(0xFFC7CBD3),
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Grid 9 x 5 kotak. 1 kotak = [unit] hari Premium (unit naik kalau hari
+/// yang dibagikan lebih dari 45). Kotak terisi seperti gelombang diagonal.
+class _DayGrid extends StatelessWidget {
+  const _DayGrid({required this.days, required this.t});
+
+  final int days;
+  final Animation<double> t;
+
+  static const int _cols = 9;
+  static const int _rows = 5;
+  static const double _gap = 3;
+
+  @override
+  Widget build(BuildContext context) {
+    const cells = _cols * _rows;
+    final unit = math.max(1, (days / cells).ceil());
+    final filled = math.min(cells, (days / unit).ceil());
+    return LayoutBuilder(
+      builder: (context, c) {
+        final cell = (c.maxWidth - _gap * (_cols - 1)) / _cols;
+        final gridH = cell * _rows + _gap * (_rows - 1);
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: c.maxWidth,
+              height: gridH,
+              child: CustomPaint(painter: _DayGridPainter(t: t, filled: filled, cell: cell)),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '1 kotak = $unit hari',
+              maxLines: 1,
+              style: const TextStyle(color: _muted, fontSize: 10, height: 1.1),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _DayGridPainter extends CustomPainter {
+  _DayGridPainter({required this.t, required this.filled, required this.cell}) : super(repaint: t);
+
+  final Animation<double> t;
+  final int filled;
+  final double cell;
+
+  static const Color _off = Color(0x17FFFFFF);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint();
+    for (var i = 0; i < _DayGrid._cols * _DayGrid._rows; i++) {
+      final r = i ~/ _DayGrid._cols;
+      final c = i % _DayGrid._cols;
+      final on = i < filled;
+      final start = 0.18 + (r + c) * 0.035;
+      final p = on ? _seg(t.value, start, math.min(1.0, start + 0.22), _outExpo) : 0.0;
+      final scale = on ? 0.55 + 0.45 * p : 1.0;
+      final s = cell * scale;
+      final cx = c * (cell + _DayGrid._gap) + cell / 2;
+      final cy = r * (cell + _DayGrid._gap) + cell / 2;
+      paint.color = Color.lerp(_off, _mint, p)!;
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromCenter(center: Offset(cx, cy), width: s, height: s),
+          const Radius.circular(2),
+        ),
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_DayGridPainter old) => old.filled != filled || old.cell != cell;
 }
