@@ -16,16 +16,21 @@ import '../../../core/pip_controller.dart';
 import '../../../core/premium_access.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/watch_xp_gate.dart';
-import '../../../data/local/entities.dart' show DownloadedEpisodeEntity;
+import '../../../data/api/moviebox_network.dart';
+import '../../../data/local/entities.dart' show DownloadedEpisodeEntity, FavoriteEntity;
+import '../../../data/models/anime_item.dart';
 import '../../../data/models/comment_models.dart';
 import '../../../data/models/moviebox_models.dart';
 import '../../../data/models/stream_data.dart';
 import '../../../data/repository/anime_repository.dart';
 import '../../../data/repository/moviebox_repository.dart';
+import '../../../data/repository/nobar_repository.dart' show NobarException;
 import '../../../providers.dart';
 import '../../components/common_components.dart';
+import '../../components/mini_player.dart';
 import '../../glass/glass.dart';
 import '../comments/comments_section.dart';
+import '../nobar/nobar_lobby_screen.dart' show openNobarRoom;
 import '../download/download_actions.dart'
     show confirmDeleteDownload, downloadStateHighlight, downloadStateIcon, downloadStateLabel;
 import '../player/danmaku.dart';
@@ -57,7 +62,7 @@ final mbCaptionsProvider = FutureProvider.autoDispose.family<List<MbCaption>, St
 
 /// Prefix id riwayat & download film (`moviebox:<id>`) supaya tidak bentrok
 /// dengan episode anime / donghua.
-const String kMovieBoxPrefix = 'moviebox:';
+const String kMovieBoxPrefix = kMbEpisodePrefix;
 
 /// Kualitas tertinggi yang dipilih OTOMATIS (pilihan manual tidak dibatasi).
 const int kMbAutoMaxQualityP = 1080;
@@ -141,6 +146,15 @@ class _MovieBoxPlayerScreenState extends ConsumerState<MovieBoxPlayerScreen> wit
   final Set<String> _cuesFailed = {};
 
   String get _dlKey => '$kMovieBoxPrefix${widget.movieId}';
+  String get _movieKey => '$kMbMovieIdPrefix${widget.movieId}';
+
+  /// Link yang diambil alih dari mini player: tetap diputar sampai user
+  /// memilih kualitas lain (link baru dari server bisa beda tanda tangan).
+  String? _adoptedUrl;
+
+  /// true saat pindah ke Nobar: jangan memuat video lagi.
+  bool _leaving = false;
+  bool _creatingNobar = false;
 
   // ---- Riwayat tontonan ----
   late final AnimeRepository _repo;
@@ -159,6 +173,107 @@ class _MovieBoxPlayerScreenState extends ConsumerState<MovieBoxPlayerScreen> wit
     _tick = Timer.periodic(const Duration(seconds: 1), _onTick);
     _levels.init();
     PipController.isInPip.addListener(_onPip);
+
+    // Dibuka dari mini player untuk film yang sama: ambil alih video yang
+    // sedang jalan (tanpa reload). Film lain: mini player ditutup.
+    final mini = MiniPlayerManager.instance.consumeForExpand(_movieKey, _dlKey);
+    if (mini != null) {
+      final vc = mini.controller;
+      _vc = vc;
+      _loadedUrl = mini.info.link;
+      _adoptedUrl = mini.info.link;
+      _speed = mini.info.speed;
+      vc.addListener(_onVideo);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _onVideo();
+      });
+      final sz = vc.value.size;
+      if (sz.width > 0 && sz.height > 0) {
+        PipController.setAspectRatio(sz.width.round(), sz.height.round());
+      }
+    }
+  }
+
+  /// Back: video dititipkan ke mini player (tetap jalan) alih-alih dihentikan.
+  /// Belum siap / error = keluar biasa.
+  void _minimizeAndPop() {
+    final vc = _vc;
+    final link = _loadedUrl;
+    if (vc != null && link != null && vc.value.isInitialized && !_playerError && !_leaving) {
+      _saveHistory();
+      vc.removeListener(_onVideo);
+      _vc = null; // kepemilikan pindah ke mini player, jangan di-dispose di sini
+      _loadedUrl = null;
+      MiniPlayerManager.instance.activate(
+        vc,
+        MiniPlayerInfo(
+          movieId: _movieKey,
+          episodeId: _dlKey,
+          title: _histTitle,
+          episodeLabel: 'Film',
+          posterUrl: _histPoster,
+          link: link,
+          speed: _speed,
+        ),
+      );
+      WakelockPlus.disable();
+    }
+    widget.onBackClick();
+  }
+
+  /// Bikin room Nobar dari film yang sedang diputar, lalu pindah ke layar
+  /// Nobar (player ini ditutup supaya cuma satu video yang jalan).
+  Future<void> _startNobar(String? title, String? poster) async {
+    if (_creatingNobar) return;
+    _creatingNobar = true;
+    _toast('Membuat room nobar…');
+    try {
+      final vc = _vc;
+      final pos = vc != null && vc.value.isInitialized ? vc.value.position.inMilliseconds : 0;
+      final room = await ref.read(nobarRepositoryProvider).create(
+            movieId: _movieKey,
+            episodeId: _dlKey,
+            movieTitle: title,
+            posterUrl: poster,
+            positionMs: pos,
+          );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      _saveHistory();
+      _leaving = true;
+      final old = _vc;
+      _vc = null;
+      _loadedUrl = null;
+      old?.removeListener(_onVideo);
+      await old?.pause();
+      await old?.dispose();
+      WakelockPlus.disable();
+      if (mounted) setState(() {});
+      if (mounted) await openNobarRoom(context, room, replace: true);
+    } on NobarException catch (e) {
+      if (mounted) _toast(e.message);
+    } catch (_) {
+      if (mounted) _toast('Gagal membuat room nobar');
+    } finally {
+      _creatingNobar = false;
+    }
+  }
+
+  Future<void> _toggleFavorite(MbDetail? d) async {
+    if (d == null) {
+      _toast('Tunggu info film termuat dulu');
+      return;
+    }
+    await ref.read(repositoryProvider).toggleFavorite(AnimeItem(
+          id: _movieKey,
+          title: d.title,
+          synopsis: d.description,
+          genre: d.genre,
+          year: d.year,
+          type: FavoriteEntity.filmType,
+          imagePoster: d.cover,
+          imageCover: d.cover,
+        ));
   }
 
   @override
@@ -633,6 +748,7 @@ class _MovieBoxPlayerScreenState extends ConsumerState<MovieBoxPlayerScreen> wit
       isPremium: isPremium,
       onSelect: (s) => setState(() {
         _selectedUrl = s.link;
+        _adoptedUrl = null;
         _preferOffline = false;
       }),
       onLocked: widget.onUpgradeClick,
@@ -819,11 +935,15 @@ class _MovieBoxPlayerScreenState extends ConsumerState<MovieBoxPlayerScreen> wit
         (dlEntry?.isCompleted ?? false) ? ref.read(episodeDownloadManagerProvider).localFileFor(_dlKey) : null;
     final playOffline = offlineFile != null && _preferOffline;
 
-    final videoReady = playOffline || selected != null;
-    final url = (offlineFile != null && _preferOffline) ? Uri.file(offlineFile.path).toString() : selected?.url;
-    if (videoReady && url != null && url != _loadedUrl && url != _pendingUrl) {
+    final adopted = _adoptedUrl;
+    final videoReady = playOffline || selected != null || adopted != null;
+    final url = adopted ??
+        ((offlineFile != null && _preferOffline) ? Uri.file(offlineFile.path).toString() : selected?.url);
+    if (!_leaving && videoReady && url != null && url != _loadedUrl && url != _pendingUrl) {
       _pendingUrl = url;
-      final headers = playOffline ? const <String, String>{} : selected!.headers;
+      final headers = (playOffline || adopted != null || selected == null)
+          ? (MovieBoxNetwork.headersFor(url) ?? const <String, String>{})
+          : selected.headers;
       WidgetsBinding.instance.addPostFrameCallback((_) => _loadUrl(url, headers));
     }
 
@@ -843,7 +963,7 @@ class _MovieBoxPlayerScreenState extends ConsumerState<MovieBoxPlayerScreen> wit
     final videoArea = _videoArea(
       streamsAsync: streamsAsync,
       videoReady: videoReady,
-      offline: playOffline,
+      offline: playOffline || adopted != null,
       streams: streams,
       selected: playOffline ? null : selected,
       premium: premium ?? false,
@@ -853,14 +973,18 @@ class _MovieBoxPlayerScreenState extends ConsumerState<MovieBoxPlayerScreen> wit
     );
 
     return PopScope(
-      canPop: !_fullscreen,
+      canPop: false,
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
         if (_screenLocked) {
           _showLockedHint();
           return;
         }
-        if (_fullscreen) _setFullscreen(false);
+        if (_fullscreen) {
+          _setFullscreen(false);
+          return;
+        }
+        _minimizeAndPop();
       },
       child: GlassScaffold(
         backgroundColor: AppColors.backgroundDark,
@@ -940,7 +1064,7 @@ class _MovieBoxPlayerScreenState extends ConsumerState<MovieBoxPlayerScreen> wit
               top: 6,
               left: 6,
               child: IconButton(
-                onPressed: _fullscreen ? () => _setFullscreen(false) : widget.onBackClick,
+                onPressed: _fullscreen ? () => _setFullscreen(false) : _minimizeAndPop,
                 style: IconButton.styleFrom(backgroundColor: Colors.black.withValues(alpha: 0.45)),
                 icon: const Icon(Icons.arrow_back, color: Colors.white),
               ),
@@ -1036,7 +1160,7 @@ class _MovieBoxPlayerScreenState extends ConsumerState<MovieBoxPlayerScreen> wit
                       onDoubleTapLeft: () => _doubleTapSeek(forward: false),
                       onDoubleTapRight: () => _doubleTapSeek(forward: true),
                       onToggleOverlay: _toggleOverlay,
-                      onBack: _fullscreen ? () => _setFullscreen(false) : widget.onBackClick,
+                      onBack: _fullscreen ? () => _setFullscreen(false) : _minimizeAndPop,
                     ),
                   if (pb.isBuffering && !_showControls && !_inPip)
                     const IgnorePointer(
@@ -1148,6 +1272,7 @@ class _MovieBoxPlayerScreenState extends ConsumerState<MovieBoxPlayerScreen> wit
         .take(12)
         .toList();
     const muted = AppColors.textSecondary;
+    final isFavorite = ref.watch(localStoreProvider.select((s) => s.isFavorite(_movieKey)));
 
     return CustomScrollView(
       keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
@@ -1304,6 +1429,20 @@ class _MovieBoxPlayerScreenState extends ConsumerState<MovieBoxPlayerScreen> wit
                     label: downloadStateLabel(download),
                     tint: downloadStateHighlight(download) ? AppColors.accentViolet : muted,
                     onTap: () => _onDownloadTap(streams: streams, premium: premium, title: title, poster: poster),
+                  ),
+                  const SizedBox(width: 10),
+                  MbActionTile(
+                    icon: isFavorite ? Icons.bookmark : Icons.bookmark_border,
+                    label: 'Favorit',
+                    tint: isFavorite ? AppColors.accentViolet : muted,
+                    onTap: () => _toggleFavorite(detail),
+                  ),
+                  const SizedBox(width: 10),
+                  MbActionTile(
+                    icon: Icons.groups_rounded,
+                    label: 'Nobar',
+                    tint: AppColors.accentViolet,
+                    onTap: () => _startNobar(title, poster),
                   ),
                   const SizedBox(width: 10),
                   MbActionTile(icon: Icons.chat, label: 'Komentar', tint: muted, onTap: _scrollToComments),

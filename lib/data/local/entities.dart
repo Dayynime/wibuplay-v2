@@ -32,6 +32,12 @@ class FavoriteEntity {
   /// true = favorit donghua (id = slug donghua), false = anime.
   bool get isDonghua => type == donghuaType;
 
+  /// Penanda favorit film MovieBox (kolom `type`); dikenali lewat id
+  /// `moviebox_<id>` supaya tidak tertukar dengan anime bertipe "Film".
+  static const String filmType = 'Film';
+
+  bool get isFilm => id.startsWith('moviebox_');
+
   AnimeItem toAnimeItem() => AnimeItem(
         id: id,
         title: title,

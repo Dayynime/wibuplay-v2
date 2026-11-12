@@ -53,13 +53,18 @@ class _LibraryTabs extends StatelessWidget {
                         ? const LinearGradient(colors: [AppColors.accentViolet, Color(0xFFFF6B4A)])
                         : null,
                   ),
-                  child: Text(
+                  // 4 tab (Anime/Donghua/Film/Komik): kecilkan teks kalau sempit.
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
                     labels[i],
+                    maxLines: 1,
                     style: TextStyle(
                       color: i == selected ? Colors.white : AppColors.textSecondary,
                       fontWeight: FontWeight.w700,
                       fontSize: 13.5,
                     ),
+                  ),
                   ),
                 ),
               ),
@@ -228,13 +233,14 @@ class FavoritesScreen extends ConsumerStatefulWidget {
 }
 
 class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
-  int _tab = 0; // 0 = anime, 1 = donghua, 2 = komik
+  int _tab = 0; // 0 = anime, 1 = donghua, 2 = film, 3 = komik
 
   @override
   Widget build(BuildContext context) {
     final all = ref.watch(profileFavoritesProvider);
-    final anime = all.where((f) => !f.isDonghua).toList();
+    final anime = all.where((f) => !f.isDonghua && !f.isFilm).toList();
     final donghua = all.where((f) => f.isDonghua).toList();
+    final films = all.where((f) => f.isFilm).toList();
     final comicCount = ref.watch(comicStoreProvider).favorites.length;
     final controller = ref.read(profileControllerProvider);
 
@@ -274,9 +280,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
                               AnimePosterCard(
                                 anime: fav.toAnimeItem(),
                                 width: cardW,
-                                onTap: () => fav.isDonghua
-                                    ? openDonghuaDetail(context, fav.id)
-                                    : openDetail(context, fav.id),
+                                onTap: () => openFavorite(context, fav),
                               ),
                               Positioned(
                                 top: 6,
@@ -320,6 +324,7 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
             labels: [
               anime.isEmpty ? 'Anime' : 'Anime (${anime.length})',
               donghua.isEmpty ? 'Donghua' : 'Donghua (${donghua.length})',
+              films.isEmpty ? 'Film' : 'Film (${films.length})',
               comicCount == 0 ? 'Komik' : 'Komik ($comicCount)',
             ],
             selected: _tab,
@@ -330,7 +335,8 @@ class _FavoritesScreenState extends ConsumerState<FavoritesScreen> {
               duration: const Duration(milliseconds: 220),
               child: switch (_tab) {
                 1 => grid(donghua, 'Belum ada donghua favorit. Tekan ikon bookmark di halaman donghua.', 'donghua'),
-                2 => ListView(
+                2 => grid(films, 'Belum ada film favorit. Tekan Favorit di halaman film.', 'film'),
+                3 => ListView(
                     key: const ValueKey('komik'),
                     padding: const EdgeInsets.only(bottom: 40),
                     children: const [ComicFavoritesBlock(showHeader: false, grid: true)],

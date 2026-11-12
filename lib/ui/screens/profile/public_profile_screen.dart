@@ -835,8 +835,9 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
     } else if (favorites == null) {
       body = const ProfileEmptyBox(text: 'Pengguna ini menyembunyikan daftar favoritnya.');
     } else {
-      final anime = favorites.where((f) => !f.isDonghua).toList();
+      final anime = favorites.where((f) => !f.isDonghua && !f.isFilm).toList();
       final donghua = favorites.where((f) => f.isDonghua).toList();
+      final films = favorites.where((f) => f.isFilm).toList();
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -854,6 +855,15 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
               trailing: '${donghua.length} Donghua',
             ),
             _favoriteRow(donghua),
+          ],
+          if (films.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            ProfileSectionHeader(
+              icon: Icons.movie_rounded,
+              title: 'Film Favorit',
+              trailing: '${films.length} Film',
+            ),
+            _favoriteRow(films),
           ],
         ],
       );
@@ -884,7 +894,7 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
               key: ValueKey(fav.id),
               anime: fav.toAnimeItem(),
               width: cardW,
-              onTap: () => fav.isDonghua ? openDonghuaDetail(context, fav.id) : openDetail(context, fav.id),
+              onTap: () => openFavorite(context, fav),
             ),
           );
         },

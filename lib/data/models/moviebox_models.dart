@@ -1,5 +1,21 @@
 /// Model film MovieBox (JSON dari server moviebox-flask).
 
+/// movieId film di riwayat / favorit / nobar / mini player: `moviebox_<id>`.
+const String kMbMovieIdPrefix = 'moviebox_';
+
+/// episodeId film (riwayat, download, nobar): `moviebox:<id>`.
+const String kMbEpisodePrefix = 'moviebox:';
+
+bool isMbMovieId(String movieId) => movieId.startsWith(kMbMovieIdPrefix);
+bool isMbEpisodeId(String episodeId) => episodeId.startsWith(kMbEpisodePrefix);
+
+/// Id MovieBox asli dari movieId (`moviebox_123` -> `123`) atau episodeId.
+String mbRawId(String id) {
+  if (id.startsWith(kMbMovieIdPrefix)) return id.substring(kMbMovieIdPrefix.length);
+  if (id.startsWith(kMbEpisodePrefix)) return id.substring(kMbEpisodePrefix.length);
+  return id;
+}
+
 String? _s(Object? v) {
   if (v == null) return null;
   final t = v.toString().trim();

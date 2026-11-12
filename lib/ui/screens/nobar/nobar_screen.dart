@@ -11,7 +11,9 @@ import '../../../core/premium_access.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/watch_xp_gate.dart';
 import '../../../core/wp_video.dart';
+import '../../../data/api/moviebox_network.dart';
 import '../../../data/models/episode_item.dart';
+import '../../../data/models/moviebox_models.dart';
 import '../../../data/models/nobar_models.dart';
 import '../../../data/models/stream_data.dart';
 import '../../../data/realtime/chess_realtime_client.dart';
@@ -450,6 +452,8 @@ class _NobarScreenState extends ConsumerState<NobarScreen> with WidgetsBindingOb
 
   /// null = belum bisa diputuskan (status Premium / daftar episode belum siap).
   bool? _episodeLocked(PlayerUiState ui) {
+    // Film tidak punya kunci episode (yang dikunci hanya kualitas > 480p).
+    if (isMbMovieId(ui.movieId)) return false;
     final premium = ref.read(myPremiumProvider);
     if (premium.valueOrNull == true) return false;
     if (!(premium.hasValue || premium.hasError) || !ui.episodesLoaded) return null;
@@ -524,7 +528,13 @@ class _NobarScreenState extends ConsumerState<NobarScreen> with WidgetsBindingOb
     try {
       vc = link.startsWith('file://')
           ? WpVideoController.file(File.fromUri(Uri.parse(link)), startAt: startAt, decoderLevel: _decoderLevel)
-          : WpVideoController.networkUrl(Uri.parse(link), startAt: startAt, decoderLevel: _decoderLevel);
+          : WpVideoController.networkUrl(
+              Uri.parse(link),
+              // Film MovieBox butuh header CDN (Cookie / Referer); anime null.
+              httpHeaders: MovieBoxNetwork.headersFor(link),
+              startAt: startAt,
+              decoderLevel: _decoderLevel,
+            );
     } catch (e) {
       setState(() {
         _videoError = true;
@@ -714,6 +724,7 @@ class _NobarScreenState extends ConsumerState<NobarScreen> with WidgetsBindingOb
   }
 
   String _episodeLabel(PlayerUiState ui) {
+    if (isMbMovieId(ui.movieId)) return 'Film';
     for (final e in ui.episodes) {
       if (e.id == ui.currentEpisodeId) return 'Episode ${e.index ?? '?'}';
     }
@@ -1078,6 +1089,8 @@ class _NobarScreenState extends ConsumerState<NobarScreen> with WidgetsBindingOb
   }
 
   Widget _episodeSection(PlayerUiState ui) {
+    // Film cuma satu video: daftar episode tidak perlu.
+    if (isMbMovieId(ui.movieId)) return const SizedBox.shrink();
     final eps = ui.episodes.where((e) => (e.id ?? '').isNotEmpty).toList();
     if (eps.isEmpty) return const SizedBox.shrink();
     return Column(

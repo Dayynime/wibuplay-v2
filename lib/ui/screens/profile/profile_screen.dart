@@ -659,8 +659,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   // ---------------------------------------------------------------- favorit
 
   Widget _buildFavorites(List<FavoriteEntity> favorites) {
-    final anime = favorites.where((f) => !f.isDonghua).toList();
+    final anime = favorites.where((f) => !f.isDonghua && !f.isFilm).toList();
     final donghua = favorites.where((f) => f.isDonghua).toList();
+    final films = favorites.where((f) => f.isFilm).toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -681,6 +682,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             trailing: '${donghua.length} Donghua',
           ),
           _favoriteRow(donghua),
+        ],
+        if (films.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          ProfileSectionHeader(
+            icon: Icons.movie_rounded,
+            title: 'Film Favorit',
+            trailing: '${films.length} Film',
+          ),
+          _favoriteRow(films),
         ],
         const ComicFavoritesBlock(),
       ],
@@ -706,7 +716,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 AnimePosterCard(
                   anime: fav.toAnimeItem(),
                   width: cardW,
-                  onTap: () => fav.isDonghua ? openDonghuaDetail(context, fav.id) : widget.onAnimeClick(fav.id),
+                  onTap: () => (fav.isDonghua || fav.isFilm) ? openFavorite(context, fav) : widget.onAnimeClick(fav.id),
                 ),
                 // Tombol hapus favorit (kiri atas poster).
                 Positioned(

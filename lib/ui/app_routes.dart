@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../data/local/entities.dart' show FavoriteEntity;
+import '../data/models/moviebox_models.dart' show mbRawId;
 import '../providers.dart' show episodeDownloadManagerProvider;
 import 'screens/comic/comic_detail_screen.dart';
 import 'screens/comic/comic_reader_controller.dart' show ComicReaderArgs;
@@ -119,7 +121,23 @@ void openPlayer(BuildContext context, String movieId, String episodeId) {
 void openPlayerFromMini(String movieId, String episodeId) {
   final nav = appNavigatorKey.currentState;
   if (nav == null) return;
+  // Film: player film mengambil alih video yang sedang jalan di mini player.
+  if (episodeId.startsWith(kMovieBoxPrefix)) {
+    _pushMovieBoxPlayer(nav, episodeId.substring(kMovieBoxPrefix.length));
+    return;
+  }
   _pushPlayer(nav, movieId, episodeId);
+}
+
+/// Buka favorit sesuai jenisnya: donghua, film, atau anime.
+void openFavorite(BuildContext context, FavoriteEntity fav) {
+  if (fav.isDonghua) {
+    openDonghuaDetail(context, fav.id);
+  } else if (fav.isFilm) {
+    openMovieBoxPlayer(context, mbRawId(fav.id));
+  } else {
+    openDetail(context, fav.id);
+  }
 }
 
 // ---------------------------------------------------------------- Donghua

@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/error_message.dart';
 import '../../../data/models/anime_item.dart';
 import '../../../data/models/episode_item.dart';
+import '../../../data/models/moviebox_models.dart';
 import '../../../data/models/stream_data.dart';
+import '../../../data/repository/moviebox_repository.dart';
 import '../../../providers.dart';
 
 /// Port PlayerUiState.
@@ -91,6 +93,21 @@ class PlayerController
     });
     final movieId = arg.$1;
     final episodeId = arg.$2;
+    // Film MovieBox (`moviebox_<id>`): dipakai Nobar & mini player supaya
+    // film bisa diputar lewat jalur yang sama dengan anime.
+    if (isMbMovieId(movieId)) {
+      final epId = '$kMbEpisodePrefix${mbRawId(movieId)}';
+      Future.microtask(() {
+        _loadFilmInfo();
+        loadEpisodeStream(epId);
+      });
+      return PlayerUiState(
+        movieId: movieId,
+        currentEpisodeId: epId,
+        episodes: [EpisodeItem(id: epId, index: '1', title: 'Film')],
+        episodesLoaded: true,
+      );
+    }
     Future.microtask(() {
       _loadAnimeInfo();
       _loadEpisodes();
@@ -109,6 +126,67 @@ class PlayerController
       final anime = await ref.read(repositoryProvider).getMovieDetail(state.movieId);
       _update((s) => s.copyWith(anime: anime));
     } catch (_) {}
+  }
+
+  Future<void> _loadFilmInfo() async {
+    try {
+      final d = await ref.read(movieBoxRepositoryProvider).getDetail(mbRawId(state.movieId));
+      _update((s) => s.copyWith(
+            anime: AnimeItem(
+              id: state.movieId,
+              title: d.title,
+              synopsis: d.description,
+              genre: d.genre,
+              year: d.year,
+              type: 'Film',
+              imagePoster: d.cover,
+              imageCover: d.cover,
+            ),
+          ));
+    } catch (_) {}
+  }
+
+  /// Link film: semua kualitas MP4 jadi "server". Default otomatis maksimal
+  /// 1080p (2160p HEVC bikin patah-patah); kunci Premium diurus layar.
+  Future<void> _loadFilmStream(String episodeId) async {
+    final repo = ref.read(repositoryProvider);
+    final resumeMs = repo.historyForEpisode(episodeId)?.playbackPositionMs ?? 0;
+    final localServer = await _localServer(episodeId);
+    final ep = EpisodeItem(id: episodeId, index: '1', title: 'Film');
+    try {
+      final streams = await ref.read(movieBoxRepositoryProvider).getStreams(mbRawId(episodeId));
+      final servers = [
+        for (final st in streams)
+          StreamServer(link: st.url, quality: st.quality, type: 'moviebox', name: st.isHevc ? 'HEVC' : 'H.264'),
+      ];
+      StreamServer? def;
+      for (var i = 0; i < streams.length && def == null; i++) {
+        if (streams[i].qualityValue <= 1080) def = servers[i];
+      }
+      def ??= servers.isEmpty ? null : servers.last;
+      if (servers.isEmpty && localServer == null) {
+        _update((s) => s.copyWith(isLoadingStream: false, streamError: () => 'Video film ini belum tersedia'));
+        return;
+      }
+      _update((s) => s.copyWith(
+            streamData: StreamData(episode: ep, server: [if (localServer != null) localServer, ...servers]),
+            selectedServer: () => localServer ?? def,
+            isLoadingStream: false,
+            resumePositionMs: resumeMs,
+          ));
+    } catch (e) {
+      if (localServer != null) {
+        _update((s) => s.copyWith(
+              streamData: StreamData(episode: ep, server: [localServer]),
+              selectedServer: () => localServer,
+              isLoadingStream: false,
+              resumePositionMs: resumeMs,
+            ));
+        return;
+      }
+      final msg = errorMessage(e, 'Gagal memuat video film');
+      _update((s) => s.copyWith(isLoadingStream: false, streamError: () => msg));
+    }
   }
 
   Future<void> _loadEpisodes() async {
@@ -142,6 +220,11 @@ class PlayerController
           selectedServer: () => null,
           streamError: () => null,
         ));
+
+    if (isMbEpisodeId(episodeId)) {
+      await _loadFilmStream(episodeId);
+      return;
+    }
 
     final repo = ref.read(repositoryProvider);
     // Posisi tersimpan untuk melanjutkan tontonan

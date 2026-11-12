@@ -39,6 +39,19 @@ class MovieBoxNetwork {
     return dio;
   }
 
+  /// Header CDN per link video (Cookie bertanda tangan / Referer), diisi
+  /// repository saat mengambil stream. Dipakai pemutar yang hanya tahu
+  /// link-nya (Nobar, mini player).
+  static final Map<String, Map<String, String>> _videoHeaders = {};
+
+  static void rememberHeaders(String url, Map<String, String> headers) {
+    if (_videoHeaders.length > 200) _videoHeaders.clear();
+    _videoHeaders[url] = headers;
+  }
+
+  /// null = bukan link film MovieBox (pakai header bawaan pemutar).
+  static Map<String, String>? headersFor(String url) => _videoHeaders[url];
+
   /// Dio terpisah untuk file subtitle di CDN (bukan server sendiri).
   static Dio createSubtitleDio() => Dio(
         BaseOptions(

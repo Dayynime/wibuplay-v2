@@ -86,10 +86,14 @@ class MovieBoxRepository {
       'ep': 0,
       if ((detailPath ?? '').isNotEmpty) 'detail_path': detailPath,
     });
-    return _list(_map(res.data)['streams'])
+    final list = _list(_map(res.data)['streams'])
         .map(MbStream.fromJson)
         .where((s) => s.url.isNotEmpty && !s.isDash)
         .toList();
+    for (final s in list) {
+      MovieBoxNetwork.rememberHeaders(s.url, s.headers);
+    }
+    return list;
   }
 
   Future<List<MbCaption>> getCaptions(String id) async {
