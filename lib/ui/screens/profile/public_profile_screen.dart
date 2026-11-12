@@ -319,6 +319,12 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
           left: 16,
           child: ProfileRankBubble(uid: uid, maxWidth: profileRankBubbleMaxWidth(context)),
         ),
+        // Gelembung bio di kanan, di bawah tombol menu.
+        Positioned(
+          top: topPad + 64,
+          right: 16,
+          child: ProfileBioBubble(uid: uid, maxWidth: profileRankBubbleMaxWidth(context)),
+        ),
         Padding(
           padding: EdgeInsets.only(top: topPad + 28, bottom: 20),
           child: Column(
@@ -367,7 +373,6 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
               const SizedBox(height: 10),
               // Baris kedua: nama clan, ID + centang, jumlah teman.
               ProfileMetaRow(uid: uid, userNumber: profile?.userNumber, premium: premium),
-              ProfileBio(uid: uid),
               const SizedBox(height: 18),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),

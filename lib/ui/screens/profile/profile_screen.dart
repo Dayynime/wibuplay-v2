@@ -229,7 +229,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               // Baris kedua: nama clan, ID + centang, jumlah teman.
               if (uid.isNotEmpty)
                 ProfileMetaRow(uid: uid, userNumber: profile?.userNumber, premium: premium),
-              if (uid.isNotEmpty) ProfileBio(uid: uid),
               const SizedBox(height: 20),
               // Stat row flat (transparan): angka besar, label kecil, garis pemisah tipis.
               Padding(
@@ -337,6 +336,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ProfileRankBubble(uid: uid, maxWidth: profileRankBubbleMaxWidth(context)),
             ],
           ),
+        ),
+        // Kanan: gelembung bio (di bawah tombol kartu & pengaturan).
+        Positioned(
+          top: topPad + 64,
+          right: 16,
+          child: ProfileBioBubble(uid: uid, maxWidth: profileRankBubbleMaxWidth(context)),
         ),
         // Kartu profil (simpan / bagikan sebagai gambar).
         if (uid.isNotEmpty)
@@ -1227,6 +1232,96 @@ class _BubbleTailPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _BubbleTailPainter oldDelegate) => false;
+}
+
+/// Bio sebagai gelembung kaca (kembaran [ProfileRankBubble]) di KANAN
+/// avatar: ekor kecil di kiri bawah mengarah ke avatar. Kosong kalau bio
+/// kosong.
+class ProfileBioBubble extends ConsumerWidget {
+  const ProfileBioBubble({super.key, required this.uid, this.maxWidth = 130});
+
+  final String uid;
+  final double maxWidth;
+
+  static const BorderRadius _radius = BorderRadius.only(
+    topLeft: Radius.circular(14),
+    topRight: Radius.circular(14),
+    bottomLeft: Radius.circular(4),
+    bottomRight: Radius.circular(14),
+  );
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (uid.isEmpty) return const SizedBox.shrink();
+    final bio = ref.watch(profileBioProvider(uid)).valueOrNull?.trim();
+    if (bio == null || bio.isEmpty) return const SizedBox.shrink();
+
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: maxWidth),
+      child: Padding(
+        padding: const EdgeInsets.only(left: 8),
+        child: CustomPaint(
+          painter: const _BubbleTailLeftPainter(),
+          child: ClipRRect(
+            borderRadius: _radius,
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(9, 7, 9, 7),
+                decoration: BoxDecoration(
+                  color: const Color(0x520B0E14),
+                  borderRadius: _radius,
+                  border: Border.all(color: const Color(0x29FFFFFF)),
+                ),
+                child: Text(
+                  bio,
+                  // Maks 5 baris supaya tidak turun menabrak nama.
+                  maxLines: 5,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFFE6E9F0),
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w600,
+                    height: 1.35,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Ekor gelembung di KIRI bawah (cermin [_BubbleTailPainter]).
+class _BubbleTailLeftPainter extends CustomPainter {
+  const _BubbleTailLeftPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final h = size.height;
+    final path = Path()
+      ..moveTo(2, h - 10)
+      ..quadraticBezierTo(-1, h - 2, -7, h)
+      ..lineTo(4, h)
+      ..close();
+    canvas.drawPath(path, Paint()..color = const Color(0x520B0E14));
+    final edge = Path()
+      ..moveTo(0.5, h - 9)
+      ..quadraticBezierTo(-1, h - 2, -7, h - 0.5)
+      ..lineTo(4, h - 0.5);
+    canvas.drawPath(
+      edge,
+      Paint()
+        ..color = const Color(0x29FFFFFF)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _BubbleTailLeftPainter oldDelegate) => false;
 }
 
 /// Baris kedua header profil: pil nama clan, pil ID + centang, pil jumlah teman.
