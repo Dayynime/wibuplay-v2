@@ -20,6 +20,7 @@ import '../notifications/notifications_screen.dart';
 import '../../components/cards.dart';
 import '../../components/chat_ticker.dart';
 import '../../components/comic_home_section.dart';
+import '../../components/movie_home_section.dart';
 import '../../components/common_components.dart';
 import '../../components/hero_banner.dart';
 import '../../components/home_profile_header.dart';
@@ -529,6 +530,12 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
         ComicHomeSection(
             onComicClick: (key) => openComicDetail(context, key),
             onSeeAllClick: widget.onComicSeeAllClick,
+          ),
+
+        // Film (MovieBox): sorotan + Rekomendasi. Gagal = section tidak tampil.
+        MovieHomeSection(
+            onMovieClick: (id) => openMovieBoxPlayer(context, id),
+            onSeeAllClick: () => openMovieBox(context),
           ),
 
         // 7. Terpopuler - kartu berperingkat

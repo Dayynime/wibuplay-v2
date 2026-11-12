@@ -207,6 +207,10 @@ void _pushMovieBoxPlayer(NavigatorState nav, String movieId, {bool replace = fal
   }
 }
 
+/// Langsung ke player film (mis. dari section Film di Beranda).
+void openMovieBoxPlayer(BuildContext context, String movieId) =>
+    _pushMovieBoxPlayer(Navigator.of(context), movieId);
+
 /// Halaman daftar Film (dari tab Menu).
 void openMovieBox(BuildContext context) {
   final nav = Navigator.of(context);
