@@ -380,6 +380,7 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
               const SizedBox(height: 10),
               // Baris kedua: nama clan, ID + centang, jumlah teman.
               ProfileMetaRow(uid: uid, userNumber: profile?.userNumber, premium: premium),
+              ProfileBio(uid: uid),
               const SizedBox(height: 18),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),

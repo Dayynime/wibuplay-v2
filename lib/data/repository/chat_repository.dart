@@ -123,6 +123,46 @@ class ChatRepository {
     return DateTime.tryParse((rows.first['created_at'] as String?) ?? '')?.toLocal();
   }
 
+  /// Bio profil (`chat_profiles.bio`). Query terpisah dari [getProfile]
+  /// supaya kalau kolom bio belum dipasang di server, profil utama tetap
+  /// kebaca. null = tidak ada bio / gagal.
+  Future<String?> getBio(String firebaseUid) async {
+    final res = await _dio.get<dynamic>(
+      'rest/v1/chat_profiles',
+      queryParameters: {
+        'firebase_uid': 'eq.$firebaseUid',
+        'select': 'bio',
+        'limit': 1,
+      },
+    );
+    final rows = _rows(res.data);
+    if (rows.isEmpty) return null;
+    final bio = (rows.first['bio'] as String?)?.trim();
+    return (bio == null || bio.isEmpty) ? null : bio;
+  }
+
+  /// Simpan bio sendiri lewat Edge Function `profile-bio` (UID dari token).
+  /// Kosong = hapus bio. Mengembalikan bio yang tersimpan (sudah dirapikan).
+  Future<String?> saveBio(String bio) async {
+    try {
+      final res = await _dio.post<dynamic>(
+        'functions/v1/profile-bio',
+        data: {'bio': bio},
+        options: await _authOptions(),
+      );
+      final d = res.data;
+      final saved = d is Map ? d['bio'] : null;
+      return saved is String && saved.trim().isNotEmpty ? saved : null;
+    } on DioException catch (e) {
+      final d = e.response?.data;
+      final msg = d is Map ? d['error'] : null;
+      if (msg is String && msg.trim().isNotEmpty) {
+        throw Exception(msg.trim());
+      }
+      rethrow;
+    }
+  }
+
   /// Header Authorization berisi Firebase ID Token asli (bukan anon key).
   Future<Options> _authOptions() async {
     if (!FirebaseConfig.ready) {

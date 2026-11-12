@@ -357,6 +357,16 @@ final chatProfileProvider = FutureProvider.family<ChatProfile?, String>((ref, ui
       () => viaHomeBootstrap<ChatProfile?>(ref, uid, 'profile', (b) => b.profile, plain), plain);
 });
 
+/// Bio profil per uid. Gagal / belum ada = null (bio tidak ditampilkan).
+final profileBioProvider = FutureProvider.family<String?, String>((ref, uid) async {
+  if (uid.isEmpty) return null;
+  try {
+    return await ref.watch(chatRepositoryProvider).getBio(uid);
+  } catch (_) {
+    return null;
+  }
+});
+
 /// Tanggal gabung Zenime per uid (Stat "Join Zenime" di profil). Gagal = null.
 final joinDateProvider = FutureProvider.family<DateTime?, String>((ref, uid) async {
   if (uid.isEmpty) return null;

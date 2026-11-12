@@ -242,6 +242,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               // Baris kedua: nama clan, ID + centang, jumlah teman.
               if (uid.isNotEmpty)
                 ProfileMetaRow(uid: uid, userNumber: profile?.userNumber, premium: premium),
+              if (uid.isNotEmpty) ProfileBio(uid: uid),
               const SizedBox(height: 20),
               // Stat row flat (transparan): angka besar, label kecil, garis pemisah tipis.
               Padding(
@@ -1282,6 +1283,29 @@ class ProfileMetaRow extends ConsumerWidget {
   }
 }
 
+/// Bio profil di bawah baris meta. Tidak tampil kalau bio kosong.
+class ProfileBio extends ConsumerWidget {
+  const ProfileBio({super.key, required this.uid});
+
+  final String uid;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final bio = ref.watch(profileBioProvider(uid)).valueOrNull;
+    if (bio == null || bio.trim().isEmpty) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(28, 12, 28, 0),
+      child: Text(
+        bio,
+        textAlign: TextAlign.center,
+        maxLines: 4,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(color: AppColors.textSecondary, fontSize: 13, height: 1.4),
+      ),
+    );
+  }
+}
+
 /// Pil kecil transparan (gaya sama dengan [ProfileClanPill]).
 class ProfileMetaPill extends StatelessWidget {
   const ProfileMetaPill({super.key, required this.children});
@@ -1702,9 +1726,14 @@ class _EditProfileSheet extends ConsumerStatefulWidget {
 
 class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
   static const int _maxUsername = 24;
+  static const int _maxBio = 150;
 
   final _picker = ImagePicker();
   late final TextEditingController _nameCtrl;
+  late final TextEditingController _bioCtrl;
+  bool _savingBio = false;
+  String? _bioError;
+  String? _bioSaved;
 
   late String _username;
   String? _avatarUrl;
@@ -1729,12 +1758,58 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
     _favPublic = p?.favoritesPublic ?? false;
     _histPublic = p?.historyPublic ?? false;
     _nameCtrl = TextEditingController(text: _username);
+    _bioSaved = ref.read(profileBioProvider(widget.uid)).valueOrNull;
+    _bioCtrl = TextEditingController(text: _bioSaved ?? '');
+    // Bio belum termuat (sheet dibuka sebelum profil selesai dimuat): ambil.
+    if (_bioSaved == null) {
+      ref.read(profileBioProvider(widget.uid).future).then((b) {
+        if (!mounted || b == null || _bioCtrl.text.isNotEmpty) return;
+        setState(() {
+          _bioSaved = b;
+          _bioCtrl.text = b;
+        });
+      });
+    }
   }
 
   @override
   void dispose() {
     _nameCtrl.dispose();
+    _bioCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _saveBio() async {
+    final text = _bioCtrl.text;
+    if (text.characters.length > _maxBio) {
+      setState(() => _bioError = 'Bio maksimal $_maxBio karakter');
+      return;
+    }
+    if ('\n'.allMatches(text.trim()).length > 3) {
+      setState(() => _bioError = 'Bio maksimal 4 baris');
+      return;
+    }
+    setState(() {
+      _savingBio = true;
+      _bioError = null;
+    });
+    try {
+      final saved = await ref.read(chatRepositoryProvider).saveBio(text);
+      ref.invalidate(profileBioProvider(widget.uid));
+      if (!mounted) return;
+      setState(() {
+        _savingBio = false;
+        _bioSaved = saved;
+        _bioCtrl.text = saved ?? '';
+      });
+      FocusScope.of(context).unfocus();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _savingBio = false;
+        _bioError = errorMessage(e, 'Gagal menyimpan bio');
+      });
+    }
   }
 
   /// Upsert menimpa SEMUA kolom, jadi nilai yang tidak diubah ikut dikirim.
@@ -2100,6 +2175,57 @@ class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
               const SizedBox(height: 10),
               Text(
                 _error!,
+                style: const TextStyle(color: AppColors.errorRed, fontSize: 12.5),
+              ),
+            ],
+            const SizedBox(height: 16),
+            TextField(
+              controller: _bioCtrl,
+              maxLength: _maxBio,
+              minLines: 2,
+              maxLines: 4,
+              keyboardType: TextInputType.multiline,
+              textCapitalization: TextCapitalization.sentences,
+              style: const TextStyle(color: AppColors.textWhite),
+              cursorColor: AppColors.accentViolet,
+              decoration: InputDecoration(
+                labelText: 'Bio',
+                hintText: 'Ceritain sedikit tentang dirimu',
+                hintStyle: const TextStyle(color: AppColors.textMuted),
+                alignLabelWithHint: true,
+                labelStyle: const TextStyle(color: AppColors.textSecondary),
+                counterStyle: const TextStyle(color: AppColors.textMuted),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Color(0x33FFFFFF)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppColors.accentViolet),
+                ),
+              ),
+            ),
+            SizedBox(
+              height: 48,
+              child: FilledButton(
+                onPressed: _savingBio ? null : _saveBio,
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.accentViolet,
+                  shape: const StadiumBorder(),
+                ),
+                child: _savingBio
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
+                      )
+                    : const Text('Simpan Bio', style: TextStyle(fontWeight: FontWeight.w700)),
+              ),
+            ),
+            if (_bioError != null) ...[
+              const SizedBox(height: 10),
+              Text(
+                _bioError!,
                 style: const TextStyle(color: AppColors.errorRed, fontSize: 12.5),
               ),
             ],
