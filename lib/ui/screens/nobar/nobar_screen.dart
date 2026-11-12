@@ -17,11 +17,15 @@ import '../../../data/models/moviebox_models.dart';
 import '../../../data/models/nobar_models.dart';
 import '../../../data/models/stream_data.dart';
 import '../../../data/realtime/chess_realtime_client.dart';
+import '../../../data/repository/moviebox_repository.dart';
 import '../../../data/repository/nobar_repository.dart';
 import '../../../data/voice/nobar_voice.dart';
 import '../../../providers.dart';
 import '../../components/mini_player.dart';
 import '../../components/net_image.dart';
+import '../../glass/glass.dart';
+import '../moviebox/moviebox_player_screen.dart' show mbCaptionsProvider;
+import '../moviebox/moviebox_subtitle.dart';
 import '../player/player_controller.dart';
 import 'nobar_chat_panel.dart';
 import 'nobar_invite.dart';
@@ -104,6 +108,14 @@ class _NobarScreenState extends ConsumerState<NobarScreen> with WidgetsBindingOb
 
   /// Posisi awal untuk video yang akan dimuat berikutnya.
   int? _startAtMs;
+
+  // ---- Subtitle film (pilihan masing-masing anggota, tidak disinkron) ----
+  String? _captionUrl;
+  bool _subtitleOff = false;
+  String? _cuesUrl;
+  List<SubtitleCue> _cues = const [];
+  bool _cuesLoading = false;
+  final Set<String> _cuesFailed = {};
 
   // Host: status terakhir yang dikirim (deteksi play/pause/seek).
   bool _lastSentPlaying = false;
@@ -650,6 +662,114 @@ class _NobarScreenState extends ConsumerState<NobarScreen> with WidgetsBindingOb
       ..showSnackBar(SnackBar(content: Text(text)));
   }
 
+  // ================================================================ subtitle film
+
+  bool get _isFilm => isMbMovieId(_args.$1);
+
+  /// Pilihan user; kalau belum memilih -> Indonesia; kalau tidak ada -> pertama.
+  MbCaption? _activeCaption(List<MbCaption> caps) {
+    if (_subtitleOff || caps.isEmpty) return null;
+    final picked = caps.where((c) => c.url == _captionUrl).firstOrNull;
+    return picked ?? caps.where((c) => c.isIndonesian).firstOrNull ?? caps.first;
+  }
+
+  Future<void> _loadCues(String url) async {
+    if (_cuesUrl == url) return;
+    _cuesUrl = url;
+    setState(() {
+      _cuesLoading = true;
+      _cues = const [];
+    });
+    try {
+      final raw = await ref.read(movieBoxRepositoryProvider).fetchSubtitle(url);
+      final cues = parseSubtitles(raw);
+      if (!mounted || _cuesUrl != url) return;
+      setState(() {
+        _cues = cues;
+        _cuesLoading = false;
+      });
+      if (cues.isEmpty) _snack('Subtitle ini kosong / formatnya tidak dikenal');
+    } catch (_) {
+      if (!mounted || _cuesUrl != url) return;
+      _cuesFailed.add(url);
+      setState(() => _cuesLoading = false);
+      _snack('Subtitle gagal dimuat');
+    }
+  }
+
+  void _openSubtitleSheet(List<MbCaption> caps) {
+    final active = _activeCaption(caps);
+    Widget pill(String text, bool selected, VoidCallback onTap) => GestureDetector(
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: selected ? AppColors.accentViolet.withValues(alpha: 0.2) : AppColors.surfaceVariantDark,
+              borderRadius: BorderRadius.circular(100),
+              border: selected ? Border.all(color: AppColors.accentViolet) : null,
+            ),
+            child: Text(
+              text,
+              style: TextStyle(
+                color: selected ? AppColors.accentViolet : Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        );
+
+    showGlassSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surfaceDark,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+      builder: (sheetContext) => SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Subtitle', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 4),
+              const Text(
+                'Hanya berlaku untuk kamu, tidak mengubah subtitle anggota lain.',
+                style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+              ),
+              const SizedBox(height: 14),
+              if (caps.isEmpty)
+                const Text(
+                  'Film ini tidak punya subtitle terpisah.',
+                  style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                )
+              else
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    pill('Mati', _subtitleOff, () {
+                      setState(() => _subtitleOff = true);
+                      Navigator.of(sheetContext).pop();
+                    }),
+                    for (final c in caps)
+                      pill(c.language, !_subtitleOff && identical(c, active), () {
+                        setState(() {
+                          _subtitleOff = false;
+                          _captionUrl = c.url;
+                          _cuesFailed.remove(c.url);
+                        });
+                        Navigator.of(sheetContext).pop();
+                      }),
+                  ],
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _scheduleHideControls() {
     _hideControls?.cancel();
     _hideControls = Timer(const Duration(seconds: 4), () {
@@ -1167,6 +1287,18 @@ class _NobarScreenState extends ConsumerState<NobarScreen> with WidgetsBindingOb
 
   Widget _videoBox(PlayerUiState ui) {
     final vc = _vc;
+
+    // Subtitle film: ambil daftar, muat yang aktif.
+    final caps = _isFilm
+        ? (ref.watch(mbCaptionsProvider(mbRawId(_args.$1))).valueOrNull ?? const <MbCaption>[])
+        : const <MbCaption>[];
+    final caption = _activeCaption(caps);
+    if (caption != null && caption.url != _cuesUrl && !_cuesFailed.contains(caption.url)) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _loadCues(caption.url);
+      });
+    }
+
     Widget content;
     if (_locked) {
       content = _overlayMessage(
@@ -1185,6 +1317,8 @@ class _NobarScreenState extends ConsumerState<NobarScreen> with WidgetsBindingOb
         fit: StackFit.expand,
         children: [
           WpVideoView(vc),
+          if (caption != null)
+            SubtitleLayer(video: vc, cues: _cues, large: _fullscreen, raised: _showControls),
           ListenableBuilder(
             listenable: vc,
             builder: (context, _) {
@@ -1208,7 +1342,7 @@ class _NobarScreenState extends ConsumerState<NobarScreen> with WidgetsBindingOb
             onDoubleTap: _isHost ? _hostTogglePlay : null,
             child: content,
           ),
-          if (vc != null) _controls(vc),
+          if (vc != null) _controls(vc, caps: caps, caption: caption),
         ],
       ),
     );
@@ -1258,7 +1392,7 @@ class _NobarScreenState extends ConsumerState<NobarScreen> with WidgetsBindingOb
     );
   }
 
-  Widget _controls(WpVideoController vc) {
+  Widget _controls(WpVideoController vc, {List<MbCaption> caps = const [], MbCaption? caption}) {
     return IgnorePointer(
       ignoring: !_showControls,
       child: AnimatedOpacity(
@@ -1385,6 +1519,19 @@ class _NobarScreenState extends ConsumerState<NobarScreen> with WidgetsBindingOb
                                     ),
                                   ),
                           ),
+                          if (_isFilm)
+                            IconButton(
+                              visualDensity: VisualDensity.compact,
+                              tooltip: caption == null ? 'Subtitle: Mati' : (_cuesLoading ? 'Memuat subtitle...' : caption.language),
+                              onPressed: () {
+                                _scheduleHideControls();
+                                _openSubtitleSheet(caps);
+                              },
+                              icon: Icon(
+                                caption == null ? Icons.subtitles_off_outlined : Icons.subtitles_rounded,
+                                color: caption == null ? Colors.white70 : Colors.white,
+                              ),
+                            ),
                           IconButton(
                             visualDensity: VisualDensity.compact,
                             onPressed: () => _setFullscreen(!_fullscreen),

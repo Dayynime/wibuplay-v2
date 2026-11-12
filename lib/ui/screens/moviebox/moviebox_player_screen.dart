@@ -218,7 +218,10 @@ class _MovieBoxPlayerScreenState extends ConsumerState<MovieBoxPlayerScreen> wit
       );
       WakelockPlus.disable();
     }
-    widget.onBackClick();
+    // pop() langsung (seperti player anime). JANGAN widget.onBackClick /
+    // maybePop: PopScope(canPop: false) menolaknya lalu memanggil
+    // _minimizeAndPop lagi -> berulang terus dan app macet.
+    if (mounted) Navigator.of(context).pop();
   }
 
   /// Bikin room Nobar dari film yang sedang diputar, lalu pindah ke layar
@@ -407,6 +410,10 @@ class _MovieBoxPlayerScreenState extends ConsumerState<MovieBoxPlayerScreen> wit
       _wasPlaying = snap.isPlaying;
       WakelockPlus.toggle(enable: snap.isPlaying);
       PipController.setCanEnter(snap.isPlaying);
+      _scheduleHide();
+    } else if (snap.isPlaying && _showControls && !(_hideTimer?.isActive ?? false)) {
+      // Jaga-jaga: kontrol tampil + video jalan tapi timer sembunyi tidak
+      // aktif (mis. terbatal saat buffering) -> jadwalkan lagi.
       _scheduleHide();
     }
   }
