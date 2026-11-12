@@ -344,27 +344,14 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
                       ),
                       const SizedBox(width: 6),
                     ],
+                    // Nama selalu putih (dulu Premium bergradien emas).
                     Flexible(
-                      child: premium
-                          // Premium: nama bergradien emas.
-                          ? ShaderMask(
-                              blendMode: BlendMode.srcIn,
-                              shaderCallback: (r) => const LinearGradient(
-                                colors: [Color(0xFFFFE08A), Color(0xFFF6BE4F), Color(0xFFFF9F6B)],
-                              ).createShader(r),
-                              child: Text(
-                                name,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: ZFont.display(size: 24, height: 1.1),
-                              ),
-                            )
-                          : Text(
-                              name,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: ZFont.display(size: 24, height: 1.1),
-                            ),
+                      child: Text(
+                        name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: ZFont.display(size: 24, height: 1.1).copyWith(color: AppColors.textWhite),
+                      ),
                     ),
                     // Badge role (Developer, dll.) di kanan nama.
                     const SizedBox(width: 6),
