@@ -7,7 +7,7 @@ import '../../core/theme/app_colors.dart';
 // =============================================================================
 // Kit desain Zenime "Samudra" (redesain Nov 2026, sama dengan preview HTML).
 //
-// Font: Plus Jakarta Sans (teks), Bricolage Grotesque (judul), Noto Sans JP
+// Font: Manrope (teks), Sora (judul), Noto Sans JP
 // (label Jepang). Diambil lewat google_fonts lalu disimpan di HP; selama belum
 // terunduh (atau offline di pembukaan pertama) otomatis pakai font bawaan.
 // Semua komponen di sini murni tampilan: tidak ada logika/data.
@@ -39,7 +39,7 @@ class ZFont {
     double? letterSpacing,
   }) =>
       _get(
-        'Bricolage Grotesque',
+        'Sora',
         TextStyle(
           fontSize: size,
           fontWeight: weight,
@@ -64,7 +64,7 @@ class ZFont {
   /// Font teks seluruh app (dipasang di ThemeData).
   static TextTheme bodyTheme(TextTheme base) {
     try {
-      return GoogleFonts.plusJakartaSansTextTheme(base);
+      return GoogleFonts.manropeTextTheme(base);
     } catch (_) {
       return base;
     }

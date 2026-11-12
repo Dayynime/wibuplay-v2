@@ -24,7 +24,7 @@ TextStyle _ts(FontWeight w, double size, double lineHeight, double spacing, Colo
 
 TextTheme _withBodyFont(TextTheme t) {
   try {
-    return GoogleFonts.plusJakartaSansTextTheme(t);
+    return GoogleFonts.manropeTextTheme(t);
   } catch (_) {
     return t;
   }
@@ -74,7 +74,7 @@ ThemeData buildAppTheme({bool glass = false}) {
     colorScheme: scheme,
     scaffoldBackgroundColor: AppColors.backgroundDark,
     canvasColor: AppColors.backgroundDark,
-    // Plus Jakarta Sans untuk seluruh teks (redesain Samudra).
+    // Manrope untuk seluruh teks.
     textTheme: _withBodyFont(textTheme),
     bottomSheetTheme: const BottomSheetThemeData(
       backgroundColor: Colors.transparent,

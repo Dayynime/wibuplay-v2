@@ -369,14 +369,10 @@ class _ClanChatPaneState extends ConsumerState<ClanChatPane> with WidgetsBinding
         final idx = msgs.length - 1 - i;
         final m = msgs[idx];
         final own = m.firebaseUid == myUid;
-        // Rombongan: pesan beruntun dari orang yang sama (<= 3 menit).
-        bool same(int j) =>
-            j >= 0 && j < msgs.length && zSameGroup(m.firebaseUid, m.createdAt, msgs[j].firebaseUid, msgs[j].createdAt);
         final p = s.profiles[m.firebaseUid];
         final replied = m.replyToId == null ? null : byId[m.replyToId];
         final bubble = ChatMessageBubble(
           key: ValueKey('cm-${m.id}'),
-          groupPos: zGroupPos(olderSame: same(idx - 1), newerSame: same(idx + 1)),
           message: _toChat(s, m, replied),
           reactions: ChatReactionChips(channel: 'clan', id: m.id),
           mine: own,
