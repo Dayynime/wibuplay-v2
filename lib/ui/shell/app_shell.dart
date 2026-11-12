@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -54,6 +55,46 @@ class _AppShellState extends ConsumerState<AppShell> {
         child: _visited.contains(i) ? build() : const SizedBox.shrink(),
       );
 
+  bool _exitDialogOpen = false;
+
+  /// Tombol kembali HP di layar utama (tab):
+  /// - di tab selain Beranda: pindah ke Beranda;
+  /// - di Beranda: tanya dulu sebelum keluar dari app.
+  /// Halaman yang dibuka di atasnya (Detail, Player, Chat, dll.) tetap
+  /// kembali ke halaman sebelumnya seperti biasa.
+  Future<void> _onBack() async {
+    if (_index != 0) {
+      _goTab(0);
+      return;
+    }
+    if (_exitDialogOpen) return;
+    _exitDialogOpen = true;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surfaceDark,
+        surfaceTintColor: Colors.transparent,
+        title: const Text('Keluar dari aplikasi?', style: TextStyle(color: AppColors.textWhite)),
+        content: const Text(
+          'Kamu yakin mau keluar?',
+          style: TextStyle(color: AppColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Batal', style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Keluar', style: TextStyle(color: AppColors.errorRed)),
+          ),
+        ],
+      ),
+    );
+    _exitDialogOpen = false;
+    if (ok == true) await SystemNavigator.pop();
+  }
+
   void _openDetail(String movieId) => openDetail(context, movieId);
 
   void _openPlayer(String movieId, String episodeId) =>
@@ -61,7 +102,13 @@ class _AppShellState extends ConsumerState<AppShell> {
 
   @override
   Widget build(BuildContext context) {
-    return GlassScaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        _onBack();
+      },
+      child: GlassScaffold(
       backgroundColor: AppColors.backgroundDark,
       body: Stack(
         children: [
@@ -93,6 +140,7 @@ class _AppShellState extends ConsumerState<AppShell> {
             child: FloatingBottomBar(currentIndex: _index, onTabSelected: _goTab),
           ),
         ],
+      ),
       ),
     );
   }
