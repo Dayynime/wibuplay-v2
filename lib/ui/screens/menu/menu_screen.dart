@@ -37,6 +37,7 @@ class MenuScreen extends ConsumerWidget {
       _MenuItem('Cuplix', Icons.slow_motion_video_rounded, 280, () => openCuplix(context)),
       _MenuItem('Games', Icons.sports_esports_rounded, 40, () => push(const ZenimeGamesScreen())),
       _MenuItem('Donghua', Icons.live_tv_rounded, 18, () => openDonghua(context)),
+      _MenuItem('Film', Icons.movie_rounded, 240, () => openMovieBox(context)),
       _MenuItem('Komik', Icons.menu_book_rounded, 200, () => openComic(context)),
       _MenuItem('Riwayat', Icons.history_rounded, 150, () => push(const HistoryScreen())),
       _MenuItem('Favorit', Icons.favorite_rounded, 300, () => push(const FavoritesScreen())),

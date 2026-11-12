@@ -6,6 +6,7 @@ import '../../core/image_cache.dart';
 import '../../core/lite_mode.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/api/anichin_network.dart';
+import '../../data/api/moviebox_network.dart';
 import 'shimmer.dart';
 
 /// Header yang sama dengan request API (Referer + User-Agent browser).
@@ -42,6 +43,8 @@ class NetImage extends StatelessWidget {
     if (host.isNotEmpty && (host == anichinHost || host.contains('anichin'))) {
       return AnichinNetwork.imageHeaders;
     }
+    // Poster film MovieBox (riwayat / download): tanpa Referer API anime.
+    if (host.endsWith('aoneroom.com')) return MovieBoxNetwork.imageHeaders;
     return netImageHeaders;
   }
 

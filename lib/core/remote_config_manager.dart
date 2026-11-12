@@ -89,6 +89,9 @@ class RemoteConfigManager {
   // Base URL API donghua (Anichin). Parameter TERPISAH dari api_base_url.
   static const String _keyAnichinBaseUrl = 'anichin_base_url';
 
+  // Base URL API film (server moviebox-flask). Parameter TERPISAH.
+  static const String _keyMovieBoxBaseUrl = 'moviebox_base_url';
+
   // Header Referer buat API/gambar/download Animein. TANPA fallback hardcode.
   static const String _keyApiReferer = 'api_referer';
 
@@ -162,6 +165,17 @@ class RemoteConfigManager {
     final rc = _instance;
     if (rc == null) return null;
     final v = rc.getString(_keyAnichinBaseUrl).trim();
+    if (v.isEmpty) return null;
+    return v.endsWith('/') ? v : '$v/';
+  }
+
+  /// Base URL API film (MovieBox), murni dari Remote Config parameter
+  /// `moviebox_base_url`. null kalau kosong / belum pernah fetch sukses,
+  /// TIDAK ada fallback hardcode.
+  static String? get movieBoxBaseUrl {
+    final rc = _instance;
+    if (rc == null) return null;
+    final v = rc.getString(_keyMovieBoxBaseUrl).trim();
     if (v.isEmpty) return null;
     return v.endsWith('/') ? v : '$v/';
   }

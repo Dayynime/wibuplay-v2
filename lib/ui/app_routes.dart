@@ -12,6 +12,8 @@ import 'screens/donghua/donghua_detail_screen.dart';
 import 'screens/donghua/donghua_player_screen.dart';
 import 'screens/donghua/donghua_premium_gate.dart';
 import 'screens/donghua/donghua_screen.dart';
+import 'screens/moviebox/moviebox_player_screen.dart';
+import 'screens/moviebox/moviebox_screen.dart';
 import 'screens/player/player_screen.dart';
 import 'screens/store/coin_screen.dart';
 import 'screens/store/premium_screen.dart';
@@ -105,6 +107,11 @@ void openPlayer(BuildContext context, String movieId, String episodeId) {
     _pushDonghuaPlayer(nav, episodeId.substring(kDonghuaDownloadPrefix.length), offline: hasFile);
     return;
   }
+  // Film MovieBox (riwayat / download): `moviebox:<id>`.
+  if (episodeId.startsWith(kMovieBoxPrefix)) {
+    _pushMovieBoxPlayer(nav, episodeId.substring(kMovieBoxPrefix.length));
+    return;
+  }
   _pushPlayer(nav, movieId, episodeId);
 }
 
@@ -178,6 +185,40 @@ void openDonghua(BuildContext context) => _pushDonghua(Navigator.of(context));
 /// Detail donghua. [slug] boleh slug anime maupun slug episode.
 void openDonghuaDetail(BuildContext context, String slug) =>
     _pushDonghuaDetail(Navigator.of(context), slug);
+
+// ---------------------------------------------------------------- Film (MovieBox)
+
+/// Player film. Ganti versi dub dari dalam player MENGGANTI layar (bukan
+/// menumpuk), sama seperti ganti episode donghua. Tanpa gate Premium (sama
+/// dengan player anime): yang dikunci hanya kualitas > 480p & download.
+void _pushMovieBoxPlayer(NavigatorState nav, String movieId, {bool replace = false}) {
+  final route = fadeRoute<void>(
+    MovieBoxPlayerScreen(
+      movieId: movieId,
+      onBackClick: () => nav.maybePop(),
+      onMovieChange: (next) => _pushMovieBoxPlayer(nav, next, replace: true),
+      onUpgradeClick: () => nav.push(fadeRoute(const PremiumScreen())),
+    ),
+  );
+  if (replace) {
+    nav.pushReplacement(route);
+  } else {
+    nav.push(route);
+  }
+}
+
+/// Halaman daftar Film (dari tab Menu).
+void openMovieBox(BuildContext context) {
+  final nav = Navigator.of(context);
+  nav.push(
+    fadeRoute(
+      MovieBoxScreen(
+        onBackClick: () => nav.maybePop(),
+        onMovieClick: (id) => _pushMovieBoxPlayer(nav, id),
+      ),
+    ),
+  );
+}
 
 /// Halaman beli Premium.
 void openPremium(BuildContext context) {
