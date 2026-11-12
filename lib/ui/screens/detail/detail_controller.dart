@@ -126,7 +126,7 @@ class DetailController extends AutoDisposeFamilyNotifier<DetailUiState, String> 
       loadEpisodes();
       _loadGallery();
     });
-    // Sudah ada di memori (pernah dibuka / di-prefetch dari poster): langsung
+    // Sudah ada di memori (pernah dibuka sebelumnya): langsung
     // tampil berisi di frame pertama, data baru tetap diambil di belakang.
     final repo = ref.read(repositoryProvider);
     final anime = repo.peekDetail(arg);
@@ -267,16 +267,12 @@ class DetailController extends AutoDisposeFamilyNotifier<DetailUiState, String> 
 
   Future<void> _loadGallery() async {
     final repo = ref.read(repositoryProvider);
-    // Tiga request dijalankan BERSAMAAN (dulu bergantian = 3x nunggu).
-    final coversF = _orDefault<List<MediaGalleryItem>>(
+    final covers = await _orDefault<List<MediaGalleryItem>>(
         () => repo.getMovieCovers(movieId), const []);
-    final postersF = _orDefault<List<MediaGalleryItem>>(
+    final posters = await _orDefault<List<MediaGalleryItem>>(
         () => repo.getMoviePosters(movieId), const []);
-    final cuplixF =
-        _orDefault<List<CuplixItem>>(() => repo.getMovieCuplix(movieId), const []);
-    final covers = await coversF;
-    final posters = await postersF;
-    final cuplix = await cuplixF;
+    final cuplix =
+        await _orDefault<List<CuplixItem>>(() => repo.getMovieCuplix(movieId), const []);
     _update((s) => s.copyWith(
           covers: covers,
           posters: posters,

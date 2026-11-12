@@ -173,9 +173,6 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 20),
-        // Poster di luar layar ikut dibangun lebih awal, jadi gambarnya sudah
-        // dimuat sebelum di-geser ke sana (preload).
-        cacheExtent: cell * 4,
         itemCount: list.length,
         separatorBuilder: (_, _) => const SizedBox(width: 10),
         itemBuilder: (context, i) {
@@ -311,9 +308,6 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
     return PageEntrance(
       child: ListView(
       controller: _scroll,
-      // Section di bawah layar dibangun lebih awal supaya gambarnya sudah
-      // termuat sebelum di-scroll ke sana.
-      cacheExtent: 1200,
       padding: const EdgeInsets.only(bottom: 135),
       children: [
         // Header: nama app + tombol cari

@@ -393,23 +393,11 @@ class AnimeRepository {
     }).toList();
   }
 
-  /// Request detail yang sedang berjalan (prefetch + buka Detail berbagi satu
-  /// request, tidak dobel).
-  final Map<String, Future<AnimeItem>> _detailInflight = {};
-
-  Future<AnimeItem> getMovieDetail(String id, {bool forceRefresh = false}) {
+  Future<AnimeItem> getMovieDetail(String id, {bool forceRefresh = false}) async {
     if (!forceRefresh) {
       final cached = _detailCache[id];
-      if (cached != null) return Future.value(cached);
+      if (cached != null) return cached;
     }
-    final running = _detailInflight[id];
-    if (running != null) return running;
-    final f = _fetchMovieDetail(id).whenComplete(() => _detailInflight.remove(id));
-    _detailInflight[id] = f;
-    return f;
-  }
-
-  Future<AnimeItem> _fetchMovieDetail(String id) async {
     try {
       final resp = await _api.getMovieDetail(id);
       final data = resp.data;
@@ -470,27 +458,11 @@ class AnimeRepository {
   /// Episode halaman pertama terakhir per anime (memori).
   final Map<String, List<EpisodeItem>> _episodeCache = {};
 
-  /// Detail di memori (SINKRON), null kalau belum pernah dimuat/prefetch.
+  /// Detail di memori (SINKRON), null kalau belum pernah dimuat.
   AnimeItem? peekDetail(String id) => _detailCache[id];
 
   /// Episode halaman pertama di memori (SINKRON).
   List<EpisodeItem>? peekEpisodes(String id) => _episodeCache[id];
-
-  final Set<String> _prefetching = {};
-
-  /// Ambil detail + episode halaman pertama di belakang (dipanggil saat poster
-  /// terlihat / ditekan), supaya Detail langsung berisi waktu dibuka.
-  void prefetchDetail(String id) {
-    if (id.isEmpty || _prefetching.contains(id)) return;
-    if (_detailCache.containsKey(id) && _episodeCache.containsKey(id)) return;
-    _prefetching.add(id);
-    unawaited(Future.wait<Object?>([
-      if (!_detailCache.containsKey(id))
-        getMovieDetail(id).then<Object?>((v) => v).catchError((Object _) => null),
-      if (!_episodeCache.containsKey(id))
-        getMovieEpisodes(id).then<Object?>((v) => v).catchError((Object _) => null),
-    ]).whenComplete(() => _prefetching.remove(id)));
-  }
 
   Future<StreamData> getEpisodeStream(String idEpisode) async {
     final resp = await _api.getEpisodeStream(idEpisode);
