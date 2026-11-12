@@ -617,6 +617,7 @@ class _HeaderCard extends StatelessWidget {
     final progress = (current / needed).clamp(0.0, 1.0).toDouble();
     final topPad = MediaQuery.paddingOf(context).top;
     final hasPhoto = c.photoUrl != null && c.photoUrl!.isNotEmpty;
+    final hasBanner = c.bannerUrl != null && c.bannerUrl!.isNotEmpty;
     final desc = (c.description ?? '').trim();
 
     return Column(
@@ -624,18 +625,20 @@ class _HeaderCard extends StatelessWidget {
       children: [
         // Banner + lambang clan yang menimpa banner.
         SizedBox(
-          height: topPad + 230,
+          height: topPad + 250,
           child: Stack(
             children: [
-              Positioned(
-                left: 0,
-                right: 0,
-                top: 0,
-                height: topPad + 170,
+              // Banner memenuhi seluruh header (turun sampai di belakang
+              // lambang & nama), memudar ke warna latar di paling bawah.
+              Positioned.fill(
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    if (hasPhoto) ...[
+                    if (hasBanner) ...[
+                      // Banner custom (bisa GIF): digelapkan tipis saja.
+                      NetImage(c.bannerUrl!),
+                      const ColoredBox(color: Color(0x400B0E14)),
+                    ] else if (hasPhoto) ...[
                       NetImage(c.photoUrl!),
                       // Digelapkan supaya teks & tombol tetap terbaca (tanpa Opacity
                       // layer yang mahal).
@@ -650,9 +653,11 @@ class _HeaderCard extends StatelessWidget {
                           ),
                         ),
                       ),
-                    const Positioned(right: -60, top: -70, child: ClanGlow(color: heroGold, size: 240)),
-                    const Positioned(left: -70, bottom: -90, child: ClanGlow(color: AppColors.accentViolet, size: 240)),
-                    const ZScreentone(opacity: 0.16),
+                    if (!hasBanner) ...[
+                      const Positioned(right: -60, top: -70, child: ClanGlow(color: heroGold, size: 240)),
+                      const Positioned(left: -70, bottom: -90, child: ClanGlow(color: AppColors.accentViolet, size: 240)),
+                      const ZScreentone(opacity: 0.16),
+                    ],
                     // Tag clan besar & samar di pojok kanan bawah banner.
                     Positioned(
                       right: 14,
@@ -667,8 +672,8 @@ class _HeaderCard extends StatelessWidget {
                         gradient: LinearGradient(
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
-                          stops: [0, 0.35, 0.75, 1],
-                          colors: [Color(0x590B0E14), Color(0x000B0E14), Color(0x990B0E14), AppColors.backgroundDark],
+                          stops: [0, 0.3, 0.72, 1],
+                          colors: [Color(0x590B0E14), Color(0x000B0E14), Color(0xB30B0E14), AppColors.backgroundDark],
                         ),
                       ),
                     ),

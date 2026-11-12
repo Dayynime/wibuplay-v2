@@ -3,15 +3,20 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../core/gif_quota.dart';
+import '../../../core/image_prep.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/clan_models.dart';
 import '../../../data/repository/clan_photo_uploader.dart';
 import '../../../data/repository/clan_repository.dart';
+import '../../../data/repository/profile_image_uploader.dart';
 import '../../../providers.dart';
 import '../../app_routes.dart';
 import '../../components/clan_badge_styles.dart';
 import '../../components/clan_tag_badge.dart';
 import '../../components/game_badges.dart';
+import '../../components/net_image.dart';
+import '../profile/image_crop_screen.dart';
 import 'clan_access_widgets.dart';
 import 'clan_badge_shop_screen.dart';
 import 'clan_widgets.dart';
@@ -362,6 +367,7 @@ class _SettingsTabState extends ConsumerState<_SettingsTab> {
   late final TextEditingController _tag = TextEditingController(text: widget.clan.tag);
   final _picker = ImagePicker();
   bool _uploadingPhoto = false;
+  bool _uploadingBanner = false;
   bool _saving = false;
   String? _feedback;
   bool _feedbackError = false;
@@ -439,6 +445,83 @@ class _SettingsTabState extends ConsumerState<_SettingsTab> {
       }
     } finally {
       if (mounted) setState(() => _uploadingPhoto = false);
+    }
+  }
+
+  void _say(String text, {bool error = true}) {
+    if (!mounted) return;
+    setState(() {
+      _feedback = text;
+      _feedbackError = error;
+    });
+  }
+
+  /// Banner clan: pilih -> atur posisi (GIF hanya pratinjau) -> upload ke
+  /// Cloudinary -> simpan. Aturan GIF sama dengan banner profil: khusus
+  /// Premium + jatah GIF harian.
+  Future<void> _changeBanner() async {
+    if (_uploadingBanner || _saving) return;
+    final XFile? x;
+    try {
+      // Tanpa resize di picker: GIF harus tetap utuh.
+      x = await _picker.pickImage(source: ImageSource.gallery);
+    } catch (_) {
+      _say('Gagal membuka galeri');
+      return;
+    }
+    if (x == null || !mounted) return;
+    final uid = ref.read(authUserProvider).valueOrNull?.uid ?? '';
+    final isGif = await ImagePrep.isGif(x.path);
+    if (isGif) {
+      if (ref.read(myPremiumProvider).valueOrNull != true) {
+        _say('Banner GIF khusus member Premium');
+        return;
+      }
+      if (await GifQuota.remaining(uid) <= 0) {
+        _say('Jatah ganti GIF hari ini habis (maks ${GifQuota.maxPerDay}x per hari)');
+        return;
+      }
+    }
+    if (!mounted) return;
+    final cropped = await ImageCropScreen.open(context, path: x.path, shape: CropShape.banner, isGif: isGif);
+    if (cropped == null || !mounted) return;
+    setState(() {
+      _uploadingBanner = true;
+      _feedback = null;
+    });
+    try {
+      final path = isGif ? await ImagePrep.prepare(cropped, maxSide: 1280) : cropped;
+      final url = await ProfileImageUploader.uploadClanBanner(path, widget.clan.id);
+      await ref.read(clanRepositoryProvider).updateClanBanner(widget.clan.id, url);
+      if (isGif && uid.isNotEmpty) await GifQuota.consume(uid);
+      widget.onChanged();
+      _say('Banner clan berhasil diganti', error: false);
+    } on ClanException catch (e) {
+      _say(e.message);
+    } catch (e) {
+      final msg = '$e'.contains('GIF terlalu besar')
+          ? 'GIF terlalu besar, maksimal 8 MB'
+          : 'Gagal upload banner. Periksa koneksi lalu coba lagi.';
+      _say(msg);
+    } finally {
+      if (mounted) setState(() => _uploadingBanner = false);
+    }
+  }
+
+  Future<void> _removeBanner() async {
+    if (_uploadingBanner) return;
+    setState(() {
+      _uploadingBanner = true;
+      _feedback = null;
+    });
+    try {
+      await ref.read(clanRepositoryProvider).updateClanBanner(widget.clan.id, '');
+      widget.onChanged();
+      _say('Banner clan dihapus', error: false);
+    } on ClanException catch (e) {
+      _say(e.message);
+    } finally {
+      if (mounted) setState(() => _uploadingBanner = false);
     }
   }
 
@@ -646,6 +729,13 @@ class _SettingsTabState extends ConsumerState<_SettingsTab> {
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: 14),
+              _BannerPicker(
+                url: clan.bannerUrl,
+                uploading: _uploadingBanner,
+                onTap: _changeBanner,
+                onRemove: (clan.bannerUrl ?? '').isEmpty ? null : _removeBanner,
               ),
               const SizedBox(height: 14),
               TextField(
@@ -997,6 +1087,112 @@ class _BadgeEntry extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+
+/// Kotak pratinjau banner clan (16:9) + tombol hapus. Ketuk = ganti.
+class _BannerPicker extends StatelessWidget {
+  const _BannerPicker({
+    required this.url,
+    required this.uploading,
+    required this.onTap,
+    required this.onRemove,
+  });
+
+  final String? url;
+  final bool uploading;
+  final VoidCallback onTap;
+  final VoidCallback? onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final has = (url ?? '').isNotEmpty;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'Banner clan',
+                style: TextStyle(color: AppColors.textWhite, fontSize: 13.5, fontWeight: FontWeight.w700),
+              ),
+            ),
+            if (onRemove != null && !uploading)
+              TextButton(
+                onPressed: onRemove,
+                style: TextButton.styleFrom(
+                  foregroundColor: const Color(0xFFFF8A98),
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  minimumSize: const Size(44, 32),
+                ),
+                child: const Text('Hapus', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
+              ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        GestureDetector(
+          onTap: uploading ? null : onTap,
+          child: AspectRatio(
+            aspectRatio: 16 / 9,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  const ColoredBox(color: AppColors.backgroundDarkSecondary),
+                  if (has) NetImage(url!),
+                  if (!has || uploading)
+                    Container(
+                      color: has ? const Color(0x990B0E14) : Colors.transparent,
+                      alignment: Alignment.center,
+                      child: uploading
+                          ? const SizedBox(
+                              width: 26,
+                              height: 26,
+                              child: CircularProgressIndicator(color: AppColors.accentViolet, strokeWidth: 3),
+                            )
+                          : const Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.add_photo_alternate_outlined, color: AppColors.textMuted, size: 28),
+                                SizedBox(height: 6),
+                                Text(
+                                  'Ketuk untuk pilih banner (GIF bisa, khusus Premium)',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(color: AppColors.textMuted, fontSize: 11.5),
+                                ),
+                              ],
+                            ),
+                    ),
+                  if (has && !uploading)
+                    Positioned(
+                      right: 8,
+                      bottom: 8,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                        decoration: BoxDecoration(
+                          color: const Color(0xB30B0E14),
+                          borderRadius: BorderRadius.circular(100),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.edit_rounded, size: 13, color: Colors.white),
+                            SizedBox(width: 4),
+                            Text('Ganti', style: TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w700)),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

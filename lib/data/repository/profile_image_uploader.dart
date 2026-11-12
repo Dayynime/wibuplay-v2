@@ -45,4 +45,8 @@ class ProfileImageUploader {
   /// [filePath] hasil ImagePrep.prepare (GIF tetap utuh, selain itu maks 1280px).
   static Future<String> uploadBanner(String filePath, String firebaseUid) =>
       _upload(filePath, 'banners/$firebaseUid-${DateTime.now().millisecondsSinceEpoch}');
+
+  /// Banner clan (GIF tetap utuh, selain itu sudah dipotong 1280x720).
+  static Future<String> uploadClanBanner(String filePath, String clanId) =>
+      _upload(filePath, 'clan-banners/$clanId-${DateTime.now().millisecondsSinceEpoch}');
 }

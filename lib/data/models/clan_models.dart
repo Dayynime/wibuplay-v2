@@ -32,6 +32,7 @@ class Clan {
     required this.name,
     this.description,
     this.photoUrl,
+    this.bannerUrl,
     this.leaderUid = '',
     this.level = 1,
     this.totalXp = 0,
@@ -49,6 +50,9 @@ class Clan {
   final String name;
   final String? description;
   final String? photoUrl;
+
+  /// Banner custom clan (gambar / GIF). null = banner bawaan dari foto clan.
+  final String? bannerUrl;
   final String leaderUid;
   final int level;
   final int totalXp;
@@ -78,6 +82,7 @@ class Clan {
         name: (j['name'] as String?) ?? '',
         description: j['description'] as String?,
         photoUrl: j['photo_url'] as String?,
+        bannerUrl: j['banner_url'] as String?,
         leaderUid: (j['leader_uid'] as String?) ?? '',
         level: (j['level'] as num?)?.toInt() ?? 1,
         totalXp: (j['total_xp'] as num?)?.toInt() ?? 0,

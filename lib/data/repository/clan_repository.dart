@@ -376,6 +376,16 @@ class ClanRepository {
         );
       });
 
+  /// Ganti banner clan (khusus leader). [bannerUrl] kosong = hapus banner.
+  Future<void> updateClanBanner(String clanId, String bannerUrl) =>
+      _guard('Gagal ganti banner clan', () async {
+        await _dio.post<dynamic>(
+          'functions/v1/clan-banner',
+          data: {'clan_id': clanId, 'banner_url': bannerUrl},
+          options: Options(headers: {'Authorization': await _authHeader()}),
+        );
+      });
+
   // ------------------------------------------------------------ badge clan
 
   /// Toko badge: semua badge di katalog + tanda mana yang sudah dimiliki clan.
