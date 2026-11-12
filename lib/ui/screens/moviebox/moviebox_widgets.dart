@@ -127,7 +127,59 @@ class MbCenterMessage extends StatelessWidget {
   }
 }
 
-/// Chip aksi di bawah video (sama dengan player donghua).
+/// Ubin aksi di bawah video: ikon di atas label. Salinan _ActionIconButton
+/// player anime supaya tampilannya sama persis.
+class MbActionTile extends StatelessWidget {
+  const MbActionTile({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.tint,
+    required this.onTap,
+    this.filled = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color tint;
+  final VoidCallback onTap;
+  final bool filled;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 74,
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: filled ? AppColors.accentViolet : AppColors.surfaceDark,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: filled ? Colors.transparent : const Color(0x12FFFFFF)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 21, color: tint),
+            const SizedBox(height: 5),
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: filled ? Colors.white : AppColors.textSecondary,
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Chip aksi (dipakai untuk pilihan Audio/dub).
 class MbActionChip extends StatelessWidget {
   const MbActionChip({
     super.key,

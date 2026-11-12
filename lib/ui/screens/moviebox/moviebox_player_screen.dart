@@ -46,6 +46,11 @@ final mbStreamsProvider = FutureProvider.autoDispose.family<List<MbStream>, Stri
   (ref, id) => ref.watch(movieBoxRepositoryProvider).getStreams(id),
 );
 
+/// "Mungkin Kamu Suka": urutan Rekomendasi MovieBox (daftar khusus film).
+final mbRecommendedProvider = FutureProvider.autoDispose<List<MbItem>>(
+  (ref) => ref.watch(movieBoxRepositoryProvider).getMovies(page: 1),
+);
+
 final mbCaptionsProvider = FutureProvider.autoDispose.family<List<MbCaption>, String>(
   (ref, id) => ref.watch(movieBoxRepositoryProvider).getCaptions(id),
 );
@@ -1048,15 +1053,35 @@ class _MovieBoxPlayerScreenState extends ConsumerState<MovieBoxPlayerScreen> wit
             },
           ),
           if (!_inPip) _seekFlash(),
+          // Sama dengan _errorOverlay player anime.
           if (_playerError)
-            Container(
-              color: Colors.black.withValues(alpha: 0.7),
-              alignment: Alignment.center,
-              padding: const EdgeInsets.all(24),
-              child: const Text(
-                'Video gagal diputar. Coba kualitas lain.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white, fontSize: 14),
+            ColoredBox(
+              color: const Color(0xDD0B0E14),
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        'Gagal memutar video di kualitas ini',
+                        style: TextStyle(color: AppColors.textWhite, fontSize: 13, fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 10),
+                      FilledButton(
+                        onPressed: () => _openQualitySheet(streams, selected, premium),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppColors.accentViolet,
+                          shape: const StadiumBorder(),
+                        ),
+                        child: const Text(
+                          'Coba Kualitas Lain',
+                          style: TextStyle(color: AppColors.textWhite, fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ),
         ],
@@ -1111,34 +1136,38 @@ class _MovieBoxPlayerScreenState extends ConsumerState<MovieBoxPlayerScreen> wit
     final synopsis = detail?.description ?? '';
     final poster = detail?.cover ?? download?.posterUrl;
     final dubs = detail?.dubs ?? const <MbDub>[];
-    final meta = <String>[
-      if (detail?.rating != null) '★ ${detail!.rating}',
+    final rating = detail?.rating;
+    final hasRating = rating != null && rating != '0' && rating != '0.0';
+    final info = [
       if (detail?.year != null) detail!.year!,
       if (detail?.duration != null) detail!.duration!,
       if (detail?.country != null) detail!.country!,
-    ];
+    ].join(' • ');
+    final recommended = (ref.watch(mbRecommendedProvider).valueOrNull ?? const <MbItem>[])
+        .where((m) => m.id != widget.movieId)
+        .take(12)
+        .toList();
+    const muted = AppColors.textSecondary;
 
     return CustomScrollView(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
       slivers: [
-        // 1. Poster kecil + judul + info
+        // 1. Poster kecil + judul + info (gaya player anime)
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SizedBox(
-                  width: 80,
-                  child: AspectRatio(
-                    aspectRatio: 2 / 3,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          const ColoredBox(color: AppColors.surfaceVariantDark),
-                          if ((poster ?? '').isNotEmpty) MovieBoxImage(poster),
-                        ],
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: SizedBox(
+                    width: 80,
+                    child: AspectRatio(
+                      aspectRatio: 2 / 3,
+                      child: ColoredBox(
+                        color: AppColors.surfaceVariantDark,
+                        child: (poster ?? '').isEmpty ? const SizedBox.expand() : MovieBoxImage(poster),
                       ),
                     ),
                   ),
@@ -1152,33 +1181,48 @@ class _MovieBoxPlayerScreenState extends ConsumerState<MovieBoxPlayerScreen> wit
                         title ?? (detailAsync.hasError ? 'Film' : 'Memuat...'),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
-                      ),
-                      if (meta.isNotEmpty) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          meta.join(' • '),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                        style: const TextStyle(
+                          color: AppColors.textWhite,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.2,
+                          height: 1.2,
                         ),
-                      ],
+                      ),
                       if ((detail?.genre ?? '').isNotEmpty) ...[
                         const SizedBox(height: 4),
                         Text(
                           detail!.genre!,
-                          maxLines: 1,
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: AppColors.accentVioletLight, fontSize: 12),
+                          style: const TextStyle(color: muted, fontSize: 13),
                         ),
                       ],
-                      if (_playerError) ...[
-                        const SizedBox(height: 6),
-                        const Text(
-                          'Video gagal diputar. Coba kualitas lain.',
-                          style: TextStyle(color: AppColors.accentViolet, fontSize: 12),
-                        ),
-                      ],
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          if (hasRating) ...[
+                            const Icon(Icons.star_rounded, size: 15, color: Color(0xFFFFC107)),
+                            const SizedBox(width: 3),
+                            Text(rating ?? '', style: const TextStyle(color: muted, fontSize: 12)),
+                          ],
+                          if (info.isNotEmpty) ...[
+                            if (hasRating)
+                              const Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 8),
+                                child: Text('•', style: TextStyle(color: muted, fontSize: 12)),
+                              ),
+                            Flexible(
+                              child: Text(
+                                info,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(color: muted, fontSize: 12),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -1187,36 +1231,42 @@ class _MovieBoxPlayerScreenState extends ConsumerState<MovieBoxPlayerScreen> wit
           ),
         ),
 
-        // 2. Sinopsis
+        // 2. Sinopsis (expandable)
         if (synopsis.trim().isNotEmpty)
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    synopsis,
-                    maxLines: _synopsisExpanded ? null : 2,
-                    overflow: _synopsisExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
-                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 14, height: 20 / 14),
-                  ),
-                  GestureDetector(
-                    onTap: () => setState(() => _synopsisExpanded = !_synopsisExpanded),
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Text(
-                        _synopsisExpanded ? 'Sembunyikan' : 'Selengkapnya',
-                        style: const TextStyle(color: AppColors.accentViolet, fontSize: 12, fontWeight: FontWeight.w700),
+              child: AnimatedSize(
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeOut,
+                alignment: Alignment.topCenter,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      synopsis,
+                      maxLines: _synopsisExpanded ? null : 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: muted, fontSize: 13, height: 20 / 13),
+                    ),
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => setState(() => _synopsisExpanded = !_synopsisExpanded),
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 4),
+                        child: Text(
+                          _synopsisExpanded ? 'Sembunyikan' : 'Selengkapnya',
+                          style: const TextStyle(color: AppColors.accentViolet, fontSize: 12, fontWeight: FontWeight.w700),
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
 
-        // 3. Banner Trakteer
+        // 3. Tombol donasi Trakteer
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -1224,39 +1274,50 @@ class _MovieBoxPlayerScreenState extends ConsumerState<MovieBoxPlayerScreen> wit
           ),
         ),
 
-        // 4. Tombol aksi
+        // 4. Baris ubin aksi (sama dengan player anime)
         SliverToBoxAdapter(
-          child: SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
-            child: Row(
-              children: [
-                MbActionChip(
-                  icon: Icons.high_quality,
-                  label: selected?.quality ?? 'Kualitas',
-                  onTap: streams.isEmpty ? () {} : () => _openQualitySheet(streams, selected, premium ?? false),
-                ),
-                const SizedBox(width: 10),
-                MbActionChip(
-                  icon: _subtitleOff || caps.isEmpty ? Icons.subtitles_off_outlined : Icons.subtitles_outlined,
-                  label: caps.isEmpty
-                      ? 'Tanpa Subtitle'
-                      : (caption == null ? 'Subtitle: Mati' : (_cuesLoading ? 'Memuat...' : caption.language)),
-                  highlight: caption != null,
-                  onTap: () => _openSettingsSheet(caps),
-                ),
-                const SizedBox(width: 10),
-                MbActionChip(
-                  icon: downloadStateIcon(download),
-                  label: downloadStateLabel(download),
-                  highlight: downloadStateHighlight(download),
-                  onTap: () => _onDownloadTap(streams: streams, premium: premium, title: title, poster: poster),
-                ),
-                const SizedBox(width: 10),
-                MbActionChip(icon: Icons.chat_bubble_outline, label: 'Komentar', onTap: _scrollToComments),
-                const SizedBox(width: 10),
-                MbActionChip(icon: Icons.share_outlined, label: 'Bagikan', onTap: () => _share(title)),
-              ],
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 22),
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  MbActionTile(
+                    icon: Icons.high_quality,
+                    label: selected?.quality ?? 'Kualitas',
+                    tint: muted,
+                    onTap: streams.isEmpty ? () {} : () => _openQualitySheet(streams, selected, premium ?? false),
+                  ),
+                  const SizedBox(width: 10),
+                  MbActionTile(
+                    icon: caption == null ? Icons.subtitles_off_outlined : Icons.subtitles,
+                    label: caps.isEmpty
+                        ? 'No Sub'
+                        : (caption == null ? 'Sub: Mati' : (_cuesLoading ? 'Memuat...' : caption.language)),
+                    tint: caption == null ? muted : AppColors.accentViolet,
+                    onTap: () => _openSettingsSheet(caps),
+                  ),
+                  const SizedBox(width: 10),
+                  MbActionTile(
+                    icon: downloadStateIcon(download),
+                    label: downloadStateLabel(download),
+                    tint: downloadStateHighlight(download) ? AppColors.accentViolet : muted,
+                    onTap: () => _onDownloadTap(streams: streams, premium: premium, title: title, poster: poster),
+                  ),
+                  const SizedBox(width: 10),
+                  MbActionTile(icon: Icons.chat, label: 'Komentar', tint: muted, onTap: _scrollToComments),
+                  const SizedBox(width: 10),
+                  MbActionTile(
+                    icon: Icons.flag,
+                    label: 'Laporkan',
+                    tint: muted,
+                    onTap: () => _toast('Fitur laporkan segera hadir'),
+                  ),
+                  const SizedBox(width: 10),
+                  MbActionTile(icon: Icons.share, label: 'Bagikan', tint: muted, onTap: () => _share(title)),
+                ],
+              ),
             ),
           ),
         ),
@@ -1267,18 +1328,12 @@ class _MovieBoxPlayerScreenState extends ConsumerState<MovieBoxPlayerScreen> wit
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Padding(
-                  padding: EdgeInsets.fromLTRB(16, 0, 16, 10),
-                  child: Text(
-                    'Audio',
-                    style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700),
-                  ),
-                ),
+                const SectionHeader(title: 'Audio', eyebrow: 'オーディオ'),
                 SizedBox(
-                  height: 40,
+                  height: 56,
                   child: ListView.separated(
                     scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     itemCount: dubs.length,
                     separatorBuilder: (_, __) => const SizedBox(width: 8),
                     itemBuilder: (_, i) {
@@ -1295,12 +1350,41 @@ class _MovieBoxPlayerScreenState extends ConsumerState<MovieBoxPlayerScreen> wit
                     },
                   ),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 8),
               ],
             ),
           ),
 
-        // 6. Komentar. Id memakai prefix donghua `dh:` + `mb-<id>` (format
+        // 6. Mungkin Kamu Suka (urutan Rekomendasi MovieBox, khusus film)
+        if (recommended.isNotEmpty)
+          SliverToBoxAdapter(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 8),
+                const SectionHeader(title: 'Mungkin Kamu Suka'),
+                const SizedBox(height: 8),
+                SizedBox(
+                  height: 230,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: recommended.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 12),
+                    itemBuilder: (_, i) => SizedBox(
+                      width: 112,
+                      child: MovieBoxCard(
+                        item: recommended[i],
+                        onTap: () => widget.onMovieChange(recommended[i].id),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+        // 7. Komentar. Id memakai prefix donghua `dh:` + `mb-<id>` (format
         // yang sudah diterima server komentar).
         if (detail != null)
           CommentsSliver(
@@ -1311,7 +1395,7 @@ class _MovieBoxPlayerScreenState extends ConsumerState<MovieBoxPlayerScreen> wit
             onUpgradeClick: widget.onUpgradeClick,
           ),
 
-        SliverToBoxAdapter(child: SizedBox(height: 28 + bottomInset)),
+        SliverToBoxAdapter(child: SizedBox(height: bottomInset + 28)),
       ],
     );
   }
