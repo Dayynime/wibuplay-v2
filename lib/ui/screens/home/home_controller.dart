@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/error_message.dart';
@@ -12,7 +14,18 @@ import '../../../providers.dart';
 /// Kalau belum ada salinan (instal baru), alurnya sama seperti dulu.
 class HomeController extends AsyncNotifier<HomeSectionData> {
   @override
-  Future<HomeSectionData> build() async {
+  FutureOr<HomeSectionData> build() {
+    // Salinan di memori (dimuat di main() sebelum runApp): dikembalikan
+    // SINKRON, jadi Beranda langsung berisi di frame pertama tanpa skeleton.
+    final mem = ref.read(repositoryProvider).peekCachedHome(currentDay: currentDayName());
+    if (mem != null) {
+      Future.microtask(_refreshInBackground);
+      return mem;
+    }
+    return _buildFromDisk();
+  }
+
+  Future<HomeSectionData> _buildFromDisk() async {
     final cached = await ref
         .read(repositoryProvider)
         .loadCachedHome(currentDay: currentDayName());

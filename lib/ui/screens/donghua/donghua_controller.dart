@@ -126,8 +126,19 @@ class DonghuaController extends AutoDisposeNotifier<DonghuaUiState> {
       loadHome();
       _loadGenres();
     });
+    // Salinan di memori (dimuat saat app start): tampil di frame pertama.
+    final cached = PageCodec.sections(DiskCache.peek(_homeCacheKey))
+        .where((sec) => sec.cards.isNotEmpty)
+        .toList();
+    if (cached.isNotEmpty) {
+      _homeFromCache = true;
+      return DonghuaUiState(home: DonghuaHomeState(sections: cached, isLoading: false));
+    }
     return const DonghuaUiState();
   }
+
+  /// true kalau state awal sudah berisi salinan memori.
+  bool _homeFromCache = false;
 
   AnichinRepository get _repo => ref.read(anichinRepositoryProvider);
 
@@ -149,8 +160,9 @@ class DonghuaController extends AutoDisposeNotifier<DonghuaUiState> {
 
   Future<void> loadHome() async {
     // Belum ada isi: salinan terakhir dari HP tampil dulu, data baru menyusul.
-    var showingCache = false;
-    if (_alive && state.home.sections.isEmpty) {
+    var showingCache = _homeFromCache;
+    _homeFromCache = false;
+    if (!showingCache && _alive && state.home.sections.isEmpty) {
       final cached = PageCodec.sections(await DiskCache.read(_homeCacheKey))
           .where((sec) => sec.cards.isNotEmpty)
           .toList();

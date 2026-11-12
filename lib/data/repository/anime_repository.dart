@@ -193,10 +193,50 @@ class AnimeRepository {
 
   static const String _homeCacheName = 'home_sections_cache_v1.json';
 
-  Future<File?> _homeCacheFile() async {
+  Future<File?> _homeCacheFile() => _homeCacheFileStatic();
+
+  static Future<File?> _homeCacheFileStatic() async {
     try {
       final dir = await getApplicationSupportDirectory();
       return File('${dir.path}/$_homeCacheName');
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Isi file salinan Beranda yang sudah dibaca ke memori saat app start
+  /// ([preloadHomeCache]); dipakai [peekCachedHome] secara sinkron.
+  static Object? _preloadedHome;
+
+  /// Baca salinan Beranda ke memori. Dipanggil sekali di main() sebelum runApp.
+  static Future<void> preloadHomeCache() async {
+    try {
+      final f = await _homeCacheFileStatic();
+      if (f == null || !await f.exists()) return;
+      _preloadedHome = jsonDecode(await f.readAsString());
+    } catch (_) {}
+  }
+
+  /// Salinan Beranda dari memori (SINKRON); null kalau tidak ada.
+  /// Supaya Beranda langsung berisi di frame pertama tanpa skeleton.
+  HomeSectionData? peekCachedHome({String currentDay = 'SENIN'}) {
+    final mem = _cachedHome;
+    if (mem != null) return mem;
+    return _decodeHomeCache(_preloadedHome, currentDay);
+  }
+
+  HomeSectionData? _decodeHomeCache(Object? j, String currentDay) {
+    try {
+      if (j is! Map || j['v'] != 1) return null;
+      final raw = j['raw'];
+      if (raw is! Map) return null;
+      final d = _homeFromRaw(raw, sameDay: j['day'] == currentDay);
+      final empty = d.slider.isEmpty &&
+          d.hot.isEmpty &&
+          d.popular.isEmpty &&
+          d.newRelease.isEmpty &&
+          d.update.isEmpty;
+      return empty ? null : d;
     } catch (_) {
       return null;
     }
@@ -353,11 +393,23 @@ class AnimeRepository {
     }).toList();
   }
 
-  Future<AnimeItem> getMovieDetail(String id, {bool forceRefresh = false}) async {
+  /// Request detail yang sedang berjalan (prefetch + buka Detail berbagi satu
+  /// request, tidak dobel).
+  final Map<String, Future<AnimeItem>> _detailInflight = {};
+
+  Future<AnimeItem> getMovieDetail(String id, {bool forceRefresh = false}) {
     if (!forceRefresh) {
       final cached = _detailCache[id];
-      if (cached != null) return cached;
+      if (cached != null) return Future.value(cached);
     }
+    final running = _detailInflight[id];
+    if (running != null) return running;
+    final f = _fetchMovieDetail(id).whenComplete(() => _detailInflight.remove(id));
+    _detailInflight[id] = f;
+    return f;
+  }
+
+  Future<AnimeItem> _fetchMovieDetail(String id) async {
     try {
       final resp = await _api.getMovieDetail(id);
       final data = resp.data;
@@ -410,7 +462,34 @@ class AnimeRepository {
   Future<List<EpisodeItem>> getMovieEpisodes(String id,
       {int page = 0, String search = ''}) async {
     final resp = await _api.getMovieEpisodes(id, page: page, search: search);
-    return JsonHelper.parseEpisodeList(resp.data);
+    final list = JsonHelper.parseEpisodeList(resp.data);
+    if (page == 0 && search.isEmpty) _episodeCache[id] = list;
+    return list;
+  }
+
+  /// Episode halaman pertama terakhir per anime (memori).
+  final Map<String, List<EpisodeItem>> _episodeCache = {};
+
+  /// Detail di memori (SINKRON), null kalau belum pernah dimuat/prefetch.
+  AnimeItem? peekDetail(String id) => _detailCache[id];
+
+  /// Episode halaman pertama di memori (SINKRON).
+  List<EpisodeItem>? peekEpisodes(String id) => _episodeCache[id];
+
+  final Set<String> _prefetching = {};
+
+  /// Ambil detail + episode halaman pertama di belakang (dipanggil saat poster
+  /// terlihat / ditekan), supaya Detail langsung berisi waktu dibuka.
+  void prefetchDetail(String id) {
+    if (id.isEmpty || _prefetching.contains(id)) return;
+    if (_detailCache.containsKey(id) && _episodeCache.containsKey(id)) return;
+    _prefetching.add(id);
+    unawaited(Future.wait<Object?>([
+      if (!_detailCache.containsKey(id))
+        getMovieDetail(id).then<Object?>((v) => v).catchError((Object _) => null),
+      if (!_episodeCache.containsKey(id))
+        getMovieEpisodes(id).then<Object?>((v) => v).catchError((Object _) => null),
+    ]).whenComplete(() => _prefetching.remove(id)));
   }
 
   Future<StreamData> getEpisodeStream(String idEpisode) async {

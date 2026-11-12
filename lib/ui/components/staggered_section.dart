@@ -80,7 +80,9 @@ class PageEntrance extends StatefulWidget {
   const PageEntrance({
     super.key,
     required this.child,
-    this.duration = const Duration(milliseconds: 700),
+    // Default 0 = langsung tampil (tanpa fade/scale seluruh halaman, yang
+    // bikin jeda ~0,7 detik dan berat karena Opacity membungkus semua isi).
+    this.duration = Duration.zero,
     this.offsetY = 32,
     this.startScale = 0.965,
   });
@@ -111,6 +113,10 @@ class _PageEntranceState extends State<PageEntrance>
   @override
   void initState() {
     super.initState();
+    if (widget.duration == Duration.zero) {
+      _c.value = 1.0;
+      return;
+    }
     // Mulai di frame berikutnya supaya frame pertama tidak patah.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _c.forward();

@@ -291,32 +291,41 @@ class ChatController extends AutoDisposeNotifier<ChatUiState> {
     if (fresh.isEmpty) return;
     _badgeChecked.addAll(fresh);
     () async {
-      try {
-        final data = await _repo.getBadgeData(fresh);
-        _update((s) => s.copyWith(
-              usernameColors: {...s.usernameColors, ...data.usernameColors},
-              userNumbers: {...s.userNumbers, ...data.userNumbers},
-              avatarUrls: {...s.avatarUrls, ...data.avatarUrls},
-            ));
-      } catch (_) {
-        _badgeChecked.removeAll(fresh);
-      }
-      // Level XP (badge "Lv.N"). Gagal = badge level tidak tampil, tidak
-      // menggagalkan badge warna/ID di atas.
-      try {
-        final levels = await ref.read(xpRepositoryProvider).getLevelsForUids(fresh);
-        _update((s) => s.copyWith(levels: {...s.levels, ...levels}));
-      } catch (_) {}
-      // Tag clan (badge di bawah username). Gagal = tidak tampil.
-      try {
-        final tags = await _repo.getClanTagsForUids(fresh);
-        _update((s) => s.copyWith(clanTags: {...s.clanTags, ...tags}));
-      } catch (_) {}
-      // Status Premium (centang biru di samping username). Gagal = tidak tampil.
-      try {
-        final premium = await ref.read(xpRepositoryProvider).getPremiumUids(fresh);
-        _update((s) => s.copyWith(premiumUids: {...s.premiumUids, ...premium}));
-      } catch (_) {}
+      // Keempat data diambil BERSAMAAN lalu dipasang SEKALI, supaya bubble
+      // langsung muncul lengkap (dulu bergantian: avatar, lalu level, lalu
+      // tag clan, lalu premium -> list berubah 4x dan bubble melar-melar).
+      // Masing-masing tetap boleh gagal sendiri tanpa menggagalkan yang lain.
+      final xp = ref.read(xpRepositoryProvider);
+      var badgeFailed = false;
+      final badgeF = _repo.getBadgeData(fresh).then<ChatBadgeData?>((d) => d).catchError((Object _) {
+        badgeFailed = true;
+        return null;
+      });
+      final levelsF = xp
+          .getLevelsForUids(fresh)
+          .then<Map<String, int>?>((v) => v)
+          .catchError((Object _) => null);
+      final tagsF = _repo
+          .getClanTagsForUids(fresh)
+          .then<Map<String, String>?>((v) => v)
+          .catchError((Object _) => null);
+      final premiumF = xp
+          .getPremiumUids(fresh)
+          .then<Set<String>?>((v) => v.toSet())
+          .catchError((Object _) => null);
+      final data = await badgeF;
+      final levels = await levelsF;
+      final tags = await tagsF;
+      final premium = await premiumF;
+      if (badgeFailed) _badgeChecked.removeAll(fresh);
+      _update((s) => s.copyWith(
+            usernameColors: data == null ? null : {...s.usernameColors, ...data.usernameColors},
+            userNumbers: data == null ? null : {...s.userNumbers, ...data.userNumbers},
+            avatarUrls: data == null ? null : {...s.avatarUrls, ...data.avatarUrls},
+            levels: levels == null ? null : {...s.levels, ...levels},
+            clanTags: tags == null ? null : {...s.clanTags, ...tags},
+            premiumUids: premium == null ? null : {...s.premiumUids, ...premium},
+          ));
     }();
   }
 

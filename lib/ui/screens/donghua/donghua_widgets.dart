@@ -47,7 +47,7 @@ class DonghuaImage extends StatelessWidget {
       memCacheHeight: memH,
       fit: fit,
       alignment: alignment,
-      fadeInDuration: const Duration(milliseconds: 200),
+      fadeInDuration: const Duration(milliseconds: 120),
       fadeOutDuration: Duration.zero,
       placeholder: (_, __) => const SizedBox.expand(
         child: ShimmerBox(borderRadius: BorderRadius.zero),

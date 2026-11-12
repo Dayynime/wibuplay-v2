@@ -116,6 +116,16 @@ class ComicController extends Notifier<ComicUiState> {
       loadTab();
       _loadGenres();
     });
+    // Salinan di memori (dimuat saat app start): tampil di frame pertama.
+    final cached = PageCodec.comics(DiskCache.peek('comic_${first.name}_${tabs.first.id}'));
+    if (cached.isNotEmpty) {
+      return ComicUiState(
+        source: first,
+        tabs: tabs,
+        selectedTab: tabs.first.id,
+        list: ComicListState(items: cached, isInitialLoading: false),
+      );
+    }
     return ComicUiState(source: first, tabs: tabs, selectedTab: tabs.first.id);
   }
 

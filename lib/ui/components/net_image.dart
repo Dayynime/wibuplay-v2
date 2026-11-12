@@ -80,7 +80,7 @@ class NetImage extends StatelessWidget {
       memCacheHeight: memH,
       fit: fit,
       alignment: alignment,
-      fadeInDuration: const Duration(milliseconds: 200),
+      fadeInDuration: const Duration(milliseconds: 120),
       fadeOutDuration: Duration.zero,
       placeholder: (context, url) => const SizedBox.expand(
         child: ShimmerBox(borderRadius: BorderRadius.zero),

@@ -126,6 +126,20 @@ class DetailController extends AutoDisposeFamilyNotifier<DetailUiState, String> 
       loadEpisodes();
       _loadGallery();
     });
+    // Sudah ada di memori (pernah dibuka / di-prefetch dari poster): langsung
+    // tampil berisi di frame pertama, data baru tetap diambil di belakang.
+    final repo = ref.read(repositoryProvider);
+    final anime = repo.peekDetail(arg);
+    final eps = repo.peekEpisodes(arg);
+    if (anime != null) {
+      final total = eps == null ? 0 : latestEpisodeIndex(eps.map((e) => e.index));
+      return DetailUiState(
+        anime: anime,
+        episodes: eps ?? const [],
+        totalEpisodes: total,
+        hasMoreEpisodes: eps == null || eps.isNotEmpty,
+      );
+    }
     return const DetailUiState(isLoading: true);
   }
 
@@ -162,7 +176,8 @@ class DetailController extends AutoDisposeFamilyNotifier<DetailUiState, String> 
   }
 
   Future<void> loadDetail() async {
-    _update((s) => s.copyWith(isLoading: true, error: () => null));
+    // Sudah ada isinya (dari memori): jangan tampilkan loading lagi.
+    _update((s) => s.copyWith(isLoading: s.anime == null, error: () => null));
     try {
       final anime = await ref.read(repositoryProvider).getMovieDetail(movieId);
       _update((s) => s.copyWith(anime: anime, isLoading: false));
@@ -177,8 +192,10 @@ class DetailController extends AutoDisposeFamilyNotifier<DetailUiState, String> 
     final request = ++_episodeRequest;
     _episodeNextPage = 0;
     _fetchingMore = false;
+    // Daftar dari memori sudah tampil (tanpa pencarian): segarkan diam-diam.
+    final silent = search.isEmpty && state.episodes.isNotEmpty && state.episodeSearch.isEmpty;
     _update((s) => s.copyWith(
-          isLoadingEpisodes: true,
+          isLoadingEpisodes: !silent,
           isLoadingMoreEpisodes: false,
           hasMoreEpisodes: true,
         ));
@@ -250,12 +267,16 @@ class DetailController extends AutoDisposeFamilyNotifier<DetailUiState, String> 
 
   Future<void> _loadGallery() async {
     final repo = ref.read(repositoryProvider);
-    final covers = await _orDefault<List<MediaGalleryItem>>(
+    // Tiga request dijalankan BERSAMAAN (dulu bergantian = 3x nunggu).
+    final coversF = _orDefault<List<MediaGalleryItem>>(
         () => repo.getMovieCovers(movieId), const []);
-    final posters = await _orDefault<List<MediaGalleryItem>>(
+    final postersF = _orDefault<List<MediaGalleryItem>>(
         () => repo.getMoviePosters(movieId), const []);
-    final cuplix =
-        await _orDefault<List<CuplixItem>>(() => repo.getMovieCuplix(movieId), const []);
+    final cuplixF =
+        _orDefault<List<CuplixItem>>(() => repo.getMovieCuplix(movieId), const []);
+    final covers = await coversF;
+    final posters = await postersF;
+    final cuplix = await cuplixF;
     _update((s) => s.copyWith(
           covers: covers,
           posters: posters,

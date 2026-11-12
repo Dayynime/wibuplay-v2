@@ -15,6 +15,8 @@ import 'core/remote_config_manager.dart';
 import 'core/theme/app_colors.dart';
 import 'core/theme/app_theme.dart';
 import 'data/local/local_store.dart';
+import 'data/local/page_cache.dart';
+import 'data/repository/anime_repository.dart';
 import 'data/local/zenime_room_migration.dart';
 import 'providers.dart';
 import 'ui/app_routes.dart';
@@ -72,7 +74,15 @@ Future<void> _initBackend() async {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Salinan Chat Global dari HP dimuat di belakang (tidak menunda start).
+  // Semua salinan halaman (Beranda, leaderboard, jadwal, donghua, komik, chat)
+  // dibaca ke memori SEBELUM runApp, supaya tiap halaman bisa langsung tampil
+  // berisi di frame pertama (seperti ApiCache di app native). Filenya kecil;
+  // dibatasi 600 ms biar HP lambat tidak tertahan di layar putih.
+  await Future.wait([
+    DiskCache.preload(),
+    AnimeRepository.preloadHomeCache(),
+  ]).timeout(const Duration(milliseconds: 600), onTimeout: () => const <void>[]);
+  // Salinan Chat Global: sekarang tinggal ambil dari memori.
   unawaited(ChatSessionCache.restore());
   // Sekali setelah update: buang cache gambar bawaan lama (sudah diganti
   // AppImageCache), tanpa menunda start.

@@ -144,7 +144,7 @@ final giftRepositoryProvider = Provider<GiftRepository>(
 );
 
 /// Top Giver sepanjang masa + clan & level tiap orang (carousel & halaman).
-final topGiversProvider = FutureProvider<TopGiversData>((ref) async {
+final topGiversProvider = FutureProvider<TopGiversData>((ref) {
   final gifts = ref.watch(giftRepositoryProvider);
   final chat = ref.read(chatRepositoryProvider);
   final xp = ref.read(xpRepositoryProvider);
@@ -383,35 +383,36 @@ final myPremiumProvider = Provider<AsyncValue<bool>>((ref) {
 });
 
 /// Top 4 XP bulan ini buat slide carousel Beranda. Gagal = slide disembunyikan.
-final heroTopXpProvider = FutureProvider.autoDispose<List<UserXpDisplay>>((ref) async {
+final heroTopXpProvider = FutureProvider.autoDispose<List<UserXpDisplay>>((ref) {
   final repo = ref.watch(xpRepositoryProvider);
-  try {
-    return await cacheFirst<List<UserXpDisplay>>(
+  // Sinkron kalau salinan ada di memori -> tampil di frame pertama.
+  return cacheFirstOr<List<UserXpDisplay>, List<UserXpDisplay>>(
+    () => cacheFirst<List<UserXpDisplay>>(
       ref,
       key: 'hero_top_xp',
       fetch: () => repo.getTopXpDisplay(limit: 4),
       encode: (v) => [for (final u in v) PageCodec.xpToJson(u)],
       decode: (j) => nonEmpty(PageCodec.xpList(j)),
-    );
-  } catch (_) {
-    return const [];
-  }
+    ),
+    (v) => v,
+    const [],
+  );
 });
 
 /// Top 4 clan buat slide carousel Beranda. Gagal = kolom clan kosong.
-final heroTopClansProvider = FutureProvider.autoDispose<List<ClanSummary>>((ref) async {
+final heroTopClansProvider = FutureProvider.autoDispose<List<ClanSummary>>((ref) {
   final repo = ref.watch(chatRepositoryProvider);
-  try {
-    return await cacheFirst<List<ClanSummary>>(
+  return cacheFirstOr<List<ClanSummary>, List<ClanSummary>>(
+    () => cacheFirst<List<ClanSummary>>(
       ref,
       key: 'hero_top_clans',
       fetch: () => repo.getTopClans(limit: 4),
       encode: (v) => [for (final c in v) PageCodec.clanToJson(c)],
       decode: (j) => nonEmpty(PageCodec.clans(j)),
-    );
-  } catch (_) {
-    return const [];
-  }
+    ),
+    (v) => v,
+    const [],
+  );
 });
 
 /// Panel Admin (role, ban akun/device). Aksi lewat Edge Function + Firebase ID Token.
@@ -654,20 +655,19 @@ final clanPendingRequestsProvider = FutureProvider.autoDispose
 );
 
 /// Top 3 donatur buat slide carousel Beranda. Gagal = slide disembunyikan.
-final topSupportersProvider = FutureProvider.autoDispose<List<TopSupporter>>((ref) async {
+final topSupportersProvider = FutureProvider.autoDispose<List<TopSupporter>>((ref) {
   final repo = ref.watch(xpRepositoryProvider);
-  try {
-    final all = await cacheFirst<List<TopSupporter>>(
+  return cacheFirstOr<List<TopSupporter>, List<TopSupporter>>(
+    () => cacheFirst<List<TopSupporter>>(
       ref,
       key: 'top_supporters_home',
       fetch: () => repo.getTopSupporters(),
       encode: (v) => [for (final s in v.take(3)) PageCodec.supporterToJson(s)],
       decode: (j) => nonEmpty(PageCodec.supporters(j)),
-    );
-    return all.take(3).toList();
-  } catch (_) {
-    return const [];
-  }
+    ),
+    (all) => all.take(3).toList(),
+    const [],
+  );
 });
 
 /// Daftar Top Support lengkap buat halaman Top Support. Melempar kalau gagal

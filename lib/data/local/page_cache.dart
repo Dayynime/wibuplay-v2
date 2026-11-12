@@ -30,6 +30,10 @@ class DiskCache {
 
   static Future<Directory?>? _dir;
 
+  /// Salinan di memori. Diisi sekali saat app start lewat [preload], jadi
+  /// halaman bisa membaca salinannya SINKRON di frame pertama (tanpa loading).
+  static final Map<String, Object?> _mem = {};
+
   static Future<Directory?> _openDir() async {
     try {
       final base = await getApplicationSupportDirectory();
@@ -41,19 +45,48 @@ class DiskCache {
     }
   }
 
+  static String _safe(String key) => key.replaceAll(RegExp(r'[^A-Za-z0-9_.-]'), '_');
+
   static Future<File?> _file(String key) async {
     final d = await (_dir ??= _openDir());
     if (d == null) return null;
-    final safe = key.replaceAll(RegExp(r'[^A-Za-z0-9_.-]'), '_');
-    return File('${d.path}/$safe.json');
+    return File('${d.path}/${_safe(key)}.json');
   }
+
+  /// Baca semua salinan dari HP ke memori. Dipanggil sekali di main() sebelum
+  /// runApp. File-nya kecil (beberapa KB), jadi cepat.
+  static Future<void> preload() async {
+    try {
+      final d = await (_dir ??= _openDir());
+      if (d == null) return;
+      final files = d
+          .listSync()
+          .whereType<File>()
+          .where((f) => f.path.endsWith('.json'))
+          .toList();
+      await Future.wait(files.map((f) async {
+        try {
+          final name = f.uri.pathSegments.last;
+          final key = name.substring(0, name.length - '.json'.length);
+          _mem[key] = jsonDecode(await f.readAsString());
+        } catch (_) {}
+      }));
+    } catch (_) {}
+  }
+
+  /// Salinan di memori untuk [key] (sinkron); null kalau belum ada.
+  static Object? peek(String key) => _mem[_safe(key)];
 
   /// JSON yang tersimpan untuk [key]; null kalau belum ada atau rusak.
   static Future<Object?> read(String key) async {
+    final k = _safe(key);
+    if (_mem.containsKey(k)) return _mem[k];
     try {
       final f = await _file(key);
       if (f == null || !await f.exists()) return null;
-      return jsonDecode(await f.readAsString());
+      final v = jsonDecode(await f.readAsString());
+      _mem[k] = v;
+      return v;
     } catch (_) {
       return null;
     }
@@ -62,9 +95,11 @@ class DiskCache {
   /// Simpan [value] (harus bisa di-jsonEncode). Gagal = diam saja.
   static Future<void> write(String key, Object? value) async {
     try {
+      final body = jsonEncode(value);
+      // Simpan bentuk hasil decode (sama persis dengan yang dibaca dari file).
+      _mem[_safe(key)] = jsonDecode(body);
       final f = await _file(key);
       if (f == null) return;
-      final body = jsonEncode(value);
       // Tulis ke file sementara lalu rename: file lama tidak pernah setengah jadi.
       final tmp = File('${f.path}.tmp');
       await tmp.writeAsString(body, flush: true);
@@ -76,11 +111,10 @@ class DiskCache {
 // -----------------------------------------------------------------------------
 // cacheFirst: untuk FutureProvider.
 //
-// Pembukaan pertama di sesi ini: kalau ada salinan di HP, provider langsung
-// selesai dengan salinan itu, lalu data baru diambil di belakang dan provider
-// dibangun ulang dengan hasilnya (UI tidak menampilkan loading lagi karena
-// `when` menyimpan data lama selama refresh). Pembukaan berikutnya dan
-// tarik-untuk-refresh berjalan seperti biasa (langsung ke jaringan).
+// Kalau ada salinan (di memori, dimuat saat app start), provider langsung
+// selesai SINKRON dengan salinan itu, lalu data baru diambil di belakang dan
+// provider dibangun ulang dengan hasilnya. Berlaku tiap kali halaman dibuka,
+// jadi tidak ada loading/skeleton selama salinan ada.
 // -----------------------------------------------------------------------------
 
 class _Fresh {
@@ -92,35 +126,90 @@ class _Fresh {
 final Map<String, _Fresh> _fresh = {};
 final Set<String> _warm = {};
 
-Future<T> cacheFirst<T>(
+/// Mengembalikan nilai SINKRON kalau salinan ada di memori (lihat
+/// [DiskCache.preload]): FutureProvider/AsyncNotifier lalu langsung berstatus
+/// data di frame pertama, tanpa loading/skeleton. Kalau tidak ada, berjalan
+/// async seperti biasa.
+FutureOr<T> cacheFirst<T>(
   Ref<Object?> ref, {
   required String key,
   required Future<T> Function() fetch,
   required Object? Function(T value) encode,
   required T? Function(Object? json) decode,
-}) async {
+}) {
   // Hasil refresh di belakang yang baru saja datang: pakai, jangan fetch lagi.
   final ready = _fresh.remove(key);
   if (ready != null && DateTime.now().difference(ready.at) < const Duration(minutes: 2)) {
     return ready.value as T;
   }
 
-  if (_warm.add(key)) {
-    T? cached;
-    try {
-      cached = decode(await DiskCache.read(key));
-    } catch (_) {
-      cached = null;
-    }
-    if (cached != null) {
-      unawaited(_refreshInBackground<T>(ref, key, fetch, encode));
-      return cached;
-    }
+  // Salinan terakhir di memori: tampil langsung (juga saat halaman dibuka
+  // lagi), data baru diambil di belakang lalu menggantikannya.
+  T? cached;
+  try {
+    cached = decode(DiskCache.peek(key));
+  } catch (_) {
+    cached = null;
+  }
+  if (cached != null) {
+    _warm.add(key);
+    unawaited(_refreshInBackground<T>(ref, key, fetch, encode));
+    return cached;
   }
 
+  if (_warm.add(key)) {
+    return _readThenFetch<T>(ref, key, fetch, encode, decode);
+  }
+
+  return _fetchAndSave<T>(key, fetch, encode);
+}
+
+Future<T> _readThenFetch<T>(
+  Ref<Object?> ref,
+  String key,
+  Future<T> Function() fetch,
+  Object? Function(T value) encode,
+  T? Function(Object? json) decode,
+) async {
+  T? cached;
+  try {
+    cached = decode(await DiskCache.read(key));
+  } catch (_) {
+    cached = null;
+  }
+  if (cached != null) {
+    unawaited(_refreshInBackground<T>(ref, key, fetch, encode));
+    return cached;
+  }
+  return _fetchAndSave<T>(key, fetch, encode);
+}
+
+Future<T> _fetchAndSave<T>(
+  String key,
+  Future<T> Function() fetch,
+  Object? Function(T value) encode,
+) async {
   final value = await fetch();
   unawaited(_save<T>(key, value, encode));
   return value;
+}
+
+/// Seperti `try { return await x; } catch { return fallback; }` tapi tetap
+/// sinkron kalau [run] sinkron (supaya provider tidak sempat loading).
+FutureOr<R> cacheFirstOr<T, R>(
+  FutureOr<T> Function() run,
+  R Function(T value) map,
+  R fallback,
+) {
+  try {
+    final FutureOr<T> v = run();
+    if (v is Future<T>) {
+      return v.then<R>(map).catchError((Object _) => fallback);
+    }
+    return map(v as T);
+  } catch (_) {
+    return fallback;
+  }
 }
 
 Future<void> _refreshInBackground<T>(

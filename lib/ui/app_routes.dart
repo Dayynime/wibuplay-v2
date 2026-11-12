@@ -21,8 +21,8 @@ import 'screens/store/premium_screen.dart';
 /// (parallax) supaya terasa menyatu, bukan sekadar ganti layar.
 Route<T> fadeRoute<T>(Widget page) {
   return PageRouteBuilder<T>(
-    transitionDuration: const Duration(milliseconds: 350),
-    reverseTransitionDuration: const Duration(milliseconds: 300),
+    transitionDuration: const Duration(milliseconds: 260),
+    reverseTransitionDuration: const Duration(milliseconds: 220),
     pageBuilder: (context, animation, secondary) => page,
     transitionsBuilder: (context, animation, secondary, child) {
       final enter = CurveTween(curve: Curves.easeOutCubic);

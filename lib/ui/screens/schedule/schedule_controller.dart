@@ -85,15 +85,24 @@ class ScheduleController extends Notifier<ScheduleUiState> {
   bool _alive = true;
   int _request = 0;
 
+  /// true kalau state awal sudah berisi salinan memori (jangan tampilkan
+  /// loading lagi di muatan pertama).
+  bool _startedFromCache = false;
+
   @override
   ScheduleUiState build() {
     _alive = true;
     ref.onDispose(() => _alive = false);
     Future.microtask(loadFullWeek);
-    return ScheduleUiState(
-      isLoading: true,
-      todayIndex: days.indexOf(HomeController.currentDayName()).clamp(0, 6),
-    );
+    final todayIndex = days.indexOf(HomeController.currentDayName()).clamp(0, 6);
+    // Salinan di memori (dimuat saat app start): langsung tampil di frame
+    // pertama, tanpa loading. Data baru menyusul lewat loadFullWeek.
+    final cached = _decodeWeek(DiskCache.peek(_cacheKey));
+    if (cached != null) {
+      _startedFromCache = true;
+      return ScheduleUiState(sections: cached, isLoading: false, todayIndex: todayIndex);
+    }
+    return ScheduleUiState(isLoading: true, todayIndex: todayIndex);
   }
 
   static const String _cacheKey = 'schedule_week';
@@ -102,8 +111,9 @@ class ScheduleController extends Notifier<ScheduleUiState> {
     final request = ++_request;
     // Belum ada isi: tampilkan salinan minggu terakhir dari HP dulu, lalu
     // data baru menggantikannya. Kalau gagal, salinan tetap tampil.
-    var showingCache = false;
-    if (state.sections.isEmpty) {
+    var showingCache = _startedFromCache;
+    _startedFromCache = false;
+    if (!showingCache && state.sections.isEmpty) {
       final cached = _decodeWeek(await DiskCache.read(_cacheKey));
       if (!_alive || request != _request) return;
       if (cached != null) {

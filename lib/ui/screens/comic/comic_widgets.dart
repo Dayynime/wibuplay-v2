@@ -85,7 +85,7 @@ class ComicImage extends StatelessWidget {
       fit: fit,
       alignment: alignment,
       memCacheWidth: memCacheWidth,
-      fadeInDuration: const Duration(milliseconds: 200),
+      fadeInDuration: const Duration(milliseconds: 120),
       fadeOutDuration: Duration.zero,
       placeholder: (_, __) => const SizedBox.expand(
         child: ShimmerBox(borderRadius: BorderRadius.zero),

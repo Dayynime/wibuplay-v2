@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/local/entities.dart';
 import '../../data/models/anime_item.dart';
 import '../../data/models/episode_item.dart';
+import '../../providers.dart';
 import 'net_image.dart';
 import 'poster_holder.dart';
 import '../redesign/z_kit.dart';
@@ -49,7 +51,19 @@ class _AnimePosterCardState extends State<AnimePosterCard> {
     final subtext = anime.genre ?? anime.year;
     final hasEp = !_blank(widget.episodeLabel);
 
-    return ZPress(
+    return Listener(
+      // Mulai ambil detail + episode begitu jari menyentuh poster, jadi saat
+      // halaman Detail terbuka datanya sudah (hampir) siap.
+      onPointerDown: (_) {
+        final id = widget.anime.id;
+        if (id == null || id.isEmpty) return;
+        try {
+          ProviderScope.containerOf(context, listen: false)
+              .read(repositoryProvider)
+              .prefetchDetail(id);
+        } catch (_) {}
+      },
+      child: ZPress(
       onTap: () {
         PosterTransitionHolder.url = widget.anime.posterUrl;
         widget.onTap();
@@ -147,6 +161,7 @@ class _AnimePosterCardState extends State<AnimePosterCard> {
             ],
           ],
         ),
+      ),
       ),
     );
   }
