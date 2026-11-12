@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -68,6 +70,14 @@ class AdminWallpaperTab extends ConsumerStatefulWidget {
 class _AdminWallpaperTabState extends ConsumerState<AdminWallpaperTab> {
   final ImagePicker _picker = ImagePicker();
   final TextEditingController _name = TextEditingController();
+  final TextEditingController _search = TextEditingController();
+  Timer? _searchDebounce;
+
+  /// Kata kunci pencarian (huruf kecil). Kosong = tidak mencari.
+  String _query = '';
+
+  /// Sedang memuat semua halaman untuk pencarian.
+  bool _loadingAll = false;
 
   String _filter = 'pending';
   List<AdminWallpaper> _items = const [];
@@ -96,6 +106,8 @@ class _AdminWallpaperTabState extends ConsumerState<AdminWallpaperTab> {
   @override
   void dispose() {
     widget.refresh.removeListener(_reload);
+    _searchDebounce?.cancel();
+    _search.dispose();
     _name.dispose();
     super.dispose();
   }
@@ -116,6 +128,7 @@ class _AdminWallpaperTabState extends ConsumerState<AdminWallpaperTab> {
         _hasMore = page.hasMore;
         _loading = false;
       });
+      if (_query.isNotEmpty && _hasMore) unawaited(_loadAll());
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -124,6 +137,93 @@ class _AdminWallpaperTabState extends ConsumerState<AdminWallpaperTab> {
       });
     }
   }
+
+  // ------------------------------------------------------------ search
+
+  /// Pencarian disaring di app: semua halaman filter aktif dimuat dulu
+  /// supaya wallpaper yang belum "Muat lagi" ikut ketemu.
+  Future<void> _loadAll() async {
+    if (_loadingAll) return;
+    final filter = _filter;
+    setState(() => _loadingAll = true);
+    try {
+      var guard = 0;
+      while (mounted && _hasMore && _filter == filter && _query.isNotEmpty && guard < 100) {
+        guard++;
+        final page = await _repo.adminList(filter, offset: _items.length);
+        if (!mounted || _filter != filter) return;
+        setState(() {
+          _items = [..._items, ...page.items];
+          _hasMore = page.hasMore;
+        });
+      }
+    } catch (_) {
+      // Biarkan hasil yang sudah ada; user bisa tarik untuk muat ulang.
+    } finally {
+      if (mounted) setState(() => _loadingAll = false);
+    }
+  }
+
+  void _onSearchChanged(String text) {
+    setState(() {}); // tombol hapus (x) ikut muncul/hilang
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 300), () {
+      if (!mounted) return;
+      final q = text.trim().toLowerCase();
+      if (q == _query) return;
+      setState(() => _query = q);
+      if (q.isNotEmpty && _hasMore && !_loading) _loadAll();
+    });
+  }
+
+  void _clearSearch() {
+    _searchDebounce?.cancel();
+    _search.clear();
+    setState(() => _query = '');
+  }
+
+  List<AdminWallpaper> get _visible {
+    if (_query.isEmpty) return _items;
+    return _items.where((w) {
+      return w.name.toLowerCase().contains(_query) ||
+          (w.uploaderName ?? '').toLowerCase().contains(_query) ||
+          w.rarity.label.toLowerCase().contains(_query);
+    }).toList();
+  }
+
+  Widget _searchField() => TextField(
+        controller: _search,
+        onChanged: _onSearchChanged,
+        textInputAction: TextInputAction.search,
+        style: const TextStyle(color: AppColors.textWhite, fontSize: 14),
+        decoration: InputDecoration(
+          isDense: true,
+          hintText: 'Cari nama, uploader, atau rarity…',
+          hintStyle: const TextStyle(color: AppColors.textMuted, fontSize: 13),
+          prefixIcon: const Icon(Icons.search_rounded, color: AppColors.textMuted, size: 20),
+          suffixIcon: _search.text.isEmpty
+              ? null
+              : IconButton(
+                  onPressed: _clearSearch,
+                  icon: const Icon(Icons.close_rounded, color: AppColors.textMuted, size: 18),
+                ),
+          filled: true,
+          fillColor: AppColors.surfaceDark,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(100),
+            borderSide: const BorderSide(color: _border),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(100),
+            borderSide: const BorderSide(color: _border),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(100),
+            borderSide: const BorderSide(color: AppColors.accentViolet),
+          ),
+        ),
+      );
 
   /// Bungkus aksi repo supaya pesan errornya tampil di banner Panel Admin.
   Future<void> _run(Future<void> Function() action, String ok) => widget.onAction(() async {
@@ -348,6 +448,18 @@ class _AdminWallpaperTabState extends ConsumerState<AdminWallpaperTab> {
                 ),
             ],
           ),
+          const SizedBox(height: 10),
+          _searchField(),
+          if (_query.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 8, left: 4),
+              child: Text(
+                _loadingAll
+                    ? 'Mencari… (${_visible.length} ketemu sejauh ini)'
+                    : '${_visible.length} hasil',
+                style: const TextStyle(color: AppColors.textMuted, fontSize: 11.5),
+              ),
+            ),
           if (!_canReview)
             const Padding(
               padding: EdgeInsets.only(top: 10),
@@ -372,16 +484,21 @@ class _AdminWallpaperTabState extends ConsumerState<AdminWallpaperTab> {
                 ],
               ),
             )
-          else if (_items.isEmpty)
-            const Padding(
-              padding: EdgeInsets.only(top: 40),
+          else if (_visible.isEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 40),
               child: Center(
-                child: Text('Belum ada wallpaper di sini.', style: TextStyle(color: AppColors.textSecondary)),
+                child: _loadingAll
+                    ? const CircularProgressIndicator(color: AppColors.accentViolet)
+                    : Text(
+                        _query.isEmpty ? 'Belum ada wallpaper di sini.' : 'Tidak ada wallpaper yang cocok.',
+                        style: const TextStyle(color: AppColors.textSecondary),
+                      ),
               ),
             )
           else ...[
-            for (final w in _items) _itemCard(w),
-            if (_hasMore)
+            for (final w in _visible) _itemCard(w),
+            if (_hasMore && _query.isEmpty)
               Center(
                 child: TextButton(
                   onPressed: _loading ? null : () => _load(more: true),
