@@ -54,6 +54,9 @@ final mbCaptionsProvider = FutureProvider.autoDispose.family<List<MbCaption>, St
 /// dengan episode anime / donghua.
 const String kMovieBoxPrefix = 'moviebox:';
 
+/// Kualitas tertinggi yang dipilih OTOMATIS (pilihan manual tidak dibatasi).
+const int kMbAutoMaxQualityP = 1080;
+
 /// Player film MovieBox. Tampilan & fitur disamakan dengan player anime /
 /// donghua: kontrol custom, gestur kecerahan/volume, double-tap +-10 detik,
 /// kunci layar, PiP, danmaku, kecepatan, kualitas (kunci > 480p non-premium),
@@ -794,10 +797,14 @@ class _MovieBoxPlayerScreenState extends ConsumerState<MovieBoxPlayerScreen> wit
 
     // ---- Kualitas terpilih: pilihan user, kalau belum -> urutan server
     // (h264 dulu) yang tidak terkunci untuk user ini.
+    // Otomatis maksimal 1080p: 2160p (4K HEVC) bikin video patah-patah di HP.
+    // 2160p tetap bisa dipilih manual dari sheet Kualitas.
     MbStream? selected;
     if (premium != null && streams.isNotEmpty) {
+      final allowed = streams.where((s) => !isQualityLocked(s.quality, premium)).toList();
       selected = streams.where((s) => s.url == _selectedUrl).firstOrNull ??
-          streams.where((s) => !isQualityLocked(s.quality, premium)).firstOrNull ??
+          allowed.where((s) => s.qualityValue <= kMbAutoMaxQualityP).firstOrNull ??
+          (allowed.isEmpty ? null : allowed.reduce((a, b) => a.qualityValue <= b.qualityValue ? a : b)) ??
           streams.first;
     }
 
