@@ -490,6 +490,8 @@ class _CreateGiveawaySheetState extends ConsumerState<_CreateGiveawaySheet> {
     final tax = total * taxPct / 100;
     final cost = total + tax;
     final enough = _ok(_days, _slots);
+    // XP pemberi kalau semua slot diklaim (dihitung server per klaim).
+    final xpMax = total * s.giveawayXpPerDay;
 
     // Sisa Premium pemberi setelah giveaway dibuat (khusus non-permanen).
     double? remainAfter;
@@ -590,6 +592,10 @@ class _CreateGiveawaySheetState extends ConsumerState<_CreateGiveawaySheet> {
                 remainAfter > 0 ? '${remainAfter.floor()} hari' : 'Tidak cukup',
                 remainAfter > 0 ? AppColors.textSecondary : AppColors.errorRed,
               ),
+            if (xpMax > 0) ...[
+              const Divider(color: Color(0x14FFFFFF), height: 20),
+              _xpRow(xpMax),
+            ],
           ],
         ),
       ),
@@ -637,6 +643,55 @@ class _CreateGiveawaySheetState extends ConsumerState<_CreateGiveawaySheet> {
   Widget _label(String text) => Text(
         text,
         style: const TextStyle(color: AppColors.textWhite, fontWeight: FontWeight.w700, fontSize: 15),
+      );
+
+  static String _fmtXp(int v) =>
+      v.toString().replaceAllMapped(RegExp(r'\B(?=(\d{3})+(?!\d))'), (_) => '.');
+
+  /// Baris XP pemberi: chip hijau + keterangan kecil.
+  Widget _xpRow(int xp) => Padding(
+        padding: const EdgeInsets.only(top: 2),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            const Icon(Icons.auto_awesome_rounded, size: 16, color: AppColors.successGreen),
+            const SizedBox(width: 8),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('XP untukmu', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                  SizedBox(height: 2),
+                  Text(
+                    'Per slot yang diklaim · naik level, tidak masuk leaderboard',
+                    style: TextStyle(color: AppColors.textMuted, fontSize: 10.5),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              child: Container(
+                key: ValueKey(xp),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.successGreen.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(100),
+                  border: Border.all(color: AppColors.successGreen.withValues(alpha: 0.45)),
+                ),
+                child: Text(
+                  's/d +${_fmtXp(xp)} XP',
+                  style: const TextStyle(
+                    color: AppColors.successGreen,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 12.5,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
       );
 
   Widget _sumRow(String label, String value, Color color) => Padding(
