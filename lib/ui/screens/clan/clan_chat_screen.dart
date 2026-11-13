@@ -378,6 +378,9 @@ class _ClanChatPaneState extends ConsumerState<ClanChatPane> with WidgetsBinding
           mine: own,
           nameColor: parseChatHex(p?.usernameColor),
           userNumber: p?.userNumber,
+          level: s.levels[m.firebaseUid],
+          clanTag: s.clanTags[m.firebaseUid],
+          isPremium: s.premiumUids.contains(m.firebaseUid),
           avatarUrl: p?.avatarUrl,
           onLongPress: () => _openActions(s, m, own, myUid),
           onReply: () {

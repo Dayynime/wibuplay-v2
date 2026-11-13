@@ -16,6 +16,9 @@ class ClanChatState {
     this.error,
     this.messages = const [],
     this.profiles = const {},
+    this.levels = const {},
+    this.clanTags = const {},
+    this.premiumUids = const {},
     this.isSending = false,
     this.sendError,
     this.replyTarget,
@@ -27,6 +30,11 @@ class ClanChatState {
   /// Urut lama -> baru.
   final List<ClanMessage> messages;
   final Map<String, ChatProfile> profiles;
+
+  /// Badge seperti Chat Global: level XP, tag clan, centang Premium.
+  final Map<String, int> levels;
+  final Map<String, String> clanTags;
+  final Set<String> premiumUids;
   final bool isSending;
   final String? sendError;
   final ClanMessage? replyTarget;
@@ -36,6 +44,9 @@ class ClanChatState {
     String? Function()? error,
     List<ClanMessage>? messages,
     Map<String, ChatProfile>? profiles,
+    Map<String, int>? levels,
+    Map<String, String>? clanTags,
+    Set<String>? premiumUids,
     bool? isSending,
     String? Function()? sendError,
     ClanMessage? Function()? replyTarget,
@@ -45,6 +56,9 @@ class ClanChatState {
       error: error != null ? error() : this.error,
       messages: messages ?? this.messages,
       profiles: profiles ?? this.profiles,
+      levels: levels ?? this.levels,
+      clanTags: clanTags ?? this.clanTags,
+      premiumUids: premiumUids ?? this.premiumUids,
       isSending: isSending ?? this.isSending,
       sendError: sendError != null ? sendError() : this.sendError,
       replyTarget: replyTarget != null ? replyTarget() : this.replyTarget,
@@ -127,18 +141,43 @@ class ClanChatController extends AutoDisposeNotifier<ClanChatState> {
     }
   }
 
+  /// uid yang badge-nya (level / tag clan / Premium) sudah diambil.
+  final Set<String> _badgeChecked = {};
+
   Future<void> _loadProfiles(List<ClanMessage> list) async {
-    final missing = list
-        .map((m) => m.firebaseUid)
-        .where((u) => !state.profiles.containsKey(u))
-        .toSet()
-        .toList();
-    if (missing.isEmpty) return;
-    try {
-      final got = await ref.read(chatRepositoryProvider).getProfilesForUids(missing);
-      if (got.isEmpty) return;
-      _update((s) => s.copyWith(profiles: {...s.profiles, ...got}));
-    } catch (_) {}
+    final uids = list.map((m) => m.firebaseUid).where((u) => u.isNotEmpty).toSet();
+    final missing = uids.where((u) => !state.profiles.containsKey(u)).toList();
+    final badgeMissing = uids.where((u) => !_badgeChecked.contains(u)).toList();
+    _badgeChecked.addAll(badgeMissing);
+
+    // Semua diambil bersamaan lalu dipasang sekali (seperti Chat Global);
+    // masing-masing boleh gagal sendiri.
+    final chat = ref.read(chatRepositoryProvider);
+    final xp = ref.read(xpRepositoryProvider);
+    final profilesF = missing.isEmpty
+        ? Future.value(const <String, ChatProfile>{})
+        : chat.getProfilesForUids(missing).catchError((Object _) => const <String, ChatProfile>{});
+    final levelsF = badgeMissing.isEmpty
+        ? Future.value(const <String, int>{})
+        : xp.getLevelsForUids(badgeMissing).catchError((Object _) => const <String, int>{});
+    final tagsF = badgeMissing.isEmpty
+        ? Future.value(const <String, String>{})
+        : chat.getClanTagsForUids(badgeMissing).catchError((Object _) => const <String, String>{});
+    final premiumF = badgeMissing.isEmpty
+        ? Future.value(const <String>{})
+        : xp.getPremiumUids(badgeMissing).catchError((Object _) => const <String>{});
+
+    final got = await profilesF;
+    final levels = await levelsF;
+    final tags = await tagsF;
+    final premium = await premiumF;
+    if (got.isEmpty && levels.isEmpty && tags.isEmpty && premium.isEmpty) return;
+    _update((s) => s.copyWith(
+          profiles: got.isEmpty ? null : {...s.profiles, ...got},
+          levels: levels.isEmpty ? null : {...s.levels, ...levels},
+          clanTags: tags.isEmpty ? null : {...s.clanTags, ...tags},
+          premiumUids: premium.isEmpty ? null : {...s.premiumUids, ...premium},
+        ));
   }
 
   void setReplyTarget(ClanMessage? m) => _update((s) => s.copyWith(replyTarget: () => m));
