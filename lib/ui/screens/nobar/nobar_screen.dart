@@ -156,7 +156,7 @@ class _NobarScreenState extends ConsumerState<NobarScreen> with WidgetsBindingOb
 
     final uid = _uid;
     if (uid != null) {
-      final voice = NobarVoice(myUid: uid, rt: rt, fetchIce: () => _repo.ice(_room.id));
+      final voice = NobarVoice(myUid: uid, fetchToken: () => _repo.voiceToken(_room.id));
       voice.setRoom(_room);
       _voice = voice;
     }

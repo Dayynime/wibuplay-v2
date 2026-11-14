@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../models/nobar_models.dart';
+import '../voice/nobar_voice.dart' show NobarVoiceToken;
 import 'authed_function.dart';
 
 class NobarException implements Exception {
@@ -123,6 +124,19 @@ class NobarRepository {
       'position_ms': positionMs,
       'playing': playing,
     }, 'Gagal menyimpan status');
+  }
+
+  /// Token LiveKit untuk masuk voice room (Edge Function `nobar-voice-token`).
+  Future<NobarVoiceToken> voiceToken(String id) async {
+    try {
+      final d = await callAuthedFunction(_dio, 'nobar-voice-token', {'id': id});
+      if (d is Map) return NobarVoiceToken.fromJson(Map<String, dynamic>.from(d));
+      throw NobarException('Gagal menyiapkan voice');
+    } on NobarException {
+      rethrow;
+    } catch (e) {
+      throw NobarException('Gagal menyiapkan voice chat');
+    }
   }
 
   Future<NobarIce> ice(String id) async {
