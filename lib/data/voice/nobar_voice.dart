@@ -323,8 +323,10 @@ class NobarVoice extends ChangeNotifier {
     for (final pub in p.audioTrackPublications) {
       final track = pub.track;
       if (track is lk.RemoteAudioTrack) {
+        // livekit_client 2.13 tidak punya RemoteAudioTrack.setVolume;
+        // atur volume lewat flutter_webrtc (dipakai LiveKit di dalamnya).
         try {
-          track.setVolume(muted ? 0 : 1.0);
+          unawaited(webrtc.Helper.setVolume(muted ? 0 : 1.0, track.mediaStreamTrack));
         } catch (_) {}
       }
     }

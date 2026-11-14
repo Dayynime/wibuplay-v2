@@ -17,6 +17,6 @@ final comicStoreProvider = ChangeNotifierProvider<ComicStore>((ref) => ComicStor
 /// Urutan sumber di sini = urutan di pemilih sumber (layar Komik).
 final comicRepositoryProvider = Provider<ComicRepository>((ref) {
   final dio = ref.watch(comicDioProvider);
-  final List<ComicSource> sources = [BacakomikSource(dio), WestmangaSource(dio)];
+  final List<ComicSource> sources = [BacakomikSource(dio), WestmangaSource()];
   return ComicRepository(sources, ref.read(comicStoreProvider));
 });

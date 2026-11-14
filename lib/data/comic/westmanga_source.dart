@@ -1,21 +1,139 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 
-import '../api/comic_network.dart';
+import '../../core/remote_config_manager.dart';
 import '../models/comic_models.dart';
 import 'comic_source.dart';
 
-/// Sumber kedua (Dayynime-v2): /comic/westmanga/... Port WestmangaSource.kt +
-/// WestmangaApi.kt + WestmangaModels.kt. Respons dibungkus `data`; list
-/// dipaginasi lewat pagination.current_page / last_page.
+/// Sumber kedua (Dayynime-v2): API situs Westmanga, dipanggil LANGSUNG dari
+/// app (dulu lewat Sanka, berhenti jalan sejak Westmanga pindah domain).
+///
+/// Base URL dari Remote Config `westmanga_base_url` (mis. https://v1.westmanga.my).
+/// Tiap request butuh token kunjungan (header X-WM-Visit) dari
+/// /api/visit-token; token terikat IP, berlaku ~30 menit, disimpan & diperbarui
+/// otomatis. Header dibuat mirip browser supaya tidak ditolak Cloudflare.
+///
+/// Endpoint:
+///   /api/contents?...      daftar, cari, genre (paginator.current_page/last_page)
+///   /api/contents/genres   daftar genre
+///   /api/comic/{slug}      detail + daftar chapter
+///   /api/v/{slug}          isi chapter (images relatif /img/...)
 class WestmangaSource implements ComicSource {
-  WestmangaSource(this._dio);
+  WestmangaSource()
+      : _dio = Dio(
+          BaseOptions(
+            connectTimeout: const Duration(seconds: 30),
+            receiveTimeout: const Duration(seconds: 30),
+            responseType: ResponseType.plain,
+            // 4xx dibaca sendiri (403 = token kedaluwarsa).
+            validateStatus: (s) => s != null && s < 500,
+          ),
+        );
 
   final Dio _dio;
+
+  static const String _ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+      '(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+
+  String? _token;
+  int _tokenExp = 0; // detik epoch
+  Future<String>? _tokenFuture;
 
   @override
   ComicSourceId get id => ComicSourceId.westmanga;
 
-  // id tab = nama endpoint /westmanga/{id}
+  String get _base {
+    final b = RemoteConfigManager.westmangaBaseUrl;
+    if (b == null) throw Exception('Sumber Dayynime-v2 belum siap, coba lagi nanti');
+    return b;
+  }
+
+  Map<String, String> _headers(String base, {String? referer}) => {
+        'User-Agent': _ua,
+        'Accept': 'application/json, text/plain, */*',
+        'Accept-Language': 'id-ID,id;q=0.9,en;q=0.8',
+        'Origin': base,
+        'Referer': referer ?? '$base/',
+        'sec-ch-ua': '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+        'sec-ch-ua-mobile': '?0',
+        'sec-ch-ua-platform': '"Windows"',
+        'Sec-Fetch-Dest': 'empty',
+        'Sec-Fetch-Mode': 'cors',
+        'Sec-Fetch-Site': 'same-origin',
+      };
+
+  static Object? _decode(Object? data) {
+    if (data is String) {
+      final t = data.trim();
+      if (t.isEmpty || !(t.startsWith('{') || t.startsWith('['))) return null;
+      try {
+        return jsonDecode(t);
+      } catch (_) {
+        return null;
+      }
+    }
+    return data;
+  }
+
+  Future<String> _visitToken(String base, {bool force = false}) {
+    final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    final t = _token;
+    if (!force && t != null && _tokenExp - now > 120) return Future.value(t);
+    return _tokenFuture ??= () async {
+      try {
+        final res = await _dio.get<dynamic>('$base/api/visit-token',
+            options: Options(headers: _headers(base)));
+        final j = _decode(res.data);
+        final tok = j is Map ? j['token']?.toString() : null;
+        if (tok == null || tok.isEmpty) {
+          throw Exception('Gagal menyambung ke Dayynime-v2, coba lagi');
+        }
+        _token = tok;
+        _tokenExp = _optLong(j is Map ? j['expires_at'] : null, now + 1500);
+        return tok;
+      } finally {
+        _tokenFuture = null;
+      }
+    }();
+  }
+
+  /// GET JSON dengan token; 401/403 = token diperbarui lalu diulang sekali.
+  Future<Map<String, dynamic>> _get(String pathAndQuery, {String? referer}) async {
+    final base = _base;
+    for (var attempt = 0; attempt < 2; attempt++) {
+      final tok = await _visitToken(base, force: attempt > 0);
+      final res = await _dio.get<dynamic>(
+        '$base$pathAndQuery',
+        options: Options(headers: {..._headers(base, referer: referer), 'X-WM-Visit': tok}),
+      );
+      final code = res.statusCode ?? 0;
+      final j = _decode(res.data);
+      if ((code == 401 || code == 403) && attempt == 0) continue;
+      if (code == 404) throw Exception('Komik tidak ditemukan');
+      if (j is Map && code < 400) return Map<String, dynamic>.from(j);
+      throw Exception(code == 403
+          ? 'Dayynime-v2 sedang menolak akses, coba lagi nanti'
+          : 'Server Dayynime-v2 bermasalah (kode $code)');
+    }
+    throw Exception('Gagal memuat Dayynime-v2');
+  }
+
+  /// "/img/..." -> "https://host/img/..."; alamat penuh dibiarkan.
+  String? _abs(String? u) {
+    if (u == null || u.trim().isEmpty) return null;
+    final v = u.trim();
+    if (v.startsWith('http://') || v.startsWith('https://')) return v;
+    if (v.startsWith('//')) return 'https:$v';
+    final b = RemoteConfigManager.westmangaBaseUrl ?? '';
+    return v.startsWith('/') ? '$b$v' : '$b/$v';
+  }
+
+  static String _q(Map<String, String> m) => m.entries
+      .map((e) => '${e.key}=${Uri.encodeQueryComponent(e.value)}')
+      .join('&');
+
+  // id tab -> parameter /api/contents (lihat _tabQuery)
   @override
   List<ComicTab> get tabs => const [
         ComicTab('latest', 'Terbaru'),
@@ -29,32 +147,40 @@ class WestmangaSource implements ComicSource {
         ComicTab('az', 'A-Z'),
         ComicTab('za', 'Z-A'),
         ComicTab('added', 'Baru Ditambah'),
-        ComicTab('colored', 'Berwarna'),
-        ComicTab('uncolored', 'Hitam Putih'),
         ComicTab('projects', 'Project'),
-        ComicTab('others', 'Lainnya'),
       ];
+
+  static Map<String, String> _tabQuery(String tabId) => switch (tabId) {
+        'popular' => {'orderBy': 'Popular'},
+        'ongoing' => {'status': 'Ongoing', 'orderBy': 'Update'},
+        'completed' => {'status': 'Completed', 'orderBy': 'Update'},
+        'list' => {},
+        'manga' => {'country': 'JP', 'orderBy': 'Update'},
+        'manhwa' => {'country': 'KR', 'orderBy': 'Update'},
+        'manhua' => {'country': 'CN', 'orderBy': 'Update'},
+        'az' => {'orderBy': 'Az'},
+        'za' => {'orderBy': 'Za'},
+        'added' => {'orderBy': 'Added'},
+        'projects' => {'project': 'true', 'orderBy': 'Update'},
+        _ => {'orderBy': 'Update'}, // latest
+      };
 
   @override
   Future<ComicListResponse> browse(String tabId, int page) async {
-    // GET westmanga/{kind}?page=
-    return _toList(
-      await comicGetMap(_dio, 'westmanga/${comicEnc(tabId)}', query: {'page': page}),
-    );
+    final q = _q({..._tabQuery(tabId), 'page': '$page'});
+    return _toList(await _get('/api/contents?$q'));
   }
 
   @override
   Future<ComicListResponse> search(String query, int page) async {
-    // GET westmanga/search?q=&page=
-    return _toList(
-      await comicGetMap(_dio, 'westmanga/search', query: {'q': query, 'page': page}),
-    );
+    final q = _q({'q': query, 'page': '$page'});
+    return _toList(await _get('/api/contents?$q'));
   }
 
   @override
   Future<ComicDetail> detail(String slug) async {
-    // GET westmanga/detail/{slug} -> { data: {...} }
-    final map = await comicGetMap(_dio, 'westmanga/detail/${comicEnc(slug)}');
+    final map = await _get('/api/comic/${Uri.encodeComponent(slug)}',
+        referer: '$_base/comic/$slug');
     final d = map['data'];
     if (d is! Map) throw Exception('Detail komik tidak ditemukan');
     final data = Map<String, dynamic>.from(d);
@@ -80,7 +206,7 @@ class WestmangaSource implements ComicSource {
     final rating = _double(data['rating']);
     return ComicDetail(
       title: _str(data['title']),
-      cover: _str(data['cover']),
+      cover: _abs(_str(data['cover'])),
       rating: rating != null && rating > 0 ? rating.toString() : null,
       status: _str(data['status']),
       type: _typeOf(_str(data['country_id'])),
@@ -97,9 +223,9 @@ class WestmangaSource implements ComicSource {
 
   @override
   Future<ComicChapterResponse> chapter(String comicSlug, String chapterSlug) async {
-    // GET westmanga/chapter/{slug}. Sengaja diambil mentah: lokasi array
-    // gambar di dalam `data` dicari fleksibel (lihat _findImages).
-    final map = await comicGetMap(_dio, 'westmanga/chapter/${comicEnc(chapterSlug)}');
+    // Lokasi array gambar di dalam `data` dicari fleksibel (lihat _findImages).
+    final map = await _get('/api/v/${Uri.encodeComponent(chapterSlug)}',
+        referer: '$_base/view/$chapterSlug');
     final d = map['data'];
     if (d is! Map) throw Exception('Respons chapter tidak valid');
     final data = Map<String, dynamic>.from(d);
@@ -142,8 +268,7 @@ class WestmangaSource implements ComicSource {
 
   @override
   Future<List<ComicGenreItem>> genres() async {
-    // GET westmanga/genres -> { data: [{id, name}] }
-    final map = await comicGetMap(_dio, 'westmanga/genres');
+    final map = await _get('/api/contents/genres');
     return [
       for (final g in _maps(map['data']))
         if (_str(g['id']) != null)
@@ -151,27 +276,13 @@ class WestmangaSource implements ComicSource {
     ];
   }
 
-  // genreSlug = id genre; boleh beberapa id dipisah koma ("13,344") -> genres-filter.
+  // genreSlug = id genre; boleh beberapa id dipisah koma ("13,344").
   @override
   Future<ComicListResponse> byGenre(String genreSlug, int page) async {
-    if (genreSlug.contains(',')) {
-      // GET westmanga/genres-filter?genres=13,344&page=
-      return _toList(
-        await comicGetMap(
-          _dio,
-          'westmanga/genres-filter',
-          query: {'genres': genreSlug, 'page': page},
-        ),
-      );
-    }
-    // GET westmanga/genre/{id}?page=
-    return _toList(
-      await comicGetMap(
-        _dio,
-        'westmanga/genre/${comicEnc(genreSlug)}',
-        query: {'page': page},
-      ),
-    );
+    final ids = genreSlug.split(',').map((e) => e.trim()).where((e) => e.isNotEmpty);
+    final g = ids.map((id) => 'genre[]=${Uri.encodeQueryComponent(id)}').join('&');
+    final q = _q({'orderBy': 'Update', 'page': '$page'});
+    return _toList(await _get('/api/contents?$g&$q'));
   }
 
   // ---------------------------------------------------------------- mapper
@@ -242,7 +353,7 @@ class WestmangaSource implements ComicSource {
     return ComicListItem(
       title: t,
       slug: s,
-      cover: _str(m['cover']),
+      cover: _abs(_str(m['cover'])),
       chapter: number != null ? 'Chapter $number' : null,
       date: newestDate != null ? _dateOnly(newestDate) : null,
       rating: rating != null && rating > 0 ? rating.toString() : null,
@@ -251,7 +362,7 @@ class WestmangaSource implements ComicSource {
   }
 
   ComicListResponse _toList(Map<String, dynamic> map) {
-    final p = map['pagination'];
+    final p = map['paginator'] ?? map['pagination'];
     final pm = p is Map ? Map<String, dynamic>.from(p) : const <String, dynamic>{};
     final current = _optLong(pm['current_page'], 1);
     final last = _optLong(pm['last_page'], 1);
@@ -294,8 +405,10 @@ class WestmangaSource implements ComicSource {
     if (arr is! List || arr.isEmpty) return null;
     final out = <String>[];
     for (final v in arr) {
-      if (v is! String || !v.startsWith('http')) return null;
-      out.add(v);
+      if (v is! String) return null;
+      final t = v.trim();
+      if (!(t.startsWith('http') || t.startsWith('/img/') || t.startsWith('//'))) return null;
+      out.add(_abs(t)!);
     }
     return out;
   }

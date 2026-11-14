@@ -92,6 +92,10 @@ class RemoteConfigManager {
   // Base URL API film (server moviebox-flask). Parameter TERPISAH.
   static const String _keyMovieBoxBaseUrl = 'moviebox_base_url';
 
+  // Base URL situs Westmanga (komik Dayynime-v2), dipanggil LANGSUNG dari app.
+  // Contoh nilai: https://v1.westmanga.my  (domainnya sering pindah).
+  static const String _keyWestmangaBaseUrl = 'westmanga_base_url';
+
   // Header Referer buat API/gambar/download Animein. TANPA fallback hardcode.
   static const String _keyApiReferer = 'api_referer';
 
@@ -178,6 +182,18 @@ class RemoteConfigManager {
     final v = rc.getString(_keyMovieBoxBaseUrl).trim();
     if (v.isEmpty) return null;
     return v.endsWith('/') ? v : '$v/';
+  }
+
+  /// Base URL Westmanga (tanpa "/" akhir), murni dari Remote Config
+  /// `westmanga_base_url`. null kalau kosong / belum pernah fetch sukses.
+  static String? get westmangaBaseUrl {
+    final rc = _instance;
+    if (rc == null) return null;
+    var v = rc.getString(_keyWestmangaBaseUrl).trim();
+    while (v.endsWith('/')) {
+      v = v.substring(0, v.length - 1);
+    }
+    return v.isEmpty ? null : v;
   }
 
   /// Referer API Animein, murni dari Remote Config `api_referer`. Sama seperti

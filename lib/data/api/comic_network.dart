@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:dio/dio.dart';
 
+import '../../core/remote_config_manager.dart';
+
 /// Klien HTTP komik (port ComicApi.kt + comicOkHttpClient di NetworkModule.kt).
 ///
 /// Memanggil LANGSUNG API komik Sanka. Publik, tanpa apikey, base URL fixed
@@ -23,8 +25,15 @@ class ComicNetwork {
 
   /// "//x" -> "https://x", "http://x" -> "https://x" (cleartext diblok Android).
   static String? normalizeImageUrl(String? url) {
-    final u = url?.trim();
+    var u = url?.trim();
     if (u == null || u.isEmpty) return null;
+    // Server gambar lama Westmanga sudah mati; file yang sama ada di domain
+    // baru: storage.westmanga.blog/west/... -> <westmanga_base_url>/img/...
+    // (cover di Favorit/Riwayat yang tersimpan sebelum pindah).
+    const oldHost = '://storage.westmanga.blog/west/';
+    final wm = RemoteConfigManager.westmangaBaseUrl;
+    final i = u.indexOf(oldHost);
+    if (wm != null && i >= 0) u = '$wm/img/${u.substring(i + oldHost.length)}';
     if (u.startsWith('//')) return 'https:$u';
     if (u.startsWith('http://')) return 'https://${u.substring(7)}';
     return u;
