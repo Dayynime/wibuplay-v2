@@ -92,6 +92,10 @@ class RemoteConfigManager {
   // Base URL API film (server moviebox-flask). Parameter TERPISAH.
   static const String _keyMovieBoxBaseUrl = 'moviebox_base_url';
 
+  // Base URL situs LK21 (sumber film), di-scrape langsung dari app.
+  // Contoh nilai: https://tv12.lk21official.cc  (domainnya sering pindah).
+  static const String _keyLk21BaseUrl = 'lk21_base_url';
+
   // Base URL situs Westmanga (komik Dayynime-v2), dipanggil LANGSUNG dari app.
   // Contoh nilai: https://v1.westmanga.my  (domainnya sering pindah).
   static const String _keyWestmangaBaseUrl = 'westmanga_base_url';
@@ -182,6 +186,18 @@ class RemoteConfigManager {
     final v = rc.getString(_keyMovieBoxBaseUrl).trim();
     if (v.isEmpty) return null;
     return v.endsWith('/') ? v : '$v/';
+  }
+
+  /// Base URL LK21 (tanpa "/" akhir), murni dari Remote Config `lk21_base_url`.
+  /// null kalau kosong / belum pernah fetch sukses.
+  static String? get lk21BaseUrl {
+    final rc = _instance;
+    if (rc == null) return null;
+    var v = rc.getString(_keyLk21BaseUrl).trim();
+    while (v.endsWith('/')) {
+      v = v.substring(0, v.length - 1);
+    }
+    return v.isEmpty ? null : v;
   }
 
   /// Base URL Westmanga (tanpa "/" akhir), murni dari Remote Config

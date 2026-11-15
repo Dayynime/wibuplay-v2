@@ -9,7 +9,7 @@ import 'common_components.dart';
 import 'shimmer.dart';
 
 /// Film yang SELALU jadi sorotan section Film di Beranda.
-const String kMovieHomeFeaturedId = '6026412232966389904'; // Spider-Man: Brand New Day
+const String kMovieHomeFeaturedId = 'spider-man-brand-new-day-2026'; // Spider-Man: Brand New Day (slug LK21)
 
 /// Isi section Film: sorotan (film pilihan di atas) + baris Rekomendasi
 /// (10 film pertama urutan "Rekomendasi" MovieBox, daftar khusus film,
@@ -27,9 +27,13 @@ final movieHomeProvider = FutureProvider<MovieHomeData>((ref) async {
     repo.getDetail(kMovieHomeFeaturedId).then<Object?>((v) => v).catchError((Object _) => null),
     repo.getMovies(page: 1, sort: MbSort.recommend).then<Object?>((v) => v).catchError((Object _) => null),
   ]);
-  final featured = results[0] as MbDetail?;
+  var featured = results[0] as MbDetail?;
   final list = (results[1] as List<MbItem>?) ?? const <MbItem>[];
-  final items = list.where((m) => m.id != kMovieHomeFeaturedId).take(10).toList();
+  // Sorotan tidak ketemu (slug berubah) -> pakai film pertama daftar.
+  if (featured == null && list.isNotEmpty) {
+    featured = await repo.getDetail(list.first.id).then<MbDetail?>((v) => v).catchError((Object _) => null);
+  }
+  final items = list.where((m) => m.id != (featured?.id ?? kMovieHomeFeaturedId)).take(10).toList();
   if (featured == null && items.isEmpty) throw Exception('Film tidak tersedia');
   return MovieHomeData(featured: featured, items: items);
 });

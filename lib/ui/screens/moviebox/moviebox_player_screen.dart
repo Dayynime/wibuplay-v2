@@ -838,6 +838,11 @@ class _MovieBoxPlayerScreenState extends ConsumerState<MovieBoxPlayerScreen> wit
       _toast('Link video belum siap, coba lagi sebentar');
       return;
     }
+    // Sumber film sekarang HLS (m3u8): pengunduh baru mendukung file tunggal.
+    if (streams.every((s) => s.url.toLowerCase().contains('.m3u8'))) {
+      _toast('Download film belum tersedia untuk sumber ini');
+      return;
+    }
 
     final picked = await _pickDownloadQuality(streams);
     if (picked == null || !mounted) return;
