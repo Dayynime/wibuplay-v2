@@ -554,8 +554,8 @@ class _PageLevels extends StatelessWidget {
     return _Page(
       hero: const AffinitySeal(type: AffinityType.rival, size: 72, delay: Duration(milliseconds: 200), clash: true),
       jp: '五つの段階',
-      title: '5 tahap level',
-      body: 'Makin banyak poin, makin tinggi level ikatan kalian. Level terlihat di cincin warna sekitar avatar.',
+      title: '20 level, 5 tahap',
+      body: 'Makin banyak poin, makin tinggi level ikatan kalian (maks Lv 20). Tiap tahap berisi 4 level. Level terlihat di cincin warna sekitar avatar.',
       children: [
         for (var k = 0; k < 5; k++)
           Padding(
@@ -578,7 +578,7 @@ class _PageLevels extends StatelessWidget {
                   child: Text.rich(
                     TextSpan(children: [
                       TextSpan(
-                        text: 'Lv ${k + 1} · ${AffinityLevels.names[k]}',
+                        text: 'Lv ${k * AffinityLevels.perStage + 1}–${(k + 1) * AffinityLevels.perStage} · ${AffinityLevels.names[k]}',
                         style: const TextStyle(color: AppColors.textWhite, fontWeight: FontWeight.w700),
                       ),
                       TextSpan(text: '  ${AffinityLevels.jp[k]} · ${meaning[k]}'),
@@ -586,7 +586,7 @@ class _PageLevels extends StatelessWidget {
                     style: const TextStyle(color: AppColors.textSecondary, fontSize: 12.5),
                   ),
                 ),
-                Text(k == 0 ? 'Awal' : '${_fmt(pts[k])} poin',
+                Text(k == 0 ? 'Awal' : '${_fmt(pts[k * AffinityLevels.perStage])} poin',
                     style: TextStyle(color: c, fontSize: 12, fontWeight: FontWeight.w800)),
               ],
             ),

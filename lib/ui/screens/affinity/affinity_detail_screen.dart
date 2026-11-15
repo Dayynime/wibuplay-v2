@@ -17,7 +17,7 @@ import 'affinity_fx.dart';
 import 'affinity_providers.dart';
 import 'affinity_screen.dart' show affinityDate;
 
-/// Detail satu ikatan: avatar berdua + cap, level 5 tahap, statistik, momen.
+/// Detail satu ikatan: avatar berdua + cap, level (20 level, 5 tahap), statistik, momen.
 class AffinityDetailScreen extends ConsumerWidget {
   const AffinityDetailScreen({super.key, required this.id});
 
@@ -386,6 +386,8 @@ class _Steps extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 5 bulatan = 5 tahap (tiap tahap 4 level).
+    final st = AffinityLevels.stage(level) + 1;
     return Stack(
       children: [
         Positioned(
@@ -409,13 +411,13 @@ class _Steps extends StatelessWidget {
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: k <= level ? Color.alphaBlend(color.withValues(alpha: 0.25), AppColors.backgroundDark) : AppColors.surfaceCard,
-                        border: Border.all(color: k <= level ? color : const Color(0x1AFFFFFF), width: 1.5),
-                        boxShadow: k == level ? [BoxShadow(color: color.withValues(alpha: 0.25), spreadRadius: 4)] : null,
+                        color: k <= st ? Color.alphaBlend(color.withValues(alpha: 0.25), AppColors.backgroundDark) : AppColors.surfaceCard,
+                        border: Border.all(color: k <= st ? color : const Color(0x1AFFFFFF), width: 1.5),
+                        boxShadow: k == st ? [BoxShadow(color: color.withValues(alpha: 0.25), spreadRadius: 4)] : null,
                       ),
                       child: Text(
                         AffinityLevels.short[k - 1],
-                        style: affinityKanjiStyle(color: k <= level ? color : AppColors.textMuted, size: 11),
+                        style: affinityKanjiStyle(color: k <= st ? color : AppColors.textMuted, size: 11),
                       ),
                     ),
                     const SizedBox(height: 4),

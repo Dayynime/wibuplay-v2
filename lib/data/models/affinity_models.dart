@@ -57,17 +57,27 @@ String affinityRoleLabel(String? role) => switch (role) {
       _ => '',
     };
 
-/// Tahap level afinitas (Lv 1..5).
+/// Level afinitas Lv 1..20, dibagi 5 tahap (tiap tahap 4 level):
+/// Lv1-4 Deai, 5-8 Kizuna, 9-12 Shinrai, 13-16 Kyoumei, 17-20 Eien.
 class AffinityLevels {
   AffinityLevels._();
+
+  static const int maxLevel = 20;
+  static const int perStage = 4;
 
   static const names = ['Deai', 'Kizuna', 'Shinrai', 'Kyoumei', 'Eien'];
   static const jp = ['出会い', '絆', '信頼', '共鳴', '永遠'];
   static const short = ['出', '絆', '信', '共', '永'];
-  static const defaultThresholds = [0, 500, 2000, 6000, 15000];
+  static const defaultThresholds = [
+    0, 300, 800, 1500, 2500, 4000, 6000, 8500, 11500, 15000, //
+    19000, 24000, 30000, 37000, 45000, 54000, 64000, 75000, 87000, 100000,
+  ];
 
-  static String name(int level) => names[(level - 1).clamp(0, 4)];
-  static String jpName(int level) => jp[(level - 1).clamp(0, 4)];
+  /// Indeks tahap 0..4 dari level.
+  static int stage(int level) => ((level - 1) ~/ perStage).clamp(0, names.length - 1);
+
+  static String name(int level) => names[stage(level)];
+  static String jpName(int level) => jp[stage(level)];
 
   /// Progres 0..1 di dalam level sekarang.
   static double progress(int points, int level, List<int> t) {
@@ -78,9 +88,11 @@ class AffinityLevels {
     return ((points - lo) / (hi - lo)).clamp(0.0, 1.0).toDouble();
   }
 
-  /// Progres total 0..1 (Lv1 kosong .. Lv5 penuh).
-  static double overall(int points, int level, List<int> t) =>
-      (((level - 1) + (level >= 5 ? 1.0 : progress(points, level, t))) / 5).clamp(0.0, 1.0).toDouble();
+  /// Progres total 0..1 (Lv1 kosong .. Lv maks penuh).
+  static double overall(int points, int level, List<int> t) {
+    final max = t.length < 2 ? maxLevel : t.length;
+    return (((level - 1) + (level >= max ? 1.0 : progress(points, level, t))) / max).clamp(0.0, 1.0).toDouble();
+  }
 }
 
 int _int(Object? v, [int d = 0]) => (v as num?)?.toInt() ?? d;
