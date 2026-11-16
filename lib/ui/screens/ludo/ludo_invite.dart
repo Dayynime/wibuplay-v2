@@ -11,19 +11,53 @@ import '../../components/friend_avatar.dart';
 import '../../components/friend_search_field.dart';
 import 'ludo_webview_screen.dart';
 
-// Undangan Ludo dikirim sebagai pesan teks biasa di chat (global, clan,
-// pribadi), sama seperti catur, jadi server chat tidak perlu diubah. App
-// mengenali baris "Kode room ludo: XXXXXX" lalu menampilkan kartu dengan
-// tombol Gabung. App versi lama tetap melihat teksnya seperti pesan biasa.
+// Undangan minigame web (Ludo, Ular Tangga, Duel) dikirim sebagai pesan teks
+// biasa di chat (global, clan, pribadi), sama seperti catur, jadi server chat
+// tidak perlu diubah. App mengenali baris "Kode room <game>: XXXXXX" lalu
+// menampilkan kartu dengan tombol Gabung. App versi lama tetap melihat teksnya.
 
-final RegExp _inviteRe = RegExp(r'Kode room ludo:\s*([A-Z2-9]{6})\b', caseSensitive: false);
+/// Minigame web yang punya room & undangan.
+class WebGame {
+  const WebGame(this.key, this.title, this.path, this.icon, this.accent);
+
+  final String key;
+  final String title;
+
+  /// Halaman di situs minigame (dibuka di LudoWebViewScreen).
+  final String path;
+  final IconData icon;
+  final Color accent;
+}
+
+const WebGame ludoGame = WebGame('ludo', 'Ludo', '/', Icons.grid_view_rounded, Color(0xFFFFB52B));
+const WebGame ularGame = WebGame('ular', 'Ular Tangga', '/ular/', Icons.stairs_rounded, Color(0xFF2FD59A));
+const WebGame duelGame = WebGame('duel', 'Duel', '/duel/', Icons.grid_3x3_rounded, Color(0xFF4D9DFF));
+
+WebGame webGameByKey(Object? key) => switch (key) {
+      'ular' => ularGame,
+      'duel' => duelGame,
+      _ => ludoGame,
+    };
+
+final RegExp _inviteRe = RegExp(r'Kode room (ludo|ular|duel):\s*([A-Z2-9]{6})\b', caseSensitive: false);
 final RegExp _playersRe = RegExp(r'\((\d) pemain\)');
 
-/// Kode room kalau [message] adalah undangan Ludo, selain itu null.
-String? ludoInviteCode(String message) => _inviteRe.firstMatch(message)?.group(1)?.toUpperCase();
+/// Kode room kalau [message] adalah undangan minigame web, selain itu null.
+String? ludoInviteCode(String message) => _inviteRe.firstMatch(message)?.group(2)?.toUpperCase();
 
-String ludoInviteText(String code, int? players) =>
-    '🎲 Ayo main Ludo bareng aku!${players != null ? ' ($players pemain)' : ''}\nKode room ludo: $code';
+/// Game dari pesan undangan (default Ludo).
+WebGame webGameOfInvite(String message) => webGameByKey(_inviteRe.firstMatch(message)?.group(1)?.toLowerCase());
+
+String _modeName(String? mode) => mode == 'ttt' ? 'Tic-Tac-Toe' : 'Connect 4';
+
+String ludoInviteText(String code, int? players, {WebGame game = ludoGame, String? mode}) {
+  final p = players != null ? ' ($players pemain)' : '';
+  return switch (game.key) {
+    'ular' => '🐍 Ayo main Ular Tangga bareng aku!$p\nKode room ular: $code',
+    'duel' => '⚔️ Tantang aku duel ${_modeName(mode)}!\nKode room duel: $code',
+    _ => '🎲 Ayo main Ludo bareng aku!$p\nKode room ludo: $code',
+  };
+}
 
 const List<Color> _ludoColors = [Color(0xFFFF6B81), Color(0xFF2FD59A), Color(0xFFFFC53D), Color(0xFF4D9DFF)];
 
@@ -41,7 +75,11 @@ class LudoInviteCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final code = ludoInviteCode(message) ?? '';
+    final game = webGameOfInvite(message);
     final players = _playersRe.firstMatch(message)?.group(1);
+    final detail = game.key == 'duel'
+        ? (message.contains('Tic-Tac-Toe') ? 'Tic-Tac-Toe' : 'Connect 4')
+        : (players != null ? '$players pemain' : null);
 
     return Container(
       margin: const EdgeInsets.only(top: 2),
@@ -63,18 +101,18 @@ class LudoInviteCard extends StatelessWidget {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const _MiniBoard(),
+              game.key == 'ludo' ? const _MiniBoard() : _GameIcon(game: game),
               const SizedBox(width: 10),
               Flexible(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Ajakan Ludo',
+                    Text(
+                      game.key == 'duel' ? 'Tantangan Duel' : 'Ajakan ${game.title}',
                       style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14),
                     ),
                     Text(
-                      [if (players != null) '$players pemain', 'Room $code'].join(' · '),
+                      [if (detail != null) detail, 'Room $code'].join(' · '),
                       style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
                     ),
                   ],
@@ -96,7 +134,7 @@ class LudoInviteCard extends StatelessWidget {
                   ? null
                   : () {
                       HapticFeedback.mediumImpact();
-                      Navigator.of(context).push<void>(fadeRoute(LudoWebViewScreen(code: code)));
+                      Navigator.of(context).push<void>(fadeRoute(LudoWebViewScreen(code: code, path: game.path)));
                     },
               icon: Icon(mine ? Icons.open_in_new_rounded : Icons.sports_esports_rounded, size: 18),
               label: Text(mine ? 'Buka room' : 'Gabung', style: const TextStyle(fontWeight: FontWeight.w800)),
@@ -104,6 +142,23 @@ class LudoInviteCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Ikon game selain Ludo.
+class _GameIcon extends StatelessWidget {
+  const _GameIcon({required this.game});
+
+  final WebGame game;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 38,
+      height: 38,
+      decoration: BoxDecoration(color: game.accent, borderRadius: BorderRadius.circular(10)),
+      child: Icon(game.icon, color: Colors.white, size: 22),
     );
   }
 }
@@ -138,22 +193,24 @@ class _MiniBoard extends StatelessWidget {
 // Lembar undang teman
 // ============================================================================
 
-/// Undang ke room Ludo [code] lewat Chat Global, Clan, Teman, atau aplikasi lain.
-Future<void> showLudoShareSheet(BuildContext context, String code, int? players) {
+/// Undang ke room [game] dengan [code] lewat Chat Global, Clan, Teman, atau aplikasi lain.
+Future<void> showLudoShareSheet(BuildContext context, String code, int? players, {WebGame game = ludoGame, String? mode}) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     backgroundColor: AppColors.surfaceDark,
     shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-    builder: (_) => _LudoShareSheet(code: code, players: players),
+    builder: (_) => _LudoShareSheet(code: code, players: players, game: game, mode: mode),
   );
 }
 
 class _LudoShareSheet extends ConsumerStatefulWidget {
-  const _LudoShareSheet({required this.code, required this.players});
+  const _LudoShareSheet({required this.code, required this.players, required this.game, this.mode});
 
   final String code;
   final int? players;
+  final WebGame game;
+  final String? mode;
 
   @override
   ConsumerState<_LudoShareSheet> createState() => _LudoShareSheetState();
@@ -167,7 +224,7 @@ class _LudoShareSheetState extends ConsumerState<_LudoShareSheet> {
   String _query = '';
   String? _friendError;
 
-  String get _text => ludoInviteText(widget.code, widget.players);
+  String get _text => ludoInviteText(widget.code, widget.players, game: widget.game, mode: widget.mode);
   String? get _uid => ref.read(authUserProvider).valueOrNull?.uid;
 
   void _snack(String text) {
@@ -254,8 +311,8 @@ class _LudoShareSheetState extends ConsumerState<_LudoShareSheet> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Ajak main Ludo',
+                Text(
+                  'Ajak main ${widget.game.title}',
                   style: TextStyle(color: AppColors.textWhite, fontSize: 18, fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(height: 4),
@@ -269,7 +326,7 @@ class _LudoShareSheetState extends ConsumerState<_LudoShareSheet> {
                   if (clan != null) _option(Icons.shield_rounded, 'Chat Clan', 'clan', _sendClan),
                   _option(Icons.people_alt_rounded, 'Teman', null, _loadFriends, chevron: true),
                   _option(Icons.ios_share_rounded, 'Aplikasi lain', null, () async {
-                    await Share.share('$_text\n\nBuka Zenime → Zenime Games → Ludo → masukkan kode.');
+                    await Share.share('$_text\n\nBuka Zenime → Zenime Games → ${widget.game.title} → masukkan kode.');
                   }),
                 ] else
                   Flexible(child: _friendList()),

@@ -18,7 +18,7 @@ import '../tree/tree_screen.dart';
 import '../wallpaper/wallpaper_screen.dart';
 import 'game_previews.dart';
 
-/// Hub "Zenime Games": satu pintu ke Catur, Ludo, Gacha, Pohon ZCoin, Border Avatar, dan
+/// Hub "Zenime Games": satu pintu ke Catur, Ludo, Ular Tangga, Duel, Block!, Gacha, Pohon ZCoin, Border Avatar, dan
 /// Efek Profil (dulunya empat kartu terpisah di tab Menu).
 class ZenimeGamesScreen extends ConsumerStatefulWidget {
   const ZenimeGamesScreen({super.key});
@@ -70,6 +70,30 @@ class _ZenimeGamesScreenState extends ConsumerState<ZenimeGamesScreen>
       colors: const [Color(0xFF0E2A47), Color(0xFF2F80ED), Color(0xFFFFC94D)],
       page: () => const LudoWebViewScreen(),
       preview: () => const LudoBoardPreview(),
+    ),
+    _GameItem(
+      title: 'Ular Tangga',
+      subtitle: 'Naik tangga, hindari ular, 2–6 pemain',
+      icon: Icons.stairs_rounded,
+      colors: const [Color(0xFF0F3D2A), Color(0xFF1FA35C), Color(0xFFFFC94D)],
+      page: () => const LudoWebViewScreen(path: '/ular/'),
+      preview: () => const UlarBoardPreview(),
+    ),
+    _GameItem(
+      title: 'Duel',
+      subtitle: 'Tic-Tac-Toe & Connect 4, 1 lawan 1',
+      icon: Icons.grid_3x3_rounded,
+      colors: const [Color(0xFF14204A), Color(0xFF3D6EE0), Color(0xFFFF5C76)],
+      page: () => const LudoWebViewScreen(path: '/duel/'),
+      preview: () => const DuelPreview(),
+    ),
+    _GameItem(
+      title: 'Block!',
+      subtitle: 'Susun balok, kejar rekor & peringkat',
+      icon: Icons.view_module_rounded,
+      colors: const [Color(0xFF1B2847), Color(0xFF6D4AFF), Color(0xFFFF6B81)],
+      page: () => const LudoWebViewScreen(path: '/block/'),
+      preview: () => const BlockPreview(),
     ),
     _GameItem(
       title: 'Gacha',

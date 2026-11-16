@@ -97,3 +97,186 @@ class _LudoPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
+
+/// Thumbnail Ular Tangga: papan warna-warni dengan tangga & ular.
+class UlarBoardPreview extends StatelessWidget {
+  const UlarBoardPreview({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: AspectRatio(aspectRatio: 1, child: CustomPaint(painter: _UlarPainter())),
+      ),
+    );
+  }
+}
+
+class _UlarPainter extends CustomPainter {
+  static const _tiles = [Color(0xFFFFE9A8), Color(0xFFC9F2DC), Color(0xFFFFD6DD), Color(0xFFD6E6FF), Color(0xFFEADCFF)];
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final s = size.width, c = s / 6;
+    final fill = Paint();
+    canvas.drawRRect(RRect.fromRectAndRadius(Offset.zero & size, Radius.circular(c * .5)), fill..color = Colors.white);
+    for (var y = 0; y < 6; y++) {
+      for (var x = 0; x < 6; x++) {
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(Rect.fromLTWH(x * c + 1.5, y * c + 1.5, c - 3, c - 3), Radius.circular(c * .22)),
+          fill..color = _tiles[(x + y) % _tiles.length],
+        );
+      }
+    }
+    // Tangga.
+    final wood = Paint()
+      ..color = const Color(0xFFC98A4B)
+      ..strokeWidth = c * .13
+      ..strokeCap = StrokeCap.round;
+    final a = Offset(c * 1.2, c * 5.3), b = Offset(c * 2.6, c * 1.2);
+    final d = b - a, n = Offset(-d.dy, d.dx) / d.distance * (c * .28);
+    canvas.drawLine(a + n, b + n, wood);
+    canvas.drawLine(a - n, b - n, wood);
+    for (var i = 1; i < 6; i++) {
+      final p = a + d * (i / 6);
+      canvas.drawLine(p + n, p - n, wood);
+    }
+    // Ular.
+    final body = Path()
+      ..moveTo(c * 4.8, c * .9)
+      ..cubicTo(c * 3.4, c * 2.2, c * 5.6, c * 3.4, c * 4.0, c * 5.2);
+    canvas.drawPath(
+      body,
+      Paint()
+        ..color = const Color(0xFF2F9A58)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = c * .5
+        ..strokeCap = StrokeCap.round,
+    );
+    canvas.drawPath(
+      body,
+      Paint()
+        ..color = const Color(0xFF3FBF6F)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = c * .36
+        ..strokeCap = StrokeCap.round,
+    );
+    canvas.drawCircle(Offset(c * 4.8, c * .9), c * .38, fill..color = const Color(0xFF3FBF6F));
+    for (final dx in [-.14, .14]) {
+      canvas.drawCircle(Offset(c * (4.8 + dx), c * .82), c * .1, fill..color = Colors.white);
+      canvas.drawCircle(Offset(c * (4.8 + dx), c * .84), c * .05, fill..color = const Color(0xFF2B3A55));
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+/// Thumbnail Duel: separuh Tic-Tac-Toe, separuh Connect 4.
+class DuelPreview extends StatelessWidget {
+  const DuelPreview({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: AspectRatio(aspectRatio: 1, child: CustomPaint(painter: _DuelPainter())),
+      ),
+    );
+  }
+}
+
+class _DuelPainter extends CustomPainter {
+  static const _red = Color(0xFFFF5C76), _blue = Color(0xFF4D9DFF);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final s = size.width;
+    final fill = Paint();
+    // Connect 4 di belakang.
+    final board = RRect.fromRectAndRadius(Rect.fromLTWH(s * .3, s * .3, s * .7, s * .7), Radius.circular(s * .08));
+    canvas.drawRRect(board, fill..color = const Color(0xFF4D7CF0));
+    final r = s * .045, step = s * .7 / 5;
+    for (var y = 0; y < 5; y++) {
+      for (var x = 0; x < 5; x++) {
+        final col = y == 4 && x < 3 ? (x.isEven ? _red : _blue) : (y == 3 && x == 1 ? _red : Colors.white);
+        canvas.drawCircle(Offset(s * .3 + step * (x + .5), s * .3 + step * (y + .5)), r, fill..color = col);
+      }
+    }
+    // Tic-Tac-Toe di depan.
+    final card = RRect.fromRectAndRadius(Rect.fromLTWH(0, 0, s * .6, s * .6), Radius.circular(s * .08));
+    canvas.drawRRect(card, fill..color = Colors.white);
+    final line = Paint()
+      ..color = const Color(0xFFD5E2F0)
+      ..strokeWidth = s * .02;
+    for (final t in [s * .2, s * .4]) {
+      canvas.drawLine(Offset(t, s * .05), Offset(t, s * .55), line);
+      canvas.drawLine(Offset(s * .05, t), Offset(s * .55, t), line);
+    }
+    final pen = Paint()
+      ..strokeWidth = s * .035
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+    void x(double cx, double cy) {
+      pen.color = _red;
+      canvas.drawLine(Offset(cx - s * .05, cy - s * .05), Offset(cx + s * .05, cy + s * .05), pen);
+      canvas.drawLine(Offset(cx + s * .05, cy - s * .05), Offset(cx - s * .05, cy + s * .05), pen);
+    }
+
+    x(s * .1, s * .1);
+    x(s * .5, s * .5);
+    canvas.drawCircle(Offset(s * .3, s * .3), s * .055, pen..color = _blue);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+/// Thumbnail Block!: papan gelap dengan balok warna-warni.
+class BlockPreview extends StatelessWidget {
+  const BlockPreview({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: AspectRatio(aspectRatio: 1, child: CustomPaint(painter: _BlockPainter())),
+      ),
+    );
+  }
+}
+
+class _BlockPainter extends CustomPainter {
+  static const _cells = <int, Color>{
+    40: Color(0xFFFF6B81), 41: Color(0xFFFF6B81), 48: Color(0xFFFF6B81),
+    42: Color(0xFFFFC53D), 50: Color(0xFFFFC53D), 51: Color(0xFFFFC53D),
+    56: Color(0xFF4D9DFF), 57: Color(0xFF4D9DFF), 58: Color(0xFF4D9DFF), 59: Color(0xFF4D9DFF),
+    44: Color(0xFF2FD59A), 52: Color(0xFF2FD59A), 60: Color(0xFF2FD59A), 61: Color(0xFF2FD59A),
+    46: Color(0xFFA77BFF), 47: Color(0xFFA77BFF), 54: Color(0xFFA77BFF), 55: Color(0xFFA77BFF), 63: Color(0xFFA77BFF),
+    20: Color(0xFFFF9A4D), 21: Color(0xFFFF9A4D), 29: Color(0xFFFF9A4D),
+  };
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final s = size.width, c = s / 8;
+    final fill = Paint();
+    canvas.drawRRect(RRect.fromRectAndRadius(Offset.zero & size, Radius.circular(c * .6)), fill..color = const Color(0xFF1D2B4D));
+    for (var i = 0; i < 64; i++) {
+      final r = Rect.fromLTWH((i % 8) * c + 1.5, (i ~/ 8) * c + 1.5, c - 3, c - 3);
+      final col = _cells[i];
+      canvas.drawRRect(RRect.fromRectAndRadius(r, Radius.circular(c * .2)), fill..color = col ?? const Color(0xFF2F4372));
+      if (col != null) {
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(Rect.fromLTWH(r.left + c * .15, r.top + c * .12, c * .35, c * .12), Radius.circular(c * .06)),
+          fill..color = Colors.white.withValues(alpha: .45),
+        );
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}

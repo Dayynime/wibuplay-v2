@@ -26,10 +26,13 @@ const Color _kInk = Color(0xFF2B3A55);
 ///                | {"type":"haptic","kind":"light"|"heavy"} | {"type":"close"}
 ///   app -> web : window.zenimeReceive({"type":"auth","token","name","avatar"})
 class LudoWebViewScreen extends ConsumerStatefulWidget {
-  const LudoWebViewScreen({super.key, this.code});
+  const LudoWebViewScreen({super.key, this.code, this.path = '/'});
 
   /// Kode room dari kartu undangan: langsung gabung ke room itu.
   final String? code;
+
+  /// Halaman game di situs minigame: '/' (Ludo), '/ular/', '/duel/', '/block/'.
+  final String path;
 
   @override
   ConsumerState<LudoWebViewScreen> createState() => _LudoWebViewScreenState();
@@ -41,9 +44,11 @@ class _LudoWebViewScreenState extends ConsumerState<LudoWebViewScreen> {
   late final Uri? _url = _buildUrl();
 
   Uri? _buildUrl() {
-    final base = RemoteConfigManager.ludoWebUrl;
+    final root = RemoteConfigManager.ludoWebUrl;
+    if (root == null) return null;
+    final base = root.replace(path: widget.path);
     final code = widget.code?.toUpperCase();
-    if (base == null || code == null || !_codeRe.hasMatch(code)) return base;
+    if (code == null || !_codeRe.hasMatch(code)) return base;
     return base.replace(queryParameters: {...base.queryParameters, 'code': code});
   }
   WebViewController? _ctrl;
@@ -113,8 +118,15 @@ class _LudoWebViewScreenState extends ConsumerState<LudoWebViewScreen> {
       case 'share':
         final code = msg['code'];
         final players = msg['players'];
+        final game = webGameByKey(msg['game']);
         if (code is String && _codeRe.hasMatch(code) && mounted) {
-          unawaited(showLudoShareSheet(context, code, players is int && players >= 2 && players <= 4 ? players : null));
+          unawaited(showLudoShareSheet(
+            context,
+            code,
+            players is int && players >= 2 && players <= 6 ? players : null,
+            game: game,
+            mode: msg['mode'] is String ? msg['mode'] as String : null,
+          ));
         }
       case 'haptic':
         if (msg['kind'] == 'heavy') {
