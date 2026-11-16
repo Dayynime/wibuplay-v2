@@ -100,6 +100,9 @@ class RemoteConfigManager {
   // Contoh nilai: https://v1.westmanga.my  (domainnya sering pindah).
   static const String _keyWestmangaBaseUrl = 'westmanga_base_url';
 
+  // URL web game Ludo (dibuka di WebView). Contoh nilai: https://ludo.zenime.biz.id
+  static const String _keyLudoWebUrl = 'ludo_web_url';
+
   // Header Referer buat API/gambar/download Animein. TANPA fallback hardcode.
   static const String _keyApiReferer = 'api_referer';
 
@@ -210,6 +213,18 @@ class RemoteConfigManager {
       v = v.substring(0, v.length - 1);
     }
     return v.isEmpty ? null : v;
+  }
+
+  /// URL web game Ludo, murni dari Remote Config `ludo_web_url`. Hanya https.
+  /// null kalau kosong / bukan https / belum pernah fetch sukses (TANPA fallback).
+  static Uri? get ludoWebUrl {
+    final rc = _instance;
+    if (rc == null) return null;
+    final v = rc.getString(_keyLudoWebUrl).trim();
+    if (v.isEmpty) return null;
+    final u = Uri.tryParse(v);
+    if (u == null || u.scheme != 'https' || u.host.isEmpty) return null;
+    return u;
   }
 
   /// Referer API Animein, murni dari Remote Config `api_referer`. Sama seperti

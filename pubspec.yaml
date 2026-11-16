@@ -48,6 +48,8 @@ dependencies:
   # Panggilan suara di catur mabar (WebRTC, audio saja).
   flutter_webrtc: ^1.6.2
   livekit_client: ^2.3.5
+  # Minigame Ludo (web game di ludo.zenime.biz.id) dibuka lewat WebView.
+  webview_flutter: ^4.10.0
 
 dependency_overrides:
   shared_preferences_android: 2.3.4

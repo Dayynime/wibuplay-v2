@@ -11,12 +11,14 @@ import '../avatar_frame/avatar_frame_screen.dart';
 import '../chess/chess_board.dart';
 import '../chess/chess_lobby_screen.dart';
 import '../level_badge/level_badge_shop_screen.dart';
+import '../ludo/ludo_preview.dart';
+import '../ludo/ludo_webview_screen.dart';
 import '../store/coin_screen.dart';
 import '../tree/tree_screen.dart';
 import '../wallpaper/wallpaper_screen.dart';
 import 'game_previews.dart';
 
-/// Hub "Zenime Games": satu pintu ke Catur, Gacha, Pohon ZCoin, Border Avatar, dan
+/// Hub "Zenime Games": satu pintu ke Catur, Ludo, Gacha, Pohon ZCoin, Border Avatar, dan
 /// Efek Profil (dulunya empat kartu terpisah di tab Menu).
 class ZenimeGamesScreen extends ConsumerStatefulWidget {
   const ZenimeGamesScreen({super.key});
@@ -60,6 +62,14 @@ class _ZenimeGamesScreenState extends ConsumerState<ZenimeGamesScreen>
       colors: const [Color(0xFF141B2B), Color(0xFF3B4A6B), Color(0xFFE4344A)],
       page: () => const ChessLobbyScreen(),
       preview: () => const ChessBoardPreview(),
+    ),
+    _GameItem(
+      title: 'Ludo',
+      subtitle: 'Mabar 2–4 pemain bareng temanmu',
+      icon: Icons.groups_rounded,
+      colors: const [Color(0xFF0E2A47), Color(0xFF2F80ED), Color(0xFFFFC94D)],
+      page: () => const LudoWebViewScreen(),
+      preview: () => const LudoBoardPreview(),
     ),
     _GameItem(
       title: 'Gacha',
