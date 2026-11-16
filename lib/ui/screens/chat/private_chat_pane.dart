@@ -12,6 +12,7 @@ import '../../components/friend_avatar.dart';
 import '../../components/swipe_to_reply.dart';
 import 'private_chat_controller.dart';
 import '../chess/chess_invite.dart';
+import '../ludo/ludo_invite.dart';
 import '../../../data/models/sticker_models.dart';
 import '../sticker/sticker_widgets.dart';
 import '../../glass/glass.dart';
@@ -574,6 +575,8 @@ class _DmBubble extends StatelessWidget {
               )
             else if (chessInviteCode(m.message) != null)
               ChessInviteCard(message: m.message, mine: isOwn)
+            else if (ludoInviteCode(m.message) != null)
+              LudoInviteCard(message: m.message, mine: isOwn)
             else if (stickerCodeOf(m.message) case final code?)
               StickerView(code: code)
             else

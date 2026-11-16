@@ -29,6 +29,7 @@ import 'private_chat_controller.dart';
 import 'clan_chat_tab.dart';
 import 'wp_event_chat_card.dart';
 import '../chess/chess_invite.dart';
+import '../ludo/ludo_invite.dart';
 import '../../../data/models/sticker_models.dart';
 import '../../../data/repository/chat_unread_repository.dart';
 import '../sticker/sticker_widgets.dart';
@@ -876,6 +877,8 @@ class ChatMessageBubble extends StatelessWidget {
               )
             else if (chessInviteCode(m.message) != null)
               ChessInviteCard(message: m.message, mine: mine)
+            else if (ludoInviteCode(m.message) != null)
+              LudoInviteCard(message: m.message, mine: mine)
             else if (stickerCodeOf(m.message) case final code?)
               StickerView(code: code)
             else

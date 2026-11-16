@@ -5,7 +5,6 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -13,6 +12,7 @@ import 'package:webview_flutter_android/webview_flutter_android.dart';
 
 import '../../../core/remote_config_manager.dart';
 import '../../../providers.dart';
+import 'ludo_invite.dart';
 
 /// Warna latar game web (langit biru), dipakai selama halaman dimuat.
 const Color _kSky = Color(0xFFCDEBFB);
@@ -26,7 +26,10 @@ const Color _kInk = Color(0xFF2B3A55);
 ///                | {"type":"haptic","kind":"light"|"heavy"} | {"type":"close"}
 ///   app -> web : window.zenimeReceive({"type":"auth","token","name","avatar"})
 class LudoWebViewScreen extends ConsumerStatefulWidget {
-  const LudoWebViewScreen({super.key});
+  const LudoWebViewScreen({super.key, this.code});
+
+  /// Kode room dari kartu undangan: langsung gabung ke room itu.
+  final String? code;
 
   @override
   ConsumerState<LudoWebViewScreen> createState() => _LudoWebViewScreenState();
@@ -35,7 +38,14 @@ class LudoWebViewScreen extends ConsumerStatefulWidget {
 class _LudoWebViewScreenState extends ConsumerState<LudoWebViewScreen> {
   static final RegExp _codeRe = RegExp(r'^[A-Z2-9]{6}$');
 
-  final Uri? _url = RemoteConfigManager.ludoWebUrl;
+  late final Uri? _url = _buildUrl();
+
+  Uri? _buildUrl() {
+    final base = RemoteConfigManager.ludoWebUrl;
+    final code = widget.code?.toUpperCase();
+    if (base == null || code == null || !_codeRe.hasMatch(code)) return base;
+    return base.replace(queryParameters: {...base.queryParameters, 'code': code});
+  }
   WebViewController? _ctrl;
   bool _loading = true;
   bool _failed = false;
@@ -102,8 +112,9 @@ class _LudoWebViewScreenState extends ConsumerState<LudoWebViewScreen> {
         unawaited(_sendAuth(forceRefresh: true));
       case 'share':
         final code = msg['code'];
-        if (code is String && _codeRe.hasMatch(code)) {
-          unawaited(Share.share('Ayo main Ludo bareng di Zenime! Kode room: $code'));
+        final players = msg['players'];
+        if (code is String && _codeRe.hasMatch(code) && mounted) {
+          unawaited(showLudoShareSheet(context, code, players is int && players >= 2 && players <= 4 ? players : null));
         }
       case 'haptic':
         if (msg['kind'] == 'heavy') {
