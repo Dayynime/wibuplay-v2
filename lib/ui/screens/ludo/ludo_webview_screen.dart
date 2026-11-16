@@ -48,6 +48,8 @@ class _LudoWebViewScreenState extends ConsumerState<LudoWebViewScreen> {
     unawaited(WakelockPlus.enable());
     _ctrl = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      // Game tidak bisa di-zoom (pinch / double tap).
+      ..enableZoom(false)
       ..setBackgroundColor(_kSky)
       ..addJavaScriptChannel('ZenimeBridge', onMessageReceived: (m) => _onMessage(m.message))
       ..setNavigationDelegate(NavigationDelegate(
