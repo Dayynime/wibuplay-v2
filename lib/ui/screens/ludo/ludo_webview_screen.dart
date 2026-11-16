@@ -9,6 +9,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:webview_flutter_android/webview_flutter_android.dart';
 
 import '../../../core/remote_config_manager.dart';
 import '../../../providers.dart';
@@ -173,6 +174,23 @@ class _LudoWebViewScreenState extends ConsumerState<LudoWebViewScreen> {
     unawaited(ctrl.loadRequest(url));
   }
 
+  /// Di Android pakai Hybrid Composition: WebView tampil sebagai view
+  /// Android asli, jadi scroll/animasinya selancar di browser. Mode bawaan
+  /// (texture layer) menyalin WebView ke tekstur tiap frame dan terasa
+  /// patah-patah di banyak HP.
+  Widget _webView(WebViewController ctrl) {
+    final platform = ctrl.platform;
+    if (platform is AndroidWebViewController) {
+      return WebViewWidget.fromPlatformCreationParams(
+        params: AndroidWebViewWidgetCreationParams(
+          controller: platform,
+          displayWithHybridComposition: true,
+        ),
+      );
+    }
+    return WebViewWidget(controller: ctrl);
+  }
+
   @override
   Widget build(BuildContext context) {
     final ctrl = _ctrl;
@@ -196,7 +214,7 @@ class _LudoWebViewScreenState extends ConsumerState<LudoWebViewScreen> {
                   )
                 : Stack(
                     children: [
-                      Positioned.fill(child: WebViewWidget(controller: ctrl)),
+                      Positioned.fill(child: _webView(ctrl)),
                       if (_failed)
                         Positioned.fill(
                           child: ColoredBox(
