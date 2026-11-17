@@ -33,15 +33,17 @@ const WebGame ludoGame = WebGame('ludo', 'Ludo', '/', Icons.grid_view_rounded, C
 const WebGame ularGame = WebGame('ular', 'Ular Tangga', '/ular/', Icons.stairs_rounded, Color(0xFF2FD59A));
 const WebGame duelGame = WebGame('duel', 'Duel', '/duel/', Icons.grid_3x3_rounded, Color(0xFF4D9DFF));
 const WebGame congklakGame = WebGame('congklak', 'Congklak', '/congklak/', Icons.blur_on_rounded, Color(0xFFC27A3C));
+const WebGame gapleGame = WebGame('gaple', 'Gaple', '/gaple/', Icons.view_agenda_rounded, Color(0xFF1F8A55));
 
 WebGame webGameByKey(Object? key) => switch (key) {
       'ular' => ularGame,
       'duel' => duelGame,
       'congklak' => congklakGame,
+      'gaple' => gapleGame,
       _ => ludoGame,
     };
 
-final RegExp _inviteRe = RegExp(r'Kode room (ludo|ular|duel|congklak):\s*([A-Z2-9]{6})\b', caseSensitive: false);
+final RegExp _inviteRe = RegExp(r'Kode room (ludo|ular|duel|congklak|gaple):\s*([A-Z2-9]{6})\b', caseSensitive: false);
 final RegExp _playersRe = RegExp(r'\((\d) pemain\)');
 
 /// Kode room kalau [message] adalah undangan minigame web, selain itu null.
@@ -58,6 +60,7 @@ String ludoInviteText(String code, int? players, {WebGame game = ludoGame, Strin
     'ular' => '🐍 Ayo main Ular Tangga bareng aku!$p\nKode room ular: $code',
     'duel' => '⚔️ Tantang aku duel ${_modeName(mode)}!\nKode room duel: $code',
     'congklak' => '🌰 Ayo main Congklak lawan aku!\nKode room congklak: $code',
+    'gaple' => '🀄 Ayo main Gaple bareng aku!$p\nKode room gaple: $code',
     _ => '🎲 Ayo main Ludo bareng aku!$p\nKode room ludo: $code',
   };
 }

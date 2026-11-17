@@ -343,3 +343,65 @@ class _CongklakPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
+
+/// Thumbnail Gaple: meja hijau dengan rantai kartu domino.
+class GaplePreview extends StatelessWidget {
+  const GaplePreview({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: AspectRatio(aspectRatio: 1, child: CustomPaint(painter: _GaplePainter())),
+      ),
+    );
+  }
+}
+
+class _GaplePainter extends CustomPainter {
+  static const _pip = <int, List<Offset>>{
+    1: [Offset(.5, .5)],
+    2: [Offset(.25, .25), Offset(.75, .75)],
+    3: [Offset(.25, .25), Offset(.5, .5), Offset(.75, .75)],
+    4: [Offset(.25, .25), Offset(.75, .25), Offset(.25, .75), Offset(.75, .75)],
+    5: [Offset(.25, .25), Offset(.75, .25), Offset(.5, .5), Offset(.25, .75), Offset(.75, .75)],
+    6: [Offset(.25, .2), Offset(.75, .2), Offset(.25, .5), Offset(.75, .5), Offset(.25, .8), Offset(.75, .8)],
+  };
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final s = size.width;
+    final fill = Paint();
+    canvas.drawRRect(RRect.fromRectAndRadius(Offset.zero & size, Radius.circular(s * .1)), fill..color = const Color(0xFF7A4A22));
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(Rect.fromLTWH(s * .04, s * .04, s * .92, s * .92), Radius.circular(s * .08)),
+      fill..color = const Color(0xFF239A60),
+    );
+    final h = s * .13, w = h * 2;
+    void tile(double x, double y, int a, int b, {bool vertical = false}) {
+      final r = vertical ? Rect.fromLTWH(x, y, h, w) : Rect.fromLTWH(x, y, w, h);
+      canvas.drawRRect(RRect.fromRectAndRadius(r.shift(const Offset(1, 2)), Radius.circular(h * .2)), fill..color = Colors.black26);
+      canvas.drawRRect(RRect.fromRectAndRadius(r, Radius.circular(h * .2)), fill..color = const Color(0xFFFFFBF0));
+      for (final (n, o) in [(a, Offset.zero), (b, vertical ? Offset(0, h) : Offset(h, 0))]) {
+        for (final p in _pip[n] ?? const <Offset>[]) {
+          canvas.drawCircle(
+            Offset(r.left + o.dx + p.dx * h, r.top + o.dy + p.dy * h),
+            h * (n == 1 ? .1 : .075),
+            fill..color = n == 1 ? const Color(0xFFE8364F) : const Color(0xFF22304D),
+          );
+        }
+      }
+    }
+
+    tile(s * .1, s * .3, 4, 6);
+    tile(s * .1 + w + 2, s * .3, 6, 6);
+    tile(s * .1 + (w + 2) * 2, s * .3, 6, 1);
+    tile(s * .1 + (w + 2) * 2 + w - h, s * .3 + h + 2, 1, 3, vertical: true);
+    tile(s * .2, s * .64, 5, 2);
+    tile(s * .2 + w + 2, s * .64, 3, 3);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}

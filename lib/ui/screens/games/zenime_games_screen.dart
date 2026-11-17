@@ -18,7 +18,7 @@ import '../tree/tree_screen.dart';
 import '../wallpaper/wallpaper_screen.dart';
 import 'game_previews.dart';
 
-/// Hub "Zenime Games": satu pintu ke Catur, Ludo, Ular Tangga, Duel, Congklak, Block!, Gacha, Pohon ZCoin, Border Avatar, dan
+/// Hub "Zenime Games": satu pintu ke Catur, Ludo, Ular Tangga, Duel, Congklak, Gaple, Block!, Gacha, Pohon ZCoin, Border Avatar, dan
 /// Efek Profil (dulunya empat kartu terpisah di tab Menu).
 class ZenimeGamesScreen extends ConsumerStatefulWidget {
   const ZenimeGamesScreen({super.key});
@@ -94,6 +94,14 @@ class _ZenimeGamesScreenState extends ConsumerState<ZenimeGamesScreen>
       colors: const [Color(0xFF3A1F0C), Color(0xFF9A5A28), Color(0xFFFFC94D)],
       page: () => const LudoWebViewScreen(path: '/congklak/'),
       preview: () => const CongklakPreview(),
+    ),
+    _GameItem(
+      title: 'Gaple',
+      subtitle: 'Domino klasik, 2–4 pemain',
+      icon: Icons.view_agenda_rounded,
+      colors: const [Color(0xFF0E3B26), Color(0xFF1F8A55), Color(0xFFFFE9A8)],
+      page: () => const LudoWebViewScreen(path: '/gaple/'),
+      preview: () => const GaplePreview(),
     ),
     _GameItem(
       title: 'Block!',
