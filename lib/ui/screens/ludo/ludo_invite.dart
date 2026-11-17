@@ -32,14 +32,16 @@ class WebGame {
 const WebGame ludoGame = WebGame('ludo', 'Ludo', '/', Icons.grid_view_rounded, Color(0xFFFFB52B));
 const WebGame ularGame = WebGame('ular', 'Ular Tangga', '/ular/', Icons.stairs_rounded, Color(0xFF2FD59A));
 const WebGame duelGame = WebGame('duel', 'Duel', '/duel/', Icons.grid_3x3_rounded, Color(0xFF4D9DFF));
+const WebGame congklakGame = WebGame('congklak', 'Congklak', '/congklak/', Icons.blur_on_rounded, Color(0xFFC27A3C));
 
 WebGame webGameByKey(Object? key) => switch (key) {
       'ular' => ularGame,
       'duel' => duelGame,
+      'congklak' => congklakGame,
       _ => ludoGame,
     };
 
-final RegExp _inviteRe = RegExp(r'Kode room (ludo|ular|duel):\s*([A-Z2-9]{6})\b', caseSensitive: false);
+final RegExp _inviteRe = RegExp(r'Kode room (ludo|ular|duel|congklak):\s*([A-Z2-9]{6})\b', caseSensitive: false);
 final RegExp _playersRe = RegExp(r'\((\d) pemain\)');
 
 /// Kode room kalau [message] adalah undangan minigame web, selain itu null.
@@ -55,6 +57,7 @@ String ludoInviteText(String code, int? players, {WebGame game = ludoGame, Strin
   return switch (game.key) {
     'ular' => '🐍 Ayo main Ular Tangga bareng aku!$p\nKode room ular: $code',
     'duel' => '⚔️ Tantang aku duel ${_modeName(mode)}!\nKode room duel: $code',
+    'congklak' => '🌰 Ayo main Congklak lawan aku!\nKode room congklak: $code',
     _ => '🎲 Ayo main Ludo bareng aku!$p\nKode room ludo: $code',
   };
 }
@@ -77,9 +80,11 @@ class LudoInviteCard extends StatelessWidget {
     final code = ludoInviteCode(message) ?? '';
     final game = webGameOfInvite(message);
     final players = _playersRe.firstMatch(message)?.group(1);
-    final detail = game.key == 'duel'
-        ? (message.contains('Tic-Tac-Toe') ? 'Tic-Tac-Toe' : 'Connect 4')
-        : (players != null ? '$players pemain' : null);
+    final detail = switch (game.key) {
+      'duel' => message.contains('Tic-Tac-Toe') ? 'Tic-Tac-Toe' : 'Connect 4',
+      'congklak' => '1 lawan 1',
+      _ => players != null ? '$players pemain' : null,
+    };
 
     return Container(
       margin: const EdgeInsets.only(top: 2),
@@ -108,7 +113,11 @@ class LudoInviteCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      game.key == 'duel' ? 'Tantangan Duel' : 'Ajakan ${game.title}',
+                      switch (game.key) {
+                        'duel' => 'Tantangan Duel',
+                        'congklak' => 'Tantangan Congklak',
+                        _ => 'Ajakan ${game.title}',
+                      },
                       style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 14),
                     ),
                     Text(

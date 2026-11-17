@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 /// Thumbnail kartu Ludo di Zenime Games: papan mini digambar dengan kode.
@@ -274,6 +276,67 @@ class _BlockPainter extends CustomPainter {
           fill..color = Colors.white.withValues(alpha: .45),
         );
       }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+/// Thumbnail Congklak: papan kayu dengan 2 baris lubang & biji.
+class CongklakPreview extends StatelessWidget {
+  const CongklakPreview({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: AspectRatio(aspectRatio: 1, child: CustomPaint(painter: _CongklakPainter())),
+      ),
+    );
+  }
+}
+
+class _CongklakPainter extends CustomPainter {
+  static const _seeds = [Color(0xFFFFF3DC), Color(0xFFFFD9B0), Color(0xFFF3C58B), Color(0xFFD9EEF0)];
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final s = size.width;
+    final fill = Paint();
+    final body = RRect.fromRectAndRadius(Rect.fromLTWH(s * .2, s * .02, s * .6, s * .96), Radius.circular(s * .3));
+    canvas.drawRRect(
+      body,
+      fill
+        ..shader = const LinearGradient(colors: [Color(0xFFA0612D), Color(0xFFCF8D4F), Color(0xFF9A5A28)])
+            .createShader(body.outerRect),
+    );
+    fill.shader = null;
+    canvas.drawRRect(
+      body,
+      Paint()
+        ..color = const Color(0xFF7A4520)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = s * .015,
+    );
+    void hole(Offset c, double rx, double ry, int n, int seed) {
+      canvas.drawOval(Rect.fromCenter(center: c, width: rx * 2, height: ry * 2), fill..color = const Color(0xFF4A250D));
+      for (var k = 0; k < n; k++) {
+        final a = (seed * 37 + k * 71) % 360 * math.pi / 180, d = ((seed + k * 13) % 10) / 10 * .6;
+        canvas.drawOval(
+          Rect.fromCenter(center: c + Offset(rx * d * math.cos(a), ry * d * math.sin(a)), width: s * .035, height: s * .028),
+          fill..color = _seeds[(seed + k) % _seeds.length],
+        );
+      }
+    }
+
+    hole(Offset(s * .5, s * .13), s * .2, s * .07, 4, 1);
+    hole(Offset(s * .5, s * .87), s * .2, s * .07, 6, 2);
+    for (var i = 0; i < 5; i++) {
+      final y = s * (.27 + i * .115);
+      hole(Offset(s * .38, y), s * .07, s * .045, 3 + i % 3, i * 3);
+      hole(Offset(s * .62, y), s * .07, s * .045, 2 + (i + 1) % 3, i * 5 + 1);
     }
   }
 
