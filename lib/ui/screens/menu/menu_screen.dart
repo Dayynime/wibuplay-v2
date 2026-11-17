@@ -9,6 +9,7 @@ import '../library/library_screens.dart';
 import '../store/coin_screen.dart';
 import '../store/premium_screen.dart';
 import '../games/zenime_games_screen.dart';
+import '../decoration/zenime_decoration_screen.dart';
 import '../nobar/nobar_lobby_screen.dart';
 import '../feed/feed_screen.dart';
 import '../../glass/glass.dart';
@@ -36,6 +37,7 @@ class MenuScreen extends ConsumerWidget {
       _MenuItem('Feed', Icons.dynamic_feed_rounded, 330, () => push(const FeedScreen())),
       _MenuItem('Cuplix', Icons.slow_motion_video_rounded, 280, () => openCuplix(context)),
       _MenuItem('Games', Icons.sports_esports_rounded, 40, () => push(const ZenimeGamesScreen())),
+      _MenuItem('Decor', Icons.auto_awesome_rounded, 290, () => push(const ZenimeDecorationScreen())),
       _MenuItem('Donghua', Icons.live_tv_rounded, 18, () => openDonghua(context)),
       _MenuItem('Film', Icons.movie_rounded, 240, () => openMovieBox(context)),
       _MenuItem('Komik', Icons.menu_book_rounded, 200, () => openComic(context)),

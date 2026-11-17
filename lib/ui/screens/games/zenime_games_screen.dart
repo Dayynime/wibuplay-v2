@@ -7,19 +7,19 @@ import '../../../data/models/account_models.dart' show formatZCoin;
 import '../../../providers.dart';
 import '../../app_routes.dart';
 import '../../glass/glass.dart';
-import '../avatar_frame/avatar_frame_screen.dart';
 import '../chess/chess_board.dart';
 import '../chess/chess_lobby_screen.dart';
-import '../level_badge/level_badge_shop_screen.dart';
 import '../ludo/ludo_preview.dart';
 import '../ludo/ludo_webview_screen.dart';
 import '../store/coin_screen.dart';
 import '../tree/tree_screen.dart';
 import '../wallpaper/wallpaper_screen.dart';
+import 'game_list_tile.dart';
 import 'game_previews.dart';
 
-/// Hub "Zenime Games": satu pintu ke Catur, Ludo, Ular Tangga, Duel, Congklak, Gaple, Block!, Gacha, Pohon ZCoin, Border Avatar, dan
-/// Efek Profil (dulunya empat kartu terpisah di tab Menu).
+/// Hub "Zenime Games": daftar game (Gaple, Ludo, Ular Tangga, Block!, Congklak,
+/// Duel, Catur, Gacha, Pohon ZCoin). Border Avatar & Badge Level ada di
+/// Zenime Decoration.
 class ZenimeGamesScreen extends ConsumerStatefulWidget {
   const ZenimeGamesScreen({super.key});
 
@@ -35,6 +35,7 @@ class _GameItem {
     required this.colors,
     required this.page,
     required this.preview,
+    required this.info,
   });
 
   final String title;
@@ -45,6 +46,9 @@ class _GameItem {
 
   /// Thumbnail halaman game (live, pakai data user).
   final Widget Function() preview;
+
+  /// Jumlah pemain, mis. "2–4 pemain".
+  final String info;
 }
 
 class _ZenimeGamesScreenState extends ConsumerState<ZenimeGamesScreen>
@@ -56,12 +60,13 @@ class _ZenimeGamesScreenState extends ConsumerState<ZenimeGamesScreen>
 
   static final List<_GameItem> _games = [
     _GameItem(
-      title: 'Catur',
-      subtitle: 'Mabar 1 lawan 1 dengan temanmu',
-      icon: Icons.grid_on_rounded,
-      colors: const [Color(0xFF141B2B), Color(0xFF3B4A6B), Color(0xFFE4344A)],
-      page: () => const ChessLobbyScreen(),
-      preview: () => const ChessBoardPreview(),
+      title: 'Gaple',
+      subtitle: 'Domino klasik, 2–4 pemain',
+      icon: Icons.view_agenda_rounded,
+      colors: const [Color(0xFF0E3B26), Color(0xFF1F8A55), Color(0xFFFFE9A8)],
+      page: () => const LudoWebViewScreen(path: '/gaple/'),
+      preview: () => const GaplePreview(),
+      info: '2–4 pemain',
     ),
     _GameItem(
       title: 'Ludo',
@@ -70,6 +75,7 @@ class _ZenimeGamesScreenState extends ConsumerState<ZenimeGamesScreen>
       colors: const [Color(0xFF0E2A47), Color(0xFF2F80ED), Color(0xFFFFC94D)],
       page: () => const LudoWebViewScreen(),
       preview: () => const LudoBoardPreview(),
+      info: '2–4 pemain',
     ),
     _GameItem(
       title: 'Ular Tangga',
@@ -78,30 +84,7 @@ class _ZenimeGamesScreenState extends ConsumerState<ZenimeGamesScreen>
       colors: const [Color(0xFF0F3D2A), Color(0xFF1FA35C), Color(0xFFFFC94D)],
       page: () => const LudoWebViewScreen(path: '/ular/'),
       preview: () => const UlarBoardPreview(),
-    ),
-    _GameItem(
-      title: 'Duel',
-      subtitle: 'Tic-Tac-Toe & Connect 4, 1 lawan 1',
-      icon: Icons.grid_3x3_rounded,
-      colors: const [Color(0xFF14204A), Color(0xFF3D6EE0), Color(0xFFFF5C76)],
-      page: () => const LudoWebViewScreen(path: '/duel/'),
-      preview: () => const DuelPreview(),
-    ),
-    _GameItem(
-      title: 'Congklak',
-      subtitle: 'Permainan tradisional, 1 lawan 1',
-      icon: Icons.blur_on_rounded,
-      colors: const [Color(0xFF3A1F0C), Color(0xFF9A5A28), Color(0xFFFFC94D)],
-      page: () => const LudoWebViewScreen(path: '/congklak/'),
-      preview: () => const CongklakPreview(),
-    ),
-    _GameItem(
-      title: 'Gaple',
-      subtitle: 'Domino klasik, 2–4 pemain',
-      icon: Icons.view_agenda_rounded,
-      colors: const [Color(0xFF0E3B26), Color(0xFF1F8A55), Color(0xFFFFE9A8)],
-      page: () => const LudoWebViewScreen(path: '/gaple/'),
-      preview: () => const GaplePreview(),
+      info: '2–6 pemain',
     ),
     _GameItem(
       title: 'Block!',
@@ -110,6 +93,34 @@ class _ZenimeGamesScreenState extends ConsumerState<ZenimeGamesScreen>
       colors: const [Color(0xFF1B2847), Color(0xFF6D4AFF), Color(0xFFFF6B81)],
       page: () => const LudoWebViewScreen(path: '/block/'),
       preview: () => const BlockPreview(),
+      info: '1 pemain',
+    ),
+    _GameItem(
+      title: 'Congklak',
+      subtitle: 'Permainan tradisional, 1 lawan 1',
+      icon: Icons.blur_on_rounded,
+      colors: const [Color(0xFF3A1F0C), Color(0xFF9A5A28), Color(0xFFFFC94D)],
+      page: () => const LudoWebViewScreen(path: '/congklak/'),
+      preview: () => const CongklakPreview(),
+      info: '2 pemain',
+    ),
+    _GameItem(
+      title: 'Duel',
+      subtitle: 'Tic-Tac-Toe & Connect 4, 1 lawan 1',
+      icon: Icons.grid_3x3_rounded,
+      colors: const [Color(0xFF14204A), Color(0xFF3D6EE0), Color(0xFFFF5C76)],
+      page: () => const LudoWebViewScreen(path: '/duel/'),
+      preview: () => const DuelPreview(),
+      info: '2 pemain',
+    ),
+    _GameItem(
+      title: 'Catur',
+      subtitle: 'Mabar 1 lawan 1 dengan temanmu',
+      icon: Icons.grid_on_rounded,
+      colors: const [Color(0xFF141B2B), Color(0xFF3B4A6B), Color(0xFFE4344A)],
+      page: () => const ChessLobbyScreen(),
+      preview: () => const ChessBoardPreview(),
+      info: '2 pemain',
     ),
     _GameItem(
       title: 'Gacha',
@@ -118,6 +129,7 @@ class _ZenimeGamesScreenState extends ConsumerState<ZenimeGamesScreen>
       colors: const [Color(0xFF3B1A6B), Color(0xFF8B3DFF), Color(0xFFFF2E63)],
       page: () => const WallpaperScreen(),
       preview: () => const GachaPreview(),
+      info: '1 pemain',
     ),
     _GameItem(
       title: 'Pohon ZCoin',
@@ -126,22 +138,7 @@ class _ZenimeGamesScreenState extends ConsumerState<ZenimeGamesScreen>
       colors: const [Color(0xFF0F3D2A), Color(0xFF1F8A4C), Color(0xFFF59E0B)],
       page: () => const TreeScreen(),
       preview: () => const TreePreview(),
-    ),
-    _GameItem(
-      title: 'Border Avatar',
-      subtitle: 'Hias avatarmu dengan border animasi',
-      icon: Icons.blur_circular_rounded,
-      colors: const [Color(0xFF0B2A4A), Color(0xFF7C3AED), Color(0xFF22D3EE)],
-      page: () => const AvatarFrameScreen(),
-      preview: () => const FramePreview(),
-    ),
-    _GameItem(
-      title: 'Badge Level',
-      subtitle: 'Gaya badge LV beranimasi, ikut tier levelmu',
-      icon: Icons.military_tech_rounded,
-      colors: const [Color(0xFF1A1033), Color(0xFF6D28D9), Color(0xFFE8A317)],
-      page: () => const LevelBadgeShopScreen(),
-      preview: () => const LevelBadgePreview(),
+      info: '1 pemain',
     ),
   ];
 
@@ -165,7 +162,7 @@ class _ZenimeGamesScreenState extends ConsumerState<ZenimeGamesScreen>
   }
 
   Widget _reveal(int i, Widget child) {
-    final start = (i * 0.1).clamp(0.0, 0.5).toDouble();
+    final start = (i * 0.07).clamp(0.0, 0.5).toDouble();
     final anim = CurvedAnimation(
       parent: _intro,
       curve: Interval(start, (start + 0.5).clamp(0.0, 1.0).toDouble(), curve: Curves.easeOutCubic),
@@ -173,7 +170,7 @@ class _ZenimeGamesScreenState extends ConsumerState<ZenimeGamesScreen>
     return FadeTransition(
       opacity: anim,
       child: SlideTransition(
-        position: Tween<Offset>(begin: const Offset(0, 0.08), end: Offset.zero).animate(anim),
+        position: Tween<Offset>(begin: const Offset(0, 0.12), end: Offset.zero).animate(anim),
         child: child,
       ),
     );
@@ -182,10 +179,10 @@ class _ZenimeGamesScreenState extends ConsumerState<ZenimeGamesScreen>
   Future<void> _open(_GameItem g) async {
     HapticFeedback.selectionClick();
     await Navigator.of(context).push<void>(fadeRoute(g.page()));
-    // Saldo bisa berubah (gacha / panen pohon / beli border & efek).
+    // Saldo bisa berubah (gacha / panen pohon).
     final uid = ref.read(authUserProvider).valueOrNull?.uid;
     if (uid != null && mounted) ref.invalidate(coinBalanceProvider(uid));
-    // Thumbnail ikut update (border/efek baru dipasang, buah dipanen, dll).
+    // Thumbnail ikut update (buah dipanen, dll).
     if (mounted) refreshGamePreviews(ref);
   }
 
@@ -208,25 +205,37 @@ class _ZenimeGamesScreenState extends ConsumerState<ZenimeGamesScreen>
           style: TextStyle(color: AppColors.textWhite, fontSize: 18, fontWeight: FontWeight.w700),
         ),
       ),
-      body: ListView(
+      body: ListView.separated(
         physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
         padding: EdgeInsets.fromLTRB(16, 8, 16, 32 + MediaQuery.paddingOf(context).bottom),
-        children: [
-          _reveal(0, _CoinBar(coins: coins, onTap: () => Navigator.of(context).push<void>(fadeRoute(const CoinScreen())))),
-          const SizedBox(height: 18),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: _games.length,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
-              childAspectRatio: 0.7,
+        itemCount: _games.length + 2,
+        separatorBuilder: (_, i) => SizedBox(height: i == 0 ? 18 : 12),
+        itemBuilder: (_, i) {
+          if (i == 0) {
+            return _reveal(0, _CoinBar(coins: coins, onTap: () => Navigator.of(context).push<void>(fadeRoute(const CoinScreen()))));
+          }
+          if (i == 1) {
+            return _reveal(1, const Padding(
+              padding: EdgeInsets.only(left: 4),
+              child: Text(
+                'Pilih game',
+                style: TextStyle(color: AppColors.textWhite, fontSize: 20, fontWeight: FontWeight.w800),
+              ),
+            ));
+          }
+          final g = _games[i - 2];
+          return _reveal(
+            i,
+            GameListTile(
+              title: g.title,
+              info: g.info,
+              infoIcon: Icons.people_outline_rounded,
+              colors: g.colors,
+              preview: g.preview(),
+              onTap: () => _open(g),
             ),
-            itemBuilder: (_, i) => _reveal(i + 1, _GameTile(item: _games[i], onTap: () => _open(_games[i]))),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
@@ -240,7 +249,7 @@ class _CoinBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _Pressable(
+    return Pressable(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
@@ -291,132 +300,6 @@ class _CoinBar extends StatelessWidget {
             ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _GameTile extends StatelessWidget {
-  const _GameTile({required this.item, required this.onTap});
-
-  final _GameItem item;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return _Pressable(
-      onTap: onTap,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(22),
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: item.colors,
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Thumbnail halaman game.
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(7, 7, 7, 0),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(16),
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      const ColoredBox(color: Color(0x59000000)),
-                      RepaintBoundary(child: item.preview()),
-                      // Ikon game di pojok kiri atas thumbnail.
-                      Positioned(
-                        left: 7,
-                        top: 7,
-                        child: Container(
-                          width: 30,
-                          height: 30,
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.35),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
-                          ),
-                          child: Icon(item.icon, color: Colors.white, size: 17),
-                        ),
-                      ),
-                      // Garis tepi tipis biar terlihat seperti "layar".
-                      IgnorePointer(
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 9, 12, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Colors.white, fontSize: 15.5, fontWeight: FontWeight.w800),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    item.subtitle,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 11, height: 1.3),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Efek tekan: mengecil sedikit lalu membal balik.
-class _Pressable extends StatefulWidget {
-  const _Pressable({required this.child, required this.onTap});
-
-  final Widget child;
-  final VoidCallback onTap;
-
-  @override
-  State<_Pressable> createState() => _PressableState();
-}
-
-class _PressableState extends State<_Pressable> {
-  bool _down = false;
-
-  void _set(bool v) {
-    if (_down != v) setState(() => _down = v);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTapDown: (_) => _set(true),
-      onTapCancel: () => _set(false),
-      onTapUp: (_) => _set(false),
-      onTap: widget.onTap,
-      child: AnimatedScale(
-        scale: _down ? 0.96 : 1,
-        duration: Duration(milliseconds: _down ? 90 : 220),
-        curve: _down ? Curves.easeOut : Curves.easeOutBack,
-        child: widget.child,
       ),
     );
   }
