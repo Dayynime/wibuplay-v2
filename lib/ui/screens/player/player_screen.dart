@@ -18,7 +18,6 @@ import '../../../core/watch_xp_gate.dart';
 import '../../../data/models/comment_models.dart';
 import '../../../data/models/episode_item.dart';
 import '../../../data/models/stream_data.dart';
-import '../../../data/town_stage_link.dart';
 import '../../../providers.dart';
 import '../../components/cards.dart';
 import '../../components/common_components.dart';
@@ -359,9 +358,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
       if (!mounted) return;
       messenger.hideCurrentSnackBar();
       _stopPlayer();
-      // Dibuka dari "Mulai Nobar" di Zenime Town: pasang ke panggung Plaza.
-      final townCh = TownStageLink.consume();
-      if (townCh != null && mounted) unawaited(TownStageLink.register(ref.read(supabaseDioProvider), room.id, townCh));
       await openNobarRoom(context, room, replace: true);
     } on NobarException catch (e) {
       say(e.message);

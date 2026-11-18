@@ -84,8 +84,11 @@ class NobarMembersStrip extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 14),
-            Builder(builder: (context) {
-              Widget slot(int i) => i < members.length
+            Row(
+              children: [
+                for (var i = 0; i < room.maxMembers; i++)
+                  Expanded(
+                    child: i < members.length
                         ? _MemberSlot(
                             member: members[i],
                             isMe: members[i].uid == myUid,
@@ -102,17 +105,10 @@ class NobarMembersStrip extends StatelessWidget {
                                       onKick: onKick,
                                     ),
                           )
-                        : _EmptySlot(onTap: onInvite);
-              // Room Panggung Nobar Town bisa lebih dari 5 orang: geser samping.
-              final slots = room.maxMembers > members.length ? room.maxMembers : members.length;
-              if (slots <= 5) {
-                return Row(children: [for (var i = 0; i < slots; i++) Expanded(child: slot(i))]);
-              }
-              return SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(children: [for (var i = 0; i < slots; i++) SizedBox(width: 66, child: slot(i))]),
-              );
-            }),
+                        : _EmptySlot(onTap: onInvite),
+                  ),
+              ],
+            ),
           ],
         );
       },

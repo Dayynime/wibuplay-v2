@@ -11,14 +11,10 @@ import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 
 import '../../../core/remote_config_manager.dart';
-import '../../../data/models/nobar_models.dart';
 import '../../../data/repository/authed_function.dart';
-import '../../../data/town_stage_link.dart';
 import '../../../data/voice/nobar_voice.dart';
 import '../../../providers.dart';
-import '../nobar/nobar_lobby_screen.dart' show openNobarRoom;
 import 'ludo_invite.dart';
-import 'town_nobar_pick.dart';
 
 /// Warna latar game web (langit biru), dipakai selama halaman dimuat.
 const Color _kSky = Color(0xFFCDEBFB);
@@ -31,10 +27,8 @@ const Color _kInk = Color(0xFF2B3A55);
 ///   web -> app : {"type":"ready"} | {"type":"getToken"} | {"type":"share","code":"ABC234"}
 ///                | {"type":"haptic","kind":"light"|"heavy"} | {"type":"close"}
 ///                | {"type":"voice","action":"join","table":"d1","pid"} | {"type":"voice","action":"leave"|"mic"|"muteAll"|"speaker"}
-///                | {"type":"nobar","action":"watch"} | {"type":"nobar","action":"start","channel":1}
 ///   app -> web : window.zenimeReceive({"type":"auth","token","name","avatar"})
 ///                | window.zenimeReceive({"type":"voice","on","starting","mic","muteAll","speaker","speaking":[pid],"micOn":[pid],"notice"})
-///                | window.zenimeReceive({"type":"toast","text"}) | window.zenimeReceive({"type":"resume"})
 ///
 /// Suara meja diskusi Zenime Town dijalankan app (LiveKit, sama dengan Nobar),
 /// bukan oleh halaman web; identity LiveKit = pid Town.
@@ -74,9 +68,6 @@ class _LudoWebViewScreenState extends ConsumerState<LudoWebViewScreen> {
 
   /// Zenime Town dimainkan mendatar (landscape); game lain tetap tegak.
   bool _landscape = false;
-
-  /// Sedang membuka Panggung Nobar (cegah tekan ganda).
-  bool _nobarBusy = false;
   static final RegExp _tableRe = RegExp(r'^d[1-9]$');
 
   @override
@@ -130,10 +121,6 @@ class _LudoWebViewScreenState extends ConsumerState<LudoWebViewScreen> {
     final want = path.startsWith('/town');
     if (want == _landscape) return;
     _landscape = want;
-    _setLandscape(want);
-  }
-
-  void _setLandscape(bool want) {
     if (want) {
       unawaited(SystemChrome.setPreferredOrientations(
           [DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]));
@@ -191,97 +178,6 @@ class _LudoWebViewScreenState extends ConsumerState<LudoWebViewScreen> {
         if (mounted) Navigator.of(context).pop();
       case 'voice':
         _onVoice(msg);
-      case 'nobar':
-        if (msg['action'] == 'watch') unawaited(_nobarWatch());
-        if (msg['action'] == 'start') {
-          final ch = msg['channel'];
-          if (ch is int && ch >= 1) unawaited(_nobarStart(ch));
-        }
-    }
-  }
-
-  // ================================================================ Panggung Nobar
-
-  void _webToast(String text) {
-    final ctrl = _ctrl;
-    if (ctrl == null || !mounted) return;
-    unawaited(ctrl
-        .runJavaScript('window.zenimeReceive && window.zenimeReceive(${jsonEncode({'type': 'toast', 'text': text})});')
-        .catchError((Object _) {}));
-  }
-
-  String _errText(Object e) {
-    final s = e.toString().replaceFirst('Exception: ', '').replaceFirst('NobarException: ', '').trim();
-    return s.isEmpty || s.length > 120 ? 'Gagal membuka Nobar, coba lagi' : s;
-  }
-
-  /// Buka layar lain dari Town: layar tegak dulu, lalu kembali mendatar dan
-  /// Town disinkron ulang setelah kembali.
-  Future<void> _outsideTown(Future<void> Function() go) async {
-    _voiceLeave();
-    final town = _landscape;
-    if (town) _setLandscape(false);
-    try {
-      await go();
-    } finally {
-      if (mounted && town && _landscape) _setLandscape(true);
-      final ctrl = _ctrl;
-      if (ctrl != null && mounted) {
-        unawaited(ctrl
-            .runJavaScript('window.zenimeReceive && window.zenimeReceive({"type":"resume"});')
-            .catchError((Object _) {}));
-      }
-    }
-  }
-
-  /// Nonton tayangan di panggung: masuk room Nobar-nya tanpa kode.
-  Future<void> _nobarWatch() async {
-    if (_nobarBusy) return;
-    _nobarBusy = true;
-    try {
-      final d = await callAuthedFunction(ref.read(supabaseDioProvider), 'town', {'action': 'stage_join'});
-      final id = d is Map ? d['room_id'] : null;
-      if (id is! String) throw Exception('Tayangan tidak ditemukan');
-      final room = await ref.read(nobarRepositoryProvider).get(id);
-      if (!mounted) return;
-      await _outsideTown(() => openNobarRoom(context, room));
-    } catch (e) {
-      _webToast(_errText(e));
-    } finally {
-      _nobarBusy = false;
-    }
-  }
-
-  /// Panggung kosong: pakai room Nobar yang aku host (kalau ada), atau pilih
-  /// anime dulu; room yang dibuat nanti otomatis dipasang ke panggung.
-  Future<void> _nobarStart(int channel) async {
-    if (_nobarBusy) return;
-    _nobarBusy = true;
-    try {
-      final uid = FirebaseAuth.instance.currentUser?.uid;
-      final repo = ref.read(nobarRepositoryProvider);
-      NobarRoom? hosted;
-      for (final r in await repo.myRooms()) {
-        if (r.isHost(uid)) hosted = r;
-      }
-      if (!mounted) return;
-      if (hosted != null) {
-        final room = hosted;
-        await callAuthedFunction(ref.read(supabaseDioProvider), 'town',
-            {'action': 'stage_set', 'room_id': room.id, 'channel': channel});
-        if (!mounted) return;
-        await _outsideTown(() => openNobarRoom(context, room));
-        return;
-      }
-      TownStageLink.arm(channel);
-      await _outsideTown(() => Navigator.of(context).push<void>(
-            MaterialPageRoute<void>(builder: (_) => const TownNobarPickScreen()),
-          ));
-      TownStageLink.disarm();
-    } catch (e) {
-      _webToast(_errText(e));
-    } finally {
-      _nobarBusy = false;
     }
   }
 
