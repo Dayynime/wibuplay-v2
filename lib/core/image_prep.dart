@@ -16,14 +16,42 @@ class ImagePrep {
   /// Batas ukuran GIF (Cloudinary gratis menolak file > 10 MB).
   static const int maxGifBytes = 8 * 1024 * 1024;
 
+  /// True untuk gambar ANIMASI: GIF, WebP animasi, dan APNG (PNG animasi).
+  /// Banyak "GIF" hasil unduhan (TikTok/Pinterest/Tenor/keyboard) sebenarnya
+  /// WebP animasi; semuanya diperlakukan seperti GIF (tanpa crop, tanpa
+  /// kompres) supaya animasinya tetap. Dicek dari ISI file, bukan ekstensi.
   static Future<bool> isGif(String path) async {
     final raf = await File(path).open();
     try {
-      final head = String.fromCharCodes(await raf.read(6));
-      return head == 'GIF87a' || head == 'GIF89a';
+      final h = await raf.read(65536);
+      if (h.length < 6) return false;
+      final head6 = String.fromCharCodes(h.sublist(0, 6));
+      if (head6 == 'GIF87a' || head6 == 'GIF89a') return true;
+      String s(int a) => String.fromCharCodes(h.sublist(a, a + 4));
+      // WebP animasi: RIFF....WEBP + VP8X dengan flag animasi (bit 0x02).
+      if (h.length >= 21 && s(0) == 'RIFF' && s(8) == 'WEBP') {
+        return s(12) == 'VP8X' && (h[20] & 0x02) != 0;
+      }
+      // APNG: PNG yang punya chunk acTL (sebelum IDAT).
+      if (h.length >= 8 && h[0] == 0x89 && h[1] == 0x50 && h[2] == 0x4E && h[3] == 0x47) {
+        return _indexOf(h, 'acTL') != -1;
+      }
+      return false;
     } finally {
       await raf.close();
     }
+  }
+
+  static int _indexOf(Uint8List b, String t) {
+    final c = t.codeUnits;
+    outer:
+    for (var i = 0; i + c.length <= b.length; i++) {
+      for (var j = 0; j < c.length; j++) {
+        if (b[i + j] != c[j]) continue outer;
+      }
+      return i;
+    }
+    return -1;
   }
 
   /// Mengembalikan path file yang siap diupload.
