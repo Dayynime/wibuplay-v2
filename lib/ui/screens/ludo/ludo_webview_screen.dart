@@ -11,6 +11,8 @@ import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 
 import '../../../core/remote_config_manager.dart';
+import '../../../data/repository/authed_function.dart';
+import '../../../data/voice/nobar_voice.dart';
 import '../../../providers.dart';
 import 'ludo_invite.dart';
 
@@ -24,7 +26,12 @@ const Color _kInk = Color(0xFF2B3A55);
 /// Kontrak bridge (sama dengan web game):
 ///   web -> app : {"type":"ready"} | {"type":"getToken"} | {"type":"share","code":"ABC234"}
 ///                | {"type":"haptic","kind":"light"|"heavy"} | {"type":"close"}
+///                | {"type":"voice","action":"join","table":"d1","pid"} | {"type":"voice","action":"leave"|"mic"|"muteAll"|"speaker"}
 ///   app -> web : window.zenimeReceive({"type":"auth","token","name","avatar"})
+///                | window.zenimeReceive({"type":"voice","on","starting","mic","muteAll","speaker","speaking":[pid],"micOn":[pid],"notice"})
+///
+/// Suara meja diskusi Zenime Town dijalankan app (LiveKit, sama dengan Nobar),
+/// bukan oleh halaman web; identity LiveKit = pid Town.
 class LudoWebViewScreen extends ConsumerStatefulWidget {
   const LudoWebViewScreen({super.key, this.code, this.path = '/'});
 
@@ -55,6 +62,11 @@ class _LudoWebViewScreenState extends ConsumerState<LudoWebViewScreen> {
   bool _loading = true;
   bool _failed = false;
 
+  /// Voice meja diskusi Zenime Town (null = tidak sedang di meja).
+  NobarVoice? _voice;
+  bool _voiceStarting = false;
+  static final RegExp _tableRe = RegExp(r'^d[1-9]$');
+
   @override
   void initState() {
     super.initState();
@@ -69,6 +81,8 @@ class _LudoWebViewScreenState extends ConsumerState<LudoWebViewScreen> {
       ..addJavaScriptChannel('ZenimeBridge', onMessageReceived: (m) => _onMessage(m.message))
       ..setNavigationDelegate(NavigationDelegate(
         onPageStarted: (_) {
+          // Pindah halaman (mis. dari Town ke Ludo): suara meja ditutup.
+          _voiceLeave();
           if (mounted) setState(() => _loading = true);
         },
         onPageFinished: (_) {
@@ -99,6 +113,7 @@ class _LudoWebViewScreenState extends ConsumerState<LudoWebViewScreen> {
 
   @override
   void dispose() {
+    _voiceLeave();
     unawaited(WakelockPlus.disable());
     super.dispose();
   }
@@ -137,7 +152,82 @@ class _LudoWebViewScreenState extends ConsumerState<LudoWebViewScreen> {
       case 'close':
         // pop() langsung (bukan maybePop) supaya tidak tertahan PopScope.
         if (mounted) Navigator.of(context).pop();
+      case 'voice':
+        _onVoice(msg);
     }
+  }
+
+  // ================================================================ voice Town
+
+  void _onVoice(Map<String, dynamic> msg) {
+    switch (msg['action']) {
+      case 'join':
+        final table = msg['table'];
+        final pid = msg['pid'];
+        if (table is! String || !_tableRe.hasMatch(table) || pid is! String || pid.isEmpty) return;
+        unawaited(_voiceJoin(table, pid));
+      case 'leave':
+        _voiceLeave();
+      case 'mic':
+        unawaited(_voice?.toggleMic());
+      case 'muteAll':
+        final v = _voice;
+        if (v != null) v.setMuteAll(!v.muteAll);
+      case 'speaker':
+        unawaited(_voice?.toggleSpeaker());
+    }
+  }
+
+  Future<void> _voiceJoin(String table, String pid) async {
+    _voiceLeave();
+    final dio = ref.read(supabaseDioProvider);
+    final v = NobarVoice(
+      myUid: pid,
+      fetchToken: () async {
+        final d = await callAuthedFunction(dio, 'town-voice-token', {'table': table});
+        if (d is Map) return NobarVoiceToken.fromJson(Map<String, dynamic>.from(d));
+        throw Exception('Token suara tidak valid');
+      },
+    );
+    _voice = v;
+    _voiceStarting = true;
+    v.addListener(_pushVoice);
+    _pushVoice();
+    await v.start();
+    if (!identical(_voice, v)) return;
+    _voiceStarting = false;
+    _pushVoice();
+  }
+
+  void _voiceLeave() {
+    final v = _voice;
+    if (v == null) return;
+    _voice = null;
+    _voiceStarting = false;
+    v.removeListener(_pushVoice);
+    v.dispose();
+  }
+
+  /// Kirim status suara ke web (siapa yang ngomong / mic nyala).
+  void _pushVoice() {
+    final v = _voice;
+    final ctrl = _ctrl;
+    if (v == null || ctrl == null || !mounted) return;
+    final ids = v.remoteIds;
+    final data = {
+      'type': 'voice',
+      'on': v.started,
+      'starting': _voiceStarting && !v.started,
+      'mic': v.micOn,
+      'muteAll': v.muteAll,
+      'speaker': v.speakerOn,
+      'speaking': [if (v.meSpeaking) v.myUid, ...ids.where((id) => v.peer(id).speaking)],
+      'micOn': [if (v.micOn) v.myUid, ...ids.where((id) => v.peer(id).micOn)],
+      'notice': v.notice,
+    };
+    unawaited(ctrl
+        .runJavaScript('window.zenimeReceive && window.zenimeReceive(${jsonEncode(data)});')
+        .catchError((Object _) {}));
   }
 
   /// Kirim Firebase ID token + nama/avatar ke web. Nama & avatar cuma
@@ -171,6 +261,20 @@ class _LudoWebViewScreenState extends ConsumerState<LudoWebViewScreen> {
     try {
       await ctrl.runJavaScript('window.zenimeReceive && window.zenimeReceive($payload);');
     } catch (_) {}
+  }
+
+  /// Tombol kembali: kalau game dibuka dari Zenime Town, kembali ke Town dulu.
+  Future<void> _onBack() async {
+    final ctrl = _ctrl;
+    if (ctrl != null) {
+      try {
+        if (await ctrl.canGoBack()) {
+          await ctrl.goBack();
+          return;
+        }
+      } catch (_) {}
+    }
+    if (mounted) await _confirmExit();
   }
 
   Future<void> _confirmExit() async {
@@ -223,7 +327,7 @@ class _LudoWebViewScreenState extends ConsumerState<LudoWebViewScreen> {
       canPop: ctrl == null,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
-        unawaited(_confirmExit());
+        unawaited(_onBack());
       },
       child: AnnotatedRegion<SystemUiOverlayStyle>(
         value: SystemUiOverlayStyle.dark.copyWith(statusBarColor: Colors.transparent),

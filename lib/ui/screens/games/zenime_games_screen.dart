@@ -16,8 +16,9 @@ import '../tree/tree_screen.dart';
 import '../wallpaper/wallpaper_screen.dart';
 import 'game_list_tile.dart';
 import 'game_previews.dart';
+import 'town_preview.dart';
 
-/// Hub "Zenime Games": daftar game (Gaple, Ludo, Ular Tangga, Block!, Congklak,
+/// Hub "Zenime Games": daftar game (Zenime Town, Gaple, Ludo, Ular Tangga, Block!, Congklak,
 /// Duel, Catur, Gacha, Pohon ZCoin). Border Avatar & Badge Level ada di
 /// Zenime Decoration.
 class ZenimeGamesScreen extends ConsumerStatefulWidget {
@@ -59,6 +60,15 @@ class _ZenimeGamesScreenState extends ConsumerState<ZenimeGamesScreen>
   );
 
   static final List<_GameItem> _games = [
+    _GameItem(
+      title: 'Zenime Town',
+      subtitle: 'Dunia pixel buat nongkrong & ngobrol',
+      icon: Icons.location_city_rounded,
+      colors: const [Color(0xFF2F6E22), Color(0xFF6CC24A), Color(0xFFFFD84D)],
+      page: () => const LudoWebViewScreen(path: '/town/'),
+      preview: () => const TownPreview(),
+      info: 'Ramai-ramai',
+    ),
     _GameItem(
       title: 'Gaple',
       subtitle: 'Domino klasik, 2–4 pemain',

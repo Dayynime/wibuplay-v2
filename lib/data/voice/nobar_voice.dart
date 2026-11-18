@@ -129,6 +129,10 @@ class NobarVoice extends ChangeNotifier {
 
   bool isMutedByMe(String uid) => _muteAll || _mutedByMe.contains(uid);
 
+  /// Identity semua peserta lain yang sedang tersambung.
+  List<String> get remoteIds =>
+      _room?.remoteParticipants.values.map((p) => p.identity).toList() ?? const <String>[];
+
   // ================================================================ aksi
 
   /// Mulai voice (mode dengar). Aman dipanggil berkali-kali.
