@@ -65,6 +65,9 @@ class _LudoWebViewScreenState extends ConsumerState<LudoWebViewScreen> {
   /// Voice meja diskusi Zenime Town (null = tidak sedang di meja).
   NobarVoice? _voice;
   bool _voiceStarting = false;
+
+  /// Zenime Town dimainkan mendatar (landscape); game lain tetap tegak.
+  bool _landscape = false;
   static final RegExp _tableRe = RegExp(r'^d[1-9]$');
 
   @override
@@ -73,6 +76,7 @@ class _LudoWebViewScreenState extends ConsumerState<LudoWebViewScreen> {
     final url = _url;
     if (url == null) return;
     unawaited(WakelockPlus.enable());
+    _applyOrientation(url.path);
     _ctrl = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       // Game tidak bisa di-zoom (pinch / double tap).
@@ -80,9 +84,10 @@ class _LudoWebViewScreenState extends ConsumerState<LudoWebViewScreen> {
       ..setBackgroundColor(_kSky)
       ..addJavaScriptChannel('ZenimeBridge', onMessageReceived: (m) => _onMessage(m.message))
       ..setNavigationDelegate(NavigationDelegate(
-        onPageStarted: (_) {
+        onPageStarted: (pageUrl) {
           // Pindah halaman (mis. dari Town ke Ludo): suara meja ditutup.
           _voiceLeave();
+          _applyOrientation(Uri.tryParse(pageUrl)?.path ?? '');
           if (mounted) setState(() => _loading = true);
         },
         onPageFinished: (_) {
@@ -111,8 +116,27 @@ class _LudoWebViewScreenState extends ConsumerState<LudoWebViewScreen> {
       ..loadRequest(url);
   }
 
+  /// Town = landscape + layar penuh; halaman game lain kembali tegak.
+  void _applyOrientation(String path) {
+    final want = path.startsWith('/town');
+    if (want == _landscape) return;
+    _landscape = want;
+    if (want) {
+      unawaited(SystemChrome.setPreferredOrientations(
+          [DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]));
+      unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky));
+    } else {
+      unawaited(SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]));
+      unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
+    }
+  }
+
   @override
   void dispose() {
+    if (_landscape) {
+      unawaited(SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]));
+      unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
+    }
     _voiceLeave();
     unawaited(WakelockPlus.disable());
     super.dispose();
