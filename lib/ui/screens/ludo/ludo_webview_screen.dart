@@ -357,6 +357,9 @@ class _LudoWebViewScreenState extends ConsumerState<LudoWebViewScreen> {
         value: SystemUiOverlayStyle.dark.copyWith(statusBarColor: Colors.transparent),
         child: Scaffold(
           backgroundColor: _kSky,
+          // Di Town keyboard menimpa layar (kotak chat ada di atas), bukan
+          // mengecilkan WebView; kalau mengecil, peta ikut terangkat.
+          resizeToAvoidBottomInset: !_landscape,
           body: SafeArea(
             child: ctrl == null
                 ? _Message(
