@@ -55,6 +55,8 @@ dependencies:
 
 dependency_overrides:
   shared_preferences_android: 2.3.4
+  # 2.3.x memakai JNI dan gagal di build release (ClassNotFoundException) -> gambar tidak muncul.
+  path_provider_android: 2.2.23
 
 dev_dependencies:
   flutter_test:
