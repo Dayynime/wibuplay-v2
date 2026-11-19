@@ -25,6 +25,7 @@ import '../../../data/models/stream_data.dart';
 import '../../../data/repository/anime_repository.dart';
 import '../../../data/repository/moviebox_repository.dart';
 import '../../../data/repository/nobar_repository.dart' show NobarException;
+import '../../../data/town_stage_link.dart';
 import '../../../providers.dart';
 import '../../components/common_components.dart';
 import '../../components/mini_player.dart';
@@ -252,6 +253,9 @@ class _MovieBoxPlayerScreenState extends ConsumerState<MovieBoxPlayerScreen> wit
       await old?.dispose();
       WakelockPlus.disable();
       if (mounted) setState(() {});
+      // Dibuka dari "Mulai Nobar" di Zenime Town: pasang ke panggung Plaza.
+      final townCh = TownStageLink.consume();
+      if (townCh != null && mounted) unawaited(TownStageLink.register(ref.read(supabaseDioProvider), room.id, townCh));
       if (mounted) await openNobarRoom(context, room, replace: true);
     } on NobarException catch (e) {
       if (mounted) _toast(e.message);
