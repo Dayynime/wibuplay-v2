@@ -41,6 +41,7 @@ import '../../components/join_date_stat.dart';
 import '../../../data/models/avatar_frame_models.dart';
 import '../../glass/glass.dart';
 import '../../components/clan_tag_badge.dart';
+import '../../components/rank_emblem.dart';
 import '../../redesign/z_kit.dart';
 import '../affinity/affinity_strip.dart';
 
@@ -294,6 +295,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               // Afinitas: ringkasan ikatan, ketuk = halaman Afinitas.
               if (uid.isNotEmpty) ...[
                 const SizedBox(height: 12),
+                ProfileRankCard(uid: uid),
+                const SizedBox(height: 10),
                 AffinityStrip(uid: uid, name: name),
               ],
               // Edit Profil, Teman, dan Wallpaper Komentar dipindah ke Pengaturan

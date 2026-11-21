@@ -32,6 +32,7 @@ import '../../components/common_components.dart';
 import '../../redesign/z_kit.dart';
 import '../affinity/affinity_add_screen.dart';
 import '../affinity/affinity_strip.dart';
+import '../../components/rank_emblem.dart';
 
 /// Buka profil publik user lain (dari Chat Global, Chat Teman, layar Teman).
 /// Port rute `profile/{targetUid}` di Zenime.
@@ -435,6 +436,8 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
                 ),
               ],
               const SizedBox(height: 12),
+              ProfileRankCard(uid: uid),
+              const SizedBox(height: 10),
               AffinityStrip(uid: uid, name: name, canInvite: !_isMe && _relation is FriendRelationFriends),
               if (_error != null) ...[
                 const SizedBox(height: 10),
