@@ -13,9 +13,13 @@ class GameListTile extends StatelessWidget {
     required this.colors,
     required this.preview,
     required this.onTap,
+    this.badge,
   });
 
   final String title;
+
+  /// Label kecil di samping judul, mis. "BETA" (null = tanpa label).
+  final String? badge;
   final String info;
   final IconData infoIcon;
 
@@ -73,11 +77,37 @@ class GameListTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: AppColors.textWhite, fontSize: 17, fontWeight: FontWeight.w800),
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              color: AppColors.textWhite, fontSize: 17, fontWeight: FontWeight.w800),
+                        ),
+                      ),
+                      if (badge != null) ...[
+                        const SizedBox(width: 7),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1.5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFD84D),
+                            borderRadius: BorderRadius.circular(99),
+                          ),
+                          child: Text(
+                            badge!,
+                            style: const TextStyle(
+                              color: Color(0xFF3B2A06),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                   const SizedBox(height: 5),
                   Row(

@@ -29,6 +29,7 @@ import '../../components/staggered_section.dart';
 import '../../components/watch_history_section.dart';
 import '../../components/home_section_cards.dart';
 import 'home_controller.dart';
+import '../ludo/ludo_webview_screen.dart';
 
 /// Port HomeScreen.kt.
 class HomeScreen extends ConsumerWidget {
@@ -415,6 +416,8 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
                 giverClanTags: ref.watch(topGiversProvider).valueOrNull?.clanTags ?? const {},
                 onGiverClick: () => Navigator.of(context)
                     .push<void>(fadeRoute(const TopGiverScreen())),
+                onTownClick: () => Navigator.of(context)
+                    .push<void>(fadeRoute(const LudoWebViewScreen(path: '/town/'))),
                 onItemClick: (item) {
                   final id = item.id;
                   if (id != null) widget.onAnimeClick(id);

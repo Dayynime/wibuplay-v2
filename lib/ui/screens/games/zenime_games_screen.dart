@@ -37,6 +37,7 @@ class _GameItem {
     required this.page,
     required this.preview,
     required this.info,
+    this.badge,
   });
 
   final String title;
@@ -50,6 +51,9 @@ class _GameItem {
 
   /// Jumlah pemain, mis. "2–4 pemain".
   final String info;
+
+  /// Label di samping judul, mis. "BETA".
+  final String? badge;
 }
 
 class _ZenimeGamesScreenState extends ConsumerState<ZenimeGamesScreen>
@@ -68,6 +72,7 @@ class _ZenimeGamesScreenState extends ConsumerState<ZenimeGamesScreen>
       page: () => const LudoWebViewScreen(path: '/town/'),
       preview: () => const TownPreview(),
       info: 'Ramai-ramai',
+      badge: 'BETA',
     ),
     _GameItem(
       title: 'Gaple',
@@ -238,6 +243,7 @@ class _ZenimeGamesScreenState extends ConsumerState<ZenimeGamesScreen>
             i,
             GameListTile(
               title: g.title,
+              badge: g.badge,
               info: g.info,
               infoIcon: Icons.people_outline_rounded,
               colors: g.colors,

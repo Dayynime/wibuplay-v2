@@ -12,6 +12,7 @@ import '../../data/models/clan_models.dart';
 import '../../data/models/support_models.dart';
 import '../../data/models/xp_models.dart';
 import 'hero_slides.dart';
+import 'hero_town_slide.dart';
 import 'net_image.dart';
 
 bool _blank(String? s) => s == null || s.trim().isEmpty;
@@ -41,6 +42,7 @@ class HeroBanner extends StatefulWidget {
     this.topGivers = const [],
     this.giverClanTags = const {},
     this.onGiverClick,
+    this.onTownClick,
   });
 
   final List<AnimeItem> sliderItems;
@@ -61,6 +63,9 @@ class HeroBanner extends StatefulWidget {
   final Map<String, String> giverClanTags;
   final VoidCallback? onGiverClick;
 
+  /// Slide promosi Zenime Town di urutan pertama (null = slide tidak ada).
+  final VoidCallback? onTownClick;
+
   @override
   State<HeroBanner> createState() => _HeroBannerState();
 }
@@ -77,28 +82,32 @@ class _HeroBannerState extends State<HeroBanner> with SingleTickerProviderStateM
       AnimationController(vsync: this, duration: _rotateEvery)
         ..addStatusListener(_onRotationDone);
 
+  /// Posisi slide poster anime: 1 kalau ada slide Zenime Town di depannya.
+  int get _animePage => widget.onTownClick != null ? 1 : 0;
+
   @override
   void initState() {
     super.initState();
-    _rotation.forward();
+    // Jam rotasi poster cuma jalan kalau slide poster yang tampil duluan.
+    if (_animePage == 0) _rotation.forward();
   }
 
   void _onRotationDone(AnimationStatus status) {
     if (status != AnimationStatus.completed || !mounted) return;
     _tick();
-    if (_page == 0) _rotation.forward(from: 0);
+    if (_page == _animePage) _rotation.forward(from: 0);
   }
 
   void _tick() {
     final n = widget.sliderItems.length;
-    if (!mounted || n <= 1 || _page != 0 || _scrolling) return;
+    if (!mounted || n <= 1 || _page != _animePage || _scrolling) return;
     setState(() => _animeIndex = (_animeIndex + 1) % n);
     _preloadNext();
   }
 
   void _onPageChanged(int i) {
     setState(() => _page = i);
-    if (i == 0) {
+    if (i == _animePage) {
       _rotation.forward(from: 0);
     } else {
       _rotation.stop();
@@ -153,8 +162,10 @@ class _HeroBannerState extends State<HeroBanner> with SingleTickerProviderStateM
     final index = _animeIndex < items.length ? _animeIndex : 0;
 
     final hasLeaderboard = widget.topXp.isNotEmpty || widget.topClans.isNotEmpty;
-    // Urutan slide: poster anime -> Top Giver -> Top Leaderboard -> Top Support.
-    var next = 1;
+    // Urutan slide: Zenime Town (promosi) -> poster anime -> Top Giver ->
+    // Top Leaderboard -> Top Support.
+    final townPage = widget.onTownClick != null ? 0 : -1;
+    var next = _animePage + 1;
     final giverPage = widget.topGivers.isNotEmpty ? next++ : -1;
     final lbPage = hasLeaderboard ? next++ : -1;
     final supportPage = widget.topSupport.isNotEmpty ? next++ : -1;
@@ -178,6 +189,16 @@ class _HeroBannerState extends State<HeroBanner> with SingleTickerProviderStateM
                   itemCount: pageCount,
                   onPageChanged: _onPageChanged,
                   itemBuilder: (context, page) {
+                    if (page == townPage) {
+                      return _SlideHost(
+                        controller: _pager,
+                        index: page,
+                        builder: (context, active, offset) => HeroTownSlide(
+                          active: active,
+                          onTap: widget.onTownClick!,
+                        ),
+                      );
+                    }
                     if (page == lbPage) {
                       return _SlideHost(
                         controller: _pager,
@@ -264,7 +285,7 @@ class _HeroBannerState extends State<HeroBanner> with SingleTickerProviderStateM
                             padding: const EdgeInsets.symmetric(horizontal: 3),
                             child: _ProgressSegment(
                               active: i == _page,
-                              progress: (i == 0 && items.length > 1) ? _rotation : null,
+                              progress: (i == _animePage && items.length > 1) ? _rotation : null,
                             ),
                           ),
                         ),
