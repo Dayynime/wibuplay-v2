@@ -66,6 +66,42 @@ String? _episodeNumberOf(String? episodeName, AnichinEpisodeRef? ref) {
   return _epTitle.firstMatch(episodeName ?? '')?.group(1);
 }
 
+final RegExp _epNumInText = RegExp(r'(?:episode|eps?)[\s_-]*(\d+(?:[.-]\d+)?)', caseSensitive: false);
+final RegExp _firstNum = RegExp(r'\d+(?:\.\d+)?');
+
+/// Nomor episode (desimal ikut, mis. 12.5) dari field episode, nama, atau slug.
+double? _episodeNum(AnichinEpisodeRef e) {
+  final f = e.episode?.trim();
+  if (f != null && f.isNotEmpty) {
+    final m = _firstNum.firstMatch(f);
+    if (m != null) return double.tryParse(m.group(0)!);
+  }
+  for (final raw in [e.name, e.slug]) {
+    final m = raw == null ? null : _epNumInText.firstMatch(raw);
+    if (m != null) return double.tryParse(m.group(1)!.replaceAll('-', '.'));
+  }
+  return null;
+}
+
+/// Urutkan episode dari nomor terkecil (Episode 1 dulu), seperti daftar anime.
+/// Kalau ada episode tanpa nomor, urutan asli dipakai; hanya dibalik bila
+/// daftarnya terdeteksi urut dari yang terbaru.
+List<AnichinEpisodeRef> _sortEpisodesAsc(List<AnichinEpisodeRef> list) {
+  if (list.length < 2) return list;
+  final nums = [for (final e in list) _episodeNum(e)];
+  if (nums.every((n) => n != null)) {
+    final idx = List<int>.generate(list.length, (i) => i)
+      ..sort((a, b) {
+        final c = nums[a]!.compareTo(nums[b]!);
+        return c != 0 ? c : a.compareTo(b);
+      });
+    return [for (final i in idx) list[i]];
+  }
+  final known = nums.whereType<double>().toList();
+  if (known.length >= 2 && known.first > known.last) return list.reversed.toList();
+  return list;
+}
+
 /// Port DonghuaPlayerScreen.kt. Tampilan disamakan dengan player anime
 /// (kontrol custom, gestur kecerahan/volume, double-tap +-10 detik), lalu di
 /// bawah video ada poster + sinopsis, banner Trakteer, chip aksi, daftar
@@ -837,15 +873,16 @@ class _DonghuaPlayerScreenState extends ConsumerState<DonghuaPlayerScreen>
     }
 
     // ---- Info episode ----
-    // Daftar di situs sumber urut terbaru -> terlama, jadi BERIKUTNYA =
-    // index - 1, SEBELUMNYA = index + 1.
-    final episodes = episodeDetail?.episodes ?? const <AnichinEpisodeRef>[];
-    final currentIdx = episodes.indexWhere((e) => e.slug == slug);
-    final currentRef = currentIdx >= 0 ? episodes[currentIdx] : null;
-    final prevSlug = currentIdx >= 0 && currentIdx + 1 < episodes.length
-        ? episodes[currentIdx + 1].slug
-        : null;
-    final nextSlug = currentIdx > 0 ? episodes[currentIdx - 1].slug : null;
+    // Urutan daftar dari situs sumber tidak konsisten (kadang terbaru dulu,
+    // kadang Episode 1 dulu), jadi diurutkan menurut NOMOR episode.
+    // SEBELUMNYA/BERIKUTNYA dihitung dari urutan naik (1, 2, 3, ...);
+    // daftar yang tampil di layar urut terbaru dulu.
+    final asc = _sortEpisodesAsc(episodeDetail?.episodes ?? const <AnichinEpisodeRef>[]);
+    final ascIdx = asc.indexWhere((e) => e.slug == slug);
+    final currentRef = ascIdx >= 0 ? asc[ascIdx] : null;
+    final prevSlug = ascIdx > 0 ? asc[ascIdx - 1].slug : null;
+    final nextSlug = ascIdx >= 0 && ascIdx + 1 < asc.length ? asc[ascIdx + 1].slug : null;
+    final episodes = asc.reversed.toList();
 
     final fullName = episodeDetail?.name ?? video?.title;
     // Offline tanpa internet: info episode gagal dimuat, pakai data download.
