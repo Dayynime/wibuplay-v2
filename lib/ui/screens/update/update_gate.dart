@@ -5,10 +5,9 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../../core/apk_downloader.dart';
 import '../../../core/build_flags.dart';
-import '../../../core/theme/app_colors.dart';
 import '../../../core/update_checker.dart';
+import '../splash/zenime_splash.dart';
 import 'force_update_screen.dart';
-import '../../glass/glass.dart';
 
 enum _Phase { checking, blocked, ok }
 
@@ -42,6 +41,9 @@ class _UpdateGateState extends State<UpdateGate> {
 
   final ApkDownloader _dl = ApkDownloader();
   _Phase _phase = _Phase.checking;
+
+  /// Animasi splash harus selesai dulu sebelum pindah ke app/update.
+  bool _splashDone = false;
   UpdateInfo? _info;
   String _current = '';
 
@@ -107,9 +109,14 @@ class _UpdateGateState extends State<UpdateGate> {
   @override
   Widget build(BuildContext context) {
     final Widget body;
-    switch (_phase) {
+    switch (_splashDone ? _phase : _Phase.checking) {
       case _Phase.checking:
-        body = const _Splash(key: ValueKey('splash'));
+        body = ZenimeSplash(
+          key: const ValueKey('splash'),
+          onFinished: () {
+            if (mounted) setState(() => _splashDone = true);
+          },
+        );
       case _Phase.blocked:
         body = ValueListenableBuilder<DownloadState>(
           key: const ValueKey('update'),
@@ -133,47 +140,6 @@ class _UpdateGateState extends State<UpdateGate> {
       switchInCurve: Curves.easeOutCubic,
       switchOutCurve: Curves.easeIn,
       child: body,
-    );
-  }
-}
-
-/// Layar singkat selama cek update: sama dengan splash bawaan (latar gelap +
-/// logo) supaya perpindahan dari splash sistem terasa menyambung.
-class _Splash extends StatefulWidget {
-  const _Splash({super.key});
-
-  @override
-  State<_Splash> createState() => _SplashState();
-}
-
-class _SplashState extends State<_Splash> with SingleTickerProviderStateMixin {
-  late final AnimationController _c =
-      AnimationController(vsync: this, duration: const Duration(milliseconds: 1300))
-        ..repeat(reverse: true);
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return GlassScaffold(
-      backgroundColor: AppColors.backgroundDark,
-      body: Center(
-        child: AnimatedBuilder(
-          animation: _c,
-          builder: (context, child) {
-            final v = Curves.easeInOut.transform(_c.value);
-            return Transform.scale(scale: 1 + 0.06 * v, child: child);
-          },
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(24),
-            child: Image.asset('assets/images/logo.jpg', width: 84, height: 84),
-          ),
-        ),
-      ),
     );
   }
 }

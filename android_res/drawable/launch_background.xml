@@ -1,14 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Splash screen Zenime: latar gelap sama dengan background app + logo di tengah. -->
+<!-- Splash native Zenime: latar polos saja (tanpa logo). Logo + animasi
+     tinta tampil di splash Flutter (lib/ui/screens/splash/zenime_splash.dart)
+     dengan warna latar yang sama, jadi perpindahannya menyambung. -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
         <shape android:shape="rectangle">
-            <solid android:color="#000000" />
+            <solid android:color="#0B0E14" />
         </shape>
     </item>
-    <item
-        android:width="120dp"
-        android:height="120dp"
-        android:drawable="@drawable/zenime_logo_1786121211149"
-        android:gravity="center" />
 </layer-list>
