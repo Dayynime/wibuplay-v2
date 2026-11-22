@@ -8,6 +8,7 @@ import '../profile/public_profile_screen.dart';
 import '../../glass/glass.dart';
 import '../../components/clan_tag_badge.dart';
 import '../../components/user_level_badge.dart';
+import '../../components/rank_emblem.dart';
 import '../../redesign/podium_kit.dart';
 import '../../redesign/z_kit.dart';
 
@@ -118,6 +119,9 @@ class XpLeaderboardScreen extends ConsumerWidget {
                       UserLevelBadge(uid: e.firebaseUid, level: e.level),
                       if (e.clanTag != null && e.clanTag!.isNotEmpty) ClanTagBadge(text: e.clanTag!),
                     ],
+                    // Kanan: lambang rank sesuai level; nomor urut pindah ke pojok avatar.
+                    rankOnAvatar: true,
+                    trailing: _RankTrailing(level: e.level),
                     onTap: () => openPublicProfile(context, e.firebaseUid),
                   ),
                 );
@@ -131,3 +135,32 @@ class XpLeaderboardScreen extends ConsumerWidget {
 }
 
 /// Warna medali & aksen.
+
+/// Lambang rank (Rookie–Eternal) + namanya, di kanan baris peringkat 4+.
+class _RankTrailing extends StatelessWidget {
+  const _RankTrailing({required this.level});
+
+  final int level;
+
+  @override
+  Widget build(BuildContext context) {
+    final i = rankIndexForLevel(level);
+    final tier = kRankTiers[i];
+    return SizedBox(
+      width: 60,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          RankEmblem(tier: i, size: 50),
+          Text(
+            tier.name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: tier.hi, fontSize: 9.5, fontWeight: FontWeight.w800),
+          ),
+        ],
+      ),
+    );
+  }
+}
+

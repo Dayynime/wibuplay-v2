@@ -661,6 +661,7 @@ class ZRankRow extends StatelessWidget {
     this.last = false,
     this.avatar,
     this.trailing,
+    this.rankOnAvatar = false,
   });
 
   final int rank;
@@ -679,6 +680,10 @@ class ZRankRow extends StatelessWidget {
 
   /// Ganti karangan daun di kanan (mis. panah saat daftar tidak diperingkat).
   final Widget? trailing;
+
+  /// Tampilkan nomor peringkat sebagai lencana kecil di pojok avatar
+  /// (dipakai kalau sisi kanan diisi [trailing] lain, mis. lambang rank).
+  final bool rankOnAvatar;
 
   @override
   Widget build(BuildContext context) {
@@ -710,7 +715,15 @@ class ZRankRow extends StatelessWidget {
             children: [
               // Border avatar animasi di lapisan sendiri (baris tidak ikut digambar ulang).
               RepaintBoundary(
-                child: avatar ?? UserAvatar(username: username, url: avatarUrl, size: 46, frameUid: uid),
+                child: rankOnAvatar
+                    ? Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          avatar ?? UserAvatar(username: username, url: avatarUrl, size: 46, frameUid: uid),
+                          Positioned(left: -6, bottom: -4, child: _RankNumberChip(rank: rank)),
+                        ],
+                      )
+                    : (avatar ?? UserAvatar(username: username, url: avatarUrl, size: 46, frameUid: uid)),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -750,6 +763,33 @@ class ZRankRow extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Lencana nomor peringkat kecil (mis. "#4") di pojok avatar.
+class _RankNumberChip extends StatelessWidget {
+  const _RankNumberChip({required this.rank});
+
+  final int rank;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFFFFE7A3), Color(0xFFE0A93A)],
+        ),
+        borderRadius: BorderRadius.circular(99),
+        border: Border.all(color: AppColors.surfaceDark, width: 2),
+      ),
+      child: Text(
+        '#$rank',
+        style: const TextStyle(color: Color(0xFF3B2A06), fontSize: 11, fontWeight: FontWeight.w900, height: 1.1),
       ),
     );
   }
