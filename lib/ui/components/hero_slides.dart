@@ -13,6 +13,7 @@ import '../../data/models/xp_models.dart';
 import 'game_badges.dart';
 import '../screens/profile/public_profile_screen.dart';
 import 'clan_tag_badge.dart';
+import 'user_name_text.dart';
 
 // =============================================================================
 // Slide leaderboard di carousel Beranda (Top XP / Top Clan, Top Support,
@@ -939,6 +940,7 @@ class _HeroLeaderboardSlideState extends State<HeroLeaderboardSlide> {
               frameUid: list[i].firebaseUid,
             ),
             name: list[i].username,
+            uid: list[i].firebaseUid,
             ratio: list[i].xp / max,
             value: '${_compactCount(list[i].xp)} XP',
             onTap: () => openPublicProfile(context, list[i].firebaseUid),
@@ -976,6 +978,7 @@ class _HeroLeaderboardSlideState extends State<HeroLeaderboardSlide> {
     required String name,
     required double ratio,
     required String value,
+    String? uid,
     VoidCallback? onTap,
   }) {
     final start = 0.06 + i * 0.08;
@@ -999,16 +1002,16 @@ class _HeroLeaderboardSlideState extends State<HeroLeaderboardSlide> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    UserNameText(
+                      uid: uid ?? '',
+                      name: name,
                       style: const TextStyle(
                         color: AppColors.textWhite,
                         fontSize: 12.5,
                         fontWeight: FontWeight.w600,
                         height: 1.2,
                       ),
+                      decoScale: .8,
                     ),
                     const SizedBox(height: 5),
                     _Bar(
@@ -1174,10 +1177,10 @@ class HeroSupportSlide extends StatelessWidget {
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: Text(
-                  s.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                child: UserNameText(
+                  uid: uid ?? '',
+                  name: s.name,
+                  decoScale: .8,
                   style: const TextStyle(
                     color: AppColors.textWhite,
                     fontSize: 12.5,
@@ -1385,16 +1388,16 @@ class HeroGiverSlide extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        x.username,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      UserNameText(
+                        uid: x.firebaseUid,
+                        name: x.username,
                         style: const TextStyle(
                           color: AppColors.textWhite,
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
                           height: 1.2,
                         ),
+                        decoScale: .8,
                       ),
                       _Odometer(
                         text: '${_groupInt(x.days)} hari',

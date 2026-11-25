@@ -22,6 +22,8 @@ import '../../components/net_image.dart';
 import '../../components/profile_badges.dart';
 import '../../components/rarity_chip.dart';
 import '../../components/role_badges.dart';
+import '../../../data/name_deco_cache.dart';
+import '../../components/name_deco_styles.dart';
 import 'profile_screen.dart' show ProfileHeroAvatar, ProfileClanPill;
 
 const String _mono = 'monospace';
@@ -528,14 +530,21 @@ class ProfileCollectCard extends ConsumerWidget {
                         const SizedBox(width: 6),
                       ],
                       Flexible(
-                        child: ShaderMask(
-                          shaderCallback: (r) => LinearGradient(colors: [Colors.white, Color.lerp(Colors.white, primary, 0.55)!]).createShader(r),
-                          child: Text(
-                            name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: 0.3),
-                          ),
+                        child: ListenableBuilder(
+                          listenable: NameDecoCache.instance,
+                          builder: (context, _) {
+                            final deco = NameDecoStyle.fromId(NameDecoCache.instance.styleFor(uid));
+                            if (deco != null) return NameDecoText(name: name, style: deco, fontSize: 18);
+                            return ShaderMask(
+                              shaderCallback: (r) => LinearGradient(colors: [Colors.white, Color.lerp(Colors.white, primary, 0.55)!]).createShader(r),
+                              child: Text(
+                                name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: 0.3),
+                              ),
+                            );
+                          },
                         ),
                       ),
                       const SizedBox(width: 5),

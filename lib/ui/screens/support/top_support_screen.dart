@@ -16,6 +16,7 @@ import '../../../providers.dart';
 import '../../components/game_badges.dart';
 import '../profile/public_profile_screen.dart';
 import '../../glass/glass.dart';
+import '../../components/user_name_text.dart';
 
 /// Halaman Top Support: podium 3 donatur teratas + daftar peringkat + ajakan
 /// donasi lewat halaman donasi Zenime Store (QRIS). Dibuka dari slide TOP SUPPORT di carousel Beranda.
@@ -450,16 +451,16 @@ class _SupportSlot extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Flexible(
-                child: Text(
-                  s.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                child: UserNameText(
+                  uid: s.firebaseUid ?? '',
+                  name: s.name,
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: nameColor,
                     fontSize: rank == 1 ? 13.5 : 12,
                     fontWeight: FontWeight.w800,
                   ),
+                  decoScale: .85,
                 ),
               ),
               if (s.isLinked)
@@ -1109,15 +1110,15 @@ class _SupporterRow extends StatelessWidget {
                     Row(
                       children: [
                         Flexible(
-                          child: Text(
-                            s.name,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                          child: UserNameText(
+                            uid: s.firebaseUid ?? '',
+                            name: s.name,
                             style: TextStyle(
                               color: nameColor,
                               fontSize: 14.5,
                               fontWeight: FontWeight.w700,
                             ),
+                            decoScale: .85,
                           ),
                         ),
                         if (s.isLinked)

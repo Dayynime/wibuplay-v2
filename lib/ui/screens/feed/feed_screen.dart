@@ -16,6 +16,7 @@ import '../../components/net_image.dart';
 import '../../components/shimmer.dart';
 import '../chat/chat_mute.dart' show canChatMuteProvider;
 import '../profile/public_profile_screen.dart';
+import '../../components/user_name_text.dart';
 
 final feedRepositoryProvider = Provider<FeedRepository>(
   (ref) => FeedRepository(ref.watch(supabaseDioProvider)),
@@ -566,15 +567,15 @@ class _FeedPostCardState extends ConsumerState<FeedPostCard> {
                       Flexible(
                         child: GestureDetector(
                           onTap: () => openPublicProfile(context, p.uid),
-                          child: Text(
-                            p.username,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                          child: UserNameText(
+                            uid: p.uid,
+                            name: p.username,
                             style: TextStyle(
                               color: _hex(p.usernameColor) ?? AppColors.textWhite,
                               fontWeight: FontWeight.w800,
                               fontSize: 14.5,
                             ),
+                            decoScale: .85,
                           ),
                         ),
                       ),
@@ -1137,10 +1138,9 @@ class _CommentTile extends StatelessWidget {
                   Row(
                     children: [
                       Flexible(
-                        child: Text(
-                          c.username,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                        child: UserNameText(
+                          uid: c.uid,
+                          name: c.username,
                           style: TextStyle(
                             color: _hex(c.usernameColor) ?? AppColors.textWhite,
                             fontWeight: FontWeight.w800,

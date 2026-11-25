@@ -16,6 +16,7 @@ import 'affinity_fx.dart';
 import 'affinity_providers.dart';
 import 'affinity_requests_sheet.dart';
 import 'affinity_tutorial.dart';
+import '../../components/user_name_text.dart';
 
 const _line = Color(0x14FFFFFF);
 const _line2 = Color(0x0DFFFFFF);
@@ -173,7 +174,7 @@ class _AffinityBody extends ConsumerWidget {
               ),
           ],
         ),
-        AffinityRise(index: i++, child: _Header(name: ownerName, total: list.items.length)),
+        AffinityRise(index: i++, child: _Header(uid: uid, name: ownerName, total: list.items.length)),
         if (own && list.incoming > 0)
           AffinityRise(
             index: i++,
@@ -264,8 +265,9 @@ class _AffinityBody extends ConsumerWidget {
 // ---------------------------------------------------------------------------
 
 class _Header extends StatelessWidget {
-  const _Header({required this.name, required this.total});
+  const _Header({required this.uid, required this.name, required this.total});
 
+  final String uid;
   final String name;
   final int total;
 
@@ -282,10 +284,9 @@ class _Header extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (name.isNotEmpty)
-                  Text(
-                    name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  UserNameText(
+                    uid: uid,
+                    name: name,
                     style: const TextStyle(color: AppColors.textSecondary, fontSize: 12.5, fontWeight: FontWeight.w600),
                   ),
                 const SizedBox(height: 2),
@@ -490,11 +491,11 @@ class _SoulmateBlock extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          it.displayName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                        UserNameText(
+                          uid: it.otherUid,
+                          name: it.displayName,
                           style: const TextStyle(color: AppColors.textWhite, fontSize: 16, fontWeight: FontWeight.w800),
+                          decoScale: .85,
                         ),
                         const SizedBox(height: 2),
                         Text(
@@ -632,10 +633,9 @@ class _SingleCell extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Text(
-                                it.displayName,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                              UserNameText(
+                                uid: it.otherUid,
+                                name: it.displayName,
                                 style: const TextStyle(color: AppColors.textWhite, fontSize: 12.5, fontWeight: FontWeight.w700),
                               ),
                               Text('Lv ${it.level}', style: const TextStyle(color: AppColors.textSecondary, fontSize: 10.5)),
@@ -705,10 +705,9 @@ class _GroupRow extends StatelessWidget {
               child: _Avatar(uid: it.otherUid, url: it.avatarUrl, name: it.displayName, size: 46),
             ),
             const SizedBox(height: 6),
-            Text(
-              it.displayName,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+            UserNameText(
+              uid: it.otherUid,
+              name: it.displayName,
               textAlign: TextAlign.center,
               style: const TextStyle(color: AppColors.textWhite, fontSize: 11.5, fontWeight: FontWeight.w600),
             ),

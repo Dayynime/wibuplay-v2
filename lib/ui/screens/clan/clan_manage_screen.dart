@@ -22,6 +22,7 @@ import 'clan_badge_shop_screen.dart';
 import 'clan_widgets.dart';
 import '../../redesign/z_kit.dart';
 import '../../glass/glass.dart';
+import '../../components/user_name_text.dart';
 
 String _thousands(int v) {
   final s = v.abs().toString();
@@ -265,11 +266,11 @@ class _RequestsTab extends StatelessWidget {
                         ),
                         const SizedBox(width: 11),
                         Expanded(
-                          child: Text(
-                            r.username,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                          child: UserNameText(
+                            uid: r.firebaseUid,
+                            name: r.username,
                             style: const TextStyle(color: AppColors.textWhite, fontSize: 14, fontWeight: FontWeight.w700),
+                            decoScale: .85,
                           ),
                         ),
                         if (busy)

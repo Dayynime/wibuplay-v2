@@ -5,6 +5,7 @@ import '../../../data/models/nobar_models.dart';
 import '../../../data/models/sticker_models.dart';
 import '../../components/friend_avatar.dart';
 import '../sticker/sticker_widgets.dart';
+import '../../components/user_name_text.dart';
 
 /// Daftar chat nobar + kolom ketik. Data & kirim diurus nobar_screen.
 class NobarChatPanel extends StatefulWidget {
@@ -207,13 +208,14 @@ class _Bubble extends StatelessWidget {
                     child: Row(
                       children: [
                         Flexible(
-                          child: Text(
-                            mine ? '${message.username} (kamu)' : message.username,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                          child: UserNameText(
+                            uid: message.uid,
+                            name: message.username,
                             style: TextStyle(color: nameColor, fontSize: 12.5, fontWeight: FontWeight.w800),
                           ),
                         ),
+                        if (mine)
+                          Text(' (kamu)', style: TextStyle(color: nameColor, fontSize: 12.5, fontWeight: FontWeight.w800)),
                         if (host) ...[
                           const SizedBox(width: 5),
                           Container(

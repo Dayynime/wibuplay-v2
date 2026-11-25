@@ -12,6 +12,7 @@ import '../../components/friend_avatar.dart';
 import '../../components/friend_search_field.dart';
 import 'clan_screen.dart';
 import 'clan_widgets.dart';
+import '../../components/user_name_text.dart';
 
 /// Pesan error dari Exception server (callAuthedFunction) tanpa prefix.
 String _msg(Object e, String fallback) {
@@ -461,11 +462,14 @@ class _InviteSheetState extends ConsumerState<_InviteSheet> {
           return ListTile(
             contentPadding: const EdgeInsets.symmetric(horizontal: 4),
             leading: FriendAvatar(url: f.avatarUrl, seed: f.firebaseUid, label: f.username, size: 40, framed: false),
-            title: Text(
-              f.username,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: AppColors.textWhite),
+            title: Align(
+              alignment: Alignment.centerLeft,
+              child: UserNameText(
+                uid: f.firebaseUid,
+                name: f.username,
+                style: const TextStyle(color: AppColors.textWhite, fontSize: 15),
+                decoScale: .85,
+              ),
             ),
             trailing: trailing,
           );

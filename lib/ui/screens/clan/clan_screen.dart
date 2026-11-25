@@ -561,11 +561,12 @@ class _TopDonors extends StatelessWidget {
                                 ),
                               ),
                               const SizedBox(height: 6),
-                              Text(
-                                donors[i].username,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                              UserNameText(
+                                uid: donors[i].firebaseUid,
+                                name: donors[i].username,
+                                textAlign: TextAlign.center,
                                 style: const TextStyle(color: AppColors.textWhite, fontSize: 12, fontWeight: FontWeight.w700),
+                                decoScale: .85,
                               ),
                               Text(
                                 _thousands(donors[i].amountToday),
@@ -1322,11 +1323,20 @@ class _DonationRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    entry.username + (isMe ? ' (Kamu)' : ''),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: AppColors.textWhite, fontSize: 14, fontWeight: FontWeight.w700),
+                  Row(
+                    children: [
+                      Flexible(
+                        child: UserNameText(
+                          uid: entry.firebaseUid,
+                          name: entry.username,
+                          style: const TextStyle(color: AppColors.textWhite, fontSize: 14, fontWeight: FontWeight.w700),
+                          decoScale: .85,
+                        ),
+                      ),
+                      if (isMe)
+                        const Text(' (Kamu)',
+                            style: TextStyle(color: AppColors.textWhite, fontSize: 14, fontWeight: FontWeight.w700)),
+                    ],
                   ),
                   const SizedBox(height: 5),
                   Row(

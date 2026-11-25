@@ -5,6 +5,7 @@ import '../../../data/models/nobar_models.dart';
 import '../../../data/voice/nobar_voice.dart';
 import '../../components/friend_avatar.dart';
 import '../../glass/glass.dart';
+import '../../components/user_name_text.dart';
 
 const Color _kGreen = Color(0xFF22C55E);
 const Color _kRed = Color(0xFFEF4444);
@@ -327,9 +328,11 @@ Future<void> _memberSheet(
               children: [
                 FriendAvatar(url: m.avatarUrl, seed: m.uid, label: m.username, size: 56, framed: false),
                 const SizedBox(height: 8),
-                Text(
-                  m.username,
+                UserNameText(
+                  uid: m.uid,
+                  name: m.username,
                   style: const TextStyle(color: AppColors.textWhite, fontWeight: FontWeight.w700, fontSize: 16),
+                  decoScale: .85,
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -481,16 +484,21 @@ class _MemberSlot extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 6),
-              Text(
-                isMe ? 'Kamu' : member.username,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: isMe ? AppColors.textWhite : AppColors.textSecondary,
-                  fontSize: 11.5,
-                  fontWeight: isMe ? FontWeight.w700 : FontWeight.w500,
+              if (isMe)
+                const Text(
+                  'Kamu',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: AppColors.textWhite, fontSize: 11.5, fontWeight: FontWeight.w700),
+                )
+              else
+                UserNameText(
+                  uid: member.uid,
+                  name: member.username,
+                  style: const TextStyle(color: AppColors.textSecondary, fontSize: 11.5, fontWeight: FontWeight.w500),
+                  textAlign: TextAlign.center,
+                  decoScale: .85,
                 ),
-              ),
             ],
           ),
         ),

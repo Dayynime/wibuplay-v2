@@ -19,6 +19,7 @@ import '../../glass/glass.dart';
 import '../../components/game_badges.dart';
 import '../../redesign/chat_kit.dart';
 import '../../redesign/z_kit.dart';
+import '../../components/user_name_text.dart';
 
 String _two(int n) => n.toString().padLeft(2, '0');
 
@@ -249,11 +250,11 @@ class _PrivateChatPaneState extends ConsumerState<PrivateChatPane> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(
-                              friend.username,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                            UserNameText(
+                              uid: friend.firebaseUid,
+                              name: friend.username,
                               style: ZFont.display(size: 15.5),
+                              decoScale: .85,
                             ),
                             const Text(
                               'Chat pribadi · ketuk untuk lihat profil',
@@ -431,14 +432,15 @@ class _ConversationRow extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      item.friend.username,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    UserNameText(
+                      uid: item.friend.firebaseUid,
+                      name: item.friend.username,
                       style: const TextStyle(
                         color: Colors.white,
+                        fontSize: 14,
                         fontWeight: FontWeight.w700,
                       ),
+                      decoScale: .85,
                     ),
                     Text(
                       item.lastMessage?.message ?? 'Belum ada pesan',
