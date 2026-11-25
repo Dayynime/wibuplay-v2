@@ -534,7 +534,7 @@ class ProfileCollectCard extends ConsumerWidget {
                           listenable: NameDecoCache.instance,
                           builder: (context, _) {
                             final deco = NameDecoStyle.fromId(NameDecoCache.instance.styleFor(uid));
-                            if (deco != null) return NameDecoText(name: name, style: deco, fontSize: 18);
+                            if (deco != null) return NameDecoText(name: name, style: deco, fontSize: 15);
                             return ShaderMask(
                               shaderCallback: (r) => LinearGradient(colors: [Colors.white, Color.lerp(Colors.white, primary, 0.55)!]).createShader(r),
                               child: Text(

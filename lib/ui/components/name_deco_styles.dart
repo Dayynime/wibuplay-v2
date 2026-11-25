@@ -186,30 +186,16 @@ class _NameDecoTextState extends State<NameDecoText> with SingleTickerProviderSt
   }
 }
 
-/// Teks yang sudah di-layout sekali: isi putih, garis putih, cahaya blur putih.
-/// Warna/gradien diberikan saat menggambar (lapisan + BlendMode.srcIn).
+/// Teks nama yang sudah di-layout, plus varian berwarna yang di-cache.
 class _Glyphs {
   _Glyphs(this.text, this.fontSize, this.maxWidth)
-      : fill = _tp(text, fontSize, maxWidth, Paint()..color = Colors.white),
-        stroke = _tp(text, fontSize, maxWidth, Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = math.max(1.0, fontSize / 9)
-          ..strokeJoin = StrokeJoin.round
-          ..color = Colors.white),
-        strokeThin = _tp(text, fontSize, maxWidth, Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = math.max(.6, fontSize / 26)
-          ..strokeJoin = StrokeJoin.round
-          ..color = Colors.white),
-        glow = _tp(text, fontSize, maxWidth, Paint()
-          ..color = Colors.white
-          ..maskFilter = MaskFilter.blur(BlurStyle.normal, fontSize / 5));
+      : fill = _tp(text, fontSize, maxWidth, Paint()..color = Colors.white);
 
   final String text;
   final double fontSize;
   final double maxWidth;
-  final TextPainter fill, stroke, strokeThin, glow;
-  final Map<String, TextPainter> _scrambled = {};
+  /// Ukuran/tata letak dasar (juga dipakai untuk geometri efek).
+  final TextPainter fill;
 
   static TextStyle styleFor(double fontSize, Paint p) {
     final base = TextStyle(
@@ -233,34 +219,61 @@ class _Glyphs {
         ellipsis: '…',
       )..layout(maxWidth: maxWidth);
 
-  /// Teks acak untuk gaya Decode (dibatasi supaya cache tidak membengkak).
-  TextPainter scrambled(String s) {
-    final hit = _scrambled[s];
+  // Varian teks berwarna (warna/gradien langsung di foreground TextPainter,
+  // tanpa saveLayer + srcIn yang tidak stabil di sebagian GPU/Impeller).
+  final Map<String, TextPainter> _variants = {};
+
+  TextPainter variant(String s, NameBase base, String key, double alpha, Paint Function() mk) {
+    final a = (alpha.clamp(0.0, 1.0) * 10).round();
+    final ck = '$s|${base.index}|$key|$a';
+    final hit = _variants[ck];
     if (hit != null) return hit;
-    if (_scrambled.length > 40) {
-      final old = _scrambled.values.toList();
-      _scrambled.clear();
-      // Bisa jadi salah satunya masih dipakai frame ini: lepas setelah frame.
+    if (_variants.length > 80) {
+      final old = _variants.values.toList();
+      _variants.clear();
       WidgetsBinding.instance.addPostFrameCallback((_) {
         for (final tp in old) {
           tp.dispose();
         }
       });
     }
-    return _scrambled[s] = _tp(s, fontSize, maxWidth, Paint()..color = Colors.white);
+    final p = mk();
+    final f = a / 10;
+    if (p.shader == null) {
+      p.color = p.color.withValues(alpha: p.color.a * f);
+    } else {
+      p.color = Color.fromRGBO(0, 0, 0, f);
+    }
+    switch (base) {
+      case NameBase.fill:
+        break;
+      case NameBase.glow:
+        p.maskFilter = MaskFilter.blur(BlurStyle.normal, fontSize / 5);
+      case NameBase.stroke:
+        p
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = math.max(1.0, fontSize / 9)
+          ..strokeJoin = StrokeJoin.round;
+      case NameBase.thin:
+        p
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = math.max(.6, fontSize / 26)
+          ..strokeJoin = StrokeJoin.round;
+    }
+    return _variants[ck] = _tp(s, fontSize, maxWidth, p);
   }
 
   void dispose() {
-    fill.dispose();
-    stroke.dispose();
-    strokeThin.dispose();
-    glow.dispose();
-    for (final tp in _scrambled.values) {
+    for (final tp in _variants.values) {
       tp.dispose();
     }
-    _scrambled.clear();
+    _variants.clear();
+    fill.dispose();
   }
 }
+
+/// Bentuk dasar teks: isi, cahaya blur, garis tebal, garis tipis.
+enum NameBase { fill, glow, stroke, thin }
 
 class _NameDecoPainter extends CustomPainter {
   _NameDecoPainter({
@@ -283,15 +296,10 @@ class _NameDecoPainter extends CustomPainter {
 
   // --------------------------------------------------------------- helpers
 
-  /// Gambar [tp] di [o] dengan warna/gradien [paint] (srcIn di lapisan sendiri).
-  void _tint(Canvas c, TextPainter tp, Offset o, Paint paint, {double opacity = 1, BlendMode blend = BlendMode.srcOver}) {
-    final r = (o & tp.size).inflate(tp.size.height);
-    c.saveLayer(r, Paint()
-      ..color = Color.fromRGBO(0, 0, 0, opacity.clamp(0.0, 1.0))
-      ..blendMode = blend);
-    tp.paint(c, o);
-    c.drawRect(r, paint..blendMode = BlendMode.srcIn);
-    c.restore();
+  /// Gambar teks nama ([s] = teks lain, mis. hasil acak Decode) dengan bentuk
+  /// [base] dan warna/gradien dari [mk] (di-cache per [key] + [alpha]).
+  void _txt(Canvas c, NameBase base, String key, Offset o, Paint Function() mk, {double alpha = 1, String? s}) {
+    glyphs.variant(s ?? glyphs.text, base, key, alpha, mk).paint(c, o);
   }
 
   Paint _col(Color c) => Paint()..color = c;
@@ -355,8 +363,8 @@ class _NameDecoPainter extends CustomPainter {
         c.restore();
         c.drawRect(Rect.fromLTWH(box.right - 3 * k, 3 * k, 2 * k, 6 * k), _col(const Color(0xFF00E5FF)));
         c.drawRect(Rect.fromLTWH(2 * k, box.bottom - 3 * k, 10 * k, 1.5 * k), _col(const Color(0xFF00E5FF)));
-        _tint(c, glyphs.glow, midText, _col(const Color(0xFF00E5FF)), opacity: .8);
-        _tint(c, fill, midText, _col(const Color(0xFFE8FDFF)));
+        _txt(c, NameBase.glow, 'g', midText, () => _col(const Color(0xFF00E5FF)), alpha: .8);
+        _txt(c, NameBase.fill, 'f', midText, () => _col(const Color(0xFFE8FDFF)));
 
       case NameDecoStyle.hudLock:
         final kk = (6 + 2 * math.sin(t * 3)) * k, off = 2 * k * math.sin(t * 3);
@@ -375,14 +383,14 @@ class _NameDecoPainter extends CustomPainter {
           c.drawRect(Rect.fromLTWH(4 * k + i * 5 * k, box.bottom + 2 * k, 3 * k, 1 * k), _col(const Color(0xB33DFFB0)));
         }
         if (math.sin(t * 6) > 0) c.drawRect(Rect.fromLTWH(box.right + 2 * k, 2 * k, 2 * k, 2 * k), _col(const Color(0xFF3DFFB0)));
-        _tint(c, glyphs.glow, midText, _col(const Color(0xFF3DFFB0)), opacity: .7);
-        _tint(c, fill, midText, _col(const Color(0xFFEFFFF8)));
+        _txt(c, NameBase.glow, 'g', midText, () => _col(const Color(0xFF3DFFB0)), alpha: .7);
+        _txt(c, NameBase.fill, 'f', midText, () => _col(const Color(0xFFEFFFF8)));
 
       case NameDecoStyle.scanline:
-        _tint(c, glyphs.glow, midText, _col(const Color(0xFF2E9BFF)), opacity: .8);
+        _txt(c, NameBase.glow, 'g', midText, () => _col(const Color(0xFF2E9BFF)), alpha: .8);
         final tr = midText & fill.size;
         c.saveLayer(tr.inflate(4), Paint());
-        _tint(c, fill, midText, _lin(tr.topCenter, tr.bottomCenter, const [Color(0xFF7CF9FF), Color(0xFF2E9BFF)]));
+        _txt(c, NameBase.fill, 'f', midText, () => _lin(tr.topCenter, tr.bottomCenter, const [Color(0xFF7CF9FF), Color(0xFF2E9BFF)]));
         for (var yy = tr.top; yy < tr.bottom; yy += 3 * k) {
           c.drawRect(Rect.fromLTWH(tr.left - 2, yy, tr.width + 4, math.max(1.0, k)),
               Paint()
@@ -399,7 +407,7 @@ class _NameDecoPainter extends CustomPainter {
 
       case NameDecoStyle.decode:
         final cyc = t % 4, scr = cyc < 1.1;
-        var tp = fill;
+        var shown = glyphs.text;
         if (scr) {
           final src = glyphs.text;
           final b = StringBuffer();
@@ -407,11 +415,13 @@ class _NameDecoPainter extends CustomPainter {
             final done = cyc > .15 + i * .11 || src[i] == ' ';
             b.write(done ? src[i] : _gly[((t * 30).floor() + i * 7) % _gly.length]);
           }
-          tp = glyphs.scrambled(b.toString());
+          shown = b.toString();
+        } else {
+          _txt(c, NameBase.glow, 'g', midText, () => _col(const Color(0xFFB478FF)), alpha: .7);
         }
-        final glowC = scr ? const Color(0xFFFF4FD8) : const Color(0xFFB478FF);
-        _tint(c, scr ? tp : glyphs.glow, midText, _col(glowC), opacity: scr ? .35 : .7);
-        _tint(c, tp, midText, _col(scr ? const Color(0xFFFF4FD8) : const Color(0xFFF4F0FF)));
+        final tp = glyphs.variant(shown, NameBase.fill, scr ? 'fs' : 'f', 1,
+            () => _col(scr ? const Color(0xFFFF4FD8) : const Color(0xFFF4F0FF)));
+        tp.paint(c, midText);
         if (math.sin(t * 8) > 0) {
           c.drawRect(Rect.fromLTWH(o.dx + tp.width + 3 * k, o.dy + th * .18, 6 * k, th * .64), _col(const Color(0xFFFF4FD8)));
         }
@@ -442,13 +452,13 @@ class _NameDecoPainter extends CustomPainter {
             c.drawCircle(pos, 1.6 * k, _col(const Color(0xFFB6FFE4)));
           }
         }
-        _tint(c, glyphs.glow, midText, _col(const Color(0xFF00FFAA)), opacity: .55);
-        _tint(c, fill, midText,
-            _lin(Offset(o.dx, 0), Offset(o.dx + w, 0), const [Color(0xFFB6FFE4), Color(0xFF00FFAA), Color(0xFF00C2FF)]));
+        _txt(c, NameBase.glow, 'g', midText, () => _col(const Color(0xFF00FFAA)), alpha: .55);
+        _txt(c, NameBase.fill, 'f', midText,
+            () => _lin(Offset(o.dx, 0), Offset(o.dx + w, 0), const [Color(0xFFB6FFE4), Color(0xFF00FFAA), Color(0xFF00C2FF)]));
 
       case NameDecoStyle.laserEdge:
-        _tint(c, glyphs.glow, midText, _col(const Color(0xFFFF285A)), opacity: .7);
-        _tint(c, fill, midText, _col(Colors.white));
+        _txt(c, NameBase.glow, 'g', midText, () => _col(const Color(0xFFFF285A)), alpha: .7);
+        _txt(c, NameBase.fill, 'f', midText, () => _col(Colors.white));
         final frame = _cut(box.deflate(.5), 5 * k);
         c.drawPath(frame, Paint()
           ..style = PaintingStyle.stroke
@@ -473,9 +483,9 @@ class _NameDecoPainter extends CustomPainter {
       case NameDecoStyle.neonTube:
         final n = (t * 12).floor() % 37;
         final flick = n == 0 || n == 2 ? .25 : 1.0;
-        _tint(c, glyphs.glow, midText, _col(const Color(0xFFFF3DF2)), opacity: flick);
-        _tint(c, glyphs.stroke, midText, _col(const Color(0xFFFF3DF2)), opacity: flick);
-        _tint(c, glyphs.strokeThin, midText, _col(const Color(0xFFFFD6FC)), opacity: flick);
+        _txt(c, NameBase.glow, 'g', midText, () => _col(const Color(0xFFFF3DF2)), alpha: flick);
+        _txt(c, NameBase.stroke, 's', midText, () => _col(const Color(0xFFFF3DF2)), alpha: flick);
+        _txt(c, NameBase.thin, 't', midText, () => _col(const Color(0xFFFFD6FC)), alpha: flick);
 
       case NameDecoStyle.dataStream:
         final plate = _cut(box, 7 * k);
@@ -506,8 +516,8 @@ class _NameDecoPainter extends CustomPainter {
           }
         }
         c.restore();
-        _tint(c, glyphs.glow, midText, _col(const Color(0xFF46A0FF)), opacity: .9);
-        _tint(c, fill, midText, _col(const Color(0xFFEAF4FF)));
+        _txt(c, NameBase.glow, 'g', midText, () => _col(const Color(0xFF46A0FF)), alpha: .9);
+        _txt(c, NameBase.fill, 'f', midText, () => _col(const Color(0xFFEAF4FF)));
 
       case NameDecoStyle.holoProjector:
         final cx = o.dx + w / 2, by = o.dy + th + 4 * k;
@@ -523,10 +533,10 @@ class _NameDecoPainter extends CustomPainter {
         final jit = math.sin(t * 50) > .92 ? 2 * k : 0.0;
         final a = .75 + .25 * math.sin(t * 9);
         final tr = midText & fill.size;
-        c.saveLayer(tr.inflate(6 * k), Paint()..color = Color.fromRGBO(0, 0, 0, a));
-        _tint(c, fill, midText.translate(-k - jit, 0), _col(const Color(0x99FF3C78)));
-        _tint(c, fill, midText.translate(k + jit, 0), _col(const Color(0xB33CC8FF)), blend: BlendMode.plus);
-        _tint(c, fill, midText, _col(const Color(0xF2DCFAFF)), blend: BlendMode.plus);
+        c.saveLayer(tr.inflate(6 * k), Paint());
+        _txt(c, NameBase.fill, 'r', midText.translate(-k - jit, 0), () => _col(const Color(0x99FF3C78)), alpha: a);
+        _txt(c, NameBase.fill, 'b', midText.translate(k + jit, 0), () => _col(const Color(0xB33CC8FF)), alpha: a);
+        _txt(c, NameBase.fill, 'f', midText, () => _col(const Color(0xF2DCFAFF)), alpha: a);
         final shift = (t * 20 * k) % (2 * k);
         for (var yy = tr.top + shift; yy < tr.bottom; yy += 2 * k) {
           c.drawRect(Rect.fromLTWH(tr.left - 3 * k, yy, tr.width + 6 * k, .8 * k),
@@ -555,10 +565,10 @@ class _NameDecoPainter extends CustomPainter {
           c.restore();
         }
         final pulse = .5 + .5 * math.sin(t * 3);
-        _tint(c, glyphs.glow, midText, _col(const Color(0xFFB98CFF)), opacity: .6 + .4 * pulse);
-        _tint(c, fill, midText,
-            _lin(Offset(o.dx, 0), Offset(o.dx + w, 0), const [Color(0xFF5EE7FF), Color(0xFFB98CFF), Color(0xFFFF6AD5)]));
-        _tint(c, glyphs.strokeThin, midText, _col(const Color(0x99FFFFFF)));
+        _txt(c, NameBase.glow, 'g', midText, () => _col(const Color(0xFFB98CFF)), alpha: .6 + .4 * pulse);
+        _txt(c, NameBase.fill, 'f', midText,
+            () => _lin(Offset(o.dx, 0), Offset(o.dx + w, 0), const [Color(0xFF5EE7FF), Color(0xFFB98CFF), Color(0xFFFF6AD5)]));
+        _txt(c, NameBase.thin, 't', midText, () => _col(const Color(0x99FFFFFF)));
 
       case NameDecoStyle.synthwave:
         c.save();
@@ -578,9 +588,9 @@ class _NameDecoPainter extends CustomPainter {
           c.drawLine(Offset(o.dx + w / 2 + i * 6 * k, hz), Offset(o.dx + w / 2 + i * 26 * k, box.bottom), grid);
         }
         c.restore();
-        _tint(c, glyphs.glow, midText, _col(const Color(0xFFFF3CAC)), opacity: .8);
+        _txt(c, NameBase.glow, 'g', midText, () => _col(const Color(0xFFFF3CAC)), alpha: .8);
         final tr = midText & fill.size;
-        _tint(c, fill, midText, _lin(tr.topCenter, tr.bottomCenter,
+        _txt(c, NameBase.fill, 'f', midText, () => _lin(tr.topCenter, tr.bottomCenter,
             const [Color(0xFFFFE66D), Color(0xFFFF8A3D), Color(0xFFFF3CAC), Color(0xFFB05BFF)], const [0, .45, .55, 1]));
 
       case NameDecoStyle.mechaChrome:
@@ -607,7 +617,7 @@ class _NameDecoPainter extends CustomPainter {
         c.restore();
         final tr = midText & fill.size;
         c.saveLayer(tr.inflate(2), Paint());
-        _tint(c, fill, midText, _lin(tr.topCenter, tr.bottomCenter,
+        _txt(c, NameBase.fill, 'f', midText, () => _lin(tr.topCenter, tr.bottomCenter,
             const [Colors.white, Color(0xFFC9D2E0), Color(0xFF6C7688), Color(0xFFE6ECF5), Color(0xFF9AA6B8)],
             const [0, .45, .5, .75, 1]));
         final s = ((t * .4) % 1.5 - .25) * w + o.dx;

@@ -358,7 +358,7 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
                         uid: uid,
                         name: name,
                         style: ZFont.display(size: 24, height: 1.1).copyWith(color: AppColors.textWhite),
-                        decoScale: .8,
+                        decoScale: .64,
                       ),
                     ),
                     // Badge role (Developer, dll.) di kanan nama.
