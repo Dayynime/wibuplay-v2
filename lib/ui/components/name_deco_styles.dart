@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -39,18 +40,52 @@ enum NameDecoStyle {
   holoProjector('holo_projector', 'Proyektor Holo', NameDecoTier.legenda),
   quantumCore('quantum_core', 'Quantum Core', NameDecoTier.legenda),
   synthwave('synthwave', 'Synthwave', NameDecoTier.legenda),
-  mechaChrome('mecha_chrome', 'Mecha Chrome', NameDecoTier.legenda);
+  mechaChrome('mecha_chrome', 'Mecha Chrome', NameDecoTier.legenda),
 
-  const NameDecoStyle(this.id, this.label, this.tier);
+  // ---- Seri 2: tanpa bingkai/latar, tiap gaya punya font sendiri.
+  terminal('terminal', 'Terminal', NameDecoTier.biasa, font: 'VT323', sizeK: 1.3, weight: FontWeight.w400),
+  arcade('arcade', 'Arcade', NameDecoTier.biasa, font: 'Press Start 2P', sizeK: .72, weight: FontWeight.w400),
+  streetComic('street_comic', 'Komik', NameDecoTier.biasa, font: 'Bangers', sizeK: 1.2, weight: FontWeight.w400),
+  neonSign('neon_sign', 'Papan Neon', NameDecoTier.langka, font: 'Monoton', sizeK: 1.0, weight: FontWeight.w400),
+  horrorDrip('horror_drip', 'Horor', NameDecoTier.langka, font: 'Creepster', sizeK: 1.2, weight: FontWeight.w400),
+  stencilOps('stencil_ops', 'Militer', NameDecoTier.langka, font: 'Black Ops One', sizeK: 1.05, weight: FontWeight.w400),
+  racer('racer', 'Pembalap', NameDecoTier.epik, font: 'Russo One', sizeK: 1.05, weight: FontWeight.w400),
+  rgbGlitch('rgb_glitch', 'Glitch RGB', NameDecoTier.epik, font: 'Rubik Glitch', sizeK: 1.1, weight: FontWeight.w400),
+  royalGold('royal_gold', 'Bangsawan', NameDecoTier.epik, font: 'Cinzel Decorative', sizeK: 1.0, weight: FontWeight.w900),
+  zenSpace('zen_space', 'Kosmik', NameDecoTier.legenda, font: 'Zen Dots', sizeK: 1.0, weight: FontWeight.w400),
+  auroraFlow('aurora_flow', 'Aurora', NameDecoTier.legenda, font: 'Audiowide', sizeK: 1.05, weight: FontWeight.w400),
+  rainbowWave('rainbow_wave', 'Pelangi', NameDecoTier.legenda, font: 'Righteous', sizeK: 1.1, weight: FontWeight.w400);
+
+  const NameDecoStyle(this.id, this.label, this.tier,
+      {this.font = 'Orbitron', this.sizeK = 1, this.weight = FontWeight.w800});
 
   final String id;
   final String label;
   final NameDecoTier tier;
 
+  /// Font Google Fonts untuk gaya ini (diunduh otomatis lewat google_fonts).
+  final String font;
+
+  /// Pengali ukuran huruf (font lebar/sempit disamakan tingginya).
+  final double sizeK;
+  final FontWeight weight;
+
   /// Gaya yang memakai bingkai/pelat (butuh ruang di kiri-kanan nama).
   bool get framed => switch (this) {
         cyberPlate || hudLock || laserEdge || dataStream || mechaChrome || synthwave => true,
         _ => false,
+      };
+
+  /// Ruang tambahan di kiri nama (garis kecepatan Pembalap).
+  double get padLeftK => this == racer ? 9 : 0;
+
+  /// Ruang ekstra di kanan nama untuk hiasan (kursor, bidikan, kilau).
+  double get padRightK => switch (this) {
+        mechaChrome => 14,
+        terminal => 10,
+        stencilOps => 11,
+        arcade => 7,
+        _ => 0,
       };
 
   static NameDecoStyle? fromId(String? id) {
@@ -150,16 +185,18 @@ class _NameDecoTextState extends State<NameDecoText> with SingleTickerProviderSt
   @override
   Widget build(BuildContext context) {
     final k = widget.fontSize / 16;
-    final padX = (widget.style.framed ? 9.0 : 3.0) * k;
-    final padY = 4.0 * k;
-    final extra = widget.style == NameDecoStyle.mechaChrome ? 14 * k : 0.0;
-    final textMax = math.max(20.0, (widget.maxWidth ?? 260) - padX * 2 - extra);
+    final st = widget.style;
+    final padX = (st.framed ? 9.0 : 3.0) * k;
+    final padL = padX + st.padLeftK * k;
+    final padY = (st == NameDecoStyle.horrorDrip ? 7.0 : 4.0) * k;
+    final extra = st.padRightK * k;
+    final textMax = math.max(20.0, (widget.maxWidth ?? 260) - padX - padL - extra);
     var g = _glyphs;
     if (g == null || g.maxWidth != textMax) {
       _retire(g);
-      g = _glyphs = _Glyphs(widget.name, widget.fontSize, textMax);
+      g = _glyphs = _Glyphs(widget.name, widget.fontSize * st.sizeK, textMax, st.font, st.weight);
     }
-    final size = Size(g.fill.width + padX * 2 + extra, g.fill.height + padY * 2);
+    final size = Size(g.fill.width + padX + padL + extra, g.fill.height + padY * 2);
     final running = widget.animate && !MediaQuery.disableAnimationsOf(context);
     // FittedBox: kalau tempatnya sempit, nama diperkecil (bukan meluap).
     return Semantics(
@@ -175,7 +212,7 @@ class _NameDecoTextState extends State<NameDecoText> with SingleTickerProviderSt
               glyphs: g,
               style: widget.style,
               k: k,
-              pad: Offset(padX, padY),
+              pad: Offset(padL, padY),
               anim: running ? _tick : null,
               loopSec: _loopSec,
             ),
@@ -188,32 +225,34 @@ class _NameDecoTextState extends State<NameDecoText> with SingleTickerProviderSt
 
 /// Teks nama yang sudah di-layout, plus varian berwarna yang di-cache.
 class _Glyphs {
-  _Glyphs(this.text, this.fontSize, this.maxWidth)
-      : fill = _tp(text, fontSize, maxWidth, Paint()..color = Colors.white);
+  _Glyphs(this.text, this.fontSize, this.maxWidth, this.font, this.weight)
+      : fill = _tp(text, fontSize, maxWidth, Paint()..color = Colors.white, font, weight);
 
   final String text;
   final double fontSize;
   final double maxWidth;
+  final String font;
+  final FontWeight weight;
   /// Ukuran/tata letak dasar (juga dipakai untuk geometri efek).
   final TextPainter fill;
 
-  static TextStyle styleFor(double fontSize, Paint p) {
+  static TextStyle styleFor(double fontSize, Paint p, String font, FontWeight weight) {
     final base = TextStyle(
       fontSize: fontSize,
-      fontWeight: FontWeight.w800,
-      letterSpacing: fontSize * .09,
+      fontWeight: weight,
+      letterSpacing: font == 'Orbitron' ? fontSize * .09 : fontSize * .03,
       height: 1.15,
       foreground: p,
     );
     try {
-      return GoogleFonts.orbitron(textStyle: base);
+      return GoogleFonts.getFont(font, textStyle: base);
     } catch (_) {
-      return base;
+      return base; // font tidak dikenal versi google_fonts ini: pakai bawaan
     }
   }
 
-  static TextPainter _tp(String s, double fontSize, double maxWidth, Paint p) => TextPainter(
-        text: TextSpan(text: s, style: styleFor(fontSize, p)),
+  static TextPainter _tp(String s, double fontSize, double maxWidth, Paint p, String font, FontWeight weight) => TextPainter(
+        text: TextSpan(text: s, style: styleFor(fontSize, p, font, weight)),
         textDirection: TextDirection.ltr,
         maxLines: 1,
         ellipsis: '…',
@@ -260,7 +299,7 @@ class _Glyphs {
           ..strokeWidth = math.max(.6, fontSize / 26)
           ..strokeJoin = StrokeJoin.round;
     }
-    return _variants[ck] = _tp(s, fontSize, maxWidth, p);
+    return _variants[ck] = _tp(s, fontSize, maxWidth, p, font, weight);
   }
 
   void dispose() {
@@ -626,6 +665,198 @@ class _NameDecoPainter extends CustomPainter {
         c.restore();
         c.drawRect(Rect.fromLTWH(3 * k, 3 * k, 3 * k, 3 * k),
             _col(math.sin(t * 5) > 0 ? const Color(0xFFFF3B3B) : const Color(0xFF5A1A1A)));
+
+      // ================================================= Seri 2 (tanpa latar)
+
+      case NameDecoStyle.terminal:
+        final n = (t * 10).floor() % 53;
+        final flick = n == 0 ? .55 : 1.0;
+        _txt(c, NameBase.glow, 'g', midText, () => _col(const Color(0xFF39FF6A)), alpha: .7 * flick);
+        _txt(c, NameBase.fill, 'f', midText, () => _col(const Color(0xFFB8FFC8)), alpha: flick);
+        if ((t * 2).floor().isEven) {
+          c.drawRect(Rect.fromLTWH(o.dx + w + 2 * k, o.dy + th * .78, 7 * k, 2 * k), _col(const Color(0xFF39FF6A)));
+        }
+
+      case NameDecoStyle.arcade:
+        final tr = midText & fill.size;
+        _txt(c, NameBase.fill, 'sh', midText.translate(1.6 * k, 1.6 * k), () => _col(const Color(0xFF3A1060)));
+        _txt(c, NameBase.fill, 'f', midText, () => _lin(tr.topCenter, tr.bottomCenter,
+            const [Color(0xFFFFF27A), Color(0xFFFFC93C), Color(0xFFFF7A1A)], const [0, .5, 1]));
+        // Kilau koin berkedip di pojok.
+        final sp = (t * 1.3) % 1;
+        if (sp < .45) {
+          final a = math.sin(sp / .45 * math.pi);
+          final cpt = Offset(o.dx + w + 2 * k, o.dy + 1 * k);
+          final r = 3.5 * k * a;
+          final star = Paint()..color = Color.fromRGBO(255, 255, 255, a);
+          c.drawRect(Rect.fromCenter(center: cpt, width: 1.2 * k, height: r * 2), star);
+          c.drawRect(Rect.fromCenter(center: cpt, width: r * 2, height: 1.2 * k), star);
+        }
+
+      case NameDecoStyle.streetComic:
+        final ang = math.sin(t * 2.2) * .035;
+        final ctr = Offset(o.dx + w / 2, cy);
+        c.save();
+        c.translate(ctr.dx, ctr.dy);
+        c.rotate(ang);
+        c.translate(-ctr.dx, -ctr.dy);
+        _txt(c, NameBase.fill, 'sh', midText.translate(2 * k, 2 * k), () => _col(const Color(0xFFFF3D8B)));
+        _txt(c, NameBase.stroke, 's', midText, () => _col(const Color(0xFF111111)));
+        _txt(c, NameBase.fill, 'f', midText, () => _col(const Color(0xFFFFF6D6)));
+        c.restore();
+
+      case NameDecoStyle.neonSign:
+        final n = (t * 12).floor() % 41;
+        final flick = n == 0 || n == 3 ? .3 : 1.0;
+        final hue = .5 + .5 * math.sin(t * 1.4);
+        final glowC = Color.lerp(const Color(0xFF00E5FF), const Color(0xFFFF3DF2), hue)!;
+        _txt(c, NameBase.glow, 'g${(hue * 6).round()}', midText, () => _col(glowC), alpha: flick);
+        _txt(c, NameBase.fill, 'f', midText, () => _col(const Color(0xFFF2FDFF)), alpha: .55 + .45 * flick);
+
+      case NameDecoStyle.horrorDrip:
+        _txt(c, NameBase.glow, 'g', midText, () => _col(const Color(0xFF8A0000)), alpha: .8);
+        final tr = midText & fill.size;
+        _txt(c, NameBase.fill, 'f', midText,
+            () => _lin(tr.topCenter, tr.bottomCenter, const [Color(0xFFFF4A3D), Color(0xFFB30000), Color(0xFF5A0000)]));
+        // Tetes darah jatuh dari bawah huruf.
+        final drip = Paint()..color = const Color(0xFFB30000);
+        for (var i = 0; i < 4; i++) {
+          final ph = (t * (.35 + _rnd(i, 3) * .25) + _rnd(i, 1)) % 1;
+          final x = o.dx + w * (.12 + .25 * i + _rnd(i, 2) * .08);
+          final y0 = o.dy + th * .82;
+          final len = ph < .5 ? ph / .5 * 4 * k : 4 * k;
+          c.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(x - .9 * k, y0, 1.8 * k, len), Radius.circular(k)), drip);
+          if (ph >= .5) {
+            final fall = (ph - .5) / .5;
+            drip.color = Color.fromRGBO(179, 0, 0, 1 - fall);
+            c.drawCircle(Offset(x, y0 + 4 * k + fall * 5 * k), 1.3 * k, drip);
+            drip.color = const Color(0xFFB30000);
+          } else {
+            c.drawCircle(Offset(x, y0 + len), 1.2 * k, drip);
+          }
+        }
+
+      case NameDecoStyle.stencilOps:
+        final tr = midText & fill.size;
+        c.saveLayer(tr.inflate(3 * k), Paint());
+        _txt(c, NameBase.fill, 'f', midText,
+            () => _lin(tr.topCenter, tr.bottomCenter, const [Color(0xFFD8D2A0), Color(0xFF8C8A55), Color(0xFF5B5E33)]));
+        final s = ((t * .5) % 1.4 - .2) * tr.width + tr.left;
+        c.drawRect(tr.inflate(2), _lin(Offset(s - 10 * k, 0), Offset(s + 10 * k, 0),
+            const [Color(0x0039FF6A), Color(0xCC39FF6A), Color(0x0039FF6A)])..blendMode = BlendMode.srcATop);
+        c.restore();
+        // Bidikan kecil berkedip di kanan.
+        if (math.sin(t * 4) > -.3) {
+          final ch = Offset(o.dx + w + 5 * k, cy);
+          final cp = Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = math.max(.8, k)
+            ..color = const Color(0xFF39FF6A);
+          c.drawCircle(ch, 3 * k, cp);
+          c.drawLine(ch.translate(-5 * k, 0), ch.translate(-1.5 * k, 0), cp);
+          c.drawLine(ch.translate(1.5 * k, 0), ch.translate(5 * k, 0), cp);
+        }
+
+      case NameDecoStyle.racer:
+        // Garis kecepatan melesat ke kiri.
+        final line = Paint()..strokeCap = StrokeCap.round;
+        for (var i = 0; i < 5; i++) {
+          final ph = (t * (1.6 + _rnd(i, 4)) + _rnd(i, 5)) % 1;
+          final y = o.dy + th * (.2 + .15 * i);
+          final x1 = o.dx - 1 * k - ph * 5 * k;
+          final len = (3 + 5 * _rnd(i, 6)) * k * (1 - ph);
+          line
+            ..strokeWidth = math.max(.8, 1.2 * k)
+            ..color = Color.fromRGBO(255, 150, 40, .9 * (1 - ph));
+          c.drawLine(Offset(x1, y), Offset(x1 - len, y), line);
+        }
+        c.save();
+        c.translate(0, cy);
+        c.transform(Float64List.fromList([1, 0, 0, 0, -.22, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]));
+        c.translate(0, -cy);
+        _txt(c, NameBase.glow, 'g', midText, () => _col(const Color(0xFFFF6A00)), alpha: .7);
+        _txt(c, NameBase.fill, 'f', midText, () => _lin(Offset(o.dx, 0), Offset(o.dx + w, 0),
+            const [Color(0xFFFFF27A), Color(0xFFFF9A2A), Color(0xFFFF2E2E)]));
+        c.restore();
+
+      case NameDecoStyle.rgbGlitch:
+        final j = math.sin(t * 37) > .55;
+        final dx = j ? math.sin(t * 91) * 2.5 * k : 1.0 * k;
+        _txt(c, NameBase.fill, 'r', midText.translate(-dx, 0), () => _col(const Color(0xCCFF2A5F)));
+        _txt(c, NameBase.fill, 'b', midText.translate(dx, j ? k : 0), () => _col(const Color(0xCC2AE5FF)));
+        _txt(c, NameBase.fill, 'f', midText, () => _col(const Color(0xFFF4F4FF)));
+
+      case NameDecoStyle.royalGold:
+        _txt(c, NameBase.glow, 'g', midText, () => _col(const Color(0xFFFFB800)), alpha: .55);
+        final tr = midText & fill.size;
+        c.saveLayer(tr.inflate(3 * k), Paint());
+        _txt(c, NameBase.fill, 'f', midText, () => _lin(tr.topCenter, tr.bottomCenter,
+            const [Color(0xFFFFF3B0), Color(0xFFFFC93C), Color(0xFFB8780A), Color(0xFFFFE08A)], const [0, .45, .7, 1]));
+        final s = ((t * .45) % 1.4 - .2) * tr.width + tr.left;
+        c.drawRect(tr.inflate(2), _lin(Offset(s - 14 * k, 0), Offset(s + 14 * k, 0),
+            const [Color(0x00FFFFFF), Color(0xF2FFFFFF), Color(0x00FFFFFF)])..blendMode = BlendMode.srcATop);
+        c.restore();
+        for (var i = 0; i < 4; i++) {
+          final ph = (t * .7 + _rnd(i, 7)) % 1;
+          final a = math.sin(ph * math.pi);
+          final pt = Offset(o.dx + w * _rnd(i, 8), o.dy + th * (i.isEven ? -.05 : 1.0));
+          final r = 3 * k * a;
+          final sp = Paint()..color = Color.fromRGBO(255, 240, 180, a);
+          c.drawPath(
+            Path()
+              ..moveTo(pt.dx, pt.dy - r)
+              ..lineTo(pt.dx + r * .25, pt.dy - r * .25)
+              ..lineTo(pt.dx + r, pt.dy)
+              ..lineTo(pt.dx + r * .25, pt.dy + r * .25)
+              ..lineTo(pt.dx, pt.dy + r)
+              ..lineTo(pt.dx - r * .25, pt.dy + r * .25)
+              ..lineTo(pt.dx - r, pt.dy)
+              ..lineTo(pt.dx - r * .25, pt.dy - r * .25)
+              ..close(),
+            sp,
+          );
+        }
+
+      case NameDecoStyle.zenSpace:
+        _txt(c, NameBase.glow, 'g', midText, () => _col(const Color(0xFF9B5CFF)), alpha: .8);
+        final tr = midText & fill.size;
+        c.saveLayer(tr.inflate(3 * k), Paint());
+        _txt(c, NameBase.fill, 'f', midText, () => _lin(tr.topLeft, tr.bottomRight,
+            const [Color(0xFF7B4DFF), Color(0xFFC08CFF), Color(0xFF4F8BFF), Color(0xFFE07BFF)]));
+        final star = Paint();
+        for (var i = 0; i < 22; i++) {
+          final tw = .35 + .65 * (.5 + .5 * math.sin(t * 3 + i * 1.7));
+          star.color = Color.fromRGBO(255, 255, 255, tw);
+          final x = tr.left + ((_rnd(i, 9) * tr.width + t * 5 * k) % tr.width);
+          c.drawRect(Rect.fromLTWH(x, tr.top + _rnd(i, 10) * tr.height, 1.2 * k, 1.2 * k), star..blendMode = BlendMode.srcATop);
+        }
+        c.restore();
+        _txt(c, NameBase.thin, 't', midText, () => _col(const Color(0x99E6D2FF)));
+
+      case NameDecoStyle.auroraFlow:
+        _txt(c, NameBase.glow, 'g', midText, () => _col(const Color(0xFF2EE6B5)), alpha: .6);
+        final tr = midText & fill.size;
+        c.saveLayer(tr.inflate(3 * k), Paint());
+        _txt(c, NameBase.fill, 'f', midText, () => _col(Colors.white));
+        final shift = (t * 30 * k) % (tr.width * 2);
+        c.drawRect(tr.inflate(2), _lin(Offset(tr.left - shift, 0), Offset(tr.left - shift + tr.width * 2, 0),
+            const [Color(0xFF5EFFB1), Color(0xFF5EC8FF), Color(0xFFB98CFF), Color(0xFF5EFFB1)], null, TileMode.repeated)
+          ..blendMode = BlendMode.srcATop);
+        c.restore();
+
+      case NameDecoStyle.rainbowWave:
+        final lift = math.sin(t * 2.5) * 1.2 * k;
+        final mt = midText.translate(0, lift);
+        final tr = mt & fill.size;
+        _txt(c, NameBase.glow, 'g', mt, () => _col(const Color(0xFFFF7AD9)), alpha: .45);
+        c.saveLayer(tr.inflate(3 * k), Paint());
+        _txt(c, NameBase.fill, 'f', mt, () => _col(Colors.white));
+        final shift = (t * 40 * k) % (tr.width * 1.5);
+        c.drawRect(tr.inflate(2), _lin(Offset(tr.left - shift, 0), Offset(tr.left - shift + tr.width * 1.5, 0),
+            const [Color(0xFFFF5E7E), Color(0xFFFFB45E), Color(0xFFFFF27A), Color(0xFF5EFFB1), Color(0xFF5EC8FF), Color(0xFFB98CFF), Color(0xFFFF5E7E)],
+            null, TileMode.repeated)
+          ..blendMode = BlendMode.srcATop);
+        c.restore();
     }
   }
 
