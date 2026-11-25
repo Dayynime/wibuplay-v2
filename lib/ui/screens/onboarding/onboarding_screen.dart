@@ -1,92 +1,52 @@
-import 'dart:async';
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../components/name_deco_styles.dart';
 import '../../components/net_image.dart';
-import '../auth/login_posters.dart';
 import '../../glass/glass.dart';
+import '../../redesign/z_kit.dart';
+import '../auth/login_posters.dart';
 
 // -----------------------------------------------------------------------------
-// Port OnboardingScreen.kt Zenime.
-// - Warna slide sengaja hardcode (brand), tiap slide punya pasangan aksen;
-//   background, indikator, dan tombol berubah mulus (lerp) saat di-swipe.
-// - Ilustrasi digambar pakai widget Flutter, hanya slide 1 yang memakai poster
-//   jaringan (kLoginPosters); yang lain tanpa aset tambahan.
+// Intro Zenime (redesain Nov 2026, gaya kit "Samudra").
+// - Latar polos + screentone, judul Sora rata kiri, label Jepang kecil.
+// - Tiap slide memperagakan potongan UI app (kartu anime, unduhan, komik,
+//   chat clan, leaderboard, Premium).
+// - Animasi masuk jalan sekali tiap slide dibuka (satu controller per slide);
+//   kalau HP diset "hapus animasi", semuanya langsung tampil diam.
 // -----------------------------------------------------------------------------
 
-const double _stage = 300;
-const Cubic _backOut = Cubic(0.34, 1.56, 0.64, 1.0);
-const Color _gold = Color(0xFFFFB020);
-
-// Poster asli untuk slide Komik & Donghua (Douluo Dalu: donghua dan manhua-nya).
-// CDN publik MyAnimeList, cuma di-link seperti kLoginPosters, tidak di-bundle.
+// Poster publik MyAnimeList, cuma di-link seperti kLoginPosters.
 const String _kDonghuaPoster = 'https://cdn.myanimelist.net/images/anime/1438/101531l.jpg';
 const String _kComicPoster = 'https://cdn.myanimelist.net/images/manga/4/221353l.jpg';
 
-class _Slide {
-  const _Slide(this.title, this.highlight, this.desc, this.a, this.b);
+const Color _gold = Color(0xFFF6BE4F);
+const Duration _enterDur = Duration(milliseconds: 2800);
 
-  final String title;
-  final String highlight;
+class _Slide {
+  const _Slide(this.no, this.jp, this.line1, this.line2, this.desc);
+
+  final String no;
+  final String jp;
+  final String line1;
+  final String line2;
   final String desc;
-  final Color a;
-  final Color b;
 }
 
 const List<_Slide> _slides = [
-  _Slide(
-    'Nonton Anime Tanpa Batas',
-    'Tanpa Batas',
-    'Ribuan judul favoritmu siap ditonton langsung dari HP Android, kapan aja.',
-    Color(0xFFE4344A),
-    Color(0xFF9333EA),
-  ),
-  _Slide(
-    'Download & Nonton Offline',
-    'Offline',
-    'Simpan episode favorit, terus tonton tanpa kuota di mana pun kamu berada.',
-    Color(0xFF3B82F6),
-    Color(0xFF8B5CF6),
-  ),
-  _Slide(
-    'Komik & Donghua Juga Ada',
-    'Donghua',
-    'Baca komik favoritmu dan nonton donghua terbaru, semua ada di satu aplikasi.',
-    Color(0xFF10B981),
-    Color(0xFF06B6D4),
-  ),
-  _Slide(
-    'Ngobrol Bareng, Gabung Clan',
-    'Clan',
-    'Chat Global, tambah teman, dan bikin Clan bareng sesama penonton.',
-    Color(0xFFA855F7),
-    Color(0xFFEC4899),
-  ),
-  _Slide(
-    'Naik Level, Jadi Legenda',
-    'Legenda',
-    'Kumpulin XP tiap nonton dan panjat Leaderboard bareng yang lain.',
-    Color(0xFFF59E0B),
-    Color(0xFFE4344A),
-  ),
-  _Slide(
-    'Upgrade ke Premium',
-    'Premium',
-    'Kualitas sampai 1080p, tanpa iklan, dan XP nonton dobel biar makin puas dan naik level makin cepat.',
-    Color(0xFFFFC53D),
-    Color(0xFFEC4899),
-  ),
+  _Slide('01', 'アニメ見放題', 'Nonton anime', 'tanpa batas.',
+      'Ribuan judul favoritmu siap ditonton langsung dari HP, kapan aja.'),
+  _Slide('02', 'オフライン', 'Download, nonton', 'offline.',
+      'Simpan episode favorit, terus tonton tanpa kuota di mana pun kamu berada.'),
+  _Slide('03', '漫画・ドンファ', 'Komik &', 'donghua juga ada.',
+      'Baca komik favoritmu dan nonton donghua terbaru, semua di satu aplikasi.'),
+  _Slide('04', 'クラン', 'Ngobrol bareng,', 'gabung clan.',
+      'Chat Global, tambah teman, dan bikin Clan bareng sesama penonton.'),
+  _Slide('05', 'ランキング', 'Naik level,', 'jadi legenda.',
+      'Kumpulin XP tiap nonton dan panjat Leaderboard bareng yang lain.'),
+  _Slide('06', 'プレミアム', 'Upgrade ke', 'Premium.',
+      'Kualitas sampai 1080p, tanpa iklan, dan XP nonton dobel biar naik level makin cepat.'),
 ];
-
-Color _accentAt(double pos, Color Function(_Slide) pick) {
-  final last = _slides.length - 1;
-  final i = pos.floor().clamp(0, last).toInt();
-  final j = math.min(i + 1, last);
-  final t = (pos - i).clamp(0.0, 1.0).toDouble();
-  return Color.lerp(pick(_slides[i]), pick(_slides[j]), t)!;
-}
 
 // -----------------------------------------------------------------------------
 // Layar utama
@@ -104,33 +64,19 @@ class OnboardingScreen extends StatefulWidget {
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
   final PageController _pc = PageController();
-  final ValueNotifier<double> _pos = ValueNotifier<double>(0);
   int _page = 0;
 
   @override
   void dispose() {
     _pc.dispose();
-    _pos.dispose();
     super.dispose();
-  }
-
-  bool _onScroll(ScrollNotification n) {
-    final m = n.metrics;
-    if (n.depth == 0 && m is PageMetrics) {
-      final p = m.page;
-      if (p != null) _pos.value = p;
-    }
-    return false;
   }
 
   void _next() {
     if (_page >= _slides.length - 1) {
       widget.onFinished();
     } else {
-      _pc.nextPage(
-        duration: const Duration(milliseconds: 380),
-        curve: Curves.easeOutCubic,
-      );
+      _pc.nextPage(duration: const Duration(milliseconds: 420), curve: Curves.easeOutCubic);
     }
   }
 
@@ -143,39 +89,41 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       canPop: _page == 0,
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) return;
-        _pc.previousPage(
-          duration: const Duration(milliseconds: 380),
-          curve: Curves.easeOutCubic,
-        );
+        _pc.previousPage(duration: const Duration(milliseconds: 420), curve: Curves.easeOutCubic);
       },
       child: GlassScaffold(
         backgroundColor: AppColors.backgroundDark,
         body: Stack(
           children: [
-            Positioned.fill(child: _AuroraBackground(pos: _pos)),
+            const Positioned(
+              top: 0,
+              right: 0,
+              width: 230,
+              height: 300,
+              child: ZScreentone(),
+            ),
             SafeArea(
               child: Column(
                 children: [
                   _TopBar(isLast: isLast, onSkip: widget.onFinished),
                   Expanded(
-                    child: NotificationListener<ScrollNotification>(
-                      onNotification: _onScroll,
-                      child: PageView.builder(
-                        controller: _pc,
-                        itemCount: _slides.length,
-                        onPageChanged: (i) => setState(() => _page = i),
-                        itemBuilder: (context, i) => _SlidePage(
-                          index: i,
-                          pos: _pos,
-                          active: _page == i,
-                        ),
-                      ),
+                    child: PageView.builder(
+                      controller: _pc,
+                      itemCount: _slides.length,
+                      onPageChanged: (i) => setState(() => _page = i),
+                      itemBuilder: (context, i) => _SlidePage(index: i, active: _page == i),
                     ),
                   ),
-                  _PageIndicator(pos: _pos),
-                  const SizedBox(height: 20),
-                  _CtaButton(pos: _pos, isLast: isLast, onTap: _next),
-                  const SizedBox(height: 24),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(22, 18, 22, 22),
+                    child: Column(
+                      children: [
+                        _Progress(page: _page, count: _slides.length),
+                        const SizedBox(height: 16),
+                        _CtaButton(isLast: isLast, onTap: _next),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -185,10 +133,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 }
-
-// -----------------------------------------------------------------------------
-// Top bar, halaman, indikator, tombol
-// -----------------------------------------------------------------------------
 
 class _TopBar extends StatelessWidget {
   const _TopBar({required this.isLast, required this.onSkip});
@@ -199,30 +143,18 @@ class _TopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 64,
+      height: 60,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Row(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: Image.asset('assets/images/logo.jpg', width: 36, height: 36),
-                ),
-                const SizedBox(width: 10),
-                const Text(
-                  'Zenime',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.3,
-                  ),
-                ),
-              ],
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.asset('assets/images/logo.jpg', width: 28, height: 28),
             ),
+            const SizedBox(width: 9),
+            Text('Zenime', style: ZFont.display(size: 17)),
+            const Spacer(),
             AnimatedOpacity(
               opacity: isLast ? 0 : 1,
               duration: const Duration(milliseconds: 250),
@@ -231,20 +163,11 @@ class _TopBar extends StatelessWidget {
                 child: GestureDetector(
                   onTap: onSkip,
                   behavior: HitTestBehavior.opaque,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.10),
-                      borderRadius: BorderRadius.circular(50),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
-                    ),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 4, vertical: 10),
                     child: Text(
                       'Lewati',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.85),
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
+                      style: TextStyle(color: AppColors.textSecondary, fontSize: 13, fontWeight: FontWeight.w700),
                     ),
                   ),
                 ),
@@ -257,554 +180,206 @@ class _TopBar extends StatelessWidget {
   }
 }
 
-class _SlidePage extends StatelessWidget {
-  const _SlidePage({required this.index, required this.pos, required this.active});
-
-  final int index;
-  final ValueNotifier<double> pos;
-  final bool active;
-
-  InlineSpan _titleSpan(_Slide s) {
-    const base = TextStyle(
-      fontSize: 30,
-      height: 38 / 30,
-      fontWeight: FontWeight.w800,
-      letterSpacing: -0.5,
-    );
-    final i = s.title.indexOf(s.highlight);
-    if (i < 0) {
-      return TextSpan(text: s.title, style: base.copyWith(color: Colors.white));
-    }
-    final shader = LinearGradient(colors: [s.a, s.b])
-        .createShader(const Rect.fromLTWH(0, 0, 220, 40));
-    return TextSpan(
-      style: base,
-      children: [
-        TextSpan(
-          text: s.title.substring(0, i),
-          style: const TextStyle(color: Colors.white),
-        ),
-        TextSpan(
-          text: s.highlight,
-          style: TextStyle(foreground: Paint()..shader = shader),
-        ),
-        TextSpan(
-          text: s.title.substring(i + s.highlight.length),
-          style: const TextStyle(color: Colors.white),
-        ),
-      ],
-    );
-  }
-
-  Widget _illustration(_Slide s) {
-    switch (index) {
-      case 0:
-        return _PosterStackIllustration(active: active, a: s.a, b: s.b);
-      case 1:
-        return _OfflineIllustration(active: active, a: s.a, b: s.b);
-      case 2:
-        return _DonghuaIllustration(active: active, a: s.a, b: s.b);
-      case 3:
-        return _ChatIllustration(active: active, a: s.a, b: s.b);
-      case 4:
-        return _LevelIllustration(active: active, a: s.a, b: s.b);
-      default:
-        return _PremiumIllustration(active: active, a: s.a, b: s.b);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final s = _slides[index];
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 28),
-      child: Column(
-        children: [
-          Expanded(
-            child: Center(
-              child: AnimatedBuilder(
-                animation: pos,
-                builder: (context, child) {
-                  // Parallax: ilustrasi gerak lebih pelan dari teks.
-                  final off = pos.value - index;
-                  final k = 1 - off.abs().clamp(0.0, 1.0).toDouble();
-                  return Transform.translate(
-                    offset: Offset(off * _stage * 0.35, 0),
-                    child: Opacity(
-                      opacity: k,
-                      child: Transform.scale(
-                        scale: 0.85 + 0.15 * k,
-                        child: child,
-                      ),
-                    ),
-                  );
-                },
-                // Skala turun otomatis di layar kecil biar ilustrasi gak kepotong.
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: SizedBox(
-                    width: _stage,
-                    height: _stage,
-                    child: _illustration(s),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          _Reveal(
-            active: active,
-            child: Text.rich(_titleSpan(s), textAlign: TextAlign.center),
-          ),
-          const SizedBox(height: 12),
-          _Reveal(
-            active: active,
-            delayMs: 120,
-            child: Text(
-              s.desc,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.65),
-                fontSize: 16,
-                height: 24 / 16,
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-        ],
-      ),
-    );
-  }
-}
-
-class _PageIndicator extends StatelessWidget {
-  const _PageIndicator({required this.pos});
-
-  final ValueNotifier<double> pos;
-
-  @override
-  Widget build(BuildContext context) {
-    return ValueListenableBuilder<double>(
-      valueListenable: pos,
-      builder: (context, p, _) {
-        final accent = _accentAt(p, (s) => s.a);
-        return Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            for (var i = 0; i < _slides.length; i++)
-              Builder(builder: (context) {
-                final near = (1 - (p - i).abs()).clamp(0.0, 1.0).toDouble();
-                return Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 4),
-                  height: 8,
-                  width: 8 + 22 * near,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(50),
-                    color: Color.lerp(Colors.white.withValues(alpha: 0.2), accent, near),
-                  ),
-                );
-              }),
-          ],
-        );
-      },
-    );
-  }
-}
-
-class _CtaButton extends StatefulWidget {
-  const _CtaButton({required this.pos, required this.isLast, required this.onTap});
-
-  final ValueNotifier<double> pos;
-  final bool isLast;
-  final VoidCallback onTap;
-
-  @override
-  State<_CtaButton> createState() => _CtaButtonState();
-}
-
-class _CtaButtonState extends State<_CtaButton> {
-  bool _pressed = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: ValueListenableBuilder<double>(
-        valueListenable: widget.pos,
-        builder: (context, p, _) {
-          final a = _accentAt(p, (s) => s.a);
-          final b = _accentAt(p, (s) => s.b);
-          return GestureDetector(
-            onTapDown: (_) => setState(() => _pressed = true),
-            onTapUp: (_) => setState(() => _pressed = false),
-            onTapCancel: () => setState(() => _pressed = false),
-            onTap: widget.onTap,
-            child: AnimatedScale(
-              scale: _pressed ? 0.96 : 1,
-              duration: const Duration(milliseconds: 120),
-              child: Container(
-                height: 60,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(30),
-                  gradient: LinearGradient(colors: [a, b]),
-                  boxShadow: [
-                    BoxShadow(
-                      color: a.withValues(alpha: 0.55),
-                      blurRadius: 22,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(30),
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      Positioned.fill(
-                        child: _Loop(
-                          period: const Duration(milliseconds: 2800),
-                          builder: (context, t) => CustomPaint(
-                            painter: _SheenPainter(-0.6 + 2.2 * t),
-                          ),
-                        ),
-                      ),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 250),
-                            transitionBuilder: (child, anim) => FadeTransition(
-                              opacity: anim,
-                              child: SlideTransition(
-                                position: Tween<Offset>(
-                                  begin: const Offset(0, 0.4),
-                                  end: Offset.zero,
-                                ).animate(anim),
-                                child: child,
-                              ),
-                            ),
-                            child: Text(
-                              widget.isLast ? 'Mulai Sekarang' : 'Lanjut',
-                              key: ValueKey(widget.isLast),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 17,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          _Loop(
-                            period: const Duration(milliseconds: 700),
-                            reverse: true,
-                            builder: (context, t) => Transform.translate(
-                              offset: Offset(Curves.easeInOut.transform(t) * 4, 0),
-                              child: const Icon(
-                                Icons.arrow_forward_rounded,
-                                color: Colors.white,
-                                size: 22,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _SheenPainter extends CustomPainter {
-  _SheenPainter(this.x);
-
-  /// Posisi kilau, dalam fraksi lebar tombol.
-  final double x;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final cx = x * size.width;
-    final shader = LinearGradient(
-      colors: [
-        Colors.white.withValues(alpha: 0),
-        Colors.white.withValues(alpha: 0.28),
-        Colors.white.withValues(alpha: 0),
-      ],
-    ).createShader(
-      Rect.fromPoints(
-        Offset(cx - size.width * 0.25, 0),
-        Offset(cx + size.width * 0.25, size.height),
-      ),
-    );
-    canvas.drawRect(Offset.zero & size, Paint()..shader = shader);
-  }
-
-  @override
-  bool shouldRepaint(_SheenPainter old) => old.x != x;
-}
-
 // -----------------------------------------------------------------------------
-// Background: aurora glow + bintang berkedip
+// Animasi masuk per slide
 // -----------------------------------------------------------------------------
 
-class _Star {
-  const _Star(this.x, this.y, this.r, this.phase, this.alpha);
-
-  final double x;
-  final double y;
-  final double r;
-  final double phase;
-  final double alpha;
-}
-
-class _AuroraBackground extends StatefulWidget {
-  const _AuroraBackground({required this.pos});
-
-  final ValueNotifier<double> pos;
-
-  @override
-  State<_AuroraBackground> createState() => _AuroraBackgroundState();
-}
-
-class _AuroraBackgroundState extends State<_AuroraBackground>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _c =
-      AnimationController(vsync: this, duration: const Duration(seconds: 40))
-        ..repeat();
-
-  late final List<_Star> _stars = () {
-    final rnd = math.Random(11);
-    return List<_Star>.generate(36, (_) {
-      return _Star(
-        rnd.nextDouble(),
-        rnd.nextDouble(),
-        0.7 + rnd.nextDouble() * 1.6,
-        rnd.nextDouble() * 6.2832,
-        0.35 + rnd.nextDouble() * 0.6,
-      );
-    });
-  }();
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return RepaintBoundary(
-      child: CustomPaint(
-        painter: _AuroraPainter(t: _c, pos: widget.pos, stars: _stars),
-      ),
-    );
-  }
-}
-
-class _AuroraPainter extends CustomPainter {
-  _AuroraPainter({required this.t, required this.pos, required this.stars})
-      : super(repaint: Listenable.merge([t, pos]));
+/// Membagikan progres animasi masuk slide (0..1 selama [_enterDur]).
+class _Enter extends InheritedWidget {
+  const _Enter({required this.t, required super.child});
 
   final Animation<double> t;
-  final ValueNotifier<double> pos;
-  final List<_Star> stars;
+
+  static Animation<double> of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<_Enter>()!.t;
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final p = pos.value;
-    final a = _accentAt(p, (s) => s.a);
-    final b = _accentAt(p, (s) => s.b);
-    final w = size.width;
-    final h = size.height;
-    final drift = t.value;
-    final twinkle = t.value * 2 * math.pi * 10;
-    final breathe = 0.5 + 0.5 * math.sin(t.value * 2 * math.pi * 7);
-
-    canvas.drawRect(Offset.zero & size, Paint()..color = AppColors.backgroundDark);
-
-    void glow(Offset c, double r, Color color, double alpha) {
-      final shader = RadialGradient(
-        colors: [color.withValues(alpha: alpha), color.withValues(alpha: 0)],
-      ).createShader(Rect.fromCircle(center: c, radius: r));
-      canvas.drawCircle(c, r, Paint()..shader = shader);
-    }
-
-    glow(
-      Offset(w * (0.30 + 0.08 * math.sin(p * 1.7)), h * 0.20),
-      w * (0.95 + 0.10 * breathe),
-      a,
-      0.40,
-    );
-    glow(
-      Offset(w * (0.85 - 0.06 * math.sin(p * 1.3)), h * 0.72),
-      w * (0.85 + 0.10 * (1 - breathe)),
-      b,
-      0.32,
-    );
-
-    final star = Paint();
-    for (final s in stars) {
-      final y = ((s.y - drift + 1) % 1) * h;
-      final tw = 0.5 + 0.5 * math.sin(twinkle + s.phase);
-      star.color = Colors.white.withValues(alpha: s.alpha * (0.25 + 0.75 * tw));
-      canvas.drawCircle(Offset(s.x * w, y), s.r, star);
-    }
-
-    // Redam bagian bawah biar tombol & indikator tetap kebaca jelas.
-    final fade = LinearGradient(
-      begin: Alignment.topCenter,
-      end: Alignment.bottomCenter,
-      colors: [
-        AppColors.backgroundDark.withValues(alpha: 0),
-        AppColors.backgroundDark.withValues(alpha: 0.85),
-      ],
-    ).createShader(Rect.fromLTRB(0, h * 0.6, w, h));
-    canvas.drawRect(Rect.fromLTRB(0, h * 0.6, w, h), Paint()..shader = fade);
-  }
-
-  @override
-  bool shouldRepaint(_AuroraPainter old) => true;
+  bool updateShouldNotify(_Enter old) => old.t != t;
 }
 
-// -----------------------------------------------------------------------------
-// Helper animasi & komponen kecil
-// -----------------------------------------------------------------------------
-
-/// Loop animasi: [builder] dipanggil tiap frame dengan t di 0..1.
-class _Loop extends StatefulWidget {
-  const _Loop({
-    required this.period,
-    required this.builder,
-    this.reverse = false,
-    this.delay = Duration.zero,
-  });
-
-  final Duration period;
-  final bool reverse;
-  final Duration delay;
-  final Widget Function(BuildContext context, double t) builder;
-
-  @override
-  State<_Loop> createState() => _LoopState();
+/// Kurva potongan waktu: mulai di [atMs], selama [durMs].
+Animation<double> _seg(Animation<double> t, int atMs, int durMs, [Curve curve = Curves.easeOutCubic]) {
+  final total = _enterDur.inMilliseconds;
+  final a = (atMs / total).clamp(0.0, 1.0);
+  final b = ((atMs + durMs) / total).clamp(a, 1.0);
+  return _Part(t, Interval(a, b, curve: curve));
 }
 
-class _LoopState extends State<_Loop> with SingleTickerProviderStateMixin {
-  late final AnimationController _c =
-      AnimationController(vsync: this, duration: widget.period);
-  Timer? _timer;
+/// Seperti CurvedAnimation tapi tanpa listener sendiri (aman dibuat tiap build).
+class _Part extends Animation<double> with AnimationWithParentMixin<double> {
+  _Part(this.parent, this.curve);
 
   @override
-  void initState() {
-    super.initState();
-    if (widget.delay == Duration.zero) {
-      _c.repeat(reverse: widget.reverse);
-    } else {
-      _timer = Timer(widget.delay, () {
-        if (mounted) _c.repeat(reverse: widget.reverse);
-      });
-    }
-  }
+  final Animation<double> parent;
+  final Curve curve;
 
   @override
-  void dispose() {
-    _timer?.cancel();
-    _c.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _c,
-      builder: (context, _) => widget.builder(context, _c.value),
-    );
-  }
+  double get value => curve.transform(parent.value);
 }
 
-/// Melayang naik-turun pelan.
-class _Floating extends StatelessWidget {
-  const _Floating({
-    required this.child,
-    this.periodMs = 3200,
-    this.startMs = 0,
-    this.amplitude = 8,
-  });
+/// Muncul: fade + naik [dy] px (atau geser dari kiri kalau [dx] diisi).
+class _In extends StatelessWidget {
+  const _In({required this.at, required this.child, this.dur = 500, this.dy = 14, this.dx = 0});
 
+  final int at;
+  final int dur;
+  final double dy;
+  final double dx;
   final Widget child;
-  final int periodMs;
-  final int startMs;
-  final double amplitude;
 
   @override
   Widget build(BuildContext context) {
-    return _Loop(
-      period: Duration(milliseconds: periodMs),
-      delay: Duration(milliseconds: startMs),
-      reverse: true,
-      builder: (context, t) => Transform.translate(
-        offset: Offset(0, (Curves.easeInOut.transform(t) * 2 - 1) * amplitude),
+    final a = _seg(_Enter.of(context), at, dur);
+    return AnimatedBuilder(
+      animation: a,
+      builder: (context, child) => Opacity(
+        opacity: a.value,
+        child: Transform.translate(offset: Offset(dx * (1 - a.value), dy * (1 - a.value)), child: child),
+      ),
+      child: child,
+    );
+  }
+}
+
+/// Muncul membesar dengan pantulan (chip, panel manga).
+class _Pop extends StatelessWidget {
+  const _Pop({required this.at, required this.child, this.from = 0, this.dur = 380});
+
+  final int at;
+  final int dur;
+  final double from;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final a = _seg(_Enter.of(context), at, dur, Curves.easeOutBack);
+    final f = _seg(_Enter.of(context), at, dur ~/ 2, Curves.linear);
+    return AnimatedBuilder(
+      animation: a,
+      builder: (context, child) => Opacity(
+        opacity: f.value,
+        child: Transform.scale(scale: from + (1 - from) * a.value, child: child),
+      ),
+      child: child,
+    );
+  }
+}
+
+/// Baris teks judul yang naik dari balik garis.
+class _MaskLine extends StatelessWidget {
+  const _MaskLine({required this.at, required this.child});
+
+  final int at;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final a = _seg(_Enter.of(context), at, 600);
+    return ClipRect(
+      child: AnimatedBuilder(
+        animation: a,
+        builder: (context, child) =>
+            FractionalTranslation(translation: Offset(0, 1.05 * (1 - a.value)), child: child),
         child: child,
       ),
     );
   }
 }
 
-/// Muncul saat [active] (fade + geser naik + opsional membesar), balik saat tidak.
-class _Reveal extends StatefulWidget {
-  const _Reveal({
-    required this.active,
-    required this.child,
-    this.delayMs = 0,
-    this.dy = 28,
-    this.scaleFrom = 1,
-    this.durationMs = 600,
-    this.curve = Curves.easeOutCubic,
-    this.alignment = Alignment.bottomCenter,
-  });
+/// Bar progres yang terisi sampai [to].
+class _FillBar extends StatelessWidget {
+  const _FillBar({required this.at, required this.to, this.height = 4});
 
-  final bool active;
-  final Widget child;
-  final int delayMs;
-  final double dy;
-  final double scaleFrom;
-  final int durationMs;
-  final Curve curve;
-  final Alignment alignment;
+  final int at;
+  final double to;
+  final double height;
 
   @override
-  State<_Reveal> createState() => _RevealState();
+  Widget build(BuildContext context) {
+    final a = _seg(_Enter.of(context), at, 1600);
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(height),
+      child: SizedBox(
+        height: height,
+        child: ColoredBox(
+          color: AppColors.surfaceElevated,
+          child: AnimatedBuilder(
+            animation: a,
+            builder: (context, _) => FractionallySizedBox(
+              alignment: Alignment.centerLeft,
+              widthFactor: to * a.value,
+              child: const ColoredBox(color: AppColors.accentViolet),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
-class _RevealState extends State<_Reveal> with SingleTickerProviderStateMixin {
-  late final int _total = widget.durationMs + widget.delayMs;
-  late final AnimationController _c =
-      AnimationController(vsync: this, duration: Duration(milliseconds: _total));
-  late final Animation<double> _a = CurvedAnimation(
-    parent: _c,
-    curve: Interval(widget.delayMs / _total, 1, curve: widget.curve),
-    reverseCurve: Curves.easeIn,
-  );
+/// Angka yang menghitung naik ke [to].
+class _CountUp extends StatelessWidget {
+  const _CountUp({required this.at, required this.to, required this.style, this.dots = false});
 
-  @override
-  void initState() {
-    super.initState();
-    if (widget.active) _c.forward();
+  final int at;
+  final int to;
+  final TextStyle style;
+  final bool dots;
+
+  static String _fmt(int n) {
+    final s = n.toString();
+    final b = StringBuffer();
+    for (var i = 0; i < s.length; i++) {
+      if (i > 0 && (s.length - i) % 3 == 0) b.write('.');
+      b.write(s[i]);
+    }
+    return b.toString();
   }
 
   @override
-  void didUpdateWidget(_Reveal old) {
+  Widget build(BuildContext context) {
+    final a = _seg(_Enter.of(context), at, 1300);
+    return AnimatedBuilder(
+      animation: a,
+      builder: (context, _) {
+        final v = (to * a.value).round();
+        return Text(dots ? _fmt(v) : '$v', style: style);
+      },
+    );
+  }
+}
+
+class _SlidePage extends StatefulWidget {
+  const _SlidePage({required this.index, required this.active});
+
+  final int index;
+  final bool active;
+
+  @override
+  State<_SlidePage> createState() => _SlidePageState();
+}
+
+class _SlidePageState extends State<_SlidePage> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(vsync: this, duration: _enterDur);
+  bool _still = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _still = MediaQuery.disableAnimationsOf(context);
+    if (_still) {
+      _c.value = 1;
+    } else if (widget.active && _c.value == 0 && !_c.isAnimating) {
+      _c.forward();
+    }
+  }
+
+  @override
+  void didUpdateWidget(_SlidePage old) {
     super.didUpdateWidget(old);
-    if (old.active != widget.active) {
-      if (widget.active) {
-        _c.forward();
-      } else {
-        _c.reverse();
-      }
+    if (_still) return;
+    if (widget.active && !old.active) {
+      _c.forward(from: 0);
     }
   }
 
@@ -816,733 +391,337 @@ class _RevealState extends State<_Reveal> with SingleTickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _a,
-      child: widget.child,
-      builder: (context, child) {
-        final v = _a.value;
-        return Opacity(
-          opacity: v.clamp(0.0, 1.0).toDouble(),
-          child: Transform.translate(
-            offset: Offset(0, (1 - v) * widget.dy),
-            child: Transform.scale(
-              scale: widget.scaleFrom + (1 - widget.scaleFrom) * v,
-              alignment: widget.alignment,
-              child: child,
+    final s = _slides[widget.index];
+    final title = ZFont.display(size: 29, height: 1.12, letterSpacing: -0.6);
+
+    return _Enter(
+      t: _c,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+              child: LayoutBuilder(
+                builder: (context, c) => FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.topCenter,
+                  child: SizedBox(
+                    width: c.maxWidth,
+                    child: RepaintBoundary(child: _hero(widget.index)),
+                  ),
+                ),
+              ),
             ),
           ),
-        );
-      },
-    );
-  }
-}
-
-BoxDecoration _glass(double radius) => BoxDecoration(
-      borderRadius: BorderRadius.circular(radius),
-      gradient: LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [
-          Colors.white.withValues(alpha: 0.13),
-          Colors.white.withValues(alpha: 0.05),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 22),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _In(
+                  at: 50,
+                  child: Row(
+                    children: [
+                      Text(s.no, style: ZFont.display(size: 11, letterSpacing: 0.5)),
+                      Container(
+                        width: 16,
+                        height: 1,
+                        margin: const EdgeInsets.symmetric(horizontal: 8),
+                        color: AppColors.textMuted,
+                      ),
+                      Text(s.jp, style: ZFont.jp()),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 10),
+                _MaskLine(at: 100, child: Text(s.line1, style: title)),
+                _MaskLine(
+                  at: 180,
+                  child: Text(s.line2, style: title.copyWith(color: AppColors.accentViolet)),
+                ),
+                const SizedBox(height: 10),
+                _In(
+                  at: 280,
+                  child: SizedBox(
+                    height: 44,
+                    child: Text(
+                      s.desc,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: AppColors.textSecondary, fontSize: 14.5, height: 1.5),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
-      border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
     );
+  }
 
-class _GlowOrb extends StatelessWidget {
-  const _GlowOrb(this.color, this.size);
+  Widget _hero(int i) => switch (i) {
+        0 => const _HeroAnime(),
+        1 => const _HeroOffline(),
+        2 => const _HeroComic(),
+        3 => const _HeroClan(),
+        4 => const _HeroRank(),
+        _ => const _HeroPremium(),
+      };
+}
 
-  final Color color;
-  final double size;
+// -----------------------------------------------------------------------------
+// Progres & tombol
+// -----------------------------------------------------------------------------
+
+class _Progress extends StatelessWidget {
+  const _Progress({required this.page, required this.count});
+
+  final int page;
+  final int count;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
+    return Row(
+      children: [
+        for (var i = 0; i < count; i++) ...[
+          if (i > 0) const SizedBox(width: 5),
+          Expanded(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(2),
+              child: SizedBox(
+                height: 3,
+                child: ColoredBox(
+                  color: AppColors.surfaceElevated,
+                  child: TweenAnimationBuilder<double>(
+                    tween: Tween(end: i <= page ? 1 : 0),
+                    duration: const Duration(milliseconds: 450),
+                    curve: Curves.easeOutCubic,
+                    builder: (context, v, _) => FractionallySizedBox(
+                      alignment: Alignment.centerLeft,
+                      widthFactor: v,
+                      child: ColoredBox(
+                        color: AppColors.accentViolet.withValues(alpha: i == page ? 1 : 0.45),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _CtaButton extends StatelessWidget {
+  const _CtaButton({required this.isLast, required this.onTap});
+
+  final bool isLast;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = isLast ? const Color(0xFF1A1206) : Colors.white;
+    final body = AnimatedContainer(
+      duration: const Duration(milliseconds: 400),
+      height: 52,
+      width: double.infinity,
       decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: RadialGradient(
-          colors: [color.withValues(alpha: 0.45), color.withValues(alpha: 0)],
-        ),
+        color: isLast ? _gold : AppColors.accentViolet,
+        borderRadius: BorderRadius.circular(14),
       ),
-    );
-  }
-}
-
-class _FloatChip extends StatelessWidget {
-  const _FloatChip({
-    required this.icon,
-    required this.label,
-    required this.tint,
-    this.periodMs = 3200,
-    this.startMs = 0,
-  });
-
-  final IconData icon;
-  final String label;
-  final Color tint;
-  final int periodMs;
-  final int startMs;
-
-  @override
-  Widget build(BuildContext context) {
-    return _Floating(
-      periodMs: periodMs,
-      startMs: startMs,
-      amplitude: 7,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: _glass(50),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: tint, size: 16),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+      alignment: Alignment.center,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            isLast ? 'Mulai Sekarang' : 'Lanjut',
+            style: TextStyle(color: fg, fontSize: 15.5, fontWeight: FontWeight.w800),
+          ),
+          if (!isLast) ...[
+            const SizedBox(width: 8),
+            Icon(Icons.arrow_forward_rounded, color: fg, size: 20),
           ],
-        ),
+        ],
       ),
     );
-  }
-}
-
-/// Chip yang muncul membal saat slide aktif.
-class _PopChip extends StatelessWidget {
-  const _PopChip({
-    required this.active,
-    required this.delayMs,
-    required this.icon,
-    required this.label,
-    required this.tint,
-    this.startMs = 0,
-  });
-
-  final bool active;
-  final int delayMs;
-  final IconData icon;
-  final String label;
-  final Color tint;
-  final int startMs;
-
-  @override
-  Widget build(BuildContext context) {
-    return _Reveal(
-      active: active,
-      delayMs: delayMs,
-      dy: 18,
-      scaleFrom: 0.6,
-      durationMs: 500,
-      curve: _backOut,
-      child: _FloatChip(icon: icon, label: label, tint: tint, startMs: startMs),
+    return ZPress(
+      onTap: onTap,
+      child: isLast ? ZSheen(radius: BorderRadius.circular(14), opacity: 0.45, child: body) : body,
     );
   }
-}
-
-class _RingPainter extends CustomPainter {
-  _RingPainter({required this.progress, required this.a, required this.b, this.stroke = 12});
-
-  final double progress;
-  final Color a;
-  final Color b;
-  final double stroke;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final rect = (Offset.zero & size).deflate(stroke / 2);
-    canvas.drawArc(
-      rect,
-      0,
-      2 * math.pi,
-      false,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = stroke
-        ..color = Colors.white.withValues(alpha: 0.10),
-    );
-    final shader = SweepGradient(
-      colors: [a, b, a],
-      transform: const GradientRotation(-math.pi / 2),
-    ).createShader(rect);
-    canvas.drawArc(
-      rect,
-      -math.pi / 2,
-      2 * math.pi * progress.clamp(0.0, 1.0).toDouble(),
-      false,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = stroke
-        ..strokeCap = StrokeCap.round
-        ..shader = shader,
-    );
-  }
-
-  @override
-  bool shouldRepaint(_RingPainter old) =>
-      old.progress != progress || old.a != a || old.b != b || old.stroke != stroke;
 }
 
 // -----------------------------------------------------------------------------
-// Slide 1: tumpukan poster anime
+// Potongan UI bersama
 // -----------------------------------------------------------------------------
 
-class _PosterStackIllustration extends StatelessWidget {
-  const _PosterStackIllustration({required this.active, required this.a, required this.b});
-
-  final bool active;
-  final Color a;
-  final Color b;
-
-  @override
-  Widget build(BuildContext context) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween<double>(begin: 0, end: active ? 1 : 0),
-      duration: const Duration(milliseconds: 900),
-      curve: Curves.easeOutBack,
-      builder: (context, spread, _) {
-        Widget side(String url, Color tint, double dir) {
-          return Transform.translate(
-            offset: Offset(84 * dir * spread, 22 * spread),
-            child: Transform.rotate(
-              angle: dir * 13 * math.pi / 180 * spread,
-              child: Transform.scale(
-                scale: 0.86,
-                child: _Poster(url: url, tint: tint),
-              ),
-            ),
-          );
-        }
-
-        return Stack(
-          alignment: Alignment.center,
-          children: [
-            _GlowOrb(a, 280),
-            side(kLoginPosters[2], b, -1),
-            side(kLoginPosters[3], a, 1),
-            _Floating(
-              periodMs: 3600,
-              amplitude: 6,
-              child: _Poster(url: kLoginPosters[0], tint: a, showPlay: true),
-            ),
-          ],
-        );
-      },
+BoxDecoration _cardDeco([Color? border]) => BoxDecoration(
+      color: AppColors.surfaceCard,
+      borderRadius: BorderRadius.circular(16),
+      border: Border.all(color: border ?? const Color(0x0FFFFFFF)),
     );
-  }
-}
 
-class _Poster extends StatelessWidget {
-  const _Poster({required this.url, required this.tint, this.showPlay = false});
+const Divider _rowLine = Divider(height: 1, thickness: 1, color: Color(0x0DFFFFFF));
+
+class _Thumb extends StatelessWidget {
+  const _Thumb(this.url, {this.w = 52, this.h = 70, this.r = 9, this.gray = false});
 
   final String url;
-  final Color tint;
-  final bool showPlay;
+  final double w;
+  final double h;
+  final double r;
+  final bool gray;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 140,
-      height: 200,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
-        boxShadow: [
-          BoxShadow(
-            color: tint.withValues(alpha: 0.35),
-            blurRadius: 24,
-            offset: const Offset(0, 10),
-          ),
-        ],
+    Widget img = NetImage(url);
+    if (gray) img = ColorFiltered(colorFilter: _grayscale, child: img);
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(r),
+      child: SizedBox(
+        width: w,
+        height: h,
+        child: ColoredBox(color: AppColors.surfaceVariantDark, child: img),
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(19),
-        child: Stack(
-          fit: StackFit.expand,
+    );
+  }
+}
+
+const ColorFilter _grayscale = ColorFilter.matrix(<double>[
+  0.36, 0.72, 0.12, 0, -30, //
+  0.36, 0.72, 0.12, 0, -30, //
+  0.36, 0.72, 0.12, 0, -30, //
+  0, 0, 0, 1, 0,
+]);
+
+class _Avatar extends StatelessWidget {
+  const _Avatar(this.url);
+
+  final String url;
+
+  @override
+  Widget build(BuildContext context) => ClipOval(
+        child: SizedBox(
+          width: 30,
+          height: 30,
+          child: ColoredBox(color: AppColors.surfaceVariantDark, child: NetImage(url)),
+        ),
+      );
+}
+
+class _SecTitle extends StatelessWidget {
+  const _SecTitle(this.title, this.note);
+
+  final String title;
+  final String note;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(2, 0, 2, 10),
+        child: Row(
           children: [
-            NetImage(url),
-            DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.transparent,
-                    AppColors.backgroundDark.withValues(alpha: 0.55),
-                  ],
-                ),
-              ),
-            ),
-            if (showPlay) Center(child: _PlayPulse(tint: tint)),
+            Text(title, style: ZFont.display(size: 14)),
+            const Spacer(),
+            Text(note, style: const TextStyle(color: AppColors.textSecondary, fontSize: 11, fontWeight: FontWeight.w600)),
           ],
         ),
-      ),
-    );
-  }
+      );
 }
 
-class _PlayPulse extends StatelessWidget {
-  const _PlayPulse({required this.tint});
+class _LvTag extends StatelessWidget {
+  const _LvTag(this.lv);
 
-  final Color tint;
+  final int lv;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+        decoration: BoxDecoration(color: const Color(0x29F6BE4F), borderRadius: BorderRadius.circular(5)),
+        child: Text('Lv $lv', style: const TextStyle(color: _gold, fontSize: 9, fontWeight: FontWeight.w800)),
+      );
+}
+
+const TextStyle _rowTitle = TextStyle(color: AppColors.textWhite, fontSize: 13.5, fontWeight: FontWeight.w800);
+const TextStyle _rowMeta = TextStyle(color: AppColors.textSecondary, fontSize: 11.5);
+
+// -----------------------------------------------------------------------------
+// 01 Anime
+// -----------------------------------------------------------------------------
+
+class _HeroAnime extends StatelessWidget {
+  const _HeroAnime();
 
   @override
   Widget build(BuildContext context) {
-    return _Loop(
-      period: const Duration(milliseconds: 1800),
-      builder: (context, t) {
-        return SizedBox(
-          width: 80,
-          height: 80,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Transform.scale(
-                scale: 1 + 0.6 * t,
-                child: Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: tint.withValues(alpha: 0.45 * (1 - t)),
-                  ),
-                ),
-              ),
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: tint,
-                  boxShadow: [
-                    BoxShadow(color: tint.withValues(alpha: 0.6), blurRadius: 16),
-                  ],
-                ),
-                child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 30),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-// -----------------------------------------------------------------------------
-// Slide 2: download & offline
-// -----------------------------------------------------------------------------
-
-class _OfflineIllustration extends StatelessWidget {
-  const _OfflineIllustration({required this.active, required this.a, required this.b});
-
-  final bool active;
-  final Color a;
-  final Color b;
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        _GlowOrb(a, 280),
-        _Reveal(
-          active: active,
-          dy: 0,
-          scaleFrom: 0.7,
-          durationMs: 700,
-          curve: _backOut,
-          alignment: Alignment.center,
-          child: SizedBox(
-            width: 190,
-            height: 190,
-            child: _Loop(
-              period: const Duration(milliseconds: 3200),
-              builder: (context, t) {
-                // Progres "mengunduh" naik pelan lalu mengulang.
-                final progress = Curves.easeInOut.transform(t);
-                return Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    CustomPaint(
-                      size: const Size(190, 190),
-                      painter: _RingPainter(progress: progress, a: a, b: b),
-                    ),
-                    Container(
-                      width: 128,
-                      height: 128,
-                      decoration: _glass(64),
-                      child: const Icon(Icons.download_rounded, color: Colors.white, size: 58),
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
-        ),
-        Positioned(
-          left: 0,
-          top: 34,
-          child: _PopChip(
-            active: active,
-            delayMs: 250,
-            icon: Icons.wifi_off_rounded,
-            label: 'Tanpa kuota',
-            tint: a,
-          ),
-        ),
-        Positioned(
-          right: 4,
-          bottom: 40,
-          child: _PopChip(
-            active: active,
-            delayMs: 400,
-            icon: Icons.hd_rounded,
-            label: '1080p',
-            tint: b,
-            startMs: 500,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// -----------------------------------------------------------------------------
-// Slide 3: donghua
-// -----------------------------------------------------------------------------
-
-class _DonghuaIllustration extends StatelessWidget {
-  const _DonghuaIllustration({required this.active, required this.a, required this.b});
-
-  final bool active;
-  final Color a;
-  final Color b;
-
-  @override
-  Widget build(BuildContext context) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween<double>(begin: 0, end: active ? 1 : 0),
-      duration: const Duration(milliseconds: 900),
-      curve: Curves.easeOutBack,
-      builder: (context, spread, _) {
-        return Stack(
-          alignment: Alignment.center,
-          children: [
-            _GlowOrb(a, 280),
-            // Poster komik (belakang, miring ke kiri).
-            Transform.translate(
-              offset: Offset(-62 * spread, 22 * spread),
-              child: Transform.rotate(
-                angle: -11 * math.pi / 180 * spread,
-                child: Transform.scale(
-                  scale: 0.86,
-                  child: _Poster(url: _kComicPoster, tint: b),
-                ),
-              ),
-            ),
-            // Poster donghua (depan, melayang, ada tombol play).
-            Transform.translate(
-              offset: Offset(36 * spread, 0),
-              child: _Floating(
-                periodMs: 3600,
-                amplitude: 6,
-                child: _Poster(url: _kDonghuaPoster, tint: a, showPlay: true),
-              ),
-            ),
-            Positioned(
-              right: 0,
-              top: 20,
-              child: _PopChip(
-                active: active,
-                delayMs: 250,
-                icon: Icons.local_fire_department_rounded,
-                label: 'Donghua',
-                tint: _gold,
-              ),
-            ),
-            Positioned(
-              left: 0,
-              bottom: 26,
-              child: _PopChip(
-                active: active,
-                delayMs: 400,
-                icon: Icons.menu_book_rounded,
-                label: 'Komik',
-                tint: b,
-                startMs: 500,
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-}
-
-// -----------------------------------------------------------------------------
-// Slide 4: chat & clan
-// -----------------------------------------------------------------------------
-
-class _ChatIllustration extends StatelessWidget {
-  const _ChatIllustration({required this.active, required this.a, required this.b});
-
-  final bool active;
-  final Color a;
-  final Color b;
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        _GlowOrb(a, 280),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 6),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _Bubble(
-                active: active,
-                delayMs: 100,
-                mine: false,
-                a: a,
-                b: b,
-                text: 'Ada rekomendasi anime baru?',
-              ),
-              const SizedBox(height: 12),
-              _Bubble(
-                active: active,
-                delayMs: 450,
-                mine: true,
-                a: a,
-                b: b,
-                text: 'Coba yang lagi rame minggu ini 🔥',
-              ),
-              const SizedBox(height: 12),
-              _Reveal(
-                active: active,
-                delayMs: 800,
-                dy: 18,
-                scaleFrom: 0.6,
-                durationMs: 500,
-                curve: _backOut,
-                alignment: Alignment.bottomLeft,
-                child: const Align(
-                  alignment: Alignment.centerLeft,
-                  child: _TypingDots(),
-                ),
-              ),
-            ],
-          ),
-        ),
-        Positioned(
-          right: 0,
-          top: 22,
-          child: _PopChip(
-            active: active,
-            delayMs: 300,
-            icon: Icons.shield_rounded,
-            label: 'Clan',
-            tint: b,
-          ),
-        ),
-        Positioned(
-          left: 0,
-          bottom: 20,
-          child: _PopChip(
-            active: active,
-            delayMs: 500,
-            icon: Icons.person_add_alt_1_rounded,
-            label: 'Teman',
-            tint: a,
-            startMs: 600,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _Bubble extends StatelessWidget {
-  const _Bubble({
-    required this.active,
-    required this.delayMs,
-    required this.mine,
-    required this.a,
-    required this.b,
-    required this.text,
-  });
-
-  final bool active;
-  final int delayMs;
-  final bool mine;
-  final Color a;
-  final Color b;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    final avatar = Container(
-      width: 34,
-      height: 34,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: LinearGradient(colors: mine ? [b, a] : [a, b]),
-      ),
-      child: Icon(
-        mine ? Icons.face_5_rounded : Icons.face_rounded,
-        color: Colors.white,
-        size: 20,
-      ),
-    );
-    final bubble = Flexible(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-        decoration: mine
-            ? BoxDecoration(
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(18),
-                  topRight: Radius.circular(18),
-                  bottomLeft: Radius.circular(18),
-                  bottomRight: Radius.circular(4),
-                ),
-                gradient: LinearGradient(colors: [a, b]),
-              )
-            : _glass(18).copyWith(
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(18),
-                  topRight: Radius.circular(18),
-                  bottomLeft: Radius.circular(4),
-                  bottomRight: Radius.circular(18),
-                ),
-              ),
-        child: Text(
-          text,
-          style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.3),
-        ),
-      ),
-    );
-
-    return _Reveal(
-      active: active,
-      delayMs: delayMs,
-      dy: 18,
-      scaleFrom: 0.6,
-      durationMs: 500,
-      curve: _backOut,
-      alignment: mine ? Alignment.bottomRight : Alignment.bottomLeft,
-      child: Row(
-        mainAxisAlignment: mine ? MainAxisAlignment.end : MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: mine
-            ? [bubble, const SizedBox(width: 8), avatar]
-            : [avatar, const SizedBox(width: 8), bubble],
-      ),
-    );
-  }
-}
-
-class _TypingDots extends StatelessWidget {
-  const _TypingDots();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(left: 42),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: _glass(18),
-      child: _Loop(
-        period: const Duration(milliseconds: 1200),
-        builder: (context, t) {
-          return Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              for (var i = 0; i < 3; i++)
-                Container(
-                  margin: EdgeInsets.only(right: i == 2 ? 0 : 5),
-                  width: 7,
-                  height: 7,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white.withValues(
-                      alpha: 0.35 + 0.65 * (0.5 + 0.5 * math.sin((t - i * 0.15) * 2 * math.pi)),
-                    ),
-                  ),
-                ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-}
-
-// -----------------------------------------------------------------------------
-// Slide 5: level & XP
-// -----------------------------------------------------------------------------
-
-class _LevelIllustration extends StatelessWidget {
-  const _LevelIllustration({required this.active, required this.a, required this.b});
-
-  final bool active;
-  final Color a;
-  final Color b;
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        _GlowOrb(a, 280),
-        _Floating(
-          periodMs: 3800,
-          amplitude: 5,
-          child: SizedBox(
-            width: 200,
-            height: 200,
-            child: TweenAnimationBuilder<double>(
-              tween: Tween<double>(begin: 0, end: active ? 0.72 : 0),
-              duration: const Duration(milliseconds: 1400),
-              curve: Curves.easeOutCubic,
-              builder: (context, v, _) => Stack(
-                alignment: Alignment.center,
+    Widget mini(String url, Widget chip) => Expanded(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: SizedBox(
+              height: 100,
+              child: Stack(
+                fit: StackFit.expand,
                 children: [
-                  CustomPaint(
-                    size: const Size(200, 200),
-                    painter: _RingPainter(progress: v, a: a, b: b, stroke: 14),
+                  const ColoredBox(color: AppColors.surfaceVariantDark),
+                  NetImage(url),
+                  Positioned(left: 6, top: 6, child: chip),
+                ],
+              ),
+            ),
+          ),
+        );
+
+    return Column(
+      children: [
+        _In(
+          at: 0,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(18),
+            child: SizedBox(
+              height: 250,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  const ColoredBox(color: AppColors.surfaceVariantDark),
+                  NetImage(kLoginPosters[0], alignment: const Alignment(0, -0.6)),
+                  const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        stops: [0.35, 1],
+                        colors: [Color(0x000B0E14), Color(0xED0B0E14)],
+                      ),
+                    ),
                   ),
-                  Container(
-                    width: 136,
-                    height: 136,
-                    decoration: _glass(68),
+                  Positioned(
+                    left: 14,
+                    right: 14,
+                    bottom: 14,
                     child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'LEVEL',
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.7),
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 2,
-                          ),
+                        const Row(
+                          children: [
+                            ZChip('Populer #1', tone: ZTone.brand),
+                            SizedBox(width: 6),
+                            ZChip('Ongoing', tone: ZTone.scrim, live: true),
+                          ],
                         ),
-                        Text(
-                          '${(v / 0.72 * 25).round()}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 48,
-                            height: 1.05,
-                            fontWeight: FontWeight.w800,
-                          ),
+                        const SizedBox(height: 6),
+                        Text('Sousou no Frieren', style: ZFont.display(size: 19)),
+                        const SizedBox(height: 8),
+                        const Row(
+                          children: [
+                            ZChip('EP 28'),
+                            SizedBox(width: 6),
+                            ZChip('9.3', icon: Icons.star_rounded),
+                            SizedBox(width: 6),
+                            ZChip('1080p'),
+                          ],
                         ),
                       ],
                     ),
@@ -1552,27 +731,17 @@ class _LevelIllustration extends StatelessWidget {
             ),
           ),
         ),
-        Positioned(
-          right: 0,
-          top: 28,
-          child: _PopChip(
-            active: active,
-            delayMs: 300,
-            icon: Icons.bolt_rounded,
-            label: '+70 XP',
-            tint: _gold,
-          ),
-        ),
-        Positioned(
-          left: 0,
-          bottom: 34,
-          child: _PopChip(
-            active: active,
-            delayMs: 480,
-            icon: Icons.emoji_events_rounded,
-            label: 'Leaderboard',
-            tint: b,
-            startMs: 500,
+        const SizedBox(height: 12),
+        _In(
+          at: 250,
+          child: Row(
+            children: [
+              mini(kLoginPosters[2], const ZChip('EP 64', tone: ZTone.scrim)),
+              const SizedBox(width: 10),
+              mini(kLoginPosters[3], const ZChip('Baru', tone: ZTone.brand)),
+              const SizedBox(width: 10),
+              mini(kLoginPosters[1], const ZChip('EP 12', tone: ZTone.scrim)),
+            ],
           ),
         ),
       ],
@@ -1581,86 +750,593 @@ class _LevelIllustration extends StatelessWidget {
 }
 
 // -----------------------------------------------------------------------------
-// Slide 6: premium
+// 02 Offline
 // -----------------------------------------------------------------------------
 
-class _PremiumIllustration extends StatelessWidget {
-  const _PremiumIllustration({required this.active, required this.a, required this.b});
-
-  final bool active;
-  final Color a;
-  final Color b;
-
-  Widget _sparkle(double left, double top, double size, double phase) {
-    return Positioned(
-      left: left,
-      top: top,
-      child: _Loop(
-        period: const Duration(milliseconds: 2400),
-        builder: (context, t) {
-          final k = 0.5 + 0.5 * math.sin((t + phase) * 2 * math.pi);
-          return Opacity(
-            opacity: 0.25 + 0.75 * k,
-            child: Transform.scale(
-              scale: 0.7 + 0.5 * k,
-              child: Icon(Icons.auto_awesome_rounded, color: _gold, size: size),
-            ),
-          );
-        },
-      ),
-    );
-  }
+class _HeroOffline extends StatelessWidget {
+  const _HeroOffline();
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      alignment: Alignment.center,
+    Widget row(String url, String title, String meta, Widget tail) => Padding(
+          padding: const EdgeInsets.all(10),
+          child: Row(
+            children: [
+              _Thumb(url),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: _rowTitle, maxLines: 1, overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 3),
+                    Text(meta, style: _rowMeta),
+                    const SizedBox(height: 7),
+                    tail,
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        _GlowOrb(_gold, 280),
-        _sparkle(52, 56, 22, 0),
-        _sparkle(228, 78, 18, 0.35),
-        _sparkle(70, 214, 16, 0.65),
-        _sparkle(214, 196, 24, 0.15),
-        _Reveal(
-          active: active,
-          dy: 20,
-          scaleFrom: 0.6,
-          durationMs: 700,
-          curve: _backOut,
-          alignment: Alignment.center,
-          child: _Floating(
-            periodMs: 3400,
-            amplitude: 8,
-            child: Image.asset(
-              'assets/images/ic_premium_badge.png',
-              width: 170,
-              height: 170,
-              fit: BoxFit.contain,
+        const _In(at: 0, child: _SecTitle('Unduhan', '3 episode · 1,1 GB')),
+        _In(
+          at: 60,
+          child: Container(
+            decoration: _cardDeco(),
+            child: Column(
+              children: [
+                row(kLoginPosters[0], 'Sousou no Frieren', 'EP 28 · 1080p · 412 MB',
+                    const Align(
+                      alignment: Alignment.centerLeft,
+                      child: _Pop(at: 1600, child: ZChip('✓ Tersimpan', tone: ZTone.jade)),
+                    )),
+                _rowLine,
+                row(kLoginPosters[3], 'JoJo: Steel Ball Run', 'EP 3 · 720p · 68%',
+                    const _FillBar(at: 400, to: .68)),
+                _rowLine,
+                row(kLoginPosters[2], 'FMA Brotherhood', 'EP 12 · 720p · Antre',
+                    const _FillBar(at: 400, to: .14)),
+              ],
             ),
           ),
         ),
-        Positioned(
-          left: 0,
-          top: 120,
-          child: _PopChip(
-            active: active,
-            delayMs: 300,
-            icon: Icons.block_rounded,
-            label: 'Tanpa iklan',
-            tint: a,
+        const SizedBox(height: 12),
+        _In(
+          at: 300,
+          child: Container(
+            decoration: _cardDeco(),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: const Row(
+              children: [
+                Icon(Icons.airplanemode_active_rounded, size: 16, color: AppColors.textSecondary),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text('Mode pesawat aktif',
+                      style: TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w700)),
+                ),
+                ZChip('Bisa ditonton', tone: ZTone.jade, live: true),
+              ],
+            ),
           ),
         ),
-        Positioned(
-          right: 0,
-          bottom: 52,
-          child: _PopChip(
-            active: active,
-            delayMs: 480,
-            icon: Icons.bolt_rounded,
-            label: 'XP ×2',
-            tint: b,
-            startMs: 500,
+      ],
+    );
+  }
+}
+
+// -----------------------------------------------------------------------------
+// 03 Komik & Donghua
+// -----------------------------------------------------------------------------
+
+class _HeroComic extends StatelessWidget {
+  const _HeroComic();
+
+  @override
+  Widget build(BuildContext context) {
+    Widget tab(String t, bool on) => Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+          decoration: BoxDecoration(
+            color: on ? AppColors.textWhite : AppColors.surfaceVariantDark,
+            borderRadius: BorderRadius.circular(99),
           ),
+          child: Text(t,
+              style: TextStyle(
+                color: on ? AppColors.backgroundDark : AppColors.textSecondary,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              )),
+        );
+
+    BoxDecoration panel() => BoxDecoration(color: Colors.white, border: Border.all(color: const Color(0xFF111111), width: 2));
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _In(
+          at: 0,
+          child: Row(children: [tab('Anime', false), const SizedBox(width: 6), tab('Komik', true), const SizedBox(width: 6), tab('Donghua', false)]),
+        ),
+        const SizedBox(height: 14),
+        Container(
+          height: 205,
+          padding: const EdgeInsets.all(5),
+          decoration: BoxDecoration(color: const Color(0xFFEDEAE3), borderRadius: BorderRadius.circular(14)),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                flex: 6,
+                child: _Pop(
+                  at: 150,
+                  from: 1.15,
+                  child: Container(
+                    decoration: panel(),
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        ColorFiltered(colorFilter: _grayscale, child: NetImage(_kComicPoster)),
+                        Positioned(
+                          left: 8,
+                          top: 8,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: const Color(0xFF111111), width: 2),
+                            ),
+                            child: const Text('!?',
+                                style: TextStyle(color: Color(0xFF111111), fontSize: 10, fontWeight: FontWeight.w900)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 5),
+              Expanded(
+                flex: 5,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: _Pop(
+                        at: 450,
+                        from: 1.15,
+                        child: Container(
+                          decoration: panel(),
+                          child: const Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              _Halftone(),
+                              Positioned(right: 6, bottom: 2, child: _Sfx()),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Expanded(
+                      child: _Pop(
+                        at: 750,
+                        from: 1.15,
+                        child: Container(
+                          decoration: panel(),
+                          child: ColorFiltered(colorFilter: _grayscale, child: NetImage(_kDonghuaPoster)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        _In(
+          at: 1000,
+          child: Container(
+            decoration: _cardDeco(),
+            padding: const EdgeInsets.all(10),
+            child: const Row(
+              children: [
+                _Thumb(_kDonghuaPoster, w: 44, h: 58, r: 8),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Chapter 142', style: _rowTitle),
+                      SizedBox(height: 3),
+                      Text('Lanjut baca · halaman 12/38', style: _rowMeta),
+                    ],
+                  ),
+                ),
+                ZChip('Baca', tone: ZTone.brand),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Titik screentone hitam rapat (panel manga).
+class _Halftone extends StatelessWidget {
+  const _Halftone();
+
+  @override
+  Widget build(BuildContext context) => CustomPaint(painter: _HalftonePainter());
+}
+
+class _HalftonePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final p = Paint()..color = const Color(0xFF111111);
+    for (double y = 2.5; y < size.height; y += 5) {
+      for (double x = 2.5; x < size.width; x += 5) {
+        canvas.drawCircle(Offset(x, y), 1, p);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(_HalftonePainter old) => false;
+}
+
+/// Tulisan efek suara "DOON" yang bergetar sebentar.
+class _Sfx extends StatelessWidget {
+  const _Sfx();
+
+  @override
+  Widget build(BuildContext context) {
+    final a = _seg(_Enter.of(context), 1200, 700, Curves.linear);
+    return AnimatedBuilder(
+      animation: a,
+      builder: (context, child) {
+        final v = a.value;
+        final shake = v > 0 && v < 1 ? ((v * 12).floor().isEven ? 2.0 : -2.0) : 0.0;
+        return Transform.translate(
+          offset: Offset(shake, -shake / 2),
+          child: Transform.rotate(angle: -0.14, child: child),
+        );
+      },
+      child: Stack(
+        children: [
+          Builder(builder: (context) {
+            // TextStyle tidak boleh punya color DAN foreground sekaligus.
+            final base = ZFont.display(size: 26, weight: FontWeight.w900, letterSpacing: 0);
+            return Text(
+              'DOON',
+              style: TextStyle(
+                fontFamily: base.fontFamily,
+                fontFamilyFallback: base.fontFamilyFallback,
+                fontSize: 26,
+                fontWeight: FontWeight.w900,
+                foreground: Paint()
+                  ..style = PaintingStyle.stroke
+                  ..strokeWidth = 4
+                  ..color = Colors.white,
+              ),
+            );
+          }),
+          Text('DOON', style: ZFont.display(size: 26, weight: FontWeight.w900, color: const Color(0xFF111111), letterSpacing: 0)),
+        ],
+      ),
+    );
+  }
+}
+
+// -----------------------------------------------------------------------------
+// 04 Clan & chat
+// -----------------------------------------------------------------------------
+
+class _HeroClan extends StatelessWidget {
+  const _HeroClan();
+
+  @override
+  Widget build(BuildContext context) {
+    Widget msg(String av, String name, NameDecoStyle deco, int lv, String text) => Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              _Avatar(av),
+              const SizedBox(width: 9),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      NameDecoText(name: name, style: deco, fontSize: 11, maxWidth: 120),
+                      const SizedBox(width: 4),
+                      _LvTag(lv),
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  Container(
+                    constraints: const BoxConstraints(maxWidth: 220),
+                    padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+                    decoration: const BoxDecoration(
+                      color: AppColors.surfaceVariantDark,
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(14),
+                        topRight: Radius.circular(14),
+                        bottomRight: Radius.circular(14),
+                        bottomLeft: Radius.circular(4),
+                      ),
+                    ),
+                    child: Text(text, style: const TextStyle(color: AppColors.textWhite, fontSize: 13, height: 1.35)),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _In(
+          at: 0,
+          child: Container(
+            decoration: _cardDeco(),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(color: AppColors.accentViolet, borderRadius: BorderRadius.circular(10)),
+                  child: Text('Z', style: ZFont.display(size: 16, weight: FontWeight.w900)),
+                ),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Akatsuki ID', style: _rowTitle),
+                      SizedBox(height: 2),
+                      Text('48 anggota · 12 online', style: TextStyle(color: AppColors.textSecondary, fontSize: 11)),
+                    ],
+                  ),
+                ),
+                const ZChip('Live', tone: ZTone.jade, live: true),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 14),
+        _In(at: 300, child: msg(kLoginPosters[2], 'Raka', NameDecoStyle.neonSign, 31, 'Frieren eps baru udah keluar woi 🔥')),
+        _In(at: 1200, child: msg(kLoginPosters[3], 'Nadia', NameDecoStyle.royalGold, 18, 'Nobar jam 8 yuk, aku bikin room')),
+        _In(
+          at: 2000,
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+              decoration: const BoxDecoration(
+                color: AppColors.accentViolet,
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(14),
+                  topRight: Radius.circular(14),
+                  bottomLeft: Radius.circular(14),
+                  bottomRight: Radius.circular(4),
+                ),
+              ),
+              child: const Text('Gas, aku join 🙌', style: TextStyle(color: Colors.white, fontSize: 13, height: 1.35)),
+            ),
+          ),
+        ),
+        const _In(
+          at: 2400,
+          child: Row(
+            children: [
+              ZChip('Nobar', icon: Icons.live_tv_rounded),
+              SizedBox(width: 6),
+              ZChip('DM', icon: Icons.chat_bubble_rounded),
+              SizedBox(width: 6),
+              ZChip('Teman', icon: Icons.group_rounded),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// -----------------------------------------------------------------------------
+// 05 Level & Leaderboard
+// -----------------------------------------------------------------------------
+
+class _HeroRank extends StatelessWidget {
+  const _HeroRank();
+
+  @override
+  Widget build(BuildContext context) {
+    Widget rk(int at, int n, Color c, String av, String name, String xp) => _In(
+          at: at,
+          dy: 0,
+          dx: -20,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(
+              children: [
+                SizedBox(width: 30, child: ZRankNumber(n, size: 34, color: c)),
+                const SizedBox(width: 12),
+                _Avatar(av),
+                const SizedBox(width: 12),
+                Expanded(child: Text(name, style: _rowTitle)),
+                Text(xp, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w700)),
+              ],
+            ),
+          ),
+        );
+
+    const meta = TextStyle(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w700);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const _In(at: 0, child: _SecTitle('Top XP minggu ini', 'Reset tiap minggu')),
+        Container(
+          decoration: _cardDeco(),
+          child: Column(
+            children: [
+              rk(150, 1, _gold, kLoginPosters[2], 'Raka', '12.480 XP'),
+              _rowLine,
+              rk(300, 2, const Color(0xFFC9D1DC), kLoginPosters[3], 'Nadia', '11.902 XP'),
+              _rowLine,
+              rk(450, 3, const Color(0xFFD38A5A), kLoginPosters[0], 'Dimas', '9.315 XP'),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        _In(
+          at: 600,
+          child: Container(
+            decoration: _cardDeco(),
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Text('Level kamu', style: meta),
+                    const Spacer(),
+                    _CountUp(at: 800, to: 2140, dots: true, style: meta),
+                    const Text(' / 3.000 XP', style: meta),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    Text('Lv ', style: ZFont.display(size: 26)),
+                    _CountUp(at: 800, to: 24, style: ZFont.display(size: 26)),
+                    const SizedBox(width: 8),
+                    const Text('→ Lv 25', style: meta),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                const _FillBar(at: 800, to: .71, height: 6),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// -----------------------------------------------------------------------------
+// 06 Premium
+// -----------------------------------------------------------------------------
+
+class _HeroPremium extends StatelessWidget {
+  const _HeroPremium();
+
+  @override
+  Widget build(BuildContext context) {
+    const feats = ['Kualitas sampai 1080p', 'Tanpa iklan sama sekali', 'XP nonton 2×', 'Badge Premium di profil'];
+
+    Widget cmp(String label, String value, bool premium) => Expanded(
+          child: Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: premium ? const Color(0x1AF6BE4F) : AppColors.surfaceVariantDark,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                    style: TextStyle(
+                      color: premium ? _gold : AppColors.textSecondary,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    )),
+                const SizedBox(height: 2),
+                Text(value, style: ZFont.display(size: 17, color: premium ? _gold : AppColors.textWhite)),
+              ],
+            ),
+          ),
+        );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _In(
+          at: 0,
+          child: ZSheen(
+            radius: BorderRadius.circular(16),
+            opacity: 0.16,
+            child: Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0x59F6BE4F)),
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  stops: [0, 0.6],
+                  colors: [Color(0xFF1F1A10), AppColors.surfaceDark],
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const ZChip('Premium', icon: Icons.workspace_premium_rounded, tone: ZTone.gold),
+                  const SizedBox(height: 12),
+                  Text('Zenime Premium', style: ZFont.display(size: 28)),
+                  const SizedBox(height: 2),
+                  const Text('Nonton lebih jernih, tanpa gangguan',
+                      style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+                  const SizedBox(height: 12),
+                  for (var i = 0; i < feats.length; i++)
+                    _In(
+                      at: 450 + i * 150,
+                      dy: 0,
+                      dx: -10,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 9),
+                        decoration: const BoxDecoration(border: Border(top: BorderSide(color: Color(0x0FFFFFFF)))),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 20,
+                              height: 20,
+                              alignment: Alignment.center,
+                              decoration: const BoxDecoration(color: Color(0x29F6BE4F), shape: BoxShape.circle),
+                              child: const Icon(Icons.check_rounded, size: 13, color: _gold),
+                            ),
+                            const SizedBox(width: 10),
+                            Text(feats[i],
+                                style: const TextStyle(
+                                    color: AppColors.textWhite, fontSize: 13.5, fontWeight: FontWeight.w600)),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        _In(
+          at: 1100,
+          child: Row(children: [cmp('Gratis', '720p', false), const SizedBox(width: 8), cmp('Premium', '1080p', true)]),
         ),
       ],
     );
