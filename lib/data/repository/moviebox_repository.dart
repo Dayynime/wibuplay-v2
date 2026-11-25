@@ -19,13 +19,100 @@ enum MbSort {
   final String label;
 }
 
+/// Kategori daftar film LK21 (path halaman daftar, tanpa /page/N).
+class MbCategory {
+  const MbCategory(this.path, this.label);
+
+  /// Mis. 'populer', 'latest', 'genre/action', 'country/japan', 'year/2026'.
+  final String path;
+  final String label;
+
+  static const populer = MbCategory('populer', 'Populer');
+  static const latest = MbCategory('latest', 'Terbaru');
+
+  /// Pilihan cepat di baris atas layar Film.
+  static const quick = <MbCategory>[
+    populer,
+    latest,
+    MbCategory('genre/action', 'Action'),
+    MbCategory('genre/animation', 'Anime'),
+    MbCategory('genre/horror', 'Horror'),
+    MbCategory('genre/comedy', 'Komedi'),
+    MbCategory('genre/sci-fi', 'Sci-Fi'),
+    MbCategory('genre/romance', 'Romance'),
+    MbCategory('country/china', 'Cina'),
+    MbCategory('country/india', 'India'),
+    MbCategory('country/japan', 'Jepang'),
+    MbCategory('country/south-korea', 'Korea'),
+    MbCategory('country/thailand', 'Thailand'),
+    MbCategory('quality/bluray', 'Bluray'),
+    MbCategory('year/2026', '2026'),
+    MbCategory('year/2025', '2025'),
+  ];
+
+  static const genres = <MbCategory>[
+    MbCategory('genre/action', 'Action'),
+    MbCategory('genre/adventure', 'Adventure'),
+    MbCategory('genre/animation', 'Anime'),
+    MbCategory('genre/biography', 'Biografi'),
+    MbCategory('genre/comedy', 'Komedi'),
+    MbCategory('genre/crime', 'Kriminal'),
+    MbCategory('genre/documentary', 'Dokumenter'),
+    MbCategory('genre/drama', 'Drama'),
+    MbCategory('genre/family', 'Keluarga'),
+    MbCategory('genre/fantasy', 'Fantasi'),
+    MbCategory('genre/history', 'Sejarah'),
+    MbCategory('genre/horror', 'Horror'),
+    MbCategory('genre/musical', 'Musikal'),
+    MbCategory('genre/mystery', 'Misteri'),
+    MbCategory('genre/romance', 'Romance'),
+    MbCategory('genre/sci-fi', 'Sci-Fi'),
+    MbCategory('genre/sport', 'Olahraga'),
+    MbCategory('genre/thriller', 'Thriller'),
+    MbCategory('genre/war', 'Perang'),
+    MbCategory('genre/western', 'Western'),
+  ];
+
+  static const countries = <MbCategory>[
+    MbCategory('country/australia', 'Australia'),
+    MbCategory('country/canada', 'Kanada'),
+    MbCategory('country/china', 'Cina'),
+    MbCategory('country/france', 'Prancis'),
+    MbCategory('country/germany', 'Jerman'),
+    MbCategory('country/hong-kong', 'Hong Kong'),
+    MbCategory('country/india', 'India'),
+    MbCategory('country/italy', 'Italia'),
+    MbCategory('country/japan', 'Jepang'),
+    MbCategory('country/malaysia', 'Malaysia'),
+    MbCategory('country/mexico', 'Meksiko'),
+    MbCategory('country/philippines', 'Filipina'),
+    MbCategory('country/romania', 'Rumania'),
+    MbCategory('country/russia', 'Rusia'),
+    MbCategory('country/south-korea', 'Korea'),
+    MbCategory('country/taiwan', 'Taiwan'),
+    MbCategory('country/thailand', 'Thailand'),
+    MbCategory('country/uk', 'Inggris'),
+    MbCategory('country/usa', 'Amerika'),
+  ];
+
+  static final years = <MbCategory>[
+    for (var y = 2026; y >= 2007; y--) MbCategory('year/$y', '$y'),
+  ];
+
+  @override
+  bool operator ==(Object other) => other is MbCategory && other.path == path;
+
+  @override
+  int get hashCode => path.hashCode;
+}
+
 /// Sumber film = LK21, di-scrape LANGSUNG dari HP user (IP server/VPS
 /// diblokir Cloudflare LK21, IP rumah/seluler lolos). Nama class tetap
 /// "MovieBox" supaya layar film, Nobar, Favorit, Riwayat tidak perlu diubah.
 /// Id film = slug LK21 (mis. "jailer-2-2026").
 ///
 /// Base URL dari Remote Config `lk21_base_url` (mis. https://tv12.lk21official.cc).
-///   daftar   : {base}/latest/page/{n}, {base}/populer/page/{n}   (<article schema.org/Movie>)
+///   daftar   : {base}/{latest|populer|genre/x|country/x|year/x|quality/x}/page/{n}  (<article>)
 ///   cari     : {data-search_url}search.php?s=&page=              (JSON)
 ///   detail   : {base}/{slug}
 ///   video    : iframe {host}/iframe3/p2p/{id}
@@ -136,8 +223,10 @@ class MovieBoxRepository {
     return out;
   }
 
-  Future<List<MbItem>> getMovies({int page = 1, MbSort sort = MbSort.recommend}) async {
-    final path = page <= 1 ? '/${sort.value}' : '/${sort.value}/page/$page';
+  /// [category] (mis. 'genre/action') mengganti [sort] kalau diisi.
+  Future<List<MbItem>> getMovies({int page = 1, MbSort sort = MbSort.recommend, String? category}) async {
+    final c = category ?? sort.value;
+    final path = page <= 1 ? '/$c' : '/$c/page/$page';
     final (html, _) = await _page('$_base$path');
     return _parseCards(html);
   }

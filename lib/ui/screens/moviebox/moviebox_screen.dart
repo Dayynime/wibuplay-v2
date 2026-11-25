@@ -25,7 +25,7 @@ class MovieBoxScreen extends ConsumerStatefulWidget {
 }
 
 class _MovieBoxScreenState extends ConsumerState<MovieBoxScreen> {
-  MbSort _sort = MbSort.recommend;
+  MbCategory _cat = MbCategory.populer;
 
   final List<MbItem> _items = [];
   int _page = 0;
@@ -74,7 +74,7 @@ class _MovieBoxScreenState extends ConsumerState<MovieBoxScreen> {
       _error = null;
     });
     try {
-      final next = await _repo.getMovies(page: _page + 1, sort: _sort);
+      final next = await _repo.getMovies(page: _page + 1, category: _cat.path);
       if (!mounted || gen != _gen) return;
       final known = _items.map((e) => e.id).toSet();
       setState(() {
@@ -92,11 +92,11 @@ class _MovieBoxScreenState extends ConsumerState<MovieBoxScreen> {
     }
   }
 
-  void _selectSort(MbSort s) {
-    if (s == _sort) return;
+  void _selectCat(MbCategory c) {
+    if (c == _cat) return;
     _gen++;
     setState(() {
-      _sort = s;
+      _cat = c;
       _items.clear();
       _page = 0;
       _hasMore = true;
@@ -178,7 +178,7 @@ class _MovieBoxScreenState extends ConsumerState<MovieBoxScreen> {
       );
     } else {
       content = _Grid(
-        key: ValueKey('list-${_sort.name}'),
+        key: ValueKey('list-${_cat.path}'),
         items: _items,
         onClick: widget.onMovieClick,
         controller: _scroll,
@@ -276,49 +276,137 @@ class _MovieBoxScreenState extends ConsumerState<MovieBoxScreen> {
   }
 
   Widget _tabs() {
+    // Kategori dari "Lainnya" yang tidak ada di baris cepat ditaruh paling depan.
+    final cats = [
+      if (!MbCategory.quick.contains(_cat)) _cat,
+      ...MbCategory.quick,
+    ];
     return Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+        SizedBox(
+          height: 44,
           child: Row(
             children: [
-              for (final s in MbSort.values) ...[
-                if (s != MbSort.values.first) const SizedBox(width: 24),
-                GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => _selectSort(s),
-                  child: Column(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.only(top: 10, bottom: 8),
-                        child: Text(
-                          s.label,
-                          style: TextStyle(
-                            color: s == _sort ? Colors.white : AppColors.textSecondary,
-                            fontSize: 14,
-                            fontWeight: s == _sort ? FontWeight.w700 : FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 220),
-                        width: 28,
-                        height: 3,
-                        decoration: BoxDecoration(
-                          color: s == _sort ? AppColors.accentViolet : Colors.transparent,
-                          borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
-                        ),
-                      ),
-                    ],
-                  ),
+              Expanded(
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.only(left: 16, right: 8),
+                  itemCount: cats.length,
+                  separatorBuilder: (_, _) => const SizedBox(width: 20),
+                  itemBuilder: (_, i) => _tab(cats[i]),
                 ),
-              ],
+              ),
+              IconButton(
+                tooltip: 'Genre, negara, tahun',
+                onPressed: _openMore,
+                icon: const Icon(Icons.tune_rounded, color: Colors.white, size: 20),
+              ),
             ],
           ),
         ),
         Divider(height: 1, color: AppColors.surfaceElevated.withValues(alpha: 0.6)),
       ],
     );
+  }
+
+  Widget _tab(MbCategory c) {
+    final on = c == _cat;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _selectCat(c),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text(
+              c.label,
+              style: TextStyle(
+                color: on ? Colors.white : AppColors.textSecondary,
+                fontSize: 14,
+                fontWeight: on ? FontWeight.w700 : FontWeight.w500,
+              ),
+            ),
+          ),
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            width: 28,
+            height: 3,
+            decoration: BoxDecoration(
+              color: on ? AppColors.accentViolet : Colors.transparent,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _openMore() async {
+    final picked = await showModalBottomSheet<MbCategory>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surfaceDark,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) {
+        Widget section(String title, List<MbCategory> list) => Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final c in list)
+                        ChoiceChip(
+                          label: Text(c.label),
+                          selected: c == _cat,
+                          onSelected: (_) => Navigator.pop(ctx, c),
+                          showCheckmark: false,
+                          labelStyle: TextStyle(
+                            color: c == _cat ? Colors.white : AppColors.textSecondary,
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          selectedColor: AppColors.accentViolet,
+                          backgroundColor: AppColors.surfaceElevated,
+                          side: BorderSide.none,
+                          shape: const StadiumBorder(),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+        return DraggableScrollableSheet(
+          expand: false,
+          initialChildSize: 0.7,
+          maxChildSize: 0.92,
+          builder: (_, sc) => ListView(
+            controller: sc,
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
+                ),
+              ),
+              section('Urutan', const [MbCategory.populer, MbCategory.latest, MbCategory('quality/bluray', 'Bluray')]),
+              section('Genre', MbCategory.genres),
+              section('Negara', MbCategory.countries),
+              section('Tahun', MbCategory.years),
+            ],
+          ),
+        );
+      },
+    );
+    if (picked != null && mounted) _selectCat(picked);
   }
 }
 
