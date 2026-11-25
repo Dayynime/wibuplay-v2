@@ -193,6 +193,7 @@ class _ClanBrowseScreenState extends ConsumerState<ClanBrowseScreen> {
                       rank: idx + 1,
                       uid: c.id,
                       username: c.name,
+                      decoratedName: false,
                       isMe: isMine,
                       last: idx == list.length - 1,
                       avatar: ClanAvatar(tag: c.tag, url: c.photoUrl, size: 46),

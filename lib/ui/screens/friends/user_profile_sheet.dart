@@ -16,6 +16,7 @@ import '../../components/top_xp_badge.dart';
 import '../../glass/glass.dart';
 import '../../components/clan_tag_badge.dart';
 import '../../components/user_level_badge.dart';
+import '../../components/user_name_text.dart';
 
 /// Profil ringkas user lain (dibuka dari Chat Global, Chat Teman, dan layar
 /// Teman) lengkap dengan tombol Tambah Teman, mengikuti alur Zenime.
@@ -162,15 +163,15 @@ class _UserProfileSheetState extends ConsumerState<UserProfileSheet> {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Flexible(
-                  child: Text(
-                    name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  child: UserNameText(
+                    uid: uid,
+                    name: name,
                     style: const TextStyle(
                       color: AppColors.textWhite,
                       fontSize: 20,
                       fontWeight: FontWeight.w700,
                     ),
+                    decoScale: .85,
                   ),
                 ),
                 if (profile?.userNumber != null) ...[

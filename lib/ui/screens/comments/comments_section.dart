@@ -22,6 +22,7 @@ import '../../components/avatar_frame.dart';
 import '../../glass/glass.dart';
 import '../../components/clan_tag_badge.dart';
 import '../../components/user_level_badge.dart';
+import '../../components/user_name_text.dart';
 
 const Color _kPinnedGold = Color(0xFFE8A317);
 const Color _kSheetColor = AppColors.backgroundDarkSecondary;
@@ -670,16 +671,15 @@ class CommentItem extends StatelessWidget {
                       child: GestureDetector(
                         behavior: HitTestBehavior.opaque,
                         onTap: () => openPublicProfile(context, comment.firebaseUid),
-                        child: Text(
-                        comment.username,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: AppColors.textWhite,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
+                        child: UserNameText(
+                          uid: comment.firebaseUid,
+                          name: comment.username,
+                          style: const TextStyle(
+                            color: AppColors.textWhite,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
-                      ),
                       ),
                     ),
                     Padding(

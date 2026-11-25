@@ -13,6 +13,7 @@ import '../../components/shimmer.dart';
 import '../profile/public_profile_screen.dart';
 import '../../glass/glass.dart';
 import '../../components/user_level_badge.dart';
+import '../../components/user_name_text.dart';
 
 /// Layar Cari Teman: menampilkan semua user, bisa dicari lewat username atau
 /// ID (angka di "ID #123"), dan langsung bisa Tambah / Batalkan / Terima.
@@ -462,16 +463,16 @@ class _UserTile extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(
-                      item.username,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    UserNameText(
+                      uid: item.firebaseUid,
+                      name: item.username,
                       style: TextStyle(
                         color: nameColor,
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
                         height: 1.2,
                       ),
+                      decoScale: .85,
                     ),
                     if (hasMeta) ...[
                       const SizedBox(height: 5),

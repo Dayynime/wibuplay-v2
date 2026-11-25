@@ -9,9 +9,11 @@ import '../../glass/glass.dart';
 import '../avatar_frame/avatar_frame_screen.dart';
 import '../games/game_list_tile.dart';
 import '../games/game_previews.dart';
+import '../../components/name_deco_styles.dart';
 import '../level_badge/level_badge_shop_screen.dart';
+import '../name_deco/name_deco_shop_screen.dart';
 
-/// Hub "Zenime Decoration": Border Avatar & Badge Level.
+/// Hub "Zenime Decoration": Border Avatar, Badge Level & Dekorasi Nama.
 class ZenimeDecorationScreen extends ConsumerStatefulWidget {
   const ZenimeDecorationScreen({super.key});
 
@@ -61,6 +63,14 @@ class _ZenimeDecorationScreenState extends ConsumerState<ZenimeDecorationScreen>
       page: () => const LevelBadgeShopScreen(),
       preview: () => const LevelBadgePreview(),
     ),
+    _DecorItem(
+      title: 'Dekorasi Nama',
+      info: 'Nama futuristik beranimasi',
+      icon: Icons.text_fields_rounded,
+      colors: const [Color(0xFF041A2A), Color(0xFF0E7490), Color(0xFFFF2A5F)],
+      page: () => const NameDecoShopScreen(),
+      preview: () => const NameDecoPreview(),
+    ),
   ];
 
   @override
@@ -100,7 +110,7 @@ class _ZenimeDecorationScreenState extends ConsumerState<ZenimeDecorationScreen>
   Future<void> _open(_DecorItem d) async {
     HapticFeedback.selectionClick();
     await Navigator.of(context).push<void>(fadeRoute(d.page()));
-    // Saldo berubah kalau beli border/badge.
+    // Saldo berubah kalau beli border/badge/dekorasi.
     final uid = ref.read(authUserProvider).valueOrNull?.uid;
     if (uid != null && mounted) ref.invalidate(coinBalanceProvider(uid));
     if (mounted) refreshGamePreviews(ref);

@@ -53,6 +53,7 @@ import 'core/screen_seed.dart';
 import 'data/models/home_bootstrap.dart';
 import 'data/repository/tree_repository.dart';
 import 'data/repository/level_badge_repository.dart';
+import 'data/repository/name_deco_repository.dart';
 import 'data/repository/chess_repository.dart';
 import 'data/repository/nobar_repository.dart';
 import 'data/supabase/supabase_client.dart';
@@ -208,6 +209,11 @@ final treeRepositoryProvider = Provider<TreeRepository>(
 /// Shop badge level (Edge Function `zenime-level-badge`).
 final levelBadgeRepositoryProvider = Provider<LevelBadgeRepository>(
   (ref) => LevelBadgeRepository(ref.watch(supabaseDioProvider)),
+);
+
+/// Shop dekorasi nama (Edge Function `zenime-name-deco`).
+final nameDecoRepositoryProvider = Provider<NameDecoRepository>(
+  (ref) => NameDecoRepository(ref.watch(supabaseDioProvider)),
 );
 
 /// Catur mabar (Edge Function `chess-game`).

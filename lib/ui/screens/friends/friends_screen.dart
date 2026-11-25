@@ -14,6 +14,7 @@ import '../profile/public_profile_screen.dart';
 import 'add_friend_screen.dart';
 import '../../glass/glass.dart';
 import '../../components/user_level_badge.dart';
+import '../../components/user_name_text.dart';
 
 /// Layar Teman: permintaan masuk (terima/tolak), daftar teman (tap buka
 /// profil, menu ⋮ buat salin ID / hapus), dan permintaan terkirim (batalkan).
@@ -555,16 +556,16 @@ class _FriendTile extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(
-                        item.username,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      UserNameText(
+                        uid: item.firebaseUid,
+                        name: item.username,
                         style: TextStyle(
                           color: nameColor,
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
                           height: 1.2,
                         ),
+                        decoScale: .85,
                       ),
                       if (hasMeta) ...[
                         const SizedBox(height: 5),

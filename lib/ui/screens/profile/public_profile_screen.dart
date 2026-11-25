@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../components/user_name_text.dart';
 import '../../components/rarity_chip.dart';
 import '../../../data/repository/safety_repository.dart' show ReportChannel;
 import '../safety/safety_actions.dart';
@@ -353,11 +354,11 @@ class _PublicProfileScreenState extends ConsumerState<PublicProfileScreen> {
                     ],
                     // Nama selalu putih (dulu Premium bergradien emas).
                     Flexible(
-                      child: Text(
-                        name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      child: UserNameText(
+                        uid: uid,
+                        name: name,
                         style: ZFont.display(size: 24, height: 1.1).copyWith(color: AppColors.textWhite),
+                        decoScale: .8,
                       ),
                     ),
                     // Badge role (Developer, dll.) di kanan nama.

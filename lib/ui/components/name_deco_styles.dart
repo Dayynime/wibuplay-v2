@@ -1,0 +1,652 @@
+import 'dart:math' as math;
+import 'dart:ui' as ui;
+
+import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+
+import '../../core/decor_tick.dart';
+
+/// Dekorasi nama futuristik (dibeli pakai ZCoin di Decor > Dekorasi Nama).
+///
+/// ```dart
+/// NameDecoText(name: 'Dayynime', style: NameDecoStyle.laserEdge, fontSize: 12)
+/// ```
+///
+/// Huruf memakai Orbitron (google_fonts). Semua efek digambar CustomPainter,
+/// satu AnimationController per nama, digambar ulang lewat [DecorTick]
+/// (maks 30 fps) di dalam RepaintBoundary, dan diam kalau "kurangi animasi".
+
+enum NameDecoTier {
+  biasa('Biasa', Color(0xFF9AA3B2)),
+  langka('Langka', Color(0xFF3FD0FF)),
+  epik('Epik', Color(0xFFB98CFF)),
+  legenda('Legenda', Color(0xFFFFC93C));
+
+  const NameDecoTier(this.label, this.color);
+  final String label;
+  final Color color;
+}
+
+enum NameDecoStyle {
+  cyberPlate('cyber_plate', 'Cyber Plate', NameDecoTier.biasa),
+  hudLock('hud_lock', 'HUD Lock', NameDecoTier.biasa),
+  scanline('scanline', 'Scanline', NameDecoTier.langka),
+  decode('decode', 'Decode', NameDecoTier.langka),
+  circuit('circuit', 'Circuit', NameDecoTier.langka),
+  laserEdge('laser_edge', 'Laser Edge', NameDecoTier.epik),
+  neonTube('neon_tube', 'Neon Tube', NameDecoTier.epik),
+  dataStream('data_stream', 'Data Stream', NameDecoTier.epik),
+  holoProjector('holo_projector', 'Proyektor Holo', NameDecoTier.legenda),
+  quantumCore('quantum_core', 'Quantum Core', NameDecoTier.legenda),
+  synthwave('synthwave', 'Synthwave', NameDecoTier.legenda),
+  mechaChrome('mecha_chrome', 'Mecha Chrome', NameDecoTier.legenda);
+
+  const NameDecoStyle(this.id, this.label, this.tier);
+
+  final String id;
+  final String label;
+  final NameDecoTier tier;
+
+  /// Gaya yang memakai bingkai/pelat (butuh ruang di kiri-kanan nama).
+  bool get framed => switch (this) {
+        cyberPlate || hudLock || laserEdge || dataStream || mechaChrome || synthwave => true,
+        _ => false,
+      };
+
+  static NameDecoStyle? fromId(String? id) {
+    if (id == null || id.isEmpty) return null;
+    for (final s in values) {
+      if (s.id == id) return s;
+    }
+    return null;
+  }
+}
+
+/// Nama pengguna dengan dekorasi [style].
+class NameDecoText extends StatefulWidget {
+  const NameDecoText({
+    super.key,
+    required this.name,
+    required this.style,
+    this.fontSize = 13,
+    this.animate = true,
+    this.maxWidth,
+  });
+
+  final String name;
+  final NameDecoStyle style;
+  final double fontSize;
+
+  /// false = gambar diam (pose statis), tanpa ticker.
+  final bool animate;
+
+  /// Batas lebar nama (diberi "…" kalau kepanjangan). null = 260.
+  final double? maxWidth;
+
+  @override
+  State<NameDecoText> createState() => _NameDecoTextState();
+}
+
+class _NameDecoTextState extends State<NameDecoText> with SingleTickerProviderStateMixin {
+  // Satu putaran panjang supaya efek dengan frekuensi berbeda tidak kelihatan "lompat".
+  static const double _loopSec = 24;
+
+  late final AnimationController _c =
+      AnimationController(vsync: this, duration: const Duration(milliseconds: 24000));
+  late final Animation<double> _tick = DecorAnimation(_c);
+  _Glyphs? _glyphs;
+
+  @override
+  void initState() {
+    super.initState();
+    PaintingBinding.instance.systemFonts.addListener(_fontsChanged);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncTicker();
+  }
+
+  @override
+  void didUpdateWidget(NameDecoText old) {
+    super.didUpdateWidget(old);
+    if (old.name != widget.name || old.fontSize != widget.fontSize || old.style != widget.style) {
+      _retire(_glyphs);
+      _glyphs = null;
+    }
+    _syncTicker();
+  }
+
+  void _syncTicker() {
+    final run = widget.animate && !MediaQuery.disableAnimationsOf(context);
+    if (run && !_c.isAnimating) {
+      _c.repeat();
+    } else if (!run && _c.isAnimating) {
+      _c.stop();
+    }
+  }
+
+  void _fontsChanged() {
+    if (!mounted) return;
+    _retire(_glyphs);
+    setState(() => _glyphs = null); // Orbitron baru selesai diunduh
+  }
+
+  /// Lepas TextPainter lama setelah frame berikutnya (painter lama sudah diganti).
+  void _retire(_Glyphs? g) {
+    if (g == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) => g.dispose());
+  }
+
+  @override
+  void dispose() {
+    PaintingBinding.instance.systemFonts.removeListener(_fontsChanged);
+    _c.dispose();
+    _glyphs?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final k = widget.fontSize / 16;
+    final padX = (widget.style.framed ? 9.0 : 3.0) * k;
+    final padY = 4.0 * k;
+    final extra = widget.style == NameDecoStyle.mechaChrome ? 14 * k : 0.0;
+    final textMax = math.max(20.0, (widget.maxWidth ?? 260) - padX * 2 - extra);
+    var g = _glyphs;
+    if (g == null || g.maxWidth != textMax) {
+      _retire(g);
+      g = _glyphs = _Glyphs(widget.name, widget.fontSize, textMax);
+    }
+    final size = Size(g.fill.width + padX * 2 + extra, g.fill.height + padY * 2);
+    final running = widget.animate && !MediaQuery.disableAnimationsOf(context);
+    // FittedBox: kalau tempatnya sempit, nama diperkecil (bukan meluap).
+    return Semantics(
+      label: widget.name,
+      excludeSemantics: true,
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: Alignment.centerLeft,
+        child: RepaintBoundary(
+          child: CustomPaint(
+            size: size,
+            painter: _NameDecoPainter(
+              glyphs: g,
+              style: widget.style,
+              k: k,
+              pad: Offset(padX, padY),
+              anim: running ? _tick : null,
+              loopSec: _loopSec,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Teks yang sudah di-layout sekali: isi putih, garis putih, cahaya blur putih.
+/// Warna/gradien diberikan saat menggambar (lapisan + BlendMode.srcIn).
+class _Glyphs {
+  _Glyphs(this.text, this.fontSize, this.maxWidth)
+      : fill = _tp(text, fontSize, maxWidth, Paint()..color = Colors.white),
+        stroke = _tp(text, fontSize, maxWidth, Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = math.max(1.0, fontSize / 9)
+          ..strokeJoin = StrokeJoin.round
+          ..color = Colors.white),
+        strokeThin = _tp(text, fontSize, maxWidth, Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = math.max(.6, fontSize / 26)
+          ..strokeJoin = StrokeJoin.round
+          ..color = Colors.white),
+        glow = _tp(text, fontSize, maxWidth, Paint()
+          ..color = Colors.white
+          ..maskFilter = MaskFilter.blur(BlurStyle.normal, fontSize / 5));
+
+  final String text;
+  final double fontSize;
+  final double maxWidth;
+  final TextPainter fill, stroke, strokeThin, glow;
+  final Map<String, TextPainter> _scrambled = {};
+
+  static TextStyle styleFor(double fontSize, Paint p) {
+    final base = TextStyle(
+      fontSize: fontSize,
+      fontWeight: FontWeight.w800,
+      letterSpacing: fontSize * .09,
+      height: 1.15,
+      foreground: p,
+    );
+    try {
+      return GoogleFonts.orbitron(textStyle: base);
+    } catch (_) {
+      return base;
+    }
+  }
+
+  static TextPainter _tp(String s, double fontSize, double maxWidth, Paint p) => TextPainter(
+        text: TextSpan(text: s, style: styleFor(fontSize, p)),
+        textDirection: TextDirection.ltr,
+        maxLines: 1,
+        ellipsis: '…',
+      )..layout(maxWidth: maxWidth);
+
+  /// Teks acak untuk gaya Decode (dibatasi supaya cache tidak membengkak).
+  TextPainter scrambled(String s) {
+    final hit = _scrambled[s];
+    if (hit != null) return hit;
+    if (_scrambled.length > 40) {
+      final old = _scrambled.values.toList();
+      _scrambled.clear();
+      // Bisa jadi salah satunya masih dipakai frame ini: lepas setelah frame.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        for (final tp in old) {
+          tp.dispose();
+        }
+      });
+    }
+    return _scrambled[s] = _tp(s, fontSize, maxWidth, Paint()..color = Colors.white);
+  }
+
+  void dispose() {
+    fill.dispose();
+    stroke.dispose();
+    strokeThin.dispose();
+    glow.dispose();
+    for (final tp in _scrambled.values) {
+      tp.dispose();
+    }
+    _scrambled.clear();
+  }
+}
+
+class _NameDecoPainter extends CustomPainter {
+  _NameDecoPainter({
+    required this.glyphs,
+    required this.style,
+    required this.k,
+    required this.pad,
+    required this.anim,
+    required this.loopSec,
+  }) : super(repaint: anim);
+
+  final _Glyphs glyphs;
+  final NameDecoStyle style;
+  final double k;
+  final Offset pad;
+  final Animation<double>? anim;
+  final double loopSec;
+
+  static const String _gly = 'ABCDEFGHJKLMNPQRSTUVWXYZ0123456789#\$%&@<>/';
+
+  // --------------------------------------------------------------- helpers
+
+  /// Gambar [tp] di [o] dengan warna/gradien [paint] (srcIn di lapisan sendiri).
+  void _tint(Canvas c, TextPainter tp, Offset o, Paint paint, {double opacity = 1, BlendMode blend = BlendMode.srcOver}) {
+    final r = (o & tp.size).inflate(tp.size.height);
+    c.saveLayer(r, Paint()
+      ..color = Color.fromRGBO(0, 0, 0, opacity.clamp(0.0, 1.0))
+      ..blendMode = blend);
+    tp.paint(c, o);
+    c.drawRect(r, paint..blendMode = BlendMode.srcIn);
+    c.restore();
+  }
+
+  Paint _col(Color c) => Paint()..color = c;
+
+  Paint _lin(Offset a, Offset b, List<Color> colors, [List<double>? stops, TileMode mode = TileMode.clamp]) =>
+      Paint()..shader = ui.Gradient.linear(a, b, colors, stops, mode);
+
+  Path _cut(Rect r, double kk) => Path()
+    ..moveTo(r.left + kk, r.top)
+    ..lineTo(r.right, r.top)
+    ..lineTo(r.right, r.bottom - kk)
+    ..lineTo(r.right - kk, r.bottom)
+    ..lineTo(r.left, r.bottom)
+    ..lineTo(r.left, r.top + kk)
+    ..close();
+
+  /// Potongan garis sepanjang [len] mulai dari jarak [start] di keliling [path].
+  Path _dash(Path path, double start, double len) {
+    final out = Path();
+    for (final m in path.computeMetrics()) {
+      final total = m.length;
+      var s = start % total;
+      if (s < 0) s += total;
+      final e = s + len;
+      out.addPath(m.extractPath(s, math.min(e, total)), Offset.zero);
+      if (e > total) out.addPath(m.extractPath(0, e - total), Offset.zero);
+    }
+    return out;
+  }
+
+  double _rnd(int i, int j) {
+    final v = math.sin(i * 12.9898 + j * 78.233) * 43758.5453;
+    return v - v.floorToDouble();
+  }
+
+  // ---------------------------------------------------------------- paint
+
+  @override
+  void paint(Canvas c, Size size) {
+    final t = anim == null ? 0.8 : anim!.value * loopSec;
+    final fill = glyphs.fill;
+    final o = pad;
+    final w = fill.width, th = fill.height;
+    final box = Rect.fromLTWH(0, 0, size.width, size.height);
+    final cy = o.dy + th / 2;
+    final midText = Offset(o.dx, o.dy);
+
+    switch (style) {
+      case NameDecoStyle.cyberPlate:
+        final plate = _cut(box, 6 * k);
+        c.drawPath(plate, _col(const Color(0x1400E5FF)));
+        c.drawPath(plate, Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1
+          ..color = const Color(0xBF00E5FF));
+        c.save();
+        c.clipPath(plate);
+        final s = ((t * .5) % 1.4 - .2) * box.width;
+        c.drawRect(box, _lin(Offset(s - 20 * k, 0), Offset(s + 20 * k, 0),
+            const [Color(0x0000E5FF), Color(0x5900E5FF), Color(0x0000E5FF)]));
+        c.restore();
+        c.drawRect(Rect.fromLTWH(box.right - 3 * k, 3 * k, 2 * k, 6 * k), _col(const Color(0xFF00E5FF)));
+        c.drawRect(Rect.fromLTWH(2 * k, box.bottom - 3 * k, 10 * k, 1.5 * k), _col(const Color(0xFF00E5FF)));
+        _tint(c, glyphs.glow, midText, _col(const Color(0xFF00E5FF)), opacity: .8);
+        _tint(c, fill, midText, _col(const Color(0xFFE8FDFF)));
+
+      case NameDecoStyle.hudLock:
+        final kk = (6 + 2 * math.sin(t * 3)) * k, off = 2 * k * math.sin(t * 3);
+        final p = Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.6 * k
+          ..color = const Color(0xFF3DFFB0);
+        final r = box.deflate(1.5 * k).inflate(off);
+        void br(Offset a, double sx, double sy) =>
+            c.drawPath(Path()..moveTo(a.dx, a.dy + sy * kk)..lineTo(a.dx, a.dy)..lineTo(a.dx + sx * kk, a.dy), p);
+        br(r.topLeft, 1, 1);
+        br(r.topRight, -1, 1);
+        br(r.bottomLeft, 1, -1);
+        br(r.bottomRight, -1, -1);
+        for (var i = 0; i < 5; i++) {
+          c.drawRect(Rect.fromLTWH(4 * k + i * 5 * k, box.bottom + 2 * k, 3 * k, 1 * k), _col(const Color(0xB33DFFB0)));
+        }
+        if (math.sin(t * 6) > 0) c.drawRect(Rect.fromLTWH(box.right + 2 * k, 2 * k, 2 * k, 2 * k), _col(const Color(0xFF3DFFB0)));
+        _tint(c, glyphs.glow, midText, _col(const Color(0xFF3DFFB0)), opacity: .7);
+        _tint(c, fill, midText, _col(const Color(0xFFEFFFF8)));
+
+      case NameDecoStyle.scanline:
+        _tint(c, glyphs.glow, midText, _col(const Color(0xFF2E9BFF)), opacity: .8);
+        final tr = midText & fill.size;
+        c.saveLayer(tr.inflate(4), Paint());
+        _tint(c, fill, midText, _lin(tr.topCenter, tr.bottomCenter, const [Color(0xFF7CF9FF), Color(0xFF2E9BFF)]));
+        for (var yy = tr.top; yy < tr.bottom; yy += 3 * k) {
+          c.drawRect(Rect.fromLTWH(tr.left - 2, yy, tr.width + 4, math.max(1.0, k)),
+              Paint()
+                ..color = const Color(0x47000000)
+                ..blendMode = BlendMode.dstOut);
+        }
+        final sy = tr.top + ((t * .9) % 1) * tr.height;
+        c.drawRect(Rect.fromLTWH(tr.left - 2, sy - 5 * k, tr.width + 4, 10 * k),
+            _lin(Offset(0, sy - 5 * k), Offset(0, sy + 5 * k), const [Color(0x00FFFFFF), Color(0xF2FFFFFF), Color(0x00FFFFFF)])
+              ..blendMode = BlendMode.srcATop);
+        c.restore();
+        c.drawRect(Rect.fromLTWH(0, sy, 2.5 * k, 1), _col(const Color(0x997CF9FF)));
+        c.drawRect(Rect.fromLTWH(box.right - 2.5 * k, sy, 2.5 * k, 1), _col(const Color(0x997CF9FF)));
+
+      case NameDecoStyle.decode:
+        final cyc = t % 4, scr = cyc < 1.1;
+        var tp = fill;
+        if (scr) {
+          final src = glyphs.text;
+          final b = StringBuffer();
+          for (var i = 0; i < src.length; i++) {
+            final done = cyc > .15 + i * .11 || src[i] == ' ';
+            b.write(done ? src[i] : _gly[((t * 30).floor() + i * 7) % _gly.length]);
+          }
+          tp = glyphs.scrambled(b.toString());
+        }
+        final glowC = scr ? const Color(0xFFFF4FD8) : const Color(0xFFB478FF);
+        _tint(c, scr ? tp : glyphs.glow, midText, _col(glowC), opacity: scr ? .35 : .7);
+        _tint(c, tp, midText, _col(scr ? const Color(0xFFFF4FD8) : const Color(0xFFF4F0FF)));
+        if (math.sin(t * 8) > 0) {
+          c.drawRect(Rect.fromLTWH(o.dx + tp.width + 3 * k, o.dy + th * .18, 6 * k, th * .64), _col(const Color(0xFFFF4FD8)));
+        }
+
+      case NameDecoStyle.circuit:
+        final lx = o.dx - 3 * k, rx = o.dx + w + 3 * k, ty = o.dy - 1 * k, by = o.dy + th + 1 * k;
+        final paths = <List<Offset>>[
+          [Offset(lx, cy), Offset(lx - 5 * k, cy), Offset(lx - 5 * k, ty - 2 * k), Offset(lx + 30 * k, ty - 2 * k)],
+          [Offset(rx, cy + 4 * k), Offset(rx + 7 * k, cy + 4 * k), Offset(rx + 7 * k, by + 3 * k), Offset(rx - 40 * k, by + 3 * k)],
+          [Offset(o.dx + w * .5, ty), Offset(o.dx + w * .5, ty - 5 * k), Offset(o.dx + w * .8, ty - 5 * k)],
+        ];
+        final line = Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = math.max(.8, k)
+          ..color = const Color(0x5900FFAA);
+        for (var pi = 0; pi < paths.length; pi++) {
+          final pts = paths[pi];
+          final path = Path()..moveTo(pts.first.dx, pts.first.dy);
+          for (final p in pts.skip(1)) {
+            path.lineTo(p.dx, p.dy);
+          }
+          c.drawPath(path, line);
+          c.drawRect(Rect.fromCenter(center: pts.last, width: 3 * k, height: 3 * k), _col(const Color(0xB300FFAA)));
+          final m = path.computeMetrics().first;
+          final pos = m.getTangentForOffset((t * 40 * k + pi * 23 * k) % m.length)?.position;
+          if (pos != null) {
+            c.drawCircle(pos, 3.5 * k, _col(const Color(0x6600FFAA))..maskFilter = MaskFilter.blur(BlurStyle.normal, 2.5 * k));
+            c.drawCircle(pos, 1.6 * k, _col(const Color(0xFFB6FFE4)));
+          }
+        }
+        _tint(c, glyphs.glow, midText, _col(const Color(0xFF00FFAA)), opacity: .55);
+        _tint(c, fill, midText,
+            _lin(Offset(o.dx, 0), Offset(o.dx + w, 0), const [Color(0xFFB6FFE4), Color(0xFF00FFAA), Color(0xFF00C2FF)]));
+
+      case NameDecoStyle.laserEdge:
+        _tint(c, glyphs.glow, midText, _col(const Color(0xFFFF285A)), opacity: .7);
+        _tint(c, fill, midText, _col(Colors.white));
+        final frame = _cut(box.deflate(.5), 5 * k);
+        c.drawPath(frame, Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1
+          ..color = const Color(0x40FF285A));
+        final per = 2 * (box.width + box.height);
+        final head = t * per * .6;
+        c.drawPath(_dash(frame, head, per * .22), Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 4 * k
+          ..color = const Color(0x99FF2A5F)
+          ..maskFilter = MaskFilter.blur(BlurStyle.normal, 3 * k));
+        c.drawPath(_dash(frame, head, per * .22), Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2 * k
+          ..color = const Color(0xFFFF2A5F));
+        c.drawPath(_dash(frame, head + per * .5, per * .22), Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1 * k
+          ..color = const Color(0xFFFFD1DD));
+
+      case NameDecoStyle.neonTube:
+        final n = (t * 12).floor() % 37;
+        final flick = n == 0 || n == 2 ? .25 : 1.0;
+        _tint(c, glyphs.glow, midText, _col(const Color(0xFFFF3DF2)), opacity: flick);
+        _tint(c, glyphs.stroke, midText, _col(const Color(0xFFFF3DF2)), opacity: flick);
+        _tint(c, glyphs.strokeThin, midText, _col(const Color(0xFFFFD6FC)), opacity: flick);
+
+      case NameDecoStyle.dataStream:
+        final plate = _cut(box, 7 * k);
+        c.drawPath(plate, _col(const Color(0x241E78FF)));
+        c.drawPath(plate, Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1
+          ..color = const Color(0x9946A0FF));
+        c.save();
+        c.clipPath(plate);
+        final cols = math.max(8, (box.width / (5.5 * k)).floor());
+        final cell = 7 * k;
+        final dot = Paint()..color = const Color(0xFF5AB4FF);
+        for (var col = 0; col < cols; col++) {
+          final cx = col * box.width / cols + 1.5 * k;
+          final sp = (18 + (col * 7) % 13) * k;
+          final oy = (t * sp + col * 11 * k) % (box.height + 20 * k) - 10 * k;
+          for (var j = 0; j < 4; j++) {
+            final bit = ((col * 3 + j + (t * 6).floor()) % 2) == 0;
+            dot.color = Color.fromRGBO(90, 180, 255, .45 - j * .1);
+            final y = oy - j * cell;
+            // "0" = kotak kecil berongga, "1" = garis tegak (gaya biner mini).
+            if (bit) {
+              c.drawRect(Rect.fromLTWH(cx, y, 2.6 * k, 4 * k), dot..style = PaintingStyle.stroke..strokeWidth = .7 * k);
+            } else {
+              c.drawRect(Rect.fromLTWH(cx + .8 * k, y, 1 * k, 4 * k), dot..style = PaintingStyle.fill);
+            }
+          }
+        }
+        c.restore();
+        _tint(c, glyphs.glow, midText, _col(const Color(0xFF46A0FF)), opacity: .9);
+        _tint(c, fill, midText, _col(const Color(0xFFEAF4FF)));
+
+      case NameDecoStyle.holoProjector:
+        final cx = o.dx + w / 2, by = o.dy + th + 4 * k;
+        c.drawPath(
+          Path()
+            ..moveTo(cx - 6 * k, by)
+            ..lineTo(o.dx + w + 4 * k, o.dy)
+            ..lineTo(o.dx - 4 * k, o.dy)
+            ..close(),
+          _lin(Offset(0, by), Offset(0, o.dy), const [Color(0x5950DCFF), Color(0x0050DCFF)]),
+        );
+        c.drawRect(Rect.fromCenter(center: Offset(cx, by), width: 14 * k, height: 2 * k), _col(const Color(0xFF4FD8FF)));
+        final jit = math.sin(t * 50) > .92 ? 2 * k : 0.0;
+        final a = .75 + .25 * math.sin(t * 9);
+        final tr = midText & fill.size;
+        c.saveLayer(tr.inflate(6 * k), Paint()..color = Color.fromRGBO(0, 0, 0, a));
+        _tint(c, fill, midText.translate(-k - jit, 0), _col(const Color(0x99FF3C78)));
+        _tint(c, fill, midText.translate(k + jit, 0), _col(const Color(0xB33CC8FF)), blend: BlendMode.plus);
+        _tint(c, fill, midText, _col(const Color(0xF2DCFAFF)), blend: BlendMode.plus);
+        final shift = (t * 20 * k) % (2 * k);
+        for (var yy = tr.top + shift; yy < tr.bottom; yy += 2 * k) {
+          c.drawRect(Rect.fromLTWH(tr.left - 3 * k, yy, tr.width + 6 * k, .8 * k),
+              Paint()
+                ..color = const Color(0x59000000)
+                ..blendMode = BlendMode.dstOut);
+        }
+        c.restore();
+
+      case NameDecoStyle.quantumCore:
+        final cx = o.dx + w / 2;
+        for (var r = 0; r < 2; r++) {
+          c.save();
+          c.translate(cx, cy);
+          c.rotate(r == 1 ? .22 : -.22);
+          final ov = Rect.fromCenter(center: Offset.zero, width: w + 20 * k, height: 18 * k);
+          c.drawOval(ov, Paint()
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = math.max(.8, k)
+            ..color = const Color(0x59B98CFF));
+          final ang = t * (r == 1 ? 2.2 : -1.7);
+          final p = Offset(math.cos(ang) * ov.width / 2, math.sin(ang) * ov.height / 2);
+          final glowC = r == 1 ? const Color(0xFFB98CFF) : const Color(0xFF5EE7FF);
+          c.drawCircle(p, 4.5 * k, _col(glowC.withValues(alpha: .6))..maskFilter = MaskFilter.blur(BlurStyle.normal, 3 * k));
+          c.drawCircle(p, 2 * k, _col(r == 1 ? Colors.white : const Color(0xFF5EE7FF)));
+          c.restore();
+        }
+        final pulse = .5 + .5 * math.sin(t * 3);
+        _tint(c, glyphs.glow, midText, _col(const Color(0xFFB98CFF)), opacity: .6 + .4 * pulse);
+        _tint(c, fill, midText,
+            _lin(Offset(o.dx, 0), Offset(o.dx + w, 0), const [Color(0xFF5EE7FF), Color(0xFFB98CFF), Color(0xFFFF6AD5)]));
+        _tint(c, glyphs.strokeThin, midText, _col(const Color(0x99FFFFFF)));
+
+      case NameDecoStyle.synthwave:
+        c.save();
+        c.clipRect(box);
+        c.drawRect(box, _lin(box.topCenter, box.bottomCenter, const [Color(0x00FF3CAC), Color(0x597828C8)]));
+        final grid = Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = math.max(.6, .8 * k)
+          ..color = const Color(0x8CFF50C8);
+        final hz = cy + 2 * k;
+        for (var i = 0; i < 4; i++) {
+          final q = (i + (t * 1.2) % 1) / 4;
+          final yy = hz + q * q * (box.bottom - hz);
+          c.drawLine(Offset(0, yy), Offset(box.right, yy), grid);
+        }
+        for (var i = -6; i <= 6; i++) {
+          c.drawLine(Offset(o.dx + w / 2 + i * 6 * k, hz), Offset(o.dx + w / 2 + i * 26 * k, box.bottom), grid);
+        }
+        c.restore();
+        _tint(c, glyphs.glow, midText, _col(const Color(0xFFFF3CAC)), opacity: .8);
+        final tr = midText & fill.size;
+        _tint(c, fill, midText, _lin(tr.topCenter, tr.bottomCenter,
+            const [Color(0xFFFFE66D), Color(0xFFFF8A3D), Color(0xFFFF3CAC), Color(0xFFB05BFF)], const [0, .45, .55, 1]));
+
+      case NameDecoStyle.mechaChrome:
+        final plate = _cut(box, 5 * k);
+        c.drawPath(plate, _col(const Color(0xFF1A1D24)));
+        c.drawPath(plate, Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1
+          ..color = const Color(0xFF4A5160));
+        final stripe = Rect.fromLTWH(box.right - 15 * k, 1, 13 * k, box.height - 2);
+        c.save();
+        c.clipRect(stripe);
+        for (var i = -2; i < 6; i++) {
+          c.drawPath(
+            Path()
+              ..moveTo(stripe.left + i * 6 * k, stripe.bottom)
+              ..lineTo(stripe.left + i * 6 * k + 6 * k, stripe.bottom)
+              ..lineTo(stripe.left + i * 6 * k + 16 * k, stripe.top)
+              ..lineTo(stripe.left + i * 6 * k + 10 * k, stripe.top)
+              ..close(),
+            _col(i.isOdd ? const Color(0xFF111111) : const Color(0xFFFFC93C)),
+          );
+        }
+        c.restore();
+        final tr = midText & fill.size;
+        c.saveLayer(tr.inflate(2), Paint());
+        _tint(c, fill, midText, _lin(tr.topCenter, tr.bottomCenter,
+            const [Colors.white, Color(0xFFC9D2E0), Color(0xFF6C7688), Color(0xFFE6ECF5), Color(0xFF9AA6B8)],
+            const [0, .45, .5, .75, 1]));
+        final s = ((t * .4) % 1.5 - .25) * w + o.dx;
+        c.drawRect(tr, _lin(Offset(s - 12 * k, 0), Offset(s + 12 * k, 0),
+            const [Color(0x00FFFFFF), Color(0xE6FFFFFF), Color(0x00FFFFFF)])..blendMode = BlendMode.srcATop);
+        c.restore();
+        c.drawRect(Rect.fromLTWH(3 * k, 3 * k, 3 * k, 3 * k),
+            _col(math.sin(t * 5) > 0 ? const Color(0xFFFF3B3B) : const Color(0xFF5A1A1A)));
+    }
+  }
+
+  @override
+  bool shouldRepaint(_NameDecoPainter old) =>
+      old.glyphs != glyphs || old.style != style || old.k != k || old.anim != anim || old.pad != pad;
+}
+
+/// Contoh untuk thumbnail kartu Decor.
+class NameDecoPreview extends StatelessWidget {
+  const NameDecoPreview({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Padding(
+          padding: EdgeInsets.all(12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              NameDecoText(name: 'ZENIME', style: NameDecoStyle.mechaChrome, fontSize: 18),
+              SizedBox(height: 12),
+              NameDecoText(name: 'ZENIME', style: NameDecoStyle.laserEdge, fontSize: 16),
+              SizedBox(height: 12),
+              NameDecoText(name: 'ZENIME', style: NameDecoStyle.quantumCore, fontSize: 15),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}

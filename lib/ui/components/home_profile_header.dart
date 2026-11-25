@@ -11,6 +11,7 @@ import 'game_badges.dart';
 import 'avatar_frame.dart';
 import 'net_image.dart';
 import 'user_level_badge.dart';
+import 'user_name_text.dart';
 import '../redesign/z_kit.dart';
 
 /// Warna tombol pill Premium, sama dengan ZenimeInfoBlue di Zenime.
@@ -226,16 +227,16 @@ class _ProfileCard extends StatelessWidget {
                                     Row(
                                       children: [
                                         Flexible(
-                                          child: Text(
-                                            username,
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
+                                          child: UserNameText(
+                                            uid: uid,
+                                            name: username,
                                             style: const TextStyle(
                                               color: AppColors.textWhite,
                                               fontSize: 17,
                                               fontWeight: FontWeight.w800,
                                               letterSpacing: -0.2,
                                             ),
+                                            decoScale: .82,
                                           ),
                                         ),
                                         const SizedBox(width: 6),

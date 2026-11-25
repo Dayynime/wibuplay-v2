@@ -43,6 +43,7 @@ import '../../components/avatar_frame.dart';
 import '../../glass/glass.dart';
 import '../../components/clan_tag_badge.dart';
 import '../../components/user_level_badge.dart';
+import '../../components/user_name_text.dart';
 import '../../redesign/chat_kit.dart';
 import '../../redesign/z_kit.dart';
 
@@ -780,10 +781,9 @@ class ChatMessageBubble extends StatelessWidget {
                 Flexible(
                   child: GestureDetector(
                     onTap: onProfileTap,
-                    child: Text(
-                      m.username,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    child: UserNameText(
+                      uid: m.firebaseUid,
+                      name: m.username,
                       style: TextStyle(
                         color: nameColor ?? AppColors.accentVioletLight,
                         fontSize: 12,

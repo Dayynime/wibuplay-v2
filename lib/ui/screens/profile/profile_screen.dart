@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../components/user_name_text.dart';
 import '../../components/rarity_chip.dart';
 import '../../../core/error_message.dart';
 import '../../../core/firebase_config.dart';
@@ -208,11 +209,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     ],
                     // Nama selalu putih (dulu Premium bergradien emas).
                     Flexible(
-                      child: Text(
-                        name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      child: UserNameText(
+                        uid: uid,
+                        name: name,
                         style: ZFont.display(size: 24, height: 1.1).copyWith(color: AppColors.textWhite),
+                        decoScale: .8,
                       ),
                     ),
                     // Badge role (Developer, dll.) di kanan nama.

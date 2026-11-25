@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import '../../core/decor_tick.dart';
 import '../../core/theme/app_colors.dart';
 import '../components/game_badges.dart';
+import '../components/user_name_text.dart';
 import 'z_kit.dart';
 
 // =============================================================================
@@ -470,18 +471,22 @@ class _ZPodiumCard extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Flexible(
-                child: Text(
-                  item.username + (item.isMe ? ' (Kamu)' : ''),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                child: UserNameText(
+                  uid: item.uid,
+                  name: item.username,
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: AppColors.textWhite,
                     fontSize: rank == 1 ? 13.5 : 12.5,
                     fontWeight: FontWeight.w600,
                   ),
+                  decoScale: .8,
                 ),
               ),
+              if (item.isMe)
+                Text(' (Kamu)',
+                    style: TextStyle(
+                        color: AppColors.textWhite, fontSize: rank == 1 ? 13.5 : 12.5, fontWeight: FontWeight.w600)),
               if (item.nameTrailing != null)
                 Padding(padding: const EdgeInsets.only(left: 3), child: item.nameTrailing),
             ],
@@ -662,6 +667,7 @@ class ZRankRow extends StatelessWidget {
     this.avatar,
     this.trailing,
     this.rankOnAvatar = false,
+    this.decoratedName = true,
   });
 
   final int rank;
@@ -684,6 +690,9 @@ class ZRankRow extends StatelessWidget {
   /// Tampilkan nomor peringkat sebagai lencana kecil di pojok avatar
   /// (dipakai kalau sisi kanan diisi [trailing] lain, mis. lambang rank).
   final bool rankOnAvatar;
+
+  /// Pakai Dekorasi Nama milik [uid] (false untuk baris yang bukan user, mis. clan).
+  final bool decoratedName;
 
   @override
   Widget build(BuildContext context) {
@@ -733,17 +742,31 @@ class ZRankRow extends StatelessWidget {
                     Row(
                       children: [
                         Flexible(
-                          child: Text(
-                            username + (isMe ? ' (Kamu)' : ''),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: AppColors.textWhite,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
+                          child: decoratedName
+                              ? UserNameText(
+                                  uid: uid,
+                                  name: username,
+                                  style: const TextStyle(
+                                    color: AppColors.textWhite,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                  decoScale: .82,
+                                )
+                              : Text(
+                                  username,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: AppColors.textWhite,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
                         ),
+                        if (isMe)
+                          const Text(' (Kamu)',
+                              style: TextStyle(color: AppColors.textWhite, fontSize: 15, fontWeight: FontWeight.w600)),
                         if (nameTrailing != null)
                           Padding(padding: const EdgeInsets.only(left: 4), child: nameTrailing),
                       ],

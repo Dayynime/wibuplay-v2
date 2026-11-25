@@ -18,6 +18,7 @@ import '../profile/public_profile_screen.dart';
 import '../../glass/glass.dart';
 import '../../components/clan_tag_badge.dart';
 import '../../components/user_level_badge.dart';
+import '../../components/user_name_text.dart';
 import '../../components/net_image.dart';
 import '../../redesign/z_kit.dart';
 
@@ -1226,13 +1227,16 @@ class _MemberRow extends StatelessWidget {
                   Row(
                     children: [
                       Flexible(
-                        child: Text(
-                          member.username + (isMe ? ' (Kamu)' : ''),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                        child: UserNameText(
+                          uid: member.firebaseUid,
+                          name: member.username,
                           style: const TextStyle(color: AppColors.textWhite, fontSize: 14, fontWeight: FontWeight.w700),
+                          decoScale: .85,
                         ),
                       ),
+                      if (isMe)
+                        const Text(' (Kamu)',
+                            style: TextStyle(color: AppColors.textWhite, fontSize: 14, fontWeight: FontWeight.w700)),
                       Padding(
                         padding: const EdgeInsets.only(left: 4),
                         child: UserCheckBadge(firebaseUid: member.firebaseUid, isPremium: isPremium, size: 14),
