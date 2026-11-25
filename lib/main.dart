@@ -32,6 +32,7 @@ import 'ui/screens/onboarding/onboarding_gate.dart';
 import 'ui/screens/security/integrity_gate.dart';
 import 'ui/screens/update/update_gate.dart';
 import 'ui/shell/app_shell.dart';
+import 'ui/screens/whats_new/whats_new.dart';
 import 'ui/glass/glass.dart';
 
 /// Firebase (login Zenime) + Remote Config. Dipanggil [IntegrityGate] HANYA
@@ -155,7 +156,7 @@ class ZenimeApp extends ConsumerWidget {
           minSplash: introSeen ? Duration.zero : const Duration(milliseconds: 1800),
           child: const OnboardingGate(
             child: AuthGate(
-              child: AnnouncementHost(child: PushHost(child: AppShell())),
+              child: AnnouncementHost(child: PushHost(child: WhatsNewHost(child: AppShell()))),
             ),
           ),
         ),

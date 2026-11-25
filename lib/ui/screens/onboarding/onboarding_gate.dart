@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../providers.dart';
+import '../whats_new/whats_new.dart';
 import 'onboarding_screen.dart';
 
 /// Gerbang intro. Dipasang DI DALAM UpdateGate (splash) dan DI LUAR AuthGate:
@@ -23,7 +24,10 @@ class _OnboardingGateState extends ConsumerState<OnboardingGate> {
   late bool _seen = ref.read(localStoreProvider).onboardingSeen;
 
   void _finish() {
-    ref.read(localStoreProvider).setOnboardingSeen(true);
+    final store = ref.read(localStoreProvider);
+    store.setOnboardingSeen(true);
+    // Install baru tidak perlu tutorial "Yang baru" versi ini.
+    store.setWhatsNewSeenId(kWhatsNewId);
     setState(() => _seen = true);
   }
 

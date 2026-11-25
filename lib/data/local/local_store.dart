@@ -78,6 +78,15 @@ class LocalStore extends ChangeNotifier {
   Future<void> setOnboardingSeen(bool seen) =>
       _prefs.setBool(_onboardingSeenKey, seen);
 
+  // ---- "Yang baru" setelah update: id versi terakhir yang sudah dilihat ----
+
+  static const String _whatsNewSeenKey = 'whats_new_seen_id';
+
+  String get whatsNewSeenId => _prefs.getString(_whatsNewSeenKey) ?? '';
+
+  Future<void> setWhatsNewSeenId(String id) =>
+      _prefs.setString(_whatsNewSeenKey, id);
+
   // ---- Pengaturan pemutar (sama dengan Zenime: default aktif) ----
 
   static const String _autoSkipIntroKey = 'player_auto_skip_intro';
