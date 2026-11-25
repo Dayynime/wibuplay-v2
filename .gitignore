@@ -7,3 +7,4 @@
 .metadata
 .flutter-plugins-dependencies
 setup_android_local.py
+.venv/
