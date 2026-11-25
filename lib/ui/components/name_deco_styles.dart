@@ -343,8 +343,17 @@ class _NameDecoPainter extends CustomPainter {
 
   Paint _col(Color c) => Paint()..color = c;
 
-  Paint _lin(Offset a, Offset b, List<Color> colors, [List<double>? stops, TileMode mode = TileMode.clamp]) =>
-      Paint()..shader = ui.Gradient.linear(a, b, colors, stops, mode);
+  /// Gradien linear. Kalau [stops] kosong dan warnanya lebih dari 2, stop
+  /// dibagi rata (ui.Gradient.linear melempar error kalau stops null dengan
+  /// warna != 2 — itu yang bikin sebagian nama tidak tergambar).
+  Paint _lin(Offset a, Offset b, List<Color> colors, [List<double>? stops, TileMode mode = TileMode.clamp]) {
+    var st = stops;
+    if (st == null && colors.length != 2) {
+      final n = colors.length - 1;
+      st = [for (var i = 0; i <= n; i++) i / n];
+    }
+    return Paint()..shader = ui.Gradient.linear(a, b, colors, st, mode);
+  }
 
   Path _cut(Rect r, double kk) => Path()
     ..moveTo(r.left + kk, r.top)
