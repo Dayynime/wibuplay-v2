@@ -5,9 +5,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../providers.dart';
-import '../../components/name_deco_styles.dart';
+import '../../components/net_image.dart';
+import '../../components/top_giver_badge.dart';
+import '../../components/zenime_mascot.dart';
+import '../auth/login_posters.dart';
 import '../../redesign/z_kit.dart';
-import '../name_deco/name_deco_shop_screen.dart';
+import '../wallpaper/wallpaper_screen.dart';
 
 // -----------------------------------------------------------------------------
 // "Yang baru" — tutorial singkat fitur baru, muncul SEKALI setelah update.
@@ -17,9 +20,8 @@ import '../name_deco/name_deco_shop_screen.dart';
 // sekali; install baru langsung ditandai sudah lihat (lewat OnboardingGate).
 // -----------------------------------------------------------------------------
 
-const String kWhatsNewId = '3.2.4';
+const String kWhatsNewId = '3.2.5';
 
-const Color _gold = Color(0xFFF6BE4F);
 
 /// Dipasang di dalam AuthGate (user sudah login), membungkus AppShell.
 class WhatsNewHost extends ConsumerStatefulWidget {
@@ -80,12 +82,12 @@ class _Page {
 }
 
 const List<_Page> _pages = [
-  _Page('新しい名前', 'Dekorasi Nama', 'Seri 2.',
-      '12 gaya baru tanpa latar: cuma huruf dan efek, tampil bersih di mana pun.'),
-  _Page('フォント', 'Tiap gaya,', 'font sendiri.',
-      'Dari huruf pixel arcade, komik, horor, sampai emas bangsawan. Semua beranimasi.'),
-  _Page('使い方', 'Cara', 'pakainya.',
-      'Beli pakai ZCoin, pasang, dan namamu langsung tampil keren di seluruh app.'),
+  _Page('新しい見た目', 'Tampilan', 'baru.',
+      'Navbar kaca, poster "terbang" ke detail, kredit ala opening anime, dan kenalan sama maskot Zenime!'),
+  _Page('トップギバー', 'Top Giver', 'makin keren.',
+      'Peringkat 1 sampai 10 punya badge & animasi sendiri. Masuk 10 besar dan pamerkan badge-mu di chat.'),
+  _Page('チャット', 'Wallpaper', 'di chat.',
+      'Pasang wallpaper koleksimu di bubble chat (dilihat semua orang) atau jadikan latar halaman chat.'),
 ];
 
 class _WhatsNewScreen extends StatefulWidget {
@@ -112,10 +114,10 @@ class _WhatsNewScreenState extends State<_WhatsNewScreen> {
       _pc.nextPage(duration: const Duration(milliseconds: 420), curve: Curves.easeOutCubic);
       return;
     }
-    // Halaman terakhir: langsung ke toko Dekorasi Nama.
+    // Halaman terakhir: langsung ke halaman Wallpaper.
     final nav = Navigator.of(context);
     nav.pop();
-    nav.push(MaterialPageRoute<void>(builder: (_) => const NameDecoShopScreen()));
+    nav.push(MaterialPageRoute<void>(builder: (_) => const WallpaperScreen()));
   }
 
   @override
@@ -186,7 +188,7 @@ class _WhatsNewScreenState extends State<_WhatsNewScreen> {
                                 style: const TextStyle(color: Colors.white, fontSize: 15.5, fontWeight: FontWeight.w800),
                               ),
                               const SizedBox(width: 8),
-                              Icon(isLast ? Icons.storefront_rounded : Icons.arrow_forward_rounded,
+                              Icon(isLast ? Icons.wallpaper_rounded : Icons.arrow_forward_rounded,
                                   color: Colors.white, size: 20),
                             ],
                           ),
@@ -338,9 +340,9 @@ class _PageViewState extends State<_PageView> with SingleTickerProviderStateMixi
                   child: SizedBox(
                     width: c.maxWidth,
                     child: switch (widget.index) {
-                      0 => const _HeroGrid(),
-                      1 => _HeroFonts(running: widget.active && !_still),
-                      _ => const _HeroSteps(),
+                      0 => const _HeroLook(),
+                      1 => const _HeroGiver(),
+                      _ => const _HeroChat(),
                     },
                   ),
                 ),
@@ -435,206 +437,110 @@ class _Progress extends StatelessWidget {
 // Isi halaman
 // -----------------------------------------------------------------------------
 
-const List<NameDecoStyle> _seri2 = [
-  NameDecoStyle.terminal,
-  NameDecoStyle.arcade,
-  NameDecoStyle.streetComic,
-  NameDecoStyle.neonSign,
-  NameDecoStyle.horrorDrip,
-  NameDecoStyle.stencilOps,
-  NameDecoStyle.racer,
-  NameDecoStyle.rgbGlitch,
-  NameDecoStyle.royalGold,
-  NameDecoStyle.zenSpace,
-  NameDecoStyle.auroraFlow,
-  NameDecoStyle.rainbowWave,
-];
-
 BoxDecoration _card([Color? border]) => BoxDecoration(
       color: AppColors.surfaceCard,
       borderRadius: BorderRadius.circular(14),
       border: Border.all(color: border ?? const Color(0x0FFFFFFF)),
     );
 
-/// 01: 12 gaya baru, tiap kartu menampilkan namanya dengan gaya itu sendiri.
-class _HeroGrid extends StatelessWidget {
-  const _HeroGrid();
+/// Baris fitur: ikon + judul + keterangan.
+class _Feature extends StatelessWidget {
+  const _Feature(this.icon, this.title, this.desc);
+
+  final IconData icon;
+  final String title;
+  final String desc;
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(builder: (context, c) {
-      final w = (c.maxWidth - 10) / 2;
-      return Wrap(
-        spacing: 10,
-        runSpacing: 10,
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      child: Row(
         children: [
-          for (var i = 0; i < _seri2.length; i++)
-            _In(
-              at: 120 + i * 70,
-              child: Container(
-                width: w,
-                height: 58,
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                decoration: _card(),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Align(
-                        alignment: Alignment.centerLeft,
-                        child: NameDecoText(
-                          name: _seri2[i].label,
-                          style: _seri2[i],
-                          fontSize: 14,
-                          maxWidth: w - 34,
-                        ),
-                      ),
-                    ),
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: BoxDecoration(color: _seri2[i].tier.color, shape: BoxShape.circle),
-                    ),
-                  ],
-                ),
-              ),
+          Container(
+            width: 34,
+            height: 34,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: AppColors.accentViolet.withValues(alpha: 0.16),
+              borderRadius: BorderRadius.circular(10),
             ),
+            child: Icon(icon, size: 18, color: AppColors.accentVioletLight),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(color: AppColors.textWhite, fontSize: 13.5, fontWeight: FontWeight.w800)),
+                const SizedBox(height: 2),
+                Text(desc, style: const TextStyle(color: AppColors.textSecondary, fontSize: 11.5)),
+              ],
+            ),
+          ),
         ],
-      );
-    });
+      ),
+    );
   }
 }
 
-/// 02: satu nama besar yang berganti gaya tiap 1,8 detik.
-class _HeroFonts extends StatefulWidget {
-  const _HeroFonts({required this.running});
-
-  final bool running;
-
-  @override
-  State<_HeroFonts> createState() => _HeroFontsState();
-}
-
-class _HeroFontsState extends State<_HeroFonts> {
-  int _i = 0;
-  Timer? _timer;
-
-  @override
-  void initState() {
-    super.initState();
-    _sync();
-  }
-
-  @override
-  void didUpdateWidget(_HeroFonts old) {
-    super.didUpdateWidget(old);
-    if (old.running != widget.running) _sync();
-  }
-
-  void _sync() {
-    _timer?.cancel();
-    _timer = null;
-    if (widget.running) {
-      _timer = Timer.periodic(const Duration(milliseconds: 1800), (_) {
-        if (mounted) setState(() => _i = (_i + 1) % _seri2.length);
-      });
-    }
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
+/// 01: maskot + daftar tampilan baru.
+class _HeroLook extends StatelessWidget {
+  const _HeroLook();
 
   @override
   Widget build(BuildContext context) {
-    final st = _seri2[_i];
+    const feats = [
+      (Icons.space_dashboard_rounded, 'Navbar kaca', 'Ikon beranimasi + titik merah di tab aktif'),
+      (Icons.open_in_full_rounded, 'Poster terbang', 'Poster yang diketuk melayang ke halaman detail'),
+      (Icons.movie_filter_rounded, 'Kredit opening', 'Studio, tahun & genre muncul ala opening anime'),
+      (Icons.palette_rounded, 'Warna ikut poster', 'Latar Beranda & detail berubah sesuai anime'),
+    ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         _In(
           at: 0,
           child: Container(
-            height: 190,
+            height: 118,
             decoration: _card(),
             child: Stack(
               children: [
-                const Positioned.fill(child: ZScreentone(opacity: 0.1)),
-                Center(
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 380),
-                    switchInCurve: Curves.easeOutCubic,
-                    transitionBuilder: (child, a) => FadeTransition(
-                      opacity: a,
-                      child: ScaleTransition(scale: Tween(begin: 0.92, end: 1.0).animate(a), child: child),
-                    ),
-                    child: NameDecoText(
-                      key: ValueKey(st),
-                      name: 'Namamu',
-                      style: st,
-                      fontSize: 28,
-                      maxWidth: 280,
+                const Positioned.fill(child: ZScreentone(opacity: 0.08)),
+                // Maskot dibesarkan, "mengintip" dari tepi bawah kartu.
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: Center(
+                    child: Transform.scale(
+                      scale: 1.45,
+                      alignment: Alignment.bottomCenter,
+                      child: const ZenimeMascot(),
                     ),
                   ),
                 ),
                 Positioned(
                   left: 12,
-                  bottom: 12,
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 250),
-                    child: Row(
-                      key: ValueKey(st),
-                      children: [
-                        ZChip(st.label, tone: ZTone.glass),
-                        const SizedBox(width: 6),
-                        ZChip(st.font, tone: ZTone.ghost),
-                      ],
-                    ),
-                  ),
-                ),
-                Positioned(
-                  right: 12,
-                  bottom: 12,
-                  child: Text(
-                    st.tier.label.toUpperCase(),
-                    style: TextStyle(color: st.tier.color, fontSize: 10.5, fontWeight: FontWeight.w800, letterSpacing: 1),
-                  ),
+                  top: 10,
+                  child: Text('Hai! 👋', style: ZFont.display(size: 13)),
                 ),
               ],
             ),
           ),
         ),
         const SizedBox(height: 12),
-        _In(
-          at: 250,
-          child: Row(
+        Container(
+          decoration: _card(),
+          child: Column(
             children: [
-              for (final t in NameDecoTier.values) ...[
-                if (t != NameDecoTier.biasa) const SizedBox(width: 8),
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(vertical: 10),
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceVariantDark,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: st.tier == t ? t.color.withValues(alpha: 0.7) : Colors.transparent),
-                    ),
-                    child: Column(
-                      children: [
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: BoxDecoration(color: t.color, shape: BoxShape.circle),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(t.label,
-                            style: const TextStyle(
-                                color: AppColors.textWhite, fontSize: 11.5, fontWeight: FontWeight.w700)),
-                      ],
-                    ),
-                  ),
+              for (var i = 0; i < feats.length; i++)
+                _In(
+                  at: 200 + i * 140,
+                  dy: 0,
+                  dx: -14,
+                  child: _Feature(feats[i].$1, feats[i].$2, feats[i].$3),
                 ),
-              ],
             ],
           ),
         ),
@@ -643,99 +549,147 @@ class _HeroFontsState extends State<_HeroFonts> {
   }
 }
 
-/// 03: langkah memakai + contoh nama di chat.
-class _HeroSteps extends StatelessWidget {
-  const _HeroSteps();
+/// 02: badge Top Giver asli (peringkat 1, 2, 3, 6, 10 dan umum).
+class _HeroGiver extends StatelessWidget {
+  const _HeroGiver();
 
   @override
   Widget build(BuildContext context) {
-    const steps = [
-      (Icons.menu_rounded, 'Buka Menu → Decor'),
-      (Icons.text_fields_rounded, 'Pilih Dekorasi Nama'),
-      (Icons.toll_rounded, 'Beli pakai ZCoin, lalu Pasang'),
-      (Icons.forum_rounded, 'Tampil di chat, komentar, clan & profil'),
-    ];
+    const ranks = [1, 2, 3, 6, 10, 14];
+    const labels = ['Kaisar Matahari', 'Ksatria Perak', 'Ronin Perunggu', 'Petir Ungu', 'Sayap Serangga', 'Peringkat 11+'];
+    return Container(
+      decoration: _card(),
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Column(
+        children: [
+          for (var i = 0; i < ranks.length; i++)
+            _In(
+              at: 120 + i * 130,
+              dy: 0,
+              dx: -16,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(14, 9, 14, 9),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: 30,
+                      child: Text(
+                        ranks[i] > 10 ? '11+' : '#${ranks[i]}',
+                        style: const TextStyle(color: AppColors.textMuted, fontSize: 11, fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                    Expanded(
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Padding(
+                          // Ruang untuk antena/lingkar sinar #1 yang keluar dari kotak.
+                          padding: const EdgeInsets.only(left: 6),
+                          child: TopGiverChip(rank: ranks[i], height: 20),
+                        ),
+                      ),
+                    ),
+                    Text(
+                      labels[i],
+                      style: const TextStyle(color: AppColors.textSecondary, fontSize: 10.5, fontWeight: FontWeight.w700),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
 
+/// 03: contoh bubble chat berwallpaper + dua cara pakai.
+class _HeroChat extends StatelessWidget {
+  const _HeroChat();
+
+  @override
+  Widget build(BuildContext context) {
+    const rc = Color(0xFFF59E0B); // warna rarity Legendary
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Container(
-          decoration: _card(),
-          child: Column(
+        _In(
+          at: 0,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              for (var i = 0; i < steps.length; i++)
-                _In(
-                  at: 120 + i * 160,
-                  dy: 0,
-                  dx: -16,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    decoration: i == 0
-                        ? null
-                        : const BoxDecoration(border: Border(top: BorderSide(color: Color(0x0DFFFFFF)))),
-                    child: Row(
+              Container(
+                width: 32,
+                height: 32,
+                alignment: Alignment.center,
+                decoration: const BoxDecoration(color: AppColors.accentViolet, shape: BoxShape.circle),
+                child: Text('K', style: ZFont.display(size: 13)),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: rc.withValues(alpha: 0.85)),
+                    boxShadow: [BoxShadow(color: rc.withValues(alpha: 0.28), blurRadius: 18, spreadRadius: -6, offset: const Offset(0, 6))],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Stack(
                       children: [
-                        SizedBox(
-                          width: 26,
-                          child: ZRankNumber(i + 1, size: 24, color: i == 3 ? _gold : AppColors.textMuted),
+                        Positioned.fill(child: NetImage(kLoginPosters[0])),
+                        const Positioned.fill(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [Color(0xE00B0E14), Color(0x9E0B0E14), Color(0x470B0E14)],
+                                stops: [0, 0.55, 1],
+                              ),
+                            ),
+                          ),
                         ),
-                        const SizedBox(width: 8),
-                        Icon(steps[i].$1, size: 18, color: AppColors.accentVioletLight),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(steps[i].$2,
-                              style: const TextStyle(
-                                  color: AppColors.textWhite, fontSize: 13.5, fontWeight: FontWeight.w700)),
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 9, 12, 34),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Kamu', style: ZFont.display(size: 12.5)),
+                              const SizedBox(height: 5),
+                              const Text('Bubble-ku sekarang pakai wallpaper ✨',
+                                  style: TextStyle(color: Colors.white, fontSize: 13.5, height: 1.3)),
+                            ],
+                          ),
+                        ),
+                        Positioned(
+                          right: 8,
+                          bottom: 7,
+                          child: Container(
+                            padding: const EdgeInsets.fromLTRB(8, 3, 9, 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0xB80B0E14),
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(color: rc.withValues(alpha: 0.9)),
+                            ),
+                            child: const Text('Legendary',
+                                style: TextStyle(color: rc, fontSize: 9.5, fontWeight: FontWeight.w800)),
+                          ),
                         ),
                       ],
                     ),
                   ),
                 ),
+              ),
             ],
           ),
         ),
-        const SizedBox(height: 12),
-        _In(
-          at: 900,
-          child: Container(
-            decoration: _card(),
-            padding: const EdgeInsets.all(12),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Container(
-                  width: 30,
-                  height: 30,
-                  alignment: Alignment.center,
-                  decoration: const BoxDecoration(color: AppColors.accentViolet, shape: BoxShape.circle),
-                  child: Text('N', style: ZFont.display(size: 13)),
-                ),
-                const SizedBox(width: 9),
-                Flexible(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const NameDecoText(name: 'Namamu', style: NameDecoStyle.auroraFlow, fontSize: 11, maxWidth: 140),
-                      const SizedBox(height: 3),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
-                        decoration: const BoxDecoration(
-                          color: AppColors.surfaceVariantDark,
-                          borderRadius: BorderRadius.only(
-                            topLeft: Radius.circular(14),
-                            topRight: Radius.circular(14),
-                            bottomRight: Radius.circular(14),
-                            bottomLeft: Radius.circular(4),
-                          ),
-                        ),
-                        child: const Text('Nama baru, siapa takut 😎',
-                            style: TextStyle(color: AppColors.textWhite, fontSize: 13, height: 1.35)),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+        const SizedBox(height: 14),
+        Container(
+          decoration: _card(),
+          child: const Column(
+            children: [
+              _In(at: 350, dy: 0, dx: -14, child: _Feature(Icons.chat_bubble_rounded, 'Bubble chat', 'Dilihat semua orang di Chat Global & Clan')),
+              _In(at: 500, dy: 0, dx: -14, child: _Feature(Icons.forum_rounded, 'Latar chat', 'Wallpaper jadi latar halaman chat, cuma di HP-mu')),
+              _In(at: 650, dy: 0, dx: -14, child: _Feature(Icons.touch_app_rounded, 'Caranya', 'Wallpaper → ketuk koleksimu → Bubble chat / Latar chat')),
+            ],
           ),
         ),
       ],
