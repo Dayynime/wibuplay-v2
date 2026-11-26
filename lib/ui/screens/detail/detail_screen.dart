@@ -1,9 +1,11 @@
 import 'dart:math' as math;
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/lite_mode.dart';
 import '../../../core/premium_access.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/local/entities.dart';
@@ -16,6 +18,7 @@ import '../../components/common_components.dart';
 import '../../components/home_section_cards.dart' show compactCount;
 import '../../components/net_image.dart';
 import '../../components/poster_holder.dart';
+import '../../components/poster_tint.dart';
 import '../download/download_actions.dart';
 import 'detail_controller.dart';
 import '../../glass/glass.dart';
@@ -106,6 +109,40 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
 
   final ScrollController _scroll = ScrollController();
 
+  /// Tag Hero kartu poster yang diketuk (null = dibuka dari tempat lain,
+  /// tanpa poster terbang).
+  final Object? _heroTag = PosterTransitionHolder.takeHero();
+
+  /// Satu key untuk poster tujuan Hero, dipakai di tampilan loading maupun
+  /// setelah data masuk, supaya penerbangan tidak putus saat layout berganti.
+  final GlobalKey _posterHeroKey = GlobalKey();
+
+  /// Warna poster (latar ikut warna poster); null sampai selesai dihitung.
+  Color? _tint;
+  String? _tintFor;
+
+  /// Episode yang sudah pernah dianimasikan masuk (tidak diulang saat
+  /// di-scroll balik).
+  final Set<Object> _risenEpisodes = {};
+
+  void _loadTint(String url) {
+    if (url.isEmpty || url == _tintFor) return;
+    _tintFor = url;
+    final hit = PosterTint.cached(url);
+    if (hit != null) {
+      _tint = hit;
+      return;
+    }
+    PosterTint.of(url).then((c) {
+      if (mounted && c != null && _tintFor == url) setState(() => _tint = c);
+    });
+  }
+
+  /// Warna dasar di ujung bawah hero dan awal cahaya di bawahnya.
+  Color get _tintBase => _tint == null
+      ? AppColors.backgroundDark
+      : Color.lerp(AppColors.backgroundDark, _tint, 0.32)!;
+
   /// Animasi masuk isi tab: muncul perlahan (fade) sambil bergeser sedikit.
   late final AnimationController _tabAnim = AnimationController(
     vsync: this,
@@ -178,11 +215,71 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
       child: Stack(
         fit: StackFit.expand,
         children: [
-          if (url.isNotEmpty) NetImage(url, alignment: Alignment.topCenter),
+          if (url.isNotEmpty)
+            // Parallax: gambar bergerak lebih lambat dari halaman, dan makin
+            // blur saat di-scroll (versi blur di-crossfade, bukan sigma yang
+            // berubah tiap frame).
+            AnimatedBuilder(
+              animation: _scroll,
+              child: NetImage(url, alignment: Alignment.topCenter),
+              builder: (context, child) {
+                final off = _scroll.hasClients ? _scroll.offset.clamp(0.0, 700.0) : 0.0;
+                final f = (off / (_heroHeight * 0.7)).clamp(0.0, 1.0);
+                return Transform.translate(
+                  offset: Offset(0, off * 0.45),
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      child!,
+                      // HP ringan (mode lite): tanpa lapisan blur.
+                      if (f > 0.02 && !LiteMode.enabled)
+                        Opacity(
+                          opacity: f,
+                          child: ImageFiltered(
+                            imageFilter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                            child: NetImage(url, alignment: Alignment.topCenter),
+                          ),
+                        ),
+                    ],
+                  ),
+                );
+              },
+            ),
           _heroGradient(),
         ],
       ),
     );
+  }
+
+  /// Poster yang ditampilkan: kalau terbang dari kartu, pakai URL yang sama
+  /// dengan kartunya supaya gambarnya tidak dimuat ulang saat mendarat.
+  String _posterUrlFor(AnimeItem? anime, String fallback) {
+    final held = PosterTransitionHolder.url ?? '';
+    if (_heroTag != null && held.isNotEmpty) return held;
+    final p = anime?.posterUrl ?? '';
+    return p.isNotEmpty ? p : fallback;
+  }
+
+  /// Poster tujuan Hero (dipakai di loading & setelah data masuk).
+  Widget _posterBox(String url) {
+    final box = Container(
+      width: 104,
+      height: 156,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0x1AFFFFFF)),
+        boxShadow: const [
+          BoxShadow(color: Color(0xCC000000), blurRadius: 24, offset: Offset(0, 14), spreadRadius: -10),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(15),
+        child: ColoredBox(color: AppColors.surfaceCard, child: NetImage(url)),
+      ),
+    );
+    final tag = _heroTag;
+    if (tag == null) return box;
+    return Hero(key: _posterHeroKey, tag: tag, child: box);
   }
 
   /// Muncul memantul (skala + fade) pada potongan [a] dari animasi isi.
@@ -251,7 +348,9 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
     if (_motionReady) return;
     _motionReady = true;
     _reduceMotion = MediaQuery.disableAnimationsOf(context);
-    if (_reduceMotion) {
+    final zoomed = PosterTransitionHolder.zoomedIn;
+    PosterTransitionHolder.zoomedIn = false;
+    if (_reduceMotion || zoomed) {
       _heroIn.value = 1;
     } else {
       _heroIn.forward();
@@ -347,7 +446,7 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
           Align(
             alignment: Alignment.topCenter,
             child: SizedBox(
-              height: _heroHeight,
+              height: _heroHeight + MediaQuery.paddingOf(context).top,
               width: double.infinity,
               child: Stack(
                 fit: StackFit.expand,
@@ -357,6 +456,14 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
               ),
             ),
           ),
+          // Tempat mendarat poster yang terbang dari kartu (posisinya sama
+          // dengan poster setelah data masuk).
+          if (_heroTag != null && holder.isNotEmpty)
+            Positioned(
+              left: 16,
+              top: MediaQuery.paddingOf(context).top + _heroHeight - 4 - 156,
+              child: _posterBox(holder),
+            ),
           _backButton(),
           const Center(child: CircularProgressIndicator(color: AppColors.accentViolet)),
         ],
@@ -377,19 +484,27 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
     return GlassScaffold(backgroundColor: AppColors.backgroundDark, body: body);
   }
 
-  Widget _heroGradient() => const DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Color(0x80000000),
-              Color(0x00000000),
-              Color(0xB30B0E14),
-              AppColors.backgroundDark,
-            ],
-          ),
-        ),
+  Widget _heroGradient() => TweenAnimationBuilder<Color?>(
+        tween: ColorTween(end: _tintBase),
+        duration: const Duration(milliseconds: 900),
+        curve: Curves.easeOutCubic,
+        builder: (context, c, _) {
+          final base = c ?? _tintBase;
+          return DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  const Color(0x80000000),
+                  const Color(0x00000000),
+                  base.withValues(alpha: 0.7),
+                  base,
+                ],
+              ),
+            ),
+          );
+        },
       );
 
   Widget _circleButton({required VoidCallback onTap, required Widget child, String? tooltip}) {
@@ -422,6 +537,7 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
   Widget _loaded(DetailUiState ui) {
     _startContentIn();
     final anime = ui.anime;
+    _loadTint(anime?.posterUrl ?? '');
     final topInset = MediaQuery.paddingOf(context).top;
     final isFavorite =
         ref.watch(localStoreProvider.select((s) => s.isFavorite(widget.movieId)));
@@ -445,6 +561,39 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
       onHorizontalDragEnd: _onSwipeTab,
       child: Stack(
         children: [
+          // Cahaya warna poster yang menyambung dari bawah hero, ikut scroll.
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: AnimatedBuilder(
+              animation: _scroll,
+              builder: (context, child) => Transform.translate(
+                offset: Offset(0, -(_scroll.hasClients ? _scroll.offset : 0.0)),
+                child: child,
+              ),
+              child: Padding(
+                padding: EdgeInsets.only(top: _heroHeight + topInset),
+                child: TweenAnimationBuilder<Color?>(
+                  tween: ColorTween(end: _tintBase),
+                  duration: const Duration(milliseconds: 900),
+                  curve: Curves.easeOutCubic,
+                  builder: (context, c, _) => IgnorePointer(
+                    child: Container(
+                      height: 420,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [c ?? _tintBase, AppColors.backgroundDark],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
           CustomScrollView(
             controller: _scroll,
             slivers: [
@@ -498,7 +647,93 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
               const SliverToBoxAdapter(child: SizedBox(height: 36)),
             ],
           ),
+          _collapsingBar(anime?.title ?? '', topInset),
         ],
+      ),
+    );
+  }
+
+  /// App bar kaca: muncul saat hero sudah lewat, judul besar "pindah" jadi
+  /// judul kecil di sini. Tombol kembali selalu ada (tetap di tempat).
+  Widget _collapsingBar(String title, double topInset) {
+    return Positioned(
+      top: 0,
+      left: 0,
+      right: 0,
+      child: AnimatedBuilder(
+        animation: _scroll,
+        builder: (context, _) {
+          final off = _scroll.hasClients ? _scroll.offset : 0.0;
+          final f = ((off - (_heroHeight - 150)) / 90).clamp(0.0, 1.0);
+          final bar = SizedBox(
+            height: topInset + 64,
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(16, topInset + 12, 16, 12),
+              child: Row(
+                children: [
+                  _pop(
+                    0.0,
+                    _circleButton(
+                      onTap: widget.onBackClick,
+                      tooltip: 'Kembali',
+                      child: const Icon(Icons.arrow_back, color: Colors.white, size: 22),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Opacity(
+                      opacity: f,
+                      child: Transform.translate(
+                        offset: Offset(0, 8 * (1 - f)),
+                        child: Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: ZFont.display(size: 16, color: Colors.white),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+          if (f <= 0.01) return bar;
+          if (LiteMode.enabled) {
+            return Stack(
+              children: [
+                Positioned.fill(
+                  child: Opacity(
+                    opacity: f,
+                    child: const ColoredBox(color: Color(0xF20B0E14)),
+                  ),
+                ),
+                bar,
+              ],
+            );
+          }
+          return Stack(
+            children: [
+              Positioned.fill(
+                child: Opacity(
+                  opacity: f,
+                  child: ClipRect(
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                      child: const DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: Color(0xB80B0E14),
+                          border: Border(bottom: BorderSide(color: Color(0x0FFFFFFF))),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              bar,
+            ],
+          );
+        },
       ),
     );
   }
@@ -530,16 +765,10 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
             right: 16,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                _pop(
-                  0.0,
-                  _circleButton(
-                    onTap: widget.onBackClick,
-                    tooltip: 'Kembali',
-                    child: const Icon(Icons.arrow_back, color: Colors.white, size: 22),
-                  ),
-                ),
-                const SizedBox(width: 1),
+              children: const [
+                // Tombol kembali dipindah ke app bar tetap (_collapsingBar).
+                SizedBox(width: 40, height: 40),
+                SizedBox(width: 1),
               ],
             ),
           ),
@@ -552,30 +781,12 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                _fadeIn(
-                  0.1,
-                  0.45,
-                  dx: 0,
-                  dy: 16,
-                  Container(
-                    width: 104,
-                    height: 156,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0x1AFFFFFF)),
-                      boxShadow: const [
-                        BoxShadow(color: Color(0xCC000000), blurRadius: 24, offset: Offset(0, 14), spreadRadius: -10),
-                      ],
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(15),
-                      child: ColoredBox(
-                        color: AppColors.surfaceCard,
-                        child: NetImage(anime?.posterUrl ?? heroUrl),
-                      ),
-                    ),
-                  ),
-                ),
+                // Poster: kalau datang dari kartu, posternya sudah "terbang" ke
+                // sini (Hero), jadi tidak di-fade lagi.
+                if (_heroTag != null)
+                  _posterBox(_posterUrlFor(anime, heroUrl))
+                else
+                  _fadeIn(0.1, 0.45, dx: 0, dy: 16, _posterBox(_posterUrlFor(anime, heroUrl))),
                 const SizedBox(width: 14),
                 Expanded(
                   child: Padding(
@@ -1107,7 +1318,15 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
           itemBuilder: (context, i) {
             final ep = ui.episodes[i];
             final id = ep.id;
-            return _EpisodeGridCard(
+            final riseKey = id ?? 'ep_$i';
+            final fresh = _risenEpisodes.add(riseKey);
+            return _RiseIn(
+              key: ValueKey('rise-$riseKey'),
+              animate: fresh && !_reduceMotion,
+              // Delay bertingkat cuma untuk layar pertama; yang muncul saat
+              // di-scroll langsung naik tanpa antre.
+              delayMs: i < 10 ? 120 + i * 55 : 0,
+              child: _EpisodeGridCard(
               key: ValueKey(id ?? 'ep_$i'),
               episode: ep,
               imageUrl: ep.imageUrl.isNotEmpty ? ep.imageUrl : fallbackImage,
@@ -1129,6 +1348,7 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
                   episode: ep,
                 );
               },
+            ),
             );
           },
         ),
@@ -1659,6 +1879,56 @@ class _InfoRow extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+
+/// Naik + fade sekali saat pertama tampil (daftar episode masuk berurutan).
+class _RiseIn extends StatefulWidget {
+  const _RiseIn({super.key, required this.animate, required this.delayMs, required this.child});
+
+  final bool animate;
+  final int delayMs;
+  final Widget child;
+
+  @override
+  State<_RiseIn> createState() => _RiseInState();
+}
+
+class _RiseInState extends State<_RiseIn> with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 420),
+    value: widget.animate ? 0 : 1,
+  );
+  late final Animation<double> _a = CurvedAnimation(parent: _c, curve: Curves.easeOutCubic);
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.animate) {
+      Future.delayed(Duration(milliseconds: widget.delayMs), () {
+        if (mounted) _c.forward();
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _a,
+      child: widget.child,
+      builder: (context, child) => Opacity(
+        opacity: _a.value,
+        child: Transform.translate(offset: Offset(0, 18 * (1 - _a.value)), child: child),
       ),
     );
   }

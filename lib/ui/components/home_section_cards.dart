@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/models/anime_item.dart';
 import '../../data/models/cuplix_item.dart';
+import 'burning_rank.dart';
 import 'net_image.dart';
 import 'poster_holder.dart';
 import '../redesign/z_kit.dart';
@@ -248,10 +249,12 @@ class _RankedCard extends StatelessWidget {
           SizedBox(
             width: 44,
             child: Center(
-              child: ZRankNumber(
+              child: BurningRankNumber(
                 rank,
                 size: 40,
-                color: rank == 1 ? const Color(0xFFF6BE4F) : AppColors.textMuted,
+                outline: rank == 1 ? const Color(0xFFF6BE4F) : AppColors.textMuted,
+                // Bergantian: tiap baris menyala sedikit setelah baris di atasnya.
+                delayMs: ((rank - 1) % 5) * 140,
               ),
             ),
           ),

@@ -9,18 +9,21 @@ import '../glass/glass.dart';
 
 /// Port BottomTab + FloatingBottomBar (FloatingBottomBar.kt).
 class BottomTab {
-  const BottomTab(this.route, this.title, this.icon);
+  const BottomTab(this.route, this.title, this.icon, this.activeIcon);
 
   final String route;
   final String title;
+
+  /// Ikon garis (tidak aktif) dan ikon terisi (aktif).
   final IconData icon;
+  final IconData activeIcon;
 
   static const List<BottomTab> all = [
-    BottomTab('home', 'Beranda', Icons.home_outlined),
-    BottomTab('explore', 'Jelajah', Icons.explore_outlined),
-    BottomTab('schedule', 'Jadwal', Icons.calendar_month_outlined),
-    BottomTab('menu', 'Menu', Icons.grid_view_rounded),
-    BottomTab('profile', 'Profil', Icons.person_outline),
+    BottomTab('home', 'Beranda', Icons.home_outlined, Icons.home_rounded),
+    BottomTab('explore', 'Jelajah', Icons.explore_outlined, Icons.explore_rounded),
+    BottomTab('schedule', 'Jadwal', Icons.calendar_month_outlined, Icons.calendar_month_rounded),
+    BottomTab('menu', 'Menu', Icons.grid_view_outlined, Icons.grid_view_rounded),
+    BottomTab('profile', 'Profil', Icons.person_outline_rounded, Icons.person_rounded),
   ];
 }
 
@@ -160,7 +163,7 @@ class _Lens extends StatelessWidget {
   }
 }
 
-class _TabItem extends StatelessWidget {
+class _TabItem extends StatefulWidget {
   const _TabItem({required this.tab, required this.isSelected, required this.onTap});
 
   final BottomTab tab;
@@ -168,43 +171,99 @@ class _TabItem extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
+  State<_TabItem> createState() => _TabItemState();
+}
+
+class _TabItemState extends State<_TabItem> with SingleTickerProviderStateMixin {
+  /// Lompatan ikon saat tab dipilih (sekali, ~450 ms).
+  late final AnimationController _pop = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 450),
+    value: 1,
+  );
+
+  @override
+  void didUpdateWidget(_TabItem old) {
+    super.didUpdateWidget(old);
+    if (widget.isSelected && !old.isSelected && !MediaQuery.disableAnimationsOf(context)) {
+      _pop.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _pop.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final tint = isSelected ? AppColors.accentVioletLight : AppColors.textMuted;
+    final sel = widget.isSelected;
+    final tint = sel ? AppColors.textWhite : AppColors.textMuted;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: onTap,
+      onTap: widget.onTap,
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        child: TweenAnimationBuilder<Color?>(
-          tween: ColorTween(end: tint),
-          duration: const Duration(milliseconds: 250),
-          builder: (context, color, _) {
-            final c = color ?? tint;
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                AnimatedScale(
-                  scale: isSelected ? 1.14 : 1.0,
-                  duration: const Duration(milliseconds: 420),
-                  curve: Curves.easeOutBack,
-                  child: Icon(tab.icon, color: c, size: 22),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  tab.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.fade,
-                  softWrap: false,
-                  style: TextStyle(
-                    color: c,
-                    fontSize: 10,
-                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+        padding: const EdgeInsets.only(top: 6, bottom: 3),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            AnimatedBuilder(
+              animation: _pop,
+              builder: (context, child) {
+                // Naik + membesar + miring sedikit, lalu mendarat di 1.1.
+                final t = _pop.value;
+                final bump = math.sin(math.pi * t);
+                final rest = sel ? 1.1 : 1.0;
+                return Transform.translate(
+                  offset: Offset(0, -4 * bump - (sel ? 1 : 0)),
+                  child: Transform.rotate(
+                    angle: -0.14 * bump * (1 - t),
+                    child: Transform.scale(scale: rest + 0.22 * bump, child: child),
                   ),
+                );
+              },
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 220),
+                switchInCurve: Curves.easeOut,
+                transitionBuilder: (child, a) => FadeTransition(opacity: a, child: child),
+                child: Icon(
+                  sel ? widget.tab.activeIcon : widget.tab.icon,
+                  key: ValueKey(sel),
+                  color: tint,
+                  size: 22,
                 ),
-              ],
-            );
-          },
+              ),
+            ),
+            const SizedBox(height: 2),
+            AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 220),
+              style: TextStyle(
+                color: tint,
+                fontSize: 10,
+                fontWeight: sel ? FontWeight.w700 : FontWeight.w500,
+              ),
+              child: Text(
+                widget.tab.title,
+                maxLines: 1,
+                overflow: TextOverflow.fade,
+                softWrap: false,
+              ),
+            ),
+            const SizedBox(height: 3),
+            // Titik merah penanda tab aktif.
+            AnimatedScale(
+              scale: sel ? 1 : 0,
+              duration: const Duration(milliseconds: 320),
+              curve: Curves.easeOutBack,
+              child: Container(
+                width: 4,
+                height: 4,
+                decoration: const BoxDecoration(color: AppColors.accentViolet, shape: BoxShape.circle),
+              ),
+            ),
+          ],
         ),
       ),
     );

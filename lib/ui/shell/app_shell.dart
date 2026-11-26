@@ -6,6 +6,7 @@ import '../../core/theme/app_colors.dart';
 import '../../providers.dart';
 import '../app_routes.dart';
 import '../components/floating_bottom_bar.dart';
+import '../components/zenime_mascot.dart';
 import '../screens/menu/menu_screen.dart';
 import '../screens/explore/explore_screen.dart';
 import '../screens/home/home_screen.dart';
@@ -138,6 +139,12 @@ class _AppShellState extends ConsumerState<AppShell> {
           Align(
             alignment: Alignment.bottomCenter,
             child: FloatingBottomBar(currentIndex: _index, onTabSelected: _goTab),
+          ),
+          // Maskot mengintip dari atas navbar (tangan di tepi atas bar).
+          Positioned(
+            right: 40,
+            bottom: MediaQuery.paddingOf(context).bottom + 73,
+            child: const ZenimeMascot(),
           ),
         ],
       ),

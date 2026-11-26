@@ -40,6 +40,9 @@ class AnimePosterCard extends StatefulWidget {
 }
 
 class _AnimePosterCardState extends State<AnimePosterCard> {
+  /// Tag Hero unik per kartu (anime yang sama bisa muncul di beberapa baris).
+  late final Object _heroTag = 'poster-hero-${identityHashCode(this)}';
+
   // Kartu poster redesain Samudra (sama dengan preview): sudut 14, tekstur
   // screentone, chip EP / Baru / status di atas, views di kiri bawah.
   @override
@@ -52,6 +55,7 @@ class _AnimePosterCardState extends State<AnimePosterCard> {
     return ZPress(
       onTap: () {
         PosterTransitionHolder.url = widget.anime.posterUrl;
+        PosterTransitionHolder.setHero(_heroTag);
         widget.onTap();
       },
       child: SizedBox(
@@ -61,7 +65,17 @@ class _AnimePosterCardState extends State<AnimePosterCard> {
           children: [
             AspectRatio(
               aspectRatio: 2 / 3,
-              child: ClipRRect(
+              child: Hero(
+                tag: _heroTag,
+                // Yang terbang cuma gambarnya (tanpa chip), sudut ikut melebar.
+                flightShuttleBuilder: (context, anim, dir, from, to) => AnimatedBuilder(
+                  animation: anim,
+                  builder: (context, _) => ClipRRect(
+                    borderRadius: BorderRadius.circular(14 + anim.value),
+                    child: ColoredBox(color: AppColors.surfaceCard, child: NetImage(anime.posterUrl)),
+                  ),
+                ),
+                child: ClipRRect(
                 borderRadius: BorderRadius.circular(14),
                 child: ColoredBox(
                   color: AppColors.surfaceCard,
@@ -122,6 +136,7 @@ class _AnimePosterCardState extends State<AnimePosterCard> {
                     ],
                   ),
                 ),
+              ),
               ),
             ),
             const SizedBox(height: 8),

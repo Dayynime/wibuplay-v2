@@ -17,6 +17,9 @@ import '../download/offline_downloads_view.dart';
 import '../library/library_screens.dart' show HistoryScreen;
 import '../profile/profile_controller.dart' show profileHistoryProvider;
 import '../notifications/notifications_screen.dart';
+import '../../components/next_airing_board.dart';
+import '../../components/manga_recommend.dart';
+import '../../components/poster_tint.dart';
 import '../../components/cards.dart';
 import '../../components/chat_ticker.dart';
 import '../../components/comic_home_section.dart';
@@ -146,6 +149,9 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
   final ScrollController _scroll = ScrollController();
   bool _isScrolled = false;
 
+  /// Gambar banner anime yang sedang tampil (latar ikut warna poster).
+  final ValueNotifier<String?> _tintUrl = ValueNotifier(null);
+
   @override
   void initState() {
     super.initState();
@@ -159,6 +165,7 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
 
   @override
   void dispose() {
+    _tintUrl.dispose();
     _scroll.dispose();
     super.dispose();
   }
@@ -195,6 +202,28 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
         },
       ),
     );
+  }
+
+  HomeSectionData? _picksFor;
+  List<AnimeItem> _picks = const [];
+
+  /// Pilihan mingguan dihitung sekali per data Beranda (bukan tiap build).
+  List<AnimeItem> _weeklyPicks(HomeSectionData data) {
+    if (!identical(data, _picksFor)) {
+      _picksFor = data;
+      // Banner & Episode Baru sudah tampil di atas: jangan diulang di sini.
+      final shown = {
+        ...data.slider.map((e) => e.id),
+        ...data.update.take(6).map((e) => e.id),
+      };
+      List<AnimeItem> notShown(List<AnimeItem> l) => l.where((e) => !shown.contains(e.id)).toList();
+      _picks = pickWeeklyRecommendations([
+        notShown(data.popular),
+        notShown(data.newRelease),
+        notShown(data.random),
+      ]);
+    }
+    return _picks;
   }
 
   /// Lebar poster disamakan dengan sel grid di Jelajah
@@ -308,7 +337,27 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
     }
 
     return PageEntrance(
-      child: ListView(
+      child: Stack(
+      children: [
+      // Cahaya warna poster banner di belakang header & banner; memudar saat
+      // halaman di-scroll ke bawah.
+      Positioned(
+        top: 0,
+        left: 0,
+        right: 0,
+        child: AnimatedBuilder(
+          animation: Listenable.merge([_scroll, _tintUrl]),
+          builder: (context, _) {
+            final off = _scroll.hasClients ? _scroll.offset : 0.0;
+            final s = (1 - off / 420).clamp(0.0, 1.0);
+            return Transform.translate(
+              offset: Offset(0, -off.clamp(0.0, 600.0) * 0.5),
+              child: PosterGlow(url: _tintUrl.value, height: 560, strength: s),
+            );
+          },
+        ),
+      ),
+      ListView(
       controller: _scroll,
       padding: const EdgeInsets.only(bottom: 135),
       children: [
@@ -418,6 +467,7 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
                     .push<void>(fadeRoute(const TopGiverScreen())),
                 onTownClick: () => Navigator.of(context)
                     .push<void>(fadeRoute(const LudoWebViewScreen(path: '/town/'))),
+                onTintChanged: (url) => _tintUrl.value = url,
                 onItemClick: (item) {
                   final id = item.id;
                   if (id != null) widget.onAnimeClick(id);
@@ -489,6 +539,14 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
           },
         ),
 
+        // Rekomendasi minggu ini: halaman manga. Ditaruh setelah dua baris
+        // geser (Episode Baru, Sedang Hangat) supaya jadi jeda visual besar
+        // di layar kedua, jauh dari banner di atas.
+        if (!loading) MangaRecommendSection(
+          items: _weeklyPicks(sections!),
+          onAnimeClick: widget.onAnimeClick,
+        ),
+
         // 5. Jadwal Hari Ini
         _slot(
           'jadwal-hari-ini',
@@ -504,7 +562,12 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
             return section(
               delayMs: 260,
               title: 'Jadwal Hari Ini',
-              child: _posterRow(data.today),
+              child: Column(
+                children: [
+                  NextAiringBoard(items: data.today, onAnimeClick: widget.onAnimeClick),
+                  _posterRow(data.today),
+                ],
+              ),
             );
           },
         ),
@@ -608,6 +671,8 @@ class _HomeContentState extends ConsumerState<_HomeContent> {
         ),
       ],
     ),
+      ],
+      ),
     );
   }
 }

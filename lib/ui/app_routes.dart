@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/local/entities.dart' show FavoriteEntity;
 import '../data/models/moviebox_models.dart' show mbRawId;
 import '../providers.dart' show episodeDownloadManagerProvider;
+import 'components/poster_holder.dart';
 import 'screens/comic/comic_detail_screen.dart';
 import 'screens/comic/comic_reader_controller.dart' show ComicReaderArgs;
 import 'screens/comic/comic_reader_screen.dart';
@@ -64,13 +65,26 @@ Route<T> fadeRoute<T>(Widget page) {
 final GlobalKey<NavigatorState> appNavigatorKey = GlobalKey<NavigatorState>();
 
 void _pushDetail(NavigatorState nav, String movieId) {
-  nav.push(
-    fadeRoute(
-      DetailScreen(
-        movieId: movieId,
-        onBackClick: () => nav.maybePop(),
-        onWatchEpisode: (mId, epId) => _pushPlayer(nav, mId, epId),
-      ),
+  final page = DetailScreen(
+    movieId: movieId,
+    onBackClick: () => nav.maybePop(),
+    onWatchEpisode: (mId, epId) => _pushPlayer(nav, mId, epId),
+  );
+  // Dari kartu poster: poster "terbang" ke Detail, jadi layarnya cukup fade
+  // (tanpa geser) dan sedikit lebih lama supaya penerbangannya terlihat.
+  nav.push(PosterTransitionHolder.freshHero != null || PosterTransitionHolder.zoomedIn
+      ? _heroRoute(page)
+      : fadeRoute(page));
+}
+
+Route<T> _heroRoute<T>(Widget page) {
+  return PageRouteBuilder<T>(
+    transitionDuration: const Duration(milliseconds: 420),
+    reverseTransitionDuration: const Duration(milliseconds: 340),
+    pageBuilder: (context, animation, secondary) => page,
+    transitionsBuilder: (context, animation, secondary, child) => FadeTransition(
+      opacity: CurvedAnimation(parent: animation, curve: const Interval(0, 0.6, curve: Curves.easeOut)),
+      child: child,
     ),
   );
 }

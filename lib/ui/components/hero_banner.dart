@@ -43,6 +43,7 @@ class HeroBanner extends StatefulWidget {
     this.giverClanTags = const {},
     this.onGiverClick,
     this.onTownClick,
+    this.onTintChanged,
   });
 
   final List<AnimeItem> sliderItems;
@@ -65,6 +66,10 @@ class HeroBanner extends StatefulWidget {
 
   /// Slide promosi Zenime Town di urutan pertama (null = slide tidak ada).
   final VoidCallback? onTownClick;
+
+  /// Gambar anime yang sedang tampil (untuk latar "ikut warna poster");
+  /// null saat slide yang tampil bukan slide anime.
+  final ValueChanged<String?>? onTintChanged;
 
   @override
   State<HeroBanner> createState() => _HeroBannerState();
@@ -90,6 +95,23 @@ class _HeroBannerState extends State<HeroBanner> with SingleTickerProviderStateM
     super.initState();
     // Jam rotasi poster cuma jalan kalau slide poster yang tampil duluan.
     if (_animePage == 0) _rotation.forward();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _reportTint());
+  }
+
+  String? _lastTint;
+
+  void _reportTint() {
+    if (!mounted || widget.onTintChanged == null) return;
+    final items = widget.sliderItems;
+    String? url;
+    if (_page == _animePage && items.isNotEmpty) {
+      final a = items[_animeIndex < items.length ? _animeIndex : 0];
+      url = a.coverUrl.isNotEmpty ? a.coverUrl : a.posterUrl;
+      if (url.isEmpty) url = null;
+    }
+    if (url == _lastTint) return;
+    _lastTint = url;
+    widget.onTintChanged!(url);
   }
 
   void _onRotationDone(AnimationStatus status) {
@@ -103,10 +125,12 @@ class _HeroBannerState extends State<HeroBanner> with SingleTickerProviderStateM
     if (!mounted || n <= 1 || _page != _animePage || _scrolling) return;
     setState(() => _animeIndex = (_animeIndex + 1) % n);
     _preloadNext();
+    _reportTint();
   }
 
   void _onPageChanged(int i) {
     setState(() => _page = i);
+    _reportTint();
     if (i == _animePage) {
       _rotation.forward(from: 0);
     } else {
@@ -137,6 +161,7 @@ class _HeroBannerState extends State<HeroBanner> with SingleTickerProviderStateM
     super.didUpdateWidget(old);
     // Jaga-jaga kalau jumlah item berkurang (mis. ganti sumber banner).
     if (_animeIndex >= widget.sliderItems.length) _animeIndex = 0;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _reportTint());
   }
 
   @override
