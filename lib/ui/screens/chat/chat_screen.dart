@@ -446,7 +446,9 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
             ),
           ],
         ),
-        body: Column(
+        body: _ChatBackground(
+          url: ref.watch(localStoreProvider.select((x) => x.chatBgUrl)),
+          child: Column(
           children: [
             _buildChatTabs(privateBadge, clanBadge),
             Expanded(
@@ -480,6 +482,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                     ),
             ),
           ],
+        ),
         ),
       ),
     );
@@ -1484,6 +1487,52 @@ class _TabBadge extends StatelessWidget {
                 style: const TextStyle(color: Colors.white, fontSize: 10.5, fontWeight: FontWeight.w800, height: 1),
               ),
             ),
+    );
+  }
+}
+
+
+/// Latar halaman chat dari wallpaper koleksi (diatur di halaman Wallpaper,
+/// cuma di HP ini). Diredam gelap supaya bubble & teks tetap terbaca.
+class _ChatBackground extends StatelessWidget {
+  const _ChatBackground({required this.url, required this.child});
+
+  final String? url;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final u = url;
+    if (u == null) return child;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Positioned.fill(
+          child: RepaintBoundary(
+            child: CachedNetworkImage(
+              cacheManager: AppImageCache.images,
+              imageUrl: u,
+              memCacheWidth: LiteMode.px(context, MediaQuery.sizeOf(context).width),
+              fit: BoxFit.cover,
+              fadeInDuration: const Duration(milliseconds: 250),
+              errorWidget: (_, __, ___) => const SizedBox.shrink(),
+            ),
+          ),
+        ),
+        const Positioned.fill(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Color(0xB30B0E14), Color(0x990B0E14), Color(0xD90B0E14)],
+                stops: [0, 0.5, 1],
+              ),
+            ),
+          ),
+        ),
+        child,
+      ],
     );
   }
 }

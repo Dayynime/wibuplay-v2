@@ -20,6 +20,7 @@ import '../../app_routes.dart' show fadeRoute;
 import '../store/coin_screen.dart';
 import '../comments/comments_section.dart' show CommentWallpaperFrame;
 import '../../glass/glass.dart';
+import '../../../data/chat_wallpaper_cache.dart';
 
 /// Wallpaper Komentar: gacha pakai ZCoin + koleksi untuk dipasang.
 ///
@@ -52,6 +53,9 @@ class _WallpaperScreenState extends ConsumerState<WallpaperScreen> {
 
   /// Wallpaper yang dipasang sebagai banner profil (terpisah dari komentar).
   String? _bannerId;
+
+  /// Wallpaper yang dipasang di bubble chat (slot terpisah).
+  String? _chatId;
 
   /// Indeks wallpaper unggulan yang sedang tampil di panggung.
   int _hero = 0;
@@ -225,6 +229,41 @@ class _WallpaperScreenState extends ConsumerState<WallpaperScreen> {
       final w = await ref.read(bannerWallpaperProvider(uid).future);
       if (mounted) setState(() => _bannerId = w?.id);
     } catch (_) {}
+    final chat = await _repo.getChatWallpaperId(uid);
+    if (mounted) setState(() => _chatId = chat);
+  }
+
+  /// Pasang / lepas wallpaper di bubble chat (Global & Clan), terlihat semua orang.
+  Future<void> _equipChat(String? id) async {
+    if (_equipping) return;
+    setState(() => _equipping = true);
+    try {
+      await _repo.equipChat(id);
+      if (!mounted) return;
+      setState(() => _chatId = id);
+      final uid = _uid;
+      if (uid.isNotEmpty) ChatWallpaperCache.instance.invalidate(uid);
+      _snack(
+        id == null ? 'Wallpaper bubble chat dilepas' : 'Wallpaper terpasang di bubble chatmu',
+        kind: id == null ? ToastKind.info : ToastKind.success,
+        icon: id == null ? Icons.hide_image_rounded : Icons.chat_bubble_rounded,
+      );
+    } catch (e) {
+      if (mounted) _snack(e is WallpaperException ? e.message : 'Gagal, coba lagi', kind: ToastKind.error);
+    } finally {
+      if (mounted) setState(() => _equipping = false);
+    }
+  }
+
+  /// Latar halaman Chat (cuma di HP ini, tidak dilihat orang lain).
+  Future<void> _setChatBg(String? url) async {
+    await ref.read(localStoreProvider).setChatBgUrl(url);
+    if (!mounted) return;
+    _snack(
+      url == null ? 'Latar chat kembali polos' : 'Wallpaper jadi latar halaman chatmu',
+      kind: url == null ? ToastKind.info : ToastKind.success,
+      icon: url == null ? Icons.hide_image_rounded : Icons.forum_rounded,
+    );
   }
 
   /// Pasang / lepas wallpaper sebagai banner profil. Menggantikan foto banner
@@ -272,6 +311,8 @@ class _WallpaperScreenState extends ConsumerState<WallpaperScreen> {
   void _openItem(WallpaperItem w) {
     final equipped = _state?.equippedId == w.id;
     final asBanner = _bannerId == w.id;
+    final asChat = _chatId == w.id;
+    final asChatBg = ref.read(localStoreProvider).chatBgUrl == w.url;
     showGlassSheet<void>(
       context: context,
       backgroundColor: AppColors.backgroundDarkSecondary,
@@ -353,6 +394,68 @@ class _WallpaperScreenState extends ConsumerState<WallpaperScreen> {
                       style: const TextStyle(fontWeight: FontWeight.w700),
                     ),
                   ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              // Chat: bubble (dilihat semua orang) + latar halaman (cuma di HP ini).
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: SizedBox(
+                        height: 46,
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            side: BorderSide(
+                              color: asChat ? const Color(0x59FFFFFF) : AppColors.accentViolet.withValues(alpha: 0.8),
+                            ),
+                            shape: const StadiumBorder(),
+                          ),
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            _equipChat(asChat ? null : w.id);
+                          },
+                          icon: Icon(asChat ? Icons.hide_image_outlined : Icons.chat_bubble_outline_rounded, size: 17),
+                          label: FittedBox(
+                            child: Text(
+                              asChat ? 'Lepas dari bubble' : 'Bubble chat',
+                              style: const TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: SizedBox(
+                        height: 46,
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            side: BorderSide(
+                              color: asChatBg ? const Color(0x59FFFFFF) : AppColors.accentViolet.withValues(alpha: 0.8),
+                            ),
+                            shape: const StadiumBorder(),
+                          ),
+                          onPressed: () {
+                            Navigator.pop(ctx);
+                            _setChatBg(asChatBg ? null : w.url);
+                          },
+                          icon: Icon(asChatBg ? Icons.hide_image_outlined : Icons.forum_outlined, size: 17),
+                          label: FittedBox(
+                            child: Text(
+                              asChatBg ? 'Lepas latar chat' : 'Latar chat',
+                              style: const TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],

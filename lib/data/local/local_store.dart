@@ -87,6 +87,24 @@ class LocalStore extends ChangeNotifier {
   Future<void> setWhatsNewSeenId(String id) =>
       _prefs.setString(_whatsNewSeenKey, id);
 
+  // ---- Latar halaman Chat (cuma di HP ini): URL wallpaper koleksi ----
+
+  static const String _chatBgKey = 'chat_bg_wallpaper';
+
+  String? get chatBgUrl {
+    final v = _prefs.getString(_chatBgKey);
+    return (v == null || v.isEmpty) ? null : v;
+  }
+
+  Future<void> setChatBgUrl(String? url) async {
+    if (url == null || url.isEmpty) {
+      await _prefs.remove(_chatBgKey);
+    } else {
+      await _prefs.setString(_chatBgKey, url);
+    }
+    notifyListeners();
+  }
+
   // ---- Pengaturan pemutar (sama dengan Zenime: default aktif) ----
 
   static const String _autoSkipIntroKey = 'player_auto_skip_intro';

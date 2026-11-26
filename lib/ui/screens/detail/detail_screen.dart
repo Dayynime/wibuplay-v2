@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' show ImageFilter;
 
@@ -21,6 +22,7 @@ import '../../components/poster_holder.dart';
 import '../../components/poster_tint.dart';
 import '../download/download_actions.dart';
 import 'detail_controller.dart';
+import 'opening_credits.dart';
 import '../../glass/glass.dart';
 import '../../redesign/z_kit.dart';
 
@@ -186,9 +188,32 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
 
   /// Dipanggil saat isi halaman pertama kali dibangun (sebelum widget yang
   /// mendengarkan animasi ini dibuat, jadi aman diubah di tengah build).
-  void _startContentIn() {
+  // ------------------------------------------------- kredit ala opening anime
+  //
+  // Kredit (studio, tahun tayang, episode, genre) muncul bergantian di pojok
+  // kanan atas hero dengan letterbox. Animasi penuh cuma sekali per anime per
+  // sesi app; berikutnya langsung tampil diam. Ketuk hero = lewati.
+  late final AnimationController _credits = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2900),
+  );
+  static final Set<String> _creditsSeen = {};
+  Timer? _contentDelay;
+
+  void _skipCredits() {
+    if (!_credits.isAnimating) return;
+    _credits.value = 1;
+    if (_contentDelay?.isActive ?? false) {
+      _contentDelay!.cancel();
+      _contentIn.forward(from: 0);
+    }
+  }
+
+  void _startContentIn({bool credits = false}) {
     if (_contentStarted) return;
     _contentStarted = true;
+    final playCredits = credits && !_reduceMotion && _creditsSeen.add(widget.movieId);
+    if (!playCredits) _credits.value = 1;
     if (_reduceMotion) {
       _tabKicked = true;
       _contentIn.value = 1;
@@ -196,8 +221,37 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
     }
     _tabAnim.value = 0;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _contentIn.forward(from: 0);
+      if (!mounted) return;
+      if (playCredits) {
+        _credits.forward(from: 0);
+        // Isi halaman menyusul saat letterbox mulai membuka.
+        _contentDelay = Timer(const Duration(milliseconds: 2100), () {
+          if (mounted) _contentIn.forward(from: 0);
+        });
+      } else {
+        _contentIn.forward(from: 0);
+      }
     });
+  }
+
+  List<CreditLine> _creditLines(AnimeItem? a, int total) {
+    if (a == null) return const [];
+    String? year(String? v) {
+      final c = _clean(v);
+      if (c == null || c.startsWith('0000')) return null;
+      return RegExp(r'^(\d{4})').firstMatch(c)?.group(1);
+    }
+
+    final y1 = year(a.airedStart), y2 = year(a.airedEnd);
+    final aired = y1 != null ? (y2 != null && y2 != y1 ? '$y1 – $y2' : y1) : _clean(a.year);
+    final genres = (a.genre ?? '').split(',').map((e) => e.trim()).where((e) => e.isNotEmpty).take(2).join(' · ');
+    final studio = _clean(a.studio);
+    return [
+      if (studio != null) CreditLine('制作', 'Studio', studio),
+      if (aired != null) CreditLine('放送', 'Tayang', aired),
+      if (total > 0) CreditLine('話数', 'Episode', '$total'),
+      if (genres.isNotEmpty) CreditLine('ジャンル', 'Genre', genres),
+    ];
   }
 
   /// Gambar hero + scrim: klip mengembang dari ukuran kartu, gambar mendarat
@@ -417,6 +471,8 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
 
   @override
   void dispose() {
+    _contentDelay?.cancel();
+    _credits.dispose();
     _scroll.removeListener(_onScroll);
     _scroll.dispose();
     _tabCurve.dispose();
@@ -535,8 +591,9 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
   // ------------------------------------------------------------------ loaded
 
   Widget _loaded(DetailUiState ui) {
-    _startContentIn();
     final anime = ui.anime;
+    final creditLines = _creditLines(anime, ui.totalEpisodes);
+    _startContentIn(credits: creditLines.length >= 2);
     _loadTint(anime?.posterUrl ?? '');
     final topInset = MediaQuery.paddingOf(context).top;
     final isFavorite =
@@ -604,6 +661,7 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
                   topInset: topInset,
                   isFavorite: isFavorite,
                   targetEpisodeId: targetEpisodeId,
+                  credits: creditLines,
                 ),
               ),
               // Ringkasan + tombol tonton (redesain Samudra).
@@ -744,6 +802,7 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
     required double topInset,
     required bool isFavorite,
     required String targetEpisodeId,
+    List<CreditLine> credits = const [],
   }) {
     // Status & tipe sudah tampil sebagai chip; meta = tahun + studio.
     final meta = [
@@ -757,6 +816,24 @@ class _DetailScreenState extends ConsumerState<DetailScreen>
         fit: StackFit.expand,
         children: [
           _heroArt(heroUrl),
+
+          // Kredit ala opening anime + letterbox (ketuk = lewati).
+          if (credits.length >= 2) ...[
+            Positioned(
+              top: topInset + 58,
+              right: 18,
+              child: OpeningCredits(lines: credits, anim: _credits),
+            ),
+            Positioned.fill(child: CreditLetterbox(anim: _credits, height: _heroHeight + topInset)),
+            Positioned.fill(
+              child: AnimatedBuilder(
+                animation: _credits,
+                builder: (context, _) => _credits.isAnimating
+                    ? GestureDetector(behavior: HitTestBehavior.opaque, onTap: _skipCredits)
+                    : const SizedBox.shrink(),
+              ),
+            ),
+          ],
 
           // Atas: kembali + favorit (bookmark), memantul masuk bergantian.
           Positioned(

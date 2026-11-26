@@ -8,8 +8,8 @@ import 'supabase/supabase_client.dart';
 
 /// Wallpaper yang tampil sebagai latar bubble chat tiap user.
 ///
-/// Sama dengan wallpaper komentar (`wp_equipped_view`); kalau user tidak
-/// memasang wallpaper komentar, dipakai wallpaper banner profil
+/// Urutan: wallpaper yang dipilih khusus untuk chat (`wp_chat_view`), lalu
+/// wallpaper komentar (`wp_equipped_view`), lalu wallpaper banner profil
 /// (`wp_banner_view`). uid yang muncul di layar dikumpulkan sebentar lalu
 /// diambil sekali jalan, disimpan 5 menit. Gagal = bubble biasa.
 ///
@@ -35,6 +35,15 @@ class ChatWallpaperCache extends ChangeNotifier {
 
   /// null = view tidak punya kolom `name` (sudah dicoba sekali).
   bool _nameColumn = true;
+
+  /// false = view `wp_chat_view` belum ada di server (jangan dicoba lagi).
+  bool _chatView = true;
+
+  /// Hapus data [uid] supaya diambil ulang (mis. setelah ganti wallpaper chat).
+  void invalidate(String uid) {
+    _expires.remove(uid);
+    _scheduleNotify();
+  }
 
   ChatWallpaper? forUid(String uid) {
     if (!_uidRe.hasMatch(uid)) return null;
@@ -93,7 +102,16 @@ class ChatWallpaperCache extends ChangeNotifier {
         }
       }
 
-      take(await _rows('wp_equipped_view', uids));
+      if (_chatView) {
+        try {
+          take(await _rows('wp_chat_view', uids));
+        } on DioException catch (e) {
+          final code = e.response?.statusCode ?? 0;
+          if (code == 404 || code == 400) _chatView = false;
+        }
+      }
+      final rest0 = uids.where((u) => !found.containsKey(u)).toList();
+      if (rest0.isNotEmpty) take(await _rows('wp_equipped_view', rest0));
       final rest = uids.where((u) => !found.containsKey(u)).toList();
       if (rest.isNotEmpty) {
         try {

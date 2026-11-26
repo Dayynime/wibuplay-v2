@@ -81,6 +81,11 @@ class _MangaRecommendSectionState extends State<MangaRecommendSection> with Tick
   late final AnimationController _in = AnimationController(vsync: this, duration: const Duration(milliseconds: 1700));
   ScrollPosition? _pos;
   bool _started = false;
+
+  /// Animasi masuk cuma SEKALI per sesi app. ListView Beranda membuang section
+  /// ini saat di-scroll jauh lalu membuatnya lagi; tanpa tanda ini panel
+  /// "dibanting" ulang tiap kali kembali terlihat (berat & mengganggu).
+  static bool _playedThisSession = false;
   final List<GlobalKey> _panelKeys = List.generate(4, (_) => GlobalKey());
   bool _opening = false;
 
@@ -89,9 +94,10 @@ class _MangaRecommendSectionState extends State<MangaRecommendSection> with Tick
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (MediaQuery.disableAnimationsOf(context)) {
+    if (_playedThisSession || MediaQuery.disableAnimationsOf(context)) {
       _started = true;
       _in.value = 1;
+      return;
     }
     final p = Scrollable.maybeOf(context)?.position;
     if (p != _pos) {
@@ -111,6 +117,7 @@ class _MangaRecommendSectionState extends State<MangaRecommendSection> with Tick
     final h = MediaQuery.sizeOf(context).height;
     if (y < h * 0.8) {
       _started = true;
+      _playedThisSession = true;
       _pos?.removeListener(_check);
       _in.forward();
     }

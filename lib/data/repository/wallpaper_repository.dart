@@ -152,6 +152,33 @@ class WallpaperRepository {
     );
   }
 
+  /// Pasang wallpaper milik sendiri di bubble chat (Global & Clan); null =
+  /// lepas (bubble kembali memakai wallpaper komentar / banner).
+  Future<void> equipChat(String? wallpaperId) async {
+    await _call(
+      'wibuplay-wallpaper-user',
+      {'action': 'chat', 'wallpaper_id': wallpaperId},
+      'Gagal memasang wallpaper chat',
+    );
+  }
+
+  /// id wallpaper bubble chat milik [uid] (null = belum pasang / view belum ada).
+  Future<String?> getChatWallpaperId(String uid) async {
+    if (!_uidRe.hasMatch(uid)) return null;
+    try {
+      final res = await _dio.get<dynamic>(
+        'rest/v1/wp_chat_view',
+        queryParameters: {'firebase_uid': 'eq.$uid', 'select': 'wallpaper_id', 'limit': 1},
+      );
+      final d = res.data;
+      if (d is List && d.isNotEmpty && d.first is Map) {
+        final id = (d.first as Map)['wallpaper_id'];
+        if (id is String) return id;
+      }
+    } catch (_) {}
+    return null;
+  }
+
   // ------------------------------------------------------------ admin
 
   /// Cek isi file (magic bytes), bukan cuma ekstensi.
