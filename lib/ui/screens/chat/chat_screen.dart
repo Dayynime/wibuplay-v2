@@ -39,7 +39,8 @@ import 'chat_mute.dart';
 import 'chat_pin.dart';
 import 'chat_reactions.dart';
 import 'chat_mention.dart';
-import 'manga_bubble.dart';
+import '../../../data/chat_wallpaper_cache.dart';
+import 'wallpaper_bubble.dart';
 import '../../components/avatar_frame.dart';
 import '../../glass/glass.dart';
 import '../../components/clan_tag_badge.dart';
@@ -753,42 +754,37 @@ class ChatMessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final m = message;
-    final hasReply = (m.replyToUsername ?? '').isNotEmpty;
-    // Warna bubble sendiri sama dengan bubble orang lain (seperti Zenime);
-    // bedanya cuma posisi (kanan) dan avatar ada di kanan bubble.
-    const bubbleColor = AppColors.surfaceCard;
-    // Premium + pesan teks biasa = balon kata manga (krem, tinta gelap).
-    final manga = isPremium &&
-        !m.isGiveaway &&
+    // Pesan teks biasa dari user yang memasang wallpaper = bubble berlatar
+    // wallpaper (stiker, hadiah, giveaway, undangan game tetap biasa).
+    final plain = !m.isGiveaway &&
         !m.isGift &&
         !m.isVoice &&
         chessInviteCode(m.message) == null &&
         ludoInviteCode(m.message) == null &&
         stickerCodeOf(m.message) == null;
-    final inkText = manga ? kMangaInk : AppColors.textWhite;
-    final mutedText = manga ? kMangaInkSoft : AppColors.textMuted;
+    if (!plain) return _build(context, null);
+    final cache = ChatWallpaperCache.instance;
+    return ListenableBuilder(
+      listenable: cache,
+      builder: (context, _) => _build(context, cache.forUid(m.firebaseUid)),
+    );
+  }
 
-    final bubble = GestureDetector(
-      onLongPress: onLongPress,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        width: _bubbleWidth(context),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: manga ? kMangaPaper : (highlighted ? const Color(0xFF3A2430) : bubbleColor),
-          borderRadius: AppShapes.card,
-          border: Border.all(
-            color: highlighted ? AppColors.accentViolet : Colors.transparent,
-            width: 1.5,
-          ),
-        ),
-        child: Column(
+  Widget _build(BuildContext context, ChatWallpaper? wp) {
+    final m = message;
+    final hasReply = (m.replyToUsername ?? '').isNotEmpty;
+    // Warna bubble sendiri sama dengan bubble orang lain (seperti Zenime);
+    // bedanya cuma posisi (kanan) dan avatar ada di kanan bubble.
+    const bubbleColor = AppColors.surfaceCard;
+    final hasWp = wp != null;
+    const inkText = AppColors.textWhite;
+    final mutedText = hasWp ? const Color(0xB3F5F5F7) : AppColors.textMuted;
+
+    final content = Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Baris 1: username > centang Premium > #ID (urutan sama dengan Zenime).
-            // Di balon manga, baris ini di atas pelat gelap supaya dekorasi
-            // nama tetap terbaca.
-            _namePlate(manga, Row(
+            Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Flexible(
@@ -823,7 +819,7 @@ class ChatMessageBubble extends StatelessWidget {
                   ),
                 ],
               ],
-            )),
+            ),
             // Baris 2: badge clan + level + Top Giver, di bawah username.
             if (clanTag != null || level != null || m.firebaseUid.isNotEmpty) ...[
               const SizedBox(height: 3),
@@ -847,7 +843,7 @@ class ChatMessageBubble extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
                 decoration: BoxDecoration(
-                  color: manga ? const Color(0x14000000) : Colors.black26,
+                  color: hasWp ? const Color(0x8C0B0E14) : Colors.black26,
                   borderRadius: BorderRadius.circular(8),
                   border: const Border(
                     left: BorderSide(color: AppColors.accentViolet, width: 3),
@@ -859,7 +855,7 @@ class ChatMessageBubble extends StatelessWidget {
                     Text(
                       m.replyToUsername!,
                       style: TextStyle(
-                        color: manga ? AppColors.accentViolet : AppColors.accentVioletLight,
+                        color: AppColors.accentVioletLight,
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
                       ),
@@ -868,7 +864,7 @@ class ChatMessageBubble extends StatelessWidget {
                       stickerPreviewText(m.replyToMessage ?? ''),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: manga ? kMangaInkSoft : AppColors.textSecondary, fontSize: 11),
+                      style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
                     ),
                   ],
                 ),
@@ -901,7 +897,7 @@ class ChatMessageBubble extends StatelessWidget {
                   color: inkText,
                   fontSize: 14,
                   height: 1.3,
-                  fontWeight: manga ? FontWeight.w600 : null,
+                  shadows: hasWp ? const [Shadow(color: Color(0x80000000), blurRadius: 3)] : null,
                 ),
               ),
             if (m.isVoice)
@@ -922,21 +918,41 @@ class ChatMessageBubble extends StatelessWidget {
                   style: TextStyle(color: mutedText, fontSize: 10),
                 ),
                 const SizedBox(width: 10),
-                _FooterAction(label: 'Balas', onTap: onReply, color: manga ? kMangaInkSoft : null),
+                _FooterAction(label: 'Balas', onTap: onReply, color: hasWp ? mutedText : null),
                 if (onDelete != null) ...[
                   const SizedBox(width: 10),
-                  _FooterAction(label: 'Hapus', onTap: onDelete!, color: manga ? kMangaInkSoft : null),
+                  _FooterAction(label: 'Hapus', onTap: onDelete!, color: hasWp ? mutedText : null),
                 ],
               ],
             ),
           ],
-        ),
-      ),
-    );
+        );
 
-    final bubbleView = manga
-        ? MangaBubbleFrame(mine: mine, fresh: mangaIsFresh(m.time), seed: m.id, child: bubble)
-        : bubble;
+    final bubble = GestureDetector(
+      onLongPress: onLongPress,
+      child: hasWp
+          ? WallpaperBubble(
+              wallpaper: wp,
+              width: _bubbleWidth(context),
+              highlighted: highlighted,
+              child: content,
+            )
+          : AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              width: _bubbleWidth(context),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: highlighted ? const Color(0xFF3A2430) : bubbleColor,
+                borderRadius: AppShapes.card,
+                border: Border.all(
+                  color: highlighted ? AppColors.accentViolet : Colors.transparent,
+                  width: 1.5,
+                ),
+              ),
+              child: content,
+            ),
+    );
+    final bubbleView = bubble;
 
     final avatar = FramedAvatar(
       uid: m.firebaseUid,
@@ -982,19 +998,6 @@ class ChatMessageBubble extends StatelessWidget {
 }
 
 /// Teks aksi kecil di footer bubble ("Balas" / "Hapus"), sama seperti Zenime.
-/// Baris nama di balon manga: pelat gelap kecil (dekorasi nama butuh latar gelap).
-Widget _namePlate(bool on, Widget child) {
-  if (!on) return child;
-  return Container(
-    padding: const EdgeInsets.fromLTRB(7, 3, 7, 3),
-    decoration: BoxDecoration(
-      color: const Color(0xFF16181D),
-      borderRadius: BorderRadius.circular(7),
-    ),
-    child: child,
-  );
-}
-
 class _FooterAction extends StatelessWidget {
   const _FooterAction({required this.label, required this.onTap, this.color});
 
