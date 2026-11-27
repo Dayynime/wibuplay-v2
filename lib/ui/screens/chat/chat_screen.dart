@@ -757,15 +757,8 @@ class ChatMessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final m = message;
-    // Pesan teks biasa dari user yang memasang wallpaper = bubble berlatar
-    // wallpaper (stiker, hadiah, giveaway, undangan game tetap biasa).
-    final plain = !m.isGiveaway &&
-        !m.isGift &&
-        !m.isVoice &&
-        chessInviteCode(m.message) == null &&
-        ludoInviteCode(m.message) == null &&
-        stickerCodeOf(m.message) == null;
-    if (!plain) return _build(context, null);
+    // Semua pesan (teks, stiker, kartu hadiah/giveaway, undangan game) dari
+    // user yang memasang wallpaper memakai bubble berlatar wallpaper.
     final cache = ChatWallpaperCache.instance;
     return ListenableBuilder(
       listenable: cache,
