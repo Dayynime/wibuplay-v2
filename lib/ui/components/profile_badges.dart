@@ -7,6 +7,7 @@ import '../../core/decor_tick.dart';
 import '../../data/models/xp_models.dart';
 import '../../providers.dart';
 import 'user_level_badge.dart';
+import '../../core/lite_mode.dart';
 
 /// Komponen badge header Profil gaya "Level di Avatar":
 /// - [ProfileXpRing]: cincin progress XP emas di sekeliling avatar + pin "LV N".
@@ -215,7 +216,7 @@ class _ClanNameTagState extends State<ClanNameTag> with SingleTickerProviderStat
     if (MediaQuery.disableAnimationsOf(context)) {
       _c.stop();
     } else if (!_c.isAnimating) {
-      _c.repeat();
+      _c.liteRepeat();
     }
   }
 

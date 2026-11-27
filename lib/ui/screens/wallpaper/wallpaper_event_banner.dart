@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../core/decor_tick.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/wallpaper_models.dart';
+import '../../../core/lite_mode.dart';
 
 /// Banner Event Limited di atas layar Spin: hitung mundur selesai (event
 /// berjalan) atau mulai (event akan datang). Jam diambil dari server lewat
@@ -53,7 +54,7 @@ class _WallpaperEventBannerState extends State<WallpaperEventBanner> with Single
     if (MediaQuery.disableAnimationsOf(context)) {
       _shine.stop();
     } else if (!_shine.isAnimating) {
-      _shine.repeat();
+      _shine.liteRepeat();
     }
   }
 

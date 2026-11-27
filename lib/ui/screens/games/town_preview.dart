@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import '../../../core/lite_mode.dart';
 
 /// Thumbnail "Zenime Town": pemandangan pixel kecil (rumput, jalan, meja
 /// diskusi, pohon, dan beberapa karakter yang melompat pelan).
@@ -19,7 +20,7 @@ class _TownPreviewState extends State<TownPreview> with SingleTickerProviderStat
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      if (!MediaQuery.of(context).disableAnimations) _c.repeat();
+      if (!MediaQuery.of(context).disableAnimations) _c.liteRepeat();
     });
   }
 

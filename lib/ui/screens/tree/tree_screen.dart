@@ -18,6 +18,7 @@ import '../store/coin_screen.dart';
 import '../store/premium_screen.dart';
 import 'tree_scene.dart';
 import '../../glass/glass.dart';
+import '../../../core/lite_mode.dart';
 
 const Color _kGold = Color(0xFFFFC53D);
 const Color _kLeaf = Color(0xFF22C55E);
@@ -1458,14 +1459,14 @@ class _HarvestButtonState extends State<_HarvestButton> with SingleTickerProvide
   @override
   void initState() {
     super.initState();
-    if (widget.enabled) _pulse.repeat();
+    if (widget.enabled) _pulse.liteRepeat();
   }
 
   @override
   void didUpdateWidget(covariant _HarvestButton old) {
     super.didUpdateWidget(old);
     if (widget.enabled && !_pulse.isAnimating) {
-      _pulse.repeat();
+      _pulse.liteRepeat();
     } else if (!widget.enabled && _pulse.isAnimating) {
       _pulse.stop();
       _pulse.value = 0;

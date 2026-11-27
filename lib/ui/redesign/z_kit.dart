@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/decor_tick.dart';
 import '../../core/theme/app_colors.dart';
+import '../../core/lite_mode.dart';
 
 // =============================================================================
 // Kit desain Zenime "Samudra" (redesain Nov 2026, sama dengan preview HTML).
@@ -276,7 +277,7 @@ class _ZSheenState extends State<ZSheen> with SingleTickerProviderStateMixin {
     if (MediaQuery.disableAnimationsOf(context)) {
       _c.stop();
     } else if (!_c.isAnimating) {
-      _c.repeat();
+      _c.liteRepeat();
     }
   }
 
@@ -347,7 +348,7 @@ class _ZSpinRingState extends State<ZSpinRing> with SingleTickerProviderStateMix
     if (MediaQuery.disableAnimationsOf(context)) {
       _c.stop();
     } else if (!_c.isAnimating) {
-      _c.repeat();
+      _c.liteRepeat();
     }
   }
 

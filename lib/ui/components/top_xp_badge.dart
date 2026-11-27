@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/decor_tick.dart';
 import '../../providers.dart';
+import '../../core/lite_mode.dart';
 
 /// Tag "TOP XP #posisi" untuk user yang masuk top XP bulanan.
 /// Tidak render apa-apa kalau user tidak ada di leaderboard.
@@ -57,7 +58,7 @@ class _TopXpChipState extends State<TopXpChip>
     if (MediaQuery.disableAnimationsOf(context)) {
       _c.stop();
     } else if (!_c.isAnimating) {
-      _c.repeat();
+      _c.liteRepeat();
     }
   }
 

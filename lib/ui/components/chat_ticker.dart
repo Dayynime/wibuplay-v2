@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/lite_mode.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/models/chat_models.dart';
 import '../../data/realtime/chat_realtime_client.dart';
@@ -38,8 +39,22 @@ class _ChatTickerState extends ConsumerState<ChatTicker>
   @override
   void initState() {
     super.initState();
-    _ticker = createTicker(_onTick)..start();
+    _ticker = createTicker(_onTick);
     _load();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Mode Ringan: strip chat diam (tidak berjalan), hemat repaint tiap frame.
+    final t = _ticker;
+    if (t == null) return;
+    if (LiteMode.of(context)) {
+      if (t.isActive) t.stop();
+    } else if (!t.isActive) {
+      _last = Duration.zero;
+      t.start();
+    }
   }
 
   @override

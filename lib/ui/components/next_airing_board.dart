@@ -8,6 +8,7 @@ import '../../data/models/anime_item.dart';
 import '../redesign/z_kit.dart';
 import 'net_image.dart';
 import 'poster_holder.dart';
+import '../../core/lite_mode.dart';
 
 /// Kartu "Tayang berikutnya" di atas Jadwal Hari Ini: hitung mundur ke jam
 /// tayang terdekat, angkanya berputar seperti papan split-flap stasiun.
@@ -170,7 +171,7 @@ class _Pulse extends StatefulWidget {
 
 class _PulseState extends State<_Pulse> with SingleTickerProviderStateMixin {
   late final AnimationController _c =
-      AnimationController(vsync: this, duration: const Duration(milliseconds: 1200))..repeat(reverse: true);
+      AnimationController(vsync: this, duration: const Duration(milliseconds: 1200))..liteRepeat(reverse: true);
 
   @override
   void dispose() {

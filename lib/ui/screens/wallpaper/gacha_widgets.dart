@@ -98,7 +98,7 @@ class _SheenState extends State<_Sheen> with SingleTickerProviderStateMixin {
     if (MediaQuery.disableAnimationsOf(context)) {
       _c.stop();
     } else if (!_c.isAnimating) {
-      _c.repeat();
+      _c.liteRepeat();
     }
   }
 

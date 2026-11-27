@@ -8,6 +8,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../app_routes.dart' show appNavigatorKey;
 import '../../components/mini_player.dart' show MiniPlayerManager;
 import '../../glass/glass.dart';
+import '../../../core/lite_mode.dart';
 
 /// Gerbang keamanan paling luar (port blockedTool di MainActivity.kt Zenime).
 ///
@@ -102,7 +103,7 @@ const String _mono = 'monospace';
 
 class _BlockedToolScreenState extends State<BlockedToolScreen> with TickerProviderStateMixin {
   late final AnimationController _loop =
-      AnimationController(vsync: this, duration: const Duration(seconds: 6))..repeat();
+      AnimationController(vsync: this, duration: const Duration(seconds: 6))..liteRepeat();
   late final AnimationController _type;
   late final List<_LogLine> _lines;
   late final int _totalChars;

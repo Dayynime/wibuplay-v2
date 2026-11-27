@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import '../../core/lite_mode.dart';
 
 /// Slide promosi Zenime Town di carousel Beranda.
 ///
@@ -46,7 +47,7 @@ class _HeroTownSlideState extends State<HeroTownSlide> with SingleTickerProvider
 
   void _sync() {
     if (widget.active && !_c.isAnimating) {
-      _c.repeat();
+      _c.liteRepeat();
     } else if (!widget.active && _c.isAnimating) {
       _c.stop();
     }

@@ -25,6 +25,7 @@ import '../../components/role_badges.dart';
 import '../../../data/name_deco_cache.dart';
 import '../../components/name_deco_styles.dart';
 import 'profile_screen.dart' show ProfileHeroAvatar, ProfileClanPill;
+import '../../../core/lite_mode.dart';
 
 const String _mono = 'monospace';
 const Color _cyan = Color(0xFF22D3EE);
@@ -98,7 +99,7 @@ class _ProfileCardPageState extends ConsumerState<_ProfileCardPage> with TickerP
   bool _busy = false;
 
   /// Kilau hologram & putaran garis neon (berulang).
-  late final AnimationController _fx = AnimationController(vsync: this, duration: const Duration(seconds: 6))..repeat();
+  late final AnimationController _fx = AnimationController(vsync: this, duration: const Duration(seconds: 6))..liteRepeat();
 
   /// Efek kartu digambar ulang maks DecorTick.fps (animasi tetap jalan).
   late final Listenable _tick = DecorTick(_fx);

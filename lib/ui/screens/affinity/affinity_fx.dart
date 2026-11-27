@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../data/models/affinity_models.dart';
+import '../../../core/lite_mode.dart';
 
 /// Gaya kanji cap (Noto Serif JP via google_fonts, aman kalau gagal).
 TextStyle affinityKanjiStyle({required Color color, required double size}) {
@@ -122,7 +123,7 @@ class _AffinitySealState extends State<AffinitySeal> with TickerProviderStateMix
     _loop = AnimationController(
       vsync: this,
       duration: Duration(milliseconds: widget.beat ? 2400 : 4000),
-    )..repeat();
+    )..liteRepeat();
     if (rebuild) setState(() {});
   }
 
@@ -366,7 +367,7 @@ class _AffinityEmptySlotState extends State<AffinityEmptySlot> with SingleTicker
     if (affinityReduceMotion(context)) {
       _c.stop();
     } else if (!_c.isAnimating) {
-      _c.repeat();
+      _c.liteRepeat();
     }
   }
 
@@ -442,7 +443,7 @@ class _AffinitySakuraState extends State<AffinitySakura> with SingleTickerProvid
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (!affinityReduceMotion(context) && !_c.isAnimating) _c.repeat();
+    if (!affinityReduceMotion(context) && !_c.isAnimating) _c.liteRepeat();
   }
 
   @override
@@ -520,7 +521,7 @@ class _AffinityRedThreadState extends State<AffinityRedThread> with SingleTicker
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (!affinityReduceMotion(context) && !_c.isAnimating) _c.repeat();
+    if (!affinityReduceMotion(context) && !_c.isAnimating) _c.liteRepeat();
   }
 
   @override
@@ -595,7 +596,7 @@ class _AffinityLeanState extends State<AffinityLean> with SingleTickerProviderSt
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (!affinityReduceMotion(context) && !_c.isAnimating) _c.repeat(reverse: true);
+    if (!affinityReduceMotion(context) && !_c.isAnimating) _c.liteRepeat(reverse: true);
   }
 
   @override
@@ -662,7 +663,7 @@ class _AffinitySheenBarState extends State<AffinitySheenBar> with TickerProvider
       if (!mounted) return;
       _fill.forward();
       Future<void>.delayed(const Duration(milliseconds: 1600), () {
-        if (mounted && !affinityReduceMotion(context)) _sheen.repeat();
+        if (mounted && !affinityReduceMotion(context)) _sheen.liteRepeat();
       });
     });
   }

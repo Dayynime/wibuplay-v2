@@ -7,6 +7,7 @@ import '../../core/theme/app_colors.dart';
 import '../../data/models/xp_models.dart';
 import '../../providers.dart';
 import '../redesign/z_kit.dart';
+import '../../core/lite_mode.dart';
 
 /// Satu tingkat rank. Rank ditentukan otomatis dari level XP.
 class RankTier {
@@ -86,13 +87,13 @@ class _RankEmblemState extends State<RankEmblem> with SingleTickerProviderStateM
   @override
   void initState() {
     super.initState();
-    if (widget.animate) _ctl.repeat();
+    if (widget.animate) _ctl.liteRepeat();
   }
 
   @override
   void didUpdateWidget(covariant RankEmblem old) {
     super.didUpdateWidget(old);
-    if (widget.animate && !_ctl.isAnimating) _ctl.repeat();
+    if (widget.animate && !_ctl.isAnimating) _ctl.liteRepeat();
     if (!widget.animate && _ctl.isAnimating) _ctl.stop();
   }
 

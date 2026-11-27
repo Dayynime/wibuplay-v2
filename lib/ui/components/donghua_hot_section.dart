@@ -7,6 +7,7 @@ import '../../core/decor_tick.dart';
 import '../../core/theme/app_colors.dart';
 import '../../data/models/anichin_models.dart';
 import '../screens/donghua/donghua_widgets.dart';
+import '../../core/lite_mode.dart';
 
 const Color _gold = Color(0xFFFFB300);
 const Color _silver = Color(0xFFCFD8DC);
@@ -46,7 +47,7 @@ class _DonghuaHotSectionState extends State<DonghuaHotSection>
   late final AnimationController _ambient = AnimationController(
     vsync: this,
     duration: const Duration(seconds: 8),
-  )..repeat();
+  )..liteRepeat();
 
   /// Ambient digambar ulang maks DecorTick.fps (animasi tetap jalan).
   late final Animation<double> _ambientTick = DecorAnimation(_ambient);
@@ -59,7 +60,7 @@ class _DonghuaHotSectionState extends State<DonghuaHotSection>
       _ambient.stop();
       _enter.value = 1;
     } else if (!_ambient.isAnimating) {
-      _ambient.repeat();
+      _ambient.liteRepeat();
     }
   }
 

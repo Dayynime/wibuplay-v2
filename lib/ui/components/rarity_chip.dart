@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/decor_tick.dart';
 import '../../data/models/wallpaper_models.dart';
+import '../../core/lite_mode.dart';
 
 /// Chip rarity wallpaper. Rarity biasa = warna polos / gradient statis.
 /// Rarity Limited = silver metalik + garis kilau yang menyapu terus-menerus
@@ -86,7 +87,7 @@ class _ShinyChipState extends State<_ShinyChip> with SingleTickerProviderStateMi
       _c.stop();
       _c.value = 0.5;
     } else if (!_c.isAnimating) {
-      _c.repeat();
+      _c.liteRepeat();
     }
   }
 

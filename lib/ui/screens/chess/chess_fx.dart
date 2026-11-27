@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 import 'chess_board.dart';
+import '../../../core/lite_mode.dart';
 
 // Efek visual layar catur: overlay hasil (menang / kalah / remis), cahaya
 // giliran, dan kedip skak. Semua digambar sendiri (tanpa aset / Lottie).
@@ -70,7 +71,7 @@ class _ChessResultOverlayState extends State<ChessResultOverlay> with TickerProv
       _intro.value = 1;
     } else {
       _intro.forward();
-      _loop.repeat();
+      _loop.liteRepeat();
       _particles.forward();
     }
   }
@@ -531,7 +532,7 @@ class _ChessBoardFrameState extends State<ChessBoardFrame> with SingleTickerProv
   void _sync() {
     final want = widget.myTurn || widget.inCheck;
     if (want && !_pulse.isAnimating) {
-      _pulse.repeat(reverse: true);
+      _pulse.liteRepeat(reverse: true);
     } else if (!want && _pulse.isAnimating) {
       _pulse.stop();
       _pulse.value = 0;

@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/decor_tick.dart';
 import '../../core/screen_seed.dart';
 import '../../providers.dart';
+import '../../core/lite_mode.dart';
 
 /// Role di tabel `user_roles`. developer/admin/moderator = STAFF (punya hak
 /// moderasi). betaTester & security = role badge saja (tanpa hak apa pun,
@@ -344,7 +345,7 @@ class _RoleBadgeChipState extends State<RoleBadgeChip>
       _c = AnimationController(
         vsync: this,
         duration: const Duration(milliseconds: 2200),
-      )..repeat();
+      )..liteRepeat();
     }
   }
 

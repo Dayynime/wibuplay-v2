@@ -17,6 +17,7 @@ import '../../components/game_badges.dart';
 import '../profile/public_profile_screen.dart';
 import '../../glass/glass.dart';
 import '../../components/user_name_text.dart';
+import '../../../core/lite_mode.dart';
 
 /// Halaman Top Support: podium 3 donatur teratas + daftar peringkat + ajakan
 /// donasi lewat halaman donasi Zenime Store (QRIS). Dibuka dari slide TOP SUPPORT di carousel Beranda.
@@ -230,7 +231,7 @@ class _SupportPodiumState extends State<_SupportPodium> with TickerProviderState
   late final AnimationController _loop = AnimationController(
     vsync: this,
     duration: const Duration(seconds: 6),
-  )..repeat();
+  )..liteRepeat();
 
   /// Loop digambar ulang maks DecorTick.fps; animasi masuk tetap penuh.
   late final Animation<double> _loopTick = DecorAnimation(_loop);
@@ -788,7 +789,7 @@ class _DonateCardState extends State<_DonateCard> with SingleTickerProviderState
   late final AnimationController _c = AnimationController(
     vsync: this,
     duration: const Duration(seconds: 3),
-  )..repeat();
+  )..liteRepeat();
 
   /// Digambar ulang maks DecorTick.fps (animasi tetap jalan).
   late final Listenable _tick = DecorTick(_c);

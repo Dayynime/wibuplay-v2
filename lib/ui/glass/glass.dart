@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/lite_mode.dart';
 
 // =============================================================================
 // LIQUID GLASS - satu-satunya tempat gaya kaca di app.
@@ -144,7 +145,8 @@ class GlassSurface extends ConsumerWidget {
     }
 
     final dense = GlassScope.denseOf(context);
-    final sigma = dense ? 0.0 : _sigmaOf(blur);
+    // Mode Ringan: kaca tanpa blur (BackdropFilter berat saat scroll).
+    final sigma = (dense || LiteMode.of(context)) ? 0.0 : _sigmaOf(blur);
     final base = tint ?? Glass.tint;
     final top = Color.alphaBlend(
       Colors.white.withValues(alpha: 0.09 * strength),
@@ -429,25 +431,29 @@ class GlassAppBar extends ConsumerWidget implements PreferredSizeWidget {
     );
     if (!on) return bar;
 
+    final glassBar = DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Glass.tint.withValues(alpha: 0.66),
+            Glass.tint.withValues(alpha: 0.40),
+          ],
+        ),
+        border: Border(
+          bottom: BorderSide(color: Colors.white.withValues(alpha: 0.09)),
+        ),
+      ),
+      child: bar,
+    );
+    // Mode Ringan: tanpa BackdropFilter (blur berat saat konten di-scroll).
+    if (LiteMode.of(context)) return glassBar;
+
     return ClipRect(
       child: BackdropFilter(
         filter: ui.ImageFilter.blur(sigmaX: Glass.blurRegular, sigmaY: Glass.blurRegular),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Glass.tint.withValues(alpha: 0.66),
-                Glass.tint.withValues(alpha: 0.40),
-              ],
-            ),
-            border: Border(
-              bottom: BorderSide(color: Colors.white.withValues(alpha: 0.09)),
-            ),
-          ),
-          child: bar,
-        ),
+        child: glassBar,
       ),
     );
   }

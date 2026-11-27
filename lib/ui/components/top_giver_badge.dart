@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/decor_tick.dart';
 import '../../providers.dart';
+import '../../core/lite_mode.dart';
 
 /// Tag "TOP GIVER" untuk user yang masuk leaderboard Top Giver.
 /// Tidak render apa-apa kalau user tidak ada di leaderboard.
@@ -67,7 +68,7 @@ class _TopGiverChipState extends State<TopGiverChip> with SingleTickerProviderSt
       _c.stop();
       _c.value = 0;
     } else if (!_c.isAnimating) {
-      _c.repeat();
+      _c.liteRepeat();
     }
   }
 

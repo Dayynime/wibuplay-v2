@@ -14,6 +14,7 @@ import 'game_badges.dart';
 import '../screens/profile/public_profile_screen.dart';
 import 'clan_tag_badge.dart';
 import 'user_name_text.dart';
+import '../../core/lite_mode.dart';
 
 // =============================================================================
 // Slide leaderboard di carousel Beranda (Top XP / Top Clan, Top Support,
@@ -153,7 +154,7 @@ class _SlideMotionState extends State<_SlideMotion> with TickerProviderStateMixi
       return;
     }
     if (_enter.status == AnimationStatus.dismissed) _enter.forward();
-    if (!_loop.isAnimating) _loop.repeat();
+    if (!_loop.isAnimating) _loop.liteRepeat();
   }
 
   @override

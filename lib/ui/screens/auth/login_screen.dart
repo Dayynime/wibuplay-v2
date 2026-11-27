@@ -13,6 +13,7 @@ import '../../../data/repository/auth_repository.dart';
 import '../../../providers.dart';
 import 'login_posters.dart';
 import '../../glass/glass.dart';
+import '../../../core/lite_mode.dart';
 
 enum _Mode { signIn, signUp }
 
@@ -43,13 +44,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   // Loop panjang (poster + aurora), intro sekali jalan, kilau tombol Google.
   late final AnimationController _loop =
       AnimationController(vsync: this, duration: const Duration(seconds: 80))
-        ..repeat();
+        ..liteRepeat();
   late final AnimationController _intro =
       AnimationController(vsync: this, duration: const Duration(milliseconds: 1500))
         ..forward();
   late final AnimationController _shine =
       AnimationController(vsync: this, duration: const Duration(milliseconds: 3600))
-        ..repeat();
+        ..liteRepeat();
 
   late final Animation<double> _wallIn = _iv(0.0, 0.55, Curves.easeOut);
   late final Animation<double> _logoIn = _iv(0.12, 0.5);

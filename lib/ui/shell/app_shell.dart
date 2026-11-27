@@ -13,6 +13,7 @@ import '../screens/home/home_screen.dart';
 import '../screens/profile/profile_screen.dart';
 import '../screens/schedule/schedule_screen.dart';
 import '../glass/glass.dart';
+import '../../core/lite_mode.dart';
 
 /// Port AppNavigation.kt: 5 tab + bottom bar melayang.
 /// Beranda, Jelajah, Jadwal, Menu (Donghua/Komik/Gacha), Profil; Detail dan Player dibuka lewat
@@ -144,7 +145,11 @@ class _AppShellState extends ConsumerState<AppShell> {
           Positioned(
             right: 40,
             bottom: MediaQuery.paddingOf(context).bottom + 73,
-            child: const ZenimeMascot(),
+            // Mode Ringan: maskot tidak ditampilkan sama sekali.
+            child: ValueListenableBuilder<bool>(
+              valueListenable: LiteMode.notifier,
+              builder: (context, lite, _) => lite ? const SizedBox.shrink() : const ZenimeMascot(),
+            ),
           ),
         ],
       ),

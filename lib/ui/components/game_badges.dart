@@ -5,6 +5,7 @@ import '../../core/decor_tick.dart';
 import '../../core/image_cache.dart';
 import '../../core/theme/app_colors.dart';
 import 'avatar_frame.dart';
+import '../../core/lite_mode.dart';
 
 /// Badge "gamer rank" yang dipakai bersama di Chat Global, profil, dan
 /// Leaderboard XP supaya tampilannya konsisten (port GameBadges.kt).
@@ -138,7 +139,7 @@ class _ClanRainbowBadgeState extends State<ClanRainbowBadge>
   late final AnimationController _c = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 23400),
-  )..repeat();
+  )..liteRepeat();
 
   /// Digambar ulang maks DecorTick.fps (animasi tetap jalan).
   late final Listenable _tick = DecorTick(_c);

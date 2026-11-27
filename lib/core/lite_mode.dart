@@ -4,15 +4,20 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Mode Ringan untuk HP RAM kecil.
+/// Mode Ringan untuk HP RAM kecil / yang terasa lag.
 ///
-/// Yang diubah (animasi badge, border avatar, wallpaper TETAP jalan):
+/// Yang diubah saat aktif:
 ///  - cache gambar di memori dikecilkan (50 MB / 250 gambar, normal 100 MB / 1000);
 ///  - resolusi decode gambar dibatasi lebih rendah (maks 720 px, normal 1080 px);
-///  - shimmer loading diganti placeholder polos (tidak animasi).
+///  - shimmer loading diganti placeholder polos (tidak animasi);
+///  - semua animasi berulang (badge, dekorasi nama, border, banner, papan
+///    jadwal, dll) berhenti di satu frame diam lewat [LiteRepeat.liteRepeat];
+///  - efek blur kaca dimatikan, maskot disembunyikan, ticker chat di Beranda diam;
+///  - wallpaper di bubble chat dan latar chat tidak ditampilkan.
 ///
 /// Otomatis nyala kalau RAM HP <= 3 GB. User bisa memaksa nyala/mati di
 /// Pengaturan; pilihan itu disimpan dan mengalahkan deteksi otomatis.
+/// Animasi yang sudah berjalan baru ikut berubah setelah app dibuka ulang.
 class LiteMode {
   LiteMode._();
 
@@ -27,6 +32,13 @@ class LiteMode {
   static final ValueNotifier<bool> notifier = ValueNotifier<bool>(false);
 
   static bool get enabled => _override ?? _auto;
+
+  /// Sama dengan [enabled], tapi ikut membangun ulang widget saat Mode Ringan
+  /// diubah (lewat MediaQuery.disableAnimations yang dipasang di main.dart).
+  static bool of(BuildContext context) {
+    MediaQuery.maybeDisableAnimationsOf(context);
+    return enabled;
+  }
 
   /// true = mengikuti deteksi otomatis (user belum memilih sendiri).
   static bool get isAuto => _override == null;
@@ -92,5 +104,18 @@ class LiteMode {
       }
     } catch (_) {}
     return 0;
+  }
+}
+
+/// Pengganti `AnimationController.repeat()` untuk animasi dekoratif yang
+/// berulang terus. Saat Mode Ringan aktif, animasi tidak dijalankan dan
+/// controller diam di satu frame (tidak ada repaint tiap frame).
+extension LiteRepeat on AnimationController {
+  TickerFuture liteRepeat({double? min, double? max, bool reverse = false, Duration? period}) {
+    if (LiteMode.enabled) {
+      stop();
+      return TickerFuture.complete();
+    }
+    return repeat(min: min, max: max, reverse: reverse, period: period);
   }
 }

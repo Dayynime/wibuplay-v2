@@ -9,6 +9,7 @@ import '../../core/theme/app_colors.dart';
 import '../components/game_badges.dart';
 import '../components/user_name_text.dart';
 import 'z_kit.dart';
+import '../../core/lite_mode.dart';
 
 // =============================================================================
 // Kit tampilan papan peringkat (Leaderboard XP & Top Giver): podium 3 kartu
@@ -273,7 +274,7 @@ class _ZPodiumState extends State<ZPodium> with TickerProviderStateMixin {
       _loop.stop();
     } else {
       if (_intro.isDismissed) _intro.forward();
-      if (!_loop.isAnimating) _loop.repeat();
+      if (!_loop.isAnimating) _loop.liteRepeat();
     }
   }
 

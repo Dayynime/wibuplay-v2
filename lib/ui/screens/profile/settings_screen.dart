@@ -341,14 +341,14 @@ class _ProfileSettingsScreenState extends ConsumerState<ProfileSettingsScreen>
                   icon: Icons.speed_rounded,
                   title: 'Mode Ringan',
                   subtitle: (lite
-                          ? 'Aktif: hemat memori untuk HP kentang'
+                          ? 'Aktif: animasi, efek blur & wallpaper chat dimatikan'
                           : 'Mati') +
                       (LiteMode.isAuto ? ' (otomatis$ramText)' : ''),
                   trailing: _AnimatedToggle(
                     value: lite,
-                    onChanged: (v) => LiteMode.set(v),
+                    onChanged: (v) => _setLite(context, v),
                   ),
-                  onTap: () => LiteMode.set(!lite),
+                  onTap: () => _setLite(context, !lite),
                 );
               },
             ),
@@ -940,7 +940,7 @@ class _PulseDotState extends State<_PulseDot> with SingleTickerProviderStateMixi
   late final AnimationController _c = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 1400),
-  )..repeat();
+  )..liteRepeat();
 
   /// Digambar ulang maks DecorTick.fps (animasi tetap jalan).
   late final Listenable _tick = DecorTick(_c);
@@ -1605,4 +1605,18 @@ class _AppFooter extends StatelessWidget {
       ],
     );
   }
+}
+
+
+/// Ubah Mode Ringan + beri tahu bahwa sebagian animasi baru berubah penuh
+/// setelah app dibuka ulang.
+void _setLite(BuildContext context, bool value) {
+  LiteMode.set(value);
+  ScaffoldMessenger.maybeOf(context)
+    ?..hideCurrentSnackBar()
+    ..showSnackBar(SnackBar(
+      content: Text(value
+          ? 'Mode Ringan aktif. Buka ulang aplikasi agar semua animasi ikut berhenti.'
+          : 'Mode Ringan mati. Buka ulang aplikasi agar semua animasi kembali.'),
+    ));
 }

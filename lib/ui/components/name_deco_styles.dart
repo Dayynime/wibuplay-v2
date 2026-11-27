@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/decor_tick.dart';
+import '../../core/lite_mode.dart';
 
 /// Dekorasi nama futuristik (dibeli pakai ZCoin di Decor > Dekorasi Nama).
 ///
@@ -156,7 +157,7 @@ class _NameDecoTextState extends State<NameDecoText> with SingleTickerProviderSt
   void _syncTicker() {
     final run = widget.animate && !MediaQuery.disableAnimationsOf(context);
     if (run && !_c.isAnimating) {
-      _c.repeat();
+      _c.liteRepeat();
     } else if (!run && _c.isAnimating) {
       _c.stop();
     }

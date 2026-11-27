@@ -140,15 +140,26 @@ class ZenimeApp extends ConsumerWidget {
       navigatorKey: appNavigatorKey,
       navigatorObservers: [routeObserver],
       // Mini player ngambang di atas semua layar (di luar Navigator).
-      builder: (context, child) => Stack(
-        children: [
-          Positioned.fill(child: child ?? const SizedBox.shrink()),
-          const MiniPlayerOverlay(),
-          // Paling atas: menutup semua halaman (juga yang di-push) saat maintenance.
-          const MaintenanceOverlay(),
-          // Muncul real-time saat admin ban user yang lagi buka app.
-          const BanOverlay(),
-        ],
+      // Mode Ringan = "kurangi animasi" untuk seluruh app: semua widget yang
+      // membaca MediaQuery.disableAnimations langsung berhenti beranimasi.
+      builder: (context, child) => ValueListenableBuilder<bool>(
+        valueListenable: LiteMode.notifier,
+        builder: (context, lite, _) {
+          final mq = MediaQuery.of(context);
+          return MediaQuery(
+            data: lite ? mq.copyWith(disableAnimations: true) : mq,
+            child: Stack(
+              children: [
+                Positioned.fill(child: child ?? const SizedBox.shrink()),
+                const MiniPlayerOverlay(),
+                // Paling atas: menutup semua halaman (juga yang di-push) saat maintenance.
+                const MaintenanceOverlay(),
+                // Muncul real-time saat admin ban user yang lagi buka app.
+                const BanOverlay(),
+              ],
+            ),
+          );
+        },
       ),
       home: IntegrityGate(
         onClear: _initBackend,

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/decor_tick.dart';
 import '../../data/models/xp_models.dart';
+import '../../core/lite_mode.dart';
 
 /// Badge level beranimasi dengan sistem tier: warna & efek makin "mewah"
 /// seiring naik level.
@@ -161,7 +162,7 @@ class _LevelStyledBadgeState extends State<LevelStyledBadge> with TickerProvider
       _c.value = 0.3;
       _intro.value = 1;
     } else {
-      if (!_c.isAnimating) _c.repeat();
+      if (!_c.isAnimating) _c.liteRepeat();
       if (_intro.value == 0) _intro.forward();
     }
   }
@@ -172,7 +173,7 @@ class _LevelStyledBadgeState extends State<LevelStyledBadge> with TickerProvider
     final tierChanged = LevelTier.of(old.level) != LevelTier.of(widget.level);
     if (old.style != widget.style) _c.duration = widget.style.period;
     if ((old.style != widget.style || tierChanged) && !_reduceMotion) {
-      _c.repeat();
+      _c.liteRepeat();
       _intro.forward(from: 0);
     }
   }

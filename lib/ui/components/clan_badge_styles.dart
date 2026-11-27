@@ -4,6 +4,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 
 import '../../core/decor_tick.dart';
+import '../../core/lite_mode.dart';
 
 /// Koleksi gaya badge tag clan beranimasi (pengganti / alternatif
 /// [ClanRainbowBadge] & [ClanNameTag]).
@@ -99,7 +100,7 @@ class _ClanStyledBadgeState extends State<ClanStyledBadge>
       _c.value = 0.3;
       _intro.value = 1;
     } else {
-      if (!_c.isAnimating) _c.repeat();
+      if (!_c.isAnimating) _c.liteRepeat();
       if (_intro.value == 0) _intro.forward();
     }
   }
@@ -110,7 +111,7 @@ class _ClanStyledBadgeState extends State<ClanStyledBadge>
     if (old.style != widget.style) {
       _c.duration = widget.style.period;
       if (!_reduceMotion) {
-        _c.repeat();
+        _c.liteRepeat();
         _intro.forward(from: 0);
       }
     }

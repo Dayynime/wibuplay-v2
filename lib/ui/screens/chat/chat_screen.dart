@@ -759,6 +759,8 @@ class ChatMessageBubble extends StatelessWidget {
     final m = message;
     // Semua pesan (teks, stiker, kartu hadiah/giveaway, undangan game) dari
     // user yang memasang wallpaper memakai bubble berlatar wallpaper.
+    // Mode Ringan: bubble polos, wallpaper tidak dimuat sama sekali.
+    if (LiteMode.of(context)) return _build(context, null);
     final cache = ChatWallpaperCache.instance;
     return ListenableBuilder(
       listenable: cache,
@@ -1496,7 +1498,8 @@ class _ChatBackground extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final u = url;
-    if (u == null) return child;
+    // Mode Ringan: latar chat tanpa wallpaper.
+    if (u == null || LiteMode.of(context)) return child;
     return Stack(
       fit: StackFit.expand,
       children: [

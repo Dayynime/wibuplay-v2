@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../providers.dart';
+import '../../core/lite_mode.dart';
 
 /// Suasana maskot.
 enum MascotMood { idle, sleep, wave, shock }
@@ -119,7 +120,7 @@ class _ZenimeMascotState extends ConsumerState<ZenimeMascot>
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         if (needLoop && !_loop.isAnimating) {
-          _loop.repeat();
+          _loop.liteRepeat();
         } else if (!needLoop && _loop.isAnimating) {
           _loop.stop();
         }

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/lite_mode.dart';
 
 /// Splash beranimasi gaya "tinta" (terinspirasi splash Wibuku), sekali jalan
 /// ~2,2 detik:
@@ -58,7 +59,7 @@ class _ZenimeSplashState extends State<ZenimeSplash> with TickerProviderStateMix
     }).catchError((_) {});
     _c.forward().whenComplete(() {
       if (!mounted) return;
-      _idle.repeat(reverse: true);
+      _idle.liteRepeat(reverse: true);
       widget.onFinished?.call();
     });
   }

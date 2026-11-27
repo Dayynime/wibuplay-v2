@@ -7,6 +7,7 @@ import '../../../core/remote_config_manager.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../app_routes.dart';
 import '../../components/mini_player.dart';
+import '../../../core/lite_mode.dart';
 
 /// Pembungkus di MaterialApp.builder (di ATAS Navigator): begitu
 /// `maintenance_mode` aktif, [MaintenanceScreen] menutup SELURUH app, termasuk
@@ -92,17 +93,17 @@ class MaintenanceScreen extends StatefulWidget {
 class _MaintenanceScreenState extends State<MaintenanceScreen>
     with TickerProviderStateMixin {
   late final AnimationController _ring =
-      AnimationController(vsync: this, duration: const Duration(seconds: 7))..repeat();
+      AnimationController(vsync: this, duration: const Duration(seconds: 7))..liteRepeat();
   late final AnimationController _orbit =
-      AnimationController(vsync: this, duration: const Duration(seconds: 3))..repeat();
+      AnimationController(vsync: this, duration: const Duration(seconds: 3))..liteRepeat();
   late final AnimationController _pulse = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 1300),
-  )..repeat(reverse: true);
+  )..liteRepeat(reverse: true);
   late final AnimationController _blink = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 650),
-  )..repeat(reverse: true);
+  )..liteRepeat(reverse: true);
 
   late int _secondsLeft = widget.autoRetrySeconds;
   Timer? _timer;

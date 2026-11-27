@@ -15,6 +15,7 @@ import '../../components/friend_avatar.dart';
 import '../../glass/glass.dart';
 import 'chess_board.dart';
 import 'chess_game_screen.dart';
+import '../../../core/lite_mode.dart';
 
 /// Lobby catur: tantangan masuk, yang menunggu lawan, permainan berjalan,
 /// dan riwayat. Dari sini user menantang teman, membuat room berkode, atau
@@ -1199,7 +1200,7 @@ class _LiveDot extends StatefulWidget {
 
 class _LiveDotState extends State<_LiveDot> with SingleTickerProviderStateMixin {
   late final AnimationController _c =
-      AnimationController(vsync: this, duration: const Duration(milliseconds: 1100))..repeat(reverse: true);
+      AnimationController(vsync: this, duration: const Duration(milliseconds: 1100))..liteRepeat(reverse: true);
 
   @override
   void dispose() {

@@ -7,6 +7,7 @@ import '../../../data/models/xp_models.dart';
 import '../../../providers.dart';
 import '../../app_routes.dart';
 import '../xp/xp_leaderboard_screen.dart';
+import '../../../core/lite_mode.dart';
 
 /// Progress bar XP ke level berikutnya di Profil + angka XP. Tanpa card,
 /// tanpa border radius. Fill beranimasi tiap progress berubah + kilau yang
@@ -25,7 +26,7 @@ class _MyXpCardState extends ConsumerState<MyXpCard>
   late final AnimationController _shine = AnimationController(
     vsync: this,
     duration: const Duration(milliseconds: 2200),
-  )..repeat();
+  )..liteRepeat();
 
   /// Kilau digambar ulang maks DecorTick.fps (animasi tetap jalan).
   late final Listenable _tick = DecorTick(_shine);

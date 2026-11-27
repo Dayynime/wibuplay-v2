@@ -26,7 +26,7 @@ class _ShimmerBoxState extends State<ShimmerBox> with SingleTickerProviderStateM
   AnimationController get _c => _ctrl ??= AnimationController(
         vsync: this,
         duration: const Duration(milliseconds: 850),
-      )..repeat();
+      )..liteRepeat();
 
   @override
   void dispose() {

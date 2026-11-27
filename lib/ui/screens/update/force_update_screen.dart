@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import '../../../core/apk_downloader.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../glass/glass.dart';
+import '../../../core/lite_mode.dart';
 
 /// Layar SATU-SATUNYA yang tampil kalau ada release GitHub lebih baru dari
 /// versi app yang berjalan (lihat UpdateGate). Tidak ada tombol back/skip.
@@ -45,10 +46,10 @@ class _ForceUpdateScreenState extends State<ForceUpdateScreen>
       AnimationController(vsync: this, duration: const Duration(milliseconds: 1500))
         ..forward();
   late final AnimationController _loop =
-      AnimationController(vsync: this, duration: const Duration(seconds: 24))..repeat();
+      AnimationController(vsync: this, duration: const Duration(seconds: 24))..liteRepeat();
   late final AnimationController _shine =
       AnimationController(vsync: this, duration: const Duration(milliseconds: 3200))
-        ..repeat();
+        ..liteRepeat();
 
   Animation<double> _iv(double a, double b, [Curve c = Curves.easeOutCubic]) =>
       CurvedAnimation(parent: _intro, curve: Interval(a, b, curve: c));
@@ -414,7 +415,7 @@ class _Eyebrow extends StatefulWidget {
 class _EyebrowState extends State<_Eyebrow> with SingleTickerProviderStateMixin {
   late final AnimationController _c =
       AnimationController(vsync: this, duration: const Duration(milliseconds: 1400))
-        ..repeat(reverse: true);
+        ..liteRepeat(reverse: true);
 
   @override
   void dispose() {
